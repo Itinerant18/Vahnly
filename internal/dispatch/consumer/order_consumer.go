@@ -140,61 +140,70 @@ func (c *OrderCreatedConsumer) processBatchLoop(ctx context.Context) {
 }
 
 func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders []domain.OrderCreatedPayload) {
-	// Constrain entire matching computation to preserve SLA bounds [cite: 2]
-	timeoutCtx, cancel := context.WithTimeout(ctx, 450*time.Millisecond)
-	defer cancel()
+	var wg sync.WaitGroup
 
 	for _, order := range orders {
-		// 1. Spatial Reduction Phase: Fetch candidates via O(1) Redis Cluster lookups [cite: 12, 23]
-		candidates, err := c.spatialScanner.ScanNearbyDrivers(timeoutCtx, order.CityPrefix, order.PickupH3Cell)
-		if err != nil {
-			log.Printf("Spatial reduction mapping failed for order %s: %v", order.OrderID, err)
-			continue
-		}
+		wg.Add(1)
+		go func(o domain.OrderCreatedPayload) {
+			defer wg.Done()
 
-		if len(candidates) == 0 {
-			log.Printf("Marketplace Starvation: No available drivers near cell %s", order.PickupH3Cell)
-			continue
-		}
+			// Allocate its own dedicated short-lived context to isolate network overhead
+			orderCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+			defer cancel()
 
-		// 2. Select Algorithm via Strategy Pattern based on runtime profiles [cite: 70, 71]
-		var optimalMatch *matcher.MatchResult
-		var matchErr error
-
-		switch c.currentAlgo {
-		case "HUNGARIAN": // Scaled approach for 500-5,000 concurrent metrics [cite: 69]
-			optimalMatch, matchErr = matcher.EvaluateHungarianOptimization(timeoutCtx, order, candidates)
-		case "GREEDY":    // Default deployment configuration [cite: 69]
-			fallthrough
-		default:
-			optimalMatch, matchErr = matcher.EvaluateGreedyMatch(timeoutCtx, order, candidates)
-		}
-
-		if matchErr != nil {
-			log.Printf("Combinatorial computation error on order %s: %v", order.OrderID, matchErr)
-			continue
-		}
-
-		// 3. Persistent Transaction Verification & Mutex Commitment
-		err = c.commitAssignmentTransaction(timeoutCtx, optimalMatch)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				log.Printf("Idempotency Intercept: Order %s already mutated by concurrent worker", order.OrderID)
-			} else {
-				log.Printf("Critical database write failure: %v", err)
+			// 1. Spatial Reduction Phase: Fetch candidates via O(1) Redis Cluster lookups [cite: 12, 23]
+			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
+			if err != nil {
+				log.Printf("Spatial reduction mapping failed for order %s: %v", o.OrderID, err)
+				return
 			}
-			continue
-		}
 
-		// 4. Downstream Notification & Downstream Event Emission
-		if err := c.emitAssignedEvent(timeoutCtx, optimalMatch); err != nil {
-			log.Printf("Critical downstream event streaming partition lost: %v", err)
-			continue
-		}
+			if len(candidates) == 0 {
+				log.Printf("Marketplace Starvation: No available drivers near cell %s", o.PickupH3Cell)
+				return
+			}
 
-		// 5. Explicitly acknowledge processing completion back to Kafka log
-		_ = c.kafkaReader.CommitMessages(ctx, order.KafkaMessageContext)
+			// 2. Select Algorithm via Strategy Pattern based on runtime profiles [cite: 70, 71]
+			var optimalMatch *matcher.MatchResult
+			var matchErr error
+
+			switch c.currentAlgo {
+			case "HUNGARIAN": // Scaled approach for 500-5,000 concurrent metrics [cite: 69]
+				optimalMatch, matchErr = matcher.EvaluateHungarianOptimization(orderCtx, o, candidates)
+			case "GREEDY":    // Default deployment configuration [cite: 69]
+				fallthrough
+			default:
+				optimalMatch, matchErr = matcher.EvaluateGreedyMatch(orderCtx, o, candidates)
+			}
+
+			if matchErr != nil {
+				log.Printf("Combinatorial computation error on order %s: %v", o.OrderID, matchErr)
+				return
+			}
+
+			// 3. Persistent Transaction Verification & Mutex Commitment
+			err = c.commitAssignmentTransaction(orderCtx, optimalMatch)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					log.Printf("Idempotency Intercept: Order %s already mutated by concurrent worker", o.OrderID)
+				} else {
+					log.Printf("Critical database write failure: %v", err)
+				}
+				return
+			}
+
+			// 4. Downstream Notification & Downstream Event Emission
+			if err := c.emitAssignedEvent(orderCtx, optimalMatch); err != nil {
+				log.Printf("Critical downstream event streaming partition lost: %v", err)
+				return
+			}
+
+			// 5. Explicitly acknowledge processing completion back to Kafka log
+			_ = c.kafkaReader.CommitMessages(ctx, o.KafkaMessageContext)
+		}(order)
 	}
+
+	wg.Wait()
 }
 
 func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, match *matcher.MatchResult) error {

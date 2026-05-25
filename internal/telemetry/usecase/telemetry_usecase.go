@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/uber/h3-go/v3" // Official Uber H3 spatial index library [cite: 12, 107]
@@ -25,7 +26,10 @@ func NewTelemetryUseCase(rr domain.RedisRepository, kp domain.KafkaProducer) dom
 
 func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domain.DriverLocation) error {
 	// 1. Compute H3 Resolution 8 Index (~0.7 km² per cell) [cite: 25]
-	centerCoord := h3.GeoCoord{Latitude: loc.Latitude, Longitude: loc.Longitude}
+	// H3 library expects coordinates in radians, not decimal degrees.
+	latRad := loc.Latitude * (math.Pi / 180.0)
+	lngRad := loc.Longitude * (math.Pi / 180.0)
+	centerCoord := h3.GeoCoord{Latitude: latRad, Longitude: lngRad}
 	resolution8Cell := h3.FromGeo(centerCoord, 8)
 	
 	loc.H3Cell = h3.ToString(resolution8Cell)

@@ -7,14 +7,15 @@ import (
 
 // DriverLocation represents the internal normalized telemetry payload
 type DriverLocation struct {
-	DriverID   string    `json:"driver_id"`
-	CityPrefix string    `json:"city_prefix"`
-	Latitude   float64   `json:"latitude"`
-	Longitude  float64   `json:"longitude"`
-	Bearing    float32   `json:"bearing"`
-	SpeedKMS   float32   `json:"speed_kms"`
-	Timestamp  time.Time `json:"timestamp"`
-	H3Cell     string    `json:"h3_cell"`
+	DriverID       string    `json:"driver_id"`
+	CityPrefix     string    `json:"city_prefix"`
+	Latitude       float64   `json:"latitude"`
+	Longitude      float64   `json:"longitude"`
+	Bearing        float32   `json:"bearing"`
+	SpeedKMS       float32   `json:"speed_kms"`
+	Timestamp      time.Time `json:"timestamp"`
+	H3Cell         string    `json:"h3_cell"`
+	PreviousH3Cell string    `json:"previous_h3_cell"`
 }
 
 // RedisRepository defines memory cache transactions for active driver state
