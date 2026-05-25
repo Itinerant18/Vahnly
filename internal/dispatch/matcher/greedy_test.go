@@ -2,6 +2,7 @@ package matcher_test
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 
@@ -9,22 +10,36 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 )
 
+type mockRoutingService struct {
+	computeFunc func(ctx context.Context, sourceID, targetID int64) (float64, error)
+}
+
+func (m *mockRoutingService) ComputeShortestPathETA(ctx context.Context, sourceID, targetID int64) (float64, error) {
+	if m.computeFunc != nil {
+		return m.computeFunc(ctx, sourceID, targetID)
+	}
+	// Return a predictable travel time based on distance (e.g. sourceID/10)
+	return float64(sourceID) / 10.0, nil
+}
+
 func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	ctx := context.Background()
 
 	order := domain.OrderCreatedPayload{
-		OrderID:       "order-1",
-		CityPrefix:    "NYC",
-		PickupH3Cell:  "882a100d2dfffff",
-		PickupLat:     40.7128,
-		PickupLng:     -74.0060,
-		BaseFarePaise: 500,
+		OrderID:         "order-1",
+		CityPrefix:      "NYC",
+		PickupH3Cell:    "882a100d2dfffff",
+		PickupLat:       40.7128,
+		PickupLng:       -74.0060,
+		PickupOSMNodeID: 9999,
+		BaseFarePaise:   500,
 	}
 
 	// Cost = (0.45 * ETA) + (0.25 * (1 - AR)) + (0.15 * CP) + (0.10 * SurgePenalty) + (0.05 * (1 / (Idle + 1)))
 	candidates := []matcher.CandidateDriver{
 		{
 			DriverID:                "driver-far-high-ar",
+			OSMNodeID:               100, // ETA will be 100/10 = 10.0s
 			DistanceMeters:          100.0,
 			AcceptanceRate:          0.95,
 			CancellationProbability: 0.02,
@@ -33,6 +48,7 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 		},
 		{
 			DriverID:                "driver-close-no-surge",
+			OSMNodeID:               10, // ETA will be 10/10 = 1.0s
 			DistanceMeters:          10.0,
 			AcceptanceRate:          0.90,
 			CancellationProbability: 0.01,
@@ -41,6 +57,7 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 		},
 		{
 			DriverID:                "driver-closest-high-ar",
+			OSMNodeID:               10, // ETA will be 10/10 = 1.0s
 			DistanceMeters:          10.0,
 			AcceptanceRate:          0.90,
 			CancellationProbability: 0.01,
@@ -49,7 +66,9 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 		},
 	}
 
-	res, err := matcher.EvaluateGreedyMatch(ctx, order, candidates)
+	mockSvc := &mockRoutingService{}
+
+	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, mockSvc)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -64,10 +83,10 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	}
 
 	// Calculate expected score precisely as the algorithm does:
-	// estimatedEtaSeconds := 10.0 / 11.1
+	// estimatedEtaSeconds := 1.0 (from mockRoutingService)
 	// surgePenalty := 0.0 (inside surge zone)
-	// costScore := (0.45 * (10.0 / 11.1)) + (0.25 * float64(1.0 - 0.90)) + (0.15 * float64(0.01)) + (0.10 * 0.0) + (0.05 * (1.0 / 11.0))
-	etaVal := 10.0 / 11.1
+	// costScore := (0.45 * 1.0) + (0.25 * float64(1.0 - 0.90)) + (0.15 * float64(0.01)) + (0.10 * 0.0) + (0.05 * (1.0 / 11.0))
+	etaVal := 1.0
 	arVal := float64(1.0 - float32(0.90))
 	cpVal := float64(float32(0.01))
 	surgeVal := 0.0
@@ -83,9 +102,54 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 func TestEvaluateGreedyMatch_Starvation(t *testing.T) {
 	ctx := context.Background()
 	order := domain.OrderCreatedPayload{OrderID: "order-empty"}
+	mockSvc := &mockRoutingService{}
 
-	_, err := matcher.EvaluateGreedyMatch(ctx, order, nil)
+	_, err := matcher.EvaluateGreedyMatch(ctx, order, 9999, nil, mockSvc)
 	if err == nil {
 		t.Fatal("Expected starvation error, got nil")
+	}
+}
+
+func TestEvaluateGreedyMatch_CircuitBreakerFallback(t *testing.T) {
+	ctx := context.Background()
+
+	order := domain.OrderCreatedPayload{
+		OrderID:         "order-cb",
+		CityPrefix:      "NYC",
+		PickupH3Cell:    "882a100d2dfffff",
+		PickupLat:       40.7128,
+		PickupLng:       -74.0060,
+		PickupOSMNodeID: 9999,
+		BaseFarePaise:   500,
+	}
+
+	candidates := []matcher.CandidateDriver{
+		{
+			DriverID:                "driver-fallback",
+			OSMNodeID:               100,
+			DistanceMeters:          111.0, // fallback ETA = 111.0 / 11.1 = 10.0s
+			AcceptanceRate:          0.90,
+			CancellationProbability: 0.00,
+			IsInsideSurgeZone:       true,
+			IdleSeconds:             9.0,
+		},
+	}
+
+	// Mock routing service returns error to trigger circuit breaker
+	failingSvc := &mockRoutingService{
+		computeFunc: func(ctx context.Context, sourceID, targetID int64) (float64, error) {
+			return 0, fmt.Errorf("network lookup failure")
+		},
+	}
+
+	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, failingSvc)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify fallback ETA is used: 111.0 / 11.1 = 10s
+	expectedETA := 10
+	if res.EstimatedEtaSeconds != expectedETA {
+		t.Errorf("Expected fallback ETA %d, got %d", expectedETA, res.EstimatedEtaSeconds)
 	}
 }

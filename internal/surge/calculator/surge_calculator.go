@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -68,56 +69,64 @@ func (e *SurgeCalculatorEngine) evaluateCitySurgeGrid(ctx context.Context, cityP
 
 	nowEpoch := time.Now().Unix()
 
+	var wg sync.WaitGroup
 	for _, cell := range cells {
-		// Build slot-aligned Redis keys matching Job 1 and Job 2 telemetry outputs
-		supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, cell)
-		demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, cell)
+		wg.Add(1)
+		go func(c string) {
+			defer wg.Done()
 
-		// 1. Evict stale window points and read current metric cardinality in parallel via multi-command pipeline
-		pipe := e.clusterClient.Pipeline()
-		pipe.ZRemRangeByScore(epochCtx, supplyKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
-		pipe.ZRemRangeByScore(epochCtx, demandKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
-		supplyCountCmd := pipe.ZCard(epochCtx, supplyKey)
-		demandCountCmd := pipe.ZCard(epochCtx, demandKey)
+			// Build slot-aligned Redis keys matching Job 1 and Job 2 telemetry outputs
+			supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, c)
+			demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, c)
 
-		_, err := pipe.Exec(epochCtx)
-		if err != nil {
-			log.Printf("[SURGE_CALC_ERROR] Redis metric collection failed on cell %s: %v", cell, err)
-			continue
-		}
+			// 1. Evict stale window points and read current metric cardinality in parallel via multi-command pipeline
+			pipe := e.clusterClient.Pipeline()
+			pipe.ZRemRangeByScore(epochCtx, supplyKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
+			pipe.ZRemRangeByScore(epochCtx, demandKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
+			supplyCountCmd := pipe.ZCard(epochCtx, supplyKey)
+			demandCountCmd := pipe.ZCard(epochCtx, demandKey)
 
-		supplyCount := supplyCountCmd.Val()
-		demandRate := demandCountCmd.Val()
-
-		// 2. Apply Enterprise Surge Multiplier Matrix Formula
-		multiplier := 1.0
-
-		if demandRate > 0 {
-			// Defend against division-by-zero bounds when active supply matches 0
-			effectiveSupply := float64(supplyCount)
-			if effectiveSupply == 0 {
-				effectiveSupply = 0.5 // Standard math friction stabilizer
+			_, err := pipe.Exec(epochCtx)
+			if err != nil {
+				log.Printf("[SURGE_CALC_ERROR] Redis metric collection failed on cell %s: %v", c, err)
+				return
 			}
 
-			// Formula calculation: max(1.0, demand_rate / (supply_count * 0.7))
-			computedMultiplier := float64(demandRate) / (effectiveSupply * 0.7)
-			
-			// Enforce lower bound (1.0) and our maximum safety multiplier cap
-			multiplier = math.Max(1.0, computedMultiplier)
-			if multiplier > e.maxSurgeCap {
-				multiplier = e.maxSurgeCap
+			supplyCount := supplyCountCmd.Val()
+			demandRate := demandCountCmd.Val()
+
+			// 2. Apply Enterprise Surge Multiplier Matrix Formula
+			multiplier := 1.0
+
+			if demandRate > 0 {
+				// Defend against division-by-zero bounds when active supply matches 0
+				effectiveSupply := float64(supplyCount)
+				if effectiveSupply == 0 {
+					effectiveSupply = 0.5 // Standard math friction stabilizer
+				}
+
+				// Formula calculation: max(1.0, demand_rate / (supply_count * 0.7))
+				computedMultiplier := float64(demandRate) / (effectiveSupply * 0.7)
+				
+				// Enforce lower bound (1.0) and our maximum safety multiplier cap
+				multiplier = math.Max(1.0, computedMultiplier)
+				if multiplier > e.maxSurgeCap {
+					multiplier = e.maxSurgeCap
+				}
 			}
-		}
 
-		// Round metric float values to 2 decimal points for clean API delivery mapping
-		multiplier = math.Round(multiplier*100) / 100
+			// Round metric float values to 2 decimal points for clean API delivery mapping
+			multiplier = math.Round(multiplier*100) / 100
 
-		// 3. Emit pricing update token down the Kafka Backbone if surge state presents adjustments
-		err = e.publishSurgeUpdate(epochCtx, cityPrefix, cell, multiplier, demandRate, supplyCount)
-		if err != nil {
-			log.Printf("[SURGE_PUBLISH_ERROR] Stream dispatch failed for zone %s: %v", cell, err)
-		}
+			// 3. Emit pricing update token down the Kafka Backbone if surge state presents adjustments
+			err = e.publishSurgeUpdate(epochCtx, cityPrefix, c, multiplier, demandRate, supplyCount)
+			if err != nil {
+				log.Printf("[SURGE_PUBLISH_ERROR] Stream dispatch failed for zone %s: %v", c, err)
+			}
+		}(cell)
 	}
+
+	wg.Wait()
 }
 
 func (e *SurgeCalculatorEngine) publishSurgeUpdate(ctx context.Context, city, cell string, multiplier float64, demand, supply int64) error {

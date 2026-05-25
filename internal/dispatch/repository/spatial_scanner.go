@@ -54,6 +54,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			// Populate all required scoring components to eliminate matrix algorithm penalty biases
 			candidates = append(candidates, matcher.CandidateDriver{
 				DriverID:                driverID,
+				OSMNodeID:               1001,  // Seeded baseline placeholder OSM Node ID for Phase 2
 				AcceptanceRate:          0.92,  // Seeded baseline placeholder metrics
 				CancellationProbability: 0.02,  // Populate to prevent zero-value objective distortion
 				IsInsideSurgeZone:       true,  
