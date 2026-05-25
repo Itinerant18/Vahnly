@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/uber/h3-go/v3"
@@ -30,21 +31,23 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 	targetCellStr := "882a100d2dfffff"
 	targetCell := h3.FromString(targetCellStr)
 	
-	// Add some driver data to the target cell and a neighbor cell
+	// Add some driver data to the target cell and a neighbor cell using ZSet structure
 	spatialRing := h3.KRing(targetCell, 1)
 	cell1 := h3.ToString(targetCell)
 	cell2 := h3.ToString(spatialRing[1])
 
-	key1 := fmt.Sprintf("drivers:set:%s:%s", city, cell1)
-	key2 := fmt.Sprintf("drivers:set:%s:%s", city, cell2)
+	// Key names must follow hashtagging layout: drivers:zset:{cityPrefix}:h3cell
+	key1 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell1)
+	key2 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell2)
 
 	// Clean up keys afterwards
 	defer func() {
 		client.Del(ctx, key1, key2)
 	}()
 
-	client.SAdd(ctx, key1, "driver-1", "driver-2")
-	client.SAdd(ctx, key2, "driver-3")
+	now := float64(time.Now().Unix())
+	client.ZAdd(ctx, key1, redis.Z{Score: now, Member: "driver-1"}, redis.Z{Score: now, Member: "driver-2"})
+	client.ZAdd(ctx, key2, redis.Z{Score: now, Member: "driver-3"})
 
 	// Scan
 	candidates, err := scanner.ScanNearbyDrivers(ctx, city, targetCellStr)

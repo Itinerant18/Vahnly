@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9" // Standard high-performance Redis cluster driver [cite: 107]
+	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 )
 
@@ -18,13 +18,31 @@ func NewRedisRepository(client *redis.ClusterClient) domain.RedisRepository {
 }
 
 func (r *redisRepo) SetDriverLocation(ctx context.Context, loc *domain.DriverLocation, ttl time.Duration) error {
-	// Format key according to specification: driver:{city}:{h3_cell}:{driver_id} [cite: 26]
-	key := fmt.Sprintf("driver:%s:%s:%s", loc.CityPrefix, loc.H3Cell, loc.DriverID)
+	// Enforce Redis Hashtagging on the city prefix to route all regional operations to the same cluster slot
+	// Pattern: {%s} wraps the hash-slot calculation token strictly to the city identifier
+	statusKey := fmt.Sprintf("driver:{%s}:status:%s", loc.CityPrefix, loc.DriverID)
+	spatialZSetKey := fmt.Sprintf("drivers:zset:{%s}:%s", loc.CityPrefix, loc.H3Cell)
 
-	// Set string values tracking standard ONLINE_AVAILABLE driver state profiles [cite: 26, 38]
-	err := r.clusterClient.Set(ctx, key, "ONLINE_AVAILABLE", ttl).Err()
+	nowEpoch := float64(time.Now().Unix())
+
+	// Execute an atomic multi-command pipeline within the same hash slot
+	pipe := r.clusterClient.TxPipeline()
+
+	// 1. Set the granular driver availability status string
+	pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", ttl)
+
+	// 2. Add driver to the H3 cell spatial ZSET index using the timestamp as the score
+	pipe.ZAdd(ctx, spatialZSetKey, redis.Z{
+		Score:  nowEpoch,
+		Member: loc.DriverID,
+	})
+
+	// 3. Set a moving expiration on the ZSET cell index to prevent memory leak accumulation
+	pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+
+	_, err := pipe.Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("redis cluster routing write error: %w", err)
+		return fmt.Errorf("redis cluster atomic slot update failed: %w", err)
 	}
 	return nil
 }
