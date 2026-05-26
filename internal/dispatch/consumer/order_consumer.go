@@ -15,6 +15,7 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
+	"github.com/platform/driver-delivery/internal/observability"
 )
 
 type OrderCreatedConsumer struct {
@@ -151,9 +152,13 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 		return
 	}
 
+	batchStart := time.Now()
+	observability.BatchSizeHistogram.Observe(float64(len(orders)))
+
 	// 1. Route to Global Hungarian Solver if specified by the runtime configuration
 	if c.currentAlgo == "HUNGARIAN" {
 		c.executeHungarianBatchPool(ctx, orders)
+		observability.BatchDurationSeconds.WithLabelValues("HUNGARIAN").Observe(time.Since(batchStart).Seconds())
 		return
 	}
 
@@ -175,6 +180,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
 			if err != nil || len(candidates) == 0 {
 				log.Printf("Greedy worker starvation or failure on order %s. Advancing offset.", o.OrderID)
+				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
@@ -184,14 +190,17 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
 			if matchErr != nil {
 				log.Printf("Greedy match failed for order %s: %v. Advancing offset.", o.OrderID, matchErr)
+				observability.OrdersUnmatchedTotal.WithLabelValues("match_failure").Inc()
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
 				return
 			}
 
+			txStart := time.Now()
 			err = c.commitAssignmentTransaction(orderCtx, optimalMatch)
 			if err != nil {
+				observability.DBTransactionDurationSeconds.WithLabelValues("error").Observe(time.Since(txStart).Seconds())
 				if errors.Is(err, pgx.ErrNoRows) {
 					// Idempotency: order already assigned by a concurrent worker
 					mu.Lock()
@@ -200,6 +209,8 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 				}
 				return
 			}
+			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(time.Since(txStart).Seconds())
+			observability.OrdersMatchedTotal.WithLabelValues("GREEDY", o.CityPrefix).Inc()
 
 			// Collect offset BEFORE emit attempts — DB is already mutated so we must
 			// advance the partition regardless of downstream publish success.
@@ -207,15 +218,24 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 			mu.Unlock()
 
-			if err := c.emitAssignedEvent(orderCtx, optimalMatch); err != nil {
+			// Use a fresh context for downstream Kafka emits so the tight orderCtx
+			// deadline doesn't starve fire-and-forget event notifications.
+			emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
+			defer emitCancel()
+
+			if err := c.emitAssignedEvent(emitCtx, optimalMatch); err != nil {
 				log.Printf("order.assigned emit failed for order %s: %v", o.OrderID, err)
+				observability.KafkaEmitErrorsTotal.WithLabelValues("order.assigned").Inc()
 			}
-			if err := c.emitDriverStateChanged(orderCtx, optimalMatch.DriverID, "ONLINE_EN_ROUTE"); err != nil {
+			if err := c.emitDriverStateChanged(emitCtx, optimalMatch.DriverID, "ONLINE_EN_ROUTE"); err != nil {
 				log.Printf("Driver state event publish failed for driver %s: %v", optimalMatch.DriverID, err)
+				observability.KafkaEmitErrorsTotal.WithLabelValues("driver.state.changed").Inc()
 			}
 		}(order)
 	}
 	wg.Wait()
+
+	observability.BatchDurationSeconds.WithLabelValues("GREEDY").Observe(time.Since(batchStart).Seconds())
 
 	if len(collectedMessages) > 0 {
 		_ = c.kafkaReader.CommitMessages(ctx, collectedMessages...)
@@ -257,6 +277,8 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 		uniqueDrivers = append(uniqueDrivers, d)
 	}
 
+	observability.CostMatrixDimension.Observe(float64(max(len(orders), len(uniqueDrivers))))
+
 	// Pass compiled pools directly to the global solver
 	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector)
 	if err != nil {
@@ -275,38 +297,49 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	// Commit assignments sequentially inside separate row transaction frames
 	for _, match := range matches {
 		matchItem := match
+		txStart := time.Now()
 		err = c.commitAssignmentTransaction(batchCtx, &matchItem)
 		if err == nil {
+			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(time.Since(txStart).Seconds())
+			observability.OrdersMatchedTotal.WithLabelValues("HUNGARIAN", "").Inc()
 			matchedOrderIDs[matchItem.OrderID] = true
 			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
 			if oEvent, found := orderMap[matchItem.OrderID]; found {
 				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
 			}
-			if err := c.emitAssignedEvent(batchCtx, &matchItem); err != nil {
+
+			// Use a fresh context for emits so the tight batchCtx doesn't starve them
+			emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
+			if err := c.emitAssignedEvent(emitCtx, &matchItem); err != nil {
 				log.Printf("order.assigned emit failed for order %s: %v", matchItem.OrderID, err)
+				observability.KafkaEmitErrorsTotal.WithLabelValues("order.assigned").Inc()
 			}
-			if err := c.emitDriverStateChanged(batchCtx, matchItem.DriverID, "ONLINE_EN_ROUTE"); err != nil {
+			if err := c.emitDriverStateChanged(emitCtx, matchItem.DriverID, "ONLINE_EN_ROUTE"); err != nil {
 				log.Printf("Driver state event publish failed for driver %s: %v", matchItem.DriverID, err)
+				observability.KafkaEmitErrorsTotal.WithLabelValues("driver.state.changed").Inc()
 			}
+			emitCancel()
 		} else if errors.Is(err, pgx.ErrNoRows) {
+			observability.DBTransactionDurationSeconds.WithLabelValues("idempotent").Observe(time.Since(txStart).Seconds())
 			// Idempotency: already assigned by a concurrent batch
 			matchedOrderIDs[matchItem.OrderID] = true
 			if oEvent, found := orderMap[matchItem.OrderID]; found {
 				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
 			}
+		} else {
+			observability.DBTransactionDurationSeconds.WithLabelValues("error").Observe(time.Since(txStart).Seconds())
 		}
 	}
 
 	// Advance offsets for ALL unmatched orders — not just zero-candidate ones.
-	// An order can be unmatched because all nearby drivers were assigned to other orders
-	// in the same batch, or because the cost matrix filtered every assignment above 1e6.
-	// Either way the offset must advance or the partition stalls permanently.
 	for _, o := range orders {
 		if !matchedOrderIDs[o.OrderID] {
 			if len(driverLocationMap[o.OrderID]) == 0 {
 				log.Printf("Marketplace Starvation (HUNGARIAN): No available drivers near cell %s. Advancing offset.", o.PickupH3Cell)
+				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
 			} else {
 				log.Printf("Hungarian: Order %s had %d candidates but no valid assignment (all drivers allocated). Advancing offset.", o.OrderID, len(driverLocationMap[o.OrderID]))
+				observability.OrdersUnmatchedTotal.WithLabelValues("fully_allocated").Inc()
 			}
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 		}

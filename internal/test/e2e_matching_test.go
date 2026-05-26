@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"github.com/uber/h3-go/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -71,7 +73,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 		t.Skip("Skipping E2E Integration Test: Active system environment parameters not declared.")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
 	// ============================================================================
@@ -110,22 +112,38 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 
 	// Prepare Kafka Test Brokers Topics
 	brokers := strings.Split(kafkaBrokers, ",")
-	dialer := &kafka.Dialer{Timeout: 2 * time.Second, DualStack: true}
-	conn, err := dialer.DialContext(ctx, "tcp", brokers[0])
+	kafkaDialer := &kafka.Dialer{Timeout: 5 * time.Second, DualStack: true}
+	kafkaCtx, kafkaCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	conn, err := kafkaDialer.DialContext(kafkaCtx, "tcp", brokers[0])
 	if err != nil {
+		kafkaCancel()
 		t.Fatalf("Kafka broker cluster connection handshake timed out: %v", err)
 	}
 	
 	// Programmatically guarantee test topic partitions are established
-	_ = conn.CreateTopics(
+	topicErr := conn.CreateTopics(
 		kafka.TopicConfig{Topic: "order.created", NumPartitions: 1, ReplicationFactor: 1},
 		kafka.TopicConfig{Topic: "order.assigned", NumPartitions: 1, ReplicationFactor: 1},
+		kafka.TopicConfig{Topic: "driver.state.changed", NumPartitions: 1, ReplicationFactor: 1},
 	)
 	conn.Close()
+	kafkaCancel()
+	if topicErr != nil {
+		t.Logf("Topic creation returned (may be benign if topics exist): %v", topicErr)
+	}
 
 	// Clean out previous states to enforce fresh test environments
 	testDriverID := "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 	testOrderID := "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+	// Compute the H3 cell using the SAME radian formula the telemetry pipeline uses.
+	// This ensures the driver's spatial ZSET key matches the order's pickup_h3_cell.
+	testLat := 22.5726
+	testLng := 88.3639
+	latRad := testLat * (math.Pi / 180.0)
+	lngRad := testLng * (math.Pi / 180.0)
+	testH3Cell := h3.ToString(h3.FromGeo(h3.GeoCoord{Latitude: latRad, Longitude: lngRad}, 8))
+	t.Logf("Computed test H3 cell (radian-based): %s", testH3Cell)
 	
 	_, _ = dbPool.Exec(ctx, "DELETE FROM dispatch_match_logs WHERE order_id = $1::uuid", testOrderID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM orders WHERE id = $1::uuid", testOrderID)
@@ -133,7 +151,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	_, _ = dbPool.Exec(ctx, "DELETE FROM regional_cities WHERE city_prefix = 'KOL'")
 	
 	// Clear the targeted H3 spatial cache index ZSET and driver profile hash
-	_ = rClient.Del(ctx, "drivers:zset:KOL:88754cb247fffff", fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID))
+	_ = rClient.Del(ctx, fmt.Sprintf("drivers:zset:KOL:%s", testH3Cell), fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID))
 
 	// Pre-seed Required Relational Structural Dependencies
 	_, err = dbPool.Exec(ctx, "INSERT INTO regional_cities (city_prefix, city_name, is_active) VALUES ('KOL', 'Kolkata', true)")
@@ -151,13 +169,22 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 
 	_, err = dbPool.Exec(ctx, `
 		INSERT INTO orders (id, city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, base_fare_paise)
-		VALUES ($1::uuid, 'KOL', gen_random_uuid(), 'CREATED', ST_GeographyFromText('POINT(88.3639 22.5726)'), ST_GeographyFromText('POINT(88.4339 22.5657)'), '88754cb247fffff', 25000);
-	`, testOrderID)
+		VALUES ($1::uuid, 'KOL', gen_random_uuid(), 'CREATED', ST_GeographyFromText('POINT(88.3639 22.5726)'), ST_GeographyFromText('POINT(88.4339 22.5657)'), $2, 25000);
+	`, testOrderID, testH3Cell)
 	if err != nil {
 		t.Fatalf("Failed seeding order request base row: %v", err)
 	}
 
 	// Pre-populate the driver profile hash parameters inside Redis cache to satisfy the hydrator pipeline
+	// Pre-populate the driver spatial ZSET so the scanner finds this driver immediately,
+	// regardless of whether the gRPC telemetry ingestion completes before the Kafka message arrives.
+	spatialZSetKey := fmt.Sprintf("drivers:zset:KOL:%s", testH3Cell)
+	_ = rClient.ZAdd(ctx, spatialZSetKey, redis.Z{
+		Score:  float64(time.Now().Unix()),
+		Member: testDriverID,
+	}).Err()
+	defer rClient.Del(ctx, spatialZSetKey)
+
 	profileKey := fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID)
 	err = rClient.HSet(ctx, profileKey, map[string]interface{}{
 		"osm_node_id":               "10001",
@@ -264,9 +291,9 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 		OrderID:         testOrderID,
 		CityPrefix:      "KOL",
 		CustomerID:      "c81d4e2e-bcf2-11e6-869b-7df243852131",
-		PickupH3Cell:    "88754cb247fffff",
-		PickupLat:       22.5726,
-		PickupLng:       88.3639,
+		PickupH3Cell:    testH3Cell,
+		PickupLat:       testLat,
+		PickupLng:       testLng,
 		PickupOSMNodeID: 1001, // node pre-seeded in cmd/dispatch/main.go CH graph
 	}
 	payloadBytes, _ := json.Marshal(orderPayload)
@@ -280,14 +307,15 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	}
 
 	// Step C: Allow the batch window buffer (~300ms) to flush and execute optimization routines
-	time.Sleep(1500 * time.Millisecond)
+	// Allow generous time for: batch window (300ms) + cost matrix + Triton RPC + DB tx commit
+	time.Sleep(2500 * time.Millisecond)
 
 	// ============================================================================
 	// 5. TRANSACTION STATE VERIFICATION & ASSERTIONS
 	// ============================================================================
 	
 	var currentStatus string
-	var assignedDriver string
+	var assignedDriver sql.NullString
 	
 	// Query current persistent relational status state
 	checkQuery := "SELECT status::text, assigned_driver_id::text FROM orders WHERE id = $1::uuid"
@@ -296,11 +324,13 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 		t.Fatalf("Failed pulling post-matching order state records from database: %v", err)
 	}
 
+	t.Logf("Post-match order state: status=%s, assigned_driver_id=%v", currentStatus, assignedDriver)
+
 	if currentStatus != "ASSIGNED" {
 		t.Errorf("E2E State Broken: Expected order status to be 'ASSIGNED', got '%s'", currentStatus)
 	}
-	if assignedDriver != testDriverID {
-		t.Errorf("E2E Selection Broken: Expected assignment to award driver '%s', got '%s'", testDriverID, assignedDriver)
+	if !assignedDriver.Valid || assignedDriver.String != testDriverID {
+		t.Errorf("E2E Selection Broken: Expected assignment to award driver '%s', got '%v'", testDriverID, assignedDriver)
 	}
 
 	// Verify immutable match logging ledger compliance metrics

@@ -17,6 +17,7 @@ import (
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/intelligence/client"
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
+	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/routing/graph"
 )
 
@@ -141,9 +142,14 @@ func main() {
 	}()
 
 	// 7. Start Match Execution Loop in Background Thread
-	go orderConsumer.StartExecutionPipeline(ctx) //
+	go orderConsumer.StartExecutionPipeline(ctx)
 
-	// 8. System Signal Intercept and Graceful Shutdown Protocol
+	// 8. Start HTTP Observability Server (Prometheus + Health + Stats)
+	metricsPort := getEnv("METRICS_PORT", "8080")
+	healthServer := observability.NewHealthServer(dbPool, redisClusterClient, brokersList, algoStrategy)
+	go healthServer.Start(metricsPort)
+
+	// 9. System Signal Intercept and Graceful Shutdown Protocol
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 

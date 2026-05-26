@@ -1,0 +1,170 @@
+version: '3.8'
+
+networks:
+  dispatch-tier:
+    name: dispatch_network
+    driver: bridge
+
+services:
+  # ============================================================================
+  # 1. RELATIONAL SPATIAL STORE (POSTGRESQL + POSTGIS)
+  # ============================================================================
+  spatial-db:
+    image: postgis/postgis:15-3.3
+    container_name: spatial_postgres_dev
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=delivery_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      # Automatically mounts schema triggers, constraints, and tables on startup
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - dispatch-tier
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # 2. EVENT BACKBONE BROKER (KAFKA IN KRAFT MODE)
+  # ============================================================================
+  kafka-broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka_kraft_dev
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-broker:9093
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:19092
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-broker:9092,EXTERNAL://127.0.0.1:19092
+      - KAFKA_LOG_DIRS=/tmp/kraft-combined-logs
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+    networks:
+      - dispatch-tier
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # 3. HIGH-VELOCITY INTELLIGENCE TIER (NVIDIA TRITON SERVER)
+  # ============================================================================
+  triton-server:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    container_name: triton_inference_dev
+    command: ["tritonserver", "--model-repository=/models"]
+    ports:
+      - "8000:8000"
+      - "8001:8001" # Target gRPC Port binding for your ETACorrector Client
+      - "8002:8002"
+    volumes:
+      - ./model_repository:/models
+    networks:
+      - dispatch-tier
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/v2/health/ready || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  # ============================================================================
+  # 4. MEMORY STORAGE GRID (6-NODE SHARDED REDIS CLUSTER)
+  # ============================================================================
+  redis-node-1:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-1
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6379:6379"
+    networks:
+      - dispatch-tier
+
+  redis-node-2:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-2
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6380:6379"
+    networks:
+      - dispatch-tier
+
+  redis-node-3:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-3
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6381:6379"
+    networks:
+      - dispatch-tier
+
+  redis-node-4:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-4
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6382:6379"
+    networks:
+      - dispatch-tier
+
+  redis-node-5:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-5
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6383:6379"
+    networks:
+      - dispatch-tier
+
+  redis-node-6:
+    image: redis:7.2-alpine
+    container_name: driver-redis-node-6
+    command: ["redis-server", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000", "--appendonly", "yes", "--protected-mode", "no"]
+    ports:
+      - "6384:6379"
+    networks:
+      - dispatch-tier
+
+  # Automation service that initializes cluster state across nodes on startup
+  redis-cluster-orchestrator:
+    image: redis:7.2-alpine
+    container_name: redis_cluster_bootstrap
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+    networks:
+      - dispatch-tier
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        apk add --no-cache bind-tools
+        get_ip() { idx=0; while [ $$idx -lt 10 ]; do ip=$$(getent hosts driver-redis-node-$$1 | awk '{print $$1}'); if [ ! -z "$$ip" ]; then echo "$$ip"; return 0; fi; sleep 1; idx=$$((idx+1)); done; return 1; }
+        
+        # Build node endpoint array map
+        NODES=""
+        for i in 1 2 3 4 5 6; do
+          ip=$$(get_ip $$i)
+          NODES="$$NODES $$ip:6379"
+        done
+        
+        echo "Initializing 6-Shard Redis Topology across nodes: $$NODES"
+        echo "yes" | redis-cli --cluster create $$NODES --cluster-replicas 1
+        echo "Cluster handshake complete."

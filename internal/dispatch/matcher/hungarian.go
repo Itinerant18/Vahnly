@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/platform/driver-delivery/internal/dispatch/domain"
+	"github.com/platform/driver-delivery/internal/observability"
 )
 
 type RoutingService interface {
@@ -57,13 +58,17 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 	supplyDensity := float32(12.0)
 
 	if etaCorrector != nil {
-		estimatedEtaSeconds, err = etaCorrector.ComputeCorrectedETA(routingCtx, driver.OSMNodeID, order.PickupOSMNodeID, demandDensity, supplyDensity)
+		rpcStart := time.Now()
+		estimatedEtaSeconds, err = observability.ExecuteWithBreaker(routingCtx, func(cbCtx context.Context) (float64, error) {
+			return etaCorrector.ComputeCorrectedETA(cbCtx, driver.OSMNodeID, order.PickupOSMNodeID, demandDensity, supplyDensity)
+		})
+		observability.TritonRPCDurationSeconds.Observe(time.Since(rpcStart).Seconds())
 	} else {
 		estimatedEtaSeconds = driver.DistanceMeters / 11.1
 	}
 
 	if err != nil {
-		estimatedEtaSeconds = driver.DistanceMeters / 11.1 // Section 07 circuit-breaker fallback
+		estimatedEtaSeconds = driver.DistanceMeters / 11.1 // Circuit-breaker fallback
 	}
 
 	surgePenalty := 0.0

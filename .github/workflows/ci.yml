@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Go vet
+        run: go vet ./...
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run unit tests
+        run: go test -v -race -count=1 -timeout 120s ./internal/dispatch/... ./internal/routing/... ./internal/surge/... ./internal/telemetry/... ./internal/pricing/...
+        # NOTE: E2E tests in ./internal/test/ are skipped automatically
+        # because DATABASE_URL/REDIS_CLUSTER_NODES/KAFKA_BROKERS are not set.
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, vet, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build dispatch service
+        run: go build -o bin/dispatch ./cmd/dispatch/
+      - name: Build ingestion service
+        run: go build -o bin/ingestion ./cmd/ingestion/
+      - name: Verify binaries exist
+        run: ls -la bin/
