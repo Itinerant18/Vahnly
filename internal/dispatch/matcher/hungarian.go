@@ -56,8 +56,8 @@ func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, 
 		var estimatedEtaSeconds float64
 		var err error
 
-		// Enforce an isolated sub-context timeout budget (<30ms) for the graph lookup stage
-		routingCtx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+		// Enforce an isolated sub-context timeout budget (<1000ms) for the graph lookup stage
+		routingCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
 		
 		// 1. Compute road-graph travel time via Contraction Hierarchies Service
 		estimatedEtaSeconds, err = routingSvc.ComputeShortestPathETA(routingCtx, driver.OSMNodeID, pickupOSMNodeID)

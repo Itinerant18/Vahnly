@@ -1,0 +1,6 @@
+﻿$env:DATABASE_URL        = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
+$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
+$env:KAFKA_BROKERS       = "localhost:19092"
+$env:ALGORITHM_STRATEGY  = "GREEDY"
+$env:REDIS_IP_MAP        = "10.244.0.81:6379=127.0.0.1:6379,10.244.0.76:6379=127.0.0.1:6380,10.244.0.78:6379=127.0.0.1:6381,10.244.0.85:6379=127.0.0.1:6382,10.244.0.83:6379=127.0.0.1:6383,10.244.0.84:6379=127.0.0.1:6384"
+& "C:\workspace\Driver\bin\dispatch.exe"

@@ -1,0 +1,536 @@
+# =============================================================================
+# LOCAL E2E MULTI-CONTAINER MANIFEST — dispatch namespace
+# =============================================================================
+# Provisions the full infrastructure stack for local Phase 2 pipeline testing:
+#   1. PostgreSQL 15 + PostGIS 3.3 with init scripts (spatial schema)
+#   2. Apache Kafka (KRaft mode, single-broker)
+#   3. 6-shard Redis Cluster (3 primary + 3 replica) with bootstrap job
+#
+# Usage:
+#   kubectl apply -f local-dev-topology.yaml
+#   kubectl get pods -n dispatch -w
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dispatch
+
+---
+# ============================================================================
+# 1. POSTGRESQL + POSTGIS SPATIAL DATA TIER
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: dispatch
+data:
+  01-init-spatial.sql: |
+    -- Enable PostGIS for geographic coordinate math
+    CREATE EXTENSION IF NOT EXISTS postgis;
+
+    -- Driver State Machine enum
+    CREATE TYPE driver_state_enum AS ENUM (
+        'ONLINE_AVAILABLE',
+        'ONLINE_EN_ROUTE',
+        'ONLINE_DELIVERING',
+        'OFFLINE',
+        'BUSY_BATCH'
+    );
+
+    -- Order Lifecycle State Machine enum
+    CREATE TYPE order_status_enum AS ENUM (
+        'CREATED',
+        'ASSIGNED',
+        'EN_ROUTE_TO_PICKUP',
+        'DELIVERING',
+        'COMPLETED',
+        'CANCELLED'
+    );
+
+    -- Regions / Cities Configuration Table
+    CREATE TABLE regional_cities (
+        city_prefix VARCHAR(10) PRIMARY KEY,
+        city_name VARCHAR(100) NOT NULL,
+        timezone VARCHAR(50) DEFAULT 'Asia/Kolkata' NOT NULL,
+        is_active BOOLEAN DEFAULT true NOT NULL,
+        geofence GEOGRAPHY(MultiPolygon, 4326),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+
+    -- Drivers Profile and Persistent State Table
+    CREATE TABLE drivers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        city_prefix VARCHAR(10) REFERENCES regional_cities(city_prefix) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(15) UNIQUE NOT NULL,
+        dl_number VARCHAR(50) UNIQUE NOT NULL,
+        current_state driver_state_enum DEFAULT 'OFFLINE' NOT NULL,
+        is_verified BOOLEAN DEFAULT false NOT NULL,
+        acceptance_rate NUMERIC(4,3) DEFAULT 1.000 NOT NULL,
+        cancellation_rate NUMERIC(4,3) DEFAULT 0.000 NOT NULL,
+        last_known_location GEOGRAPHY(Point, 4326),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+
+    -- Orders / Trips Table
+    CREATE TABLE orders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        city_prefix VARCHAR(10) REFERENCES regional_cities(city_prefix) NOT NULL,
+        customer_id UUID NOT NULL,
+        status order_status_enum DEFAULT 'CREATED' NOT NULL,
+        pickup_location GEOGRAPHY(Point, 4326) NOT NULL,
+        dropoff_location GEOGRAPHY(Point, 4326) NOT NULL,
+        pickup_h3_cell VARCHAR(15) NOT NULL,
+        assigned_driver_id UUID REFERENCES drivers(id),
+        surge_multiplier NUMERIC(3,2) DEFAULT 1.00 NOT NULL,
+        base_fare_paise INT NOT NULL,
+        assigned_at TIMESTAMP WITH TIME ZONE,
+        picked_up_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        CONSTRAINT chk_order_status_trajectory CHECK (
+            (status = 'CREATED') OR
+            (status = 'ASSIGNED' AND assigned_driver_id IS NOT NULL) OR
+            (status = 'EN_ROUTE_TO_PICKUP' AND assigned_driver_id IS NOT NULL) OR
+            (status = 'DELIVERING' AND assigned_driver_id IS NOT NULL) OR
+            (status = 'COMPLETED' AND assigned_driver_id IS NOT NULL) OR
+            (status = 'CANCELLED')
+        )
+    );
+
+    -- Dispatch Decisions Ledger
+    CREATE TABLE dispatch_match_logs (
+        id BIGSERIAL PRIMARY KEY,
+        order_id UUID REFERENCES orders(id) NOT NULL,
+        batch_window_started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        batch_window_ended_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        algorithm_used VARCHAR(50) NOT NULL,
+        total_candidates_evaluated INT NOT NULL,
+        chosen_driver_id UUID REFERENCES drivers(id) NOT NULL,
+        computed_eta_seconds INT NOT NULL,
+        assignment_score NUMERIC(10,4) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+
+    -- State Machine Transition Trigger
+    CREATE OR REPLACE FUNCTION verify_order_state_transition()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF OLD.status IS NULL THEN
+            RETURN NEW;
+        END IF;
+        IF OLD.status IN ('COMPLETED', 'CANCELLED') THEN
+            RAISE EXCEPTION 'IllegalStateTransition: Cannot mutate a terminal trip state.';
+        END IF;
+        IF OLD.status = 'CREATED' AND NEW.status NOT IN ('ASSIGNED', 'CANCELLED') THEN
+            RAISE EXCEPTION 'IllegalStateTransition: New orders must move to ASSIGNED or CANCELLED.';
+        END IF;
+        IF OLD.status = 'ASSIGNED' AND NEW.status NOT IN ('EN_ROUTE_TO_PICKUP', 'CANCELLED') THEN
+            RAISE EXCEPTION 'IllegalStateTransition: Assigned orders must move to EN_ROUTE or CANCELLED.';
+        END IF;
+        IF OLD.status = 'DELIVERING' AND NEW.status NOT IN ('COMPLETED') THEN
+            RAISE EXCEPTION 'IllegalStateTransition: Orders in flight can only transition to COMPLETED.';
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE TRIGGER trg_enforce_order_state_machine
+    BEFORE UPDATE ON orders
+    FOR EACH ROW
+    EXECUTE FUNCTION verify_order_state_transition();
+
+    -- Spatial GIST indexes
+    CREATE INDEX idx_cities_geofence ON regional_cities USING GIST(geofence);
+    CREATE INDEX idx_drivers_location ON drivers USING GIST(last_known_location);
+    CREATE INDEX idx_orders_pickup ON orders USING GIST(pickup_location);
+
+    -- B-Tree indexes for fast state queries
+    CREATE INDEX idx_drivers_search ON drivers(city_prefix, current_state, is_verified);
+    CREATE INDEX idx_orders_matching_state ON orders(city_prefix, status) WHERE status = 'CREATED';
+    CREATE INDEX idx_match_logs_order ON dispatch_match_logs(order_id);
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: dispatch
+spec:
+  serviceName: postgresql-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: postgis/postgis:15-3.3
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "password"
+            - name: POSTGRES_DB
+              value: "delivery_platform"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        # ─── FIX: init scripts must come from ConfigMap, NOT a PVC ───
+        # A PVC is empty at creation time — the SQL files would never exist.
+        # Mount the ConfigMap as a read-only projected volume instead.
+        - name: init-scripts
+          configMap:
+            name: postgres-init-script
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-service
+  namespace: dispatch
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgresql
+
+---
+# ============================================================================
+# 2. APACHE KAFKA EVENT STREAMING BACKBONE (KRaft Mode)
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-init-topics
+  namespace: dispatch
+data:
+  create-topics.sh: |
+    #!/bin/bash
+    set -e
+    echo "Waiting for Kafka broker to accept connections..."
+    until kafka-topics --bootstrap-server kafka-service:9092 --list > /dev/null 2>&1; do
+      sleep 2
+    done
+
+    TOPICS=(
+      "order.created"
+      "order.assigned"
+      "driver.location.updated"
+      "dispatch.match"
+      "surge.update"
+    )
+
+    for topic in "${TOPICS[@]}"; do
+      echo "Creating topic: $topic"
+      kafka-topics --bootstrap-server kafka-service:9092 \
+        --create --if-not-exists \
+        --topic "$topic" \
+        --partitions 3 \
+        --replication-factor 1
+    done
+    echo "All dispatch event topics created."
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-kraft
+  namespace: dispatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-kraft
+  template:
+    metadata:
+      labels:
+        app: kafka-kraft
+    spec:
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.5.0
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            # ── Listener map: all three roles declared ──────────────────────
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:19092"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-service.dispatch.svc.cluster.local:9092,EXTERNAL://localhost:19092"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            # ── KRaft: CRITICAL — must match a name in KAFKA_LISTENERS ──────
+            # Missing this was the crash: StorageTool validates it at format time.
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_CONTROLLER_LISTENERS
+              value: "CONTROLLER://0.0.0.0:9093"
+            # ── KRaft quorum: use localhost (not 0.0.0.0) for self-reference ─
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@localhost:9093"
+            - name: KAFKA_LOG_DIRS
+              value: "/tmp/kraft-combined-logs"
+            - name: CLUSTER_ID
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
+            # ── Single-broker local dev settings ───────────────────────────
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_LOG_RETENTION_HOURS
+              value: "24"
+          ports:
+            - containerPort: 9092
+              name: internal
+            - containerPort: 19092
+              name: external
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: dispatch
+spec:
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: internal
+    - port: 19092
+      targetPort: 19092
+      name: external
+  selector:
+    app: kafka-kraft
+
+---
+# Kafka topic seeder job — runs after broker is ready
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-init-job
+  namespace: dispatch
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      containers:
+        - name: topic-creator
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "/scripts/create-topics.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      restartPolicy: OnFailure
+      volumes:
+        - name: scripts
+          configMap:
+            name: kafka-init-topics
+            defaultMode: 0755
+
+---
+# ============================================================================
+# 3. 6-SHARD REDIS CLUSTER TOPOLOGY (3 Primary + 3 Replica)
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-config
+  namespace: dispatch
+data:
+  redis.conf: |
+    port 6379
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 5000
+    appendonly yes
+    protected-mode no
+    bind 0.0.0.0
+  bootstrap-cluster.sh: |
+    #!/bin/sh
+    set -e
+    apk add --no-cache bind-tools > /dev/null 2>&1
+
+    echo "Waiting for all 6 Redis cluster pods to resolve via headless DNS..."
+    EXPECTED=6
+    RETRIES=0
+    MAX_RETRIES=60
+
+    while true; do
+      # Resolve A records from the headless service
+      RESOLVED=$(nslookup redis-cluster-nodes.dispatch.svc.cluster.local 2>/dev/null \
+        | grep -c 'Address:' || true)
+      # Subtract 1 for the DNS server's own address line
+      RESOLVED=$((RESOLVED - 1))
+
+      if [ "$RESOLVED" -ge "$EXPECTED" ]; then
+        echo "All $EXPECTED Redis pods are DNS-resolvable."
+        break
+      fi
+
+      RETRIES=$((RETRIES + 1))
+      if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        echo "FATAL: Timed out waiting for Redis pods after $MAX_RETRIES retries."
+        exit 1
+      fi
+      echo "  Resolved $RESOLVED / $EXPECTED pods — retrying in 3s (attempt $RETRIES/$MAX_RETRIES)..."
+      sleep 3
+    done
+
+    # Also verify TCP connectivity to each pod
+    IPs=$(nslookup redis-cluster-nodes.dispatch.svc.cluster.local 2>/dev/null \
+      | awk '/^Address:/ && !/:#/' | awk '{print $2}' | tail -n "$EXPECTED")
+
+    for ip in $IPs; do
+      echo "Verifying Redis PING on $ip:6379..."
+      until redis-cli -h "$ip" -p 6379 ping 2>/dev/null | grep -q PONG; do
+        sleep 1
+      done
+    done
+
+    # Build the cluster node list
+    CLUSTER_NODES=""
+    for ip in $IPs; do
+      CLUSTER_NODES="$CLUSTER_NODES $ip:6379"
+    done
+
+    echo "Executing cluster creation across: $CLUSTER_NODES"
+    echo "yes" | redis-cli --cluster create $CLUSTER_NODES --cluster-replicas 1
+    echo "Redis 6-shard cluster (3P + 3R) initialized successfully."
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: dispatch
+spec:
+  serviceName: redis-cluster-nodes
+  replicas: 6
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+          ports:
+            - containerPort: 6379
+              name: client
+            - containerPort: 16379
+              name: gossip
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: conf
+              mountPath: /usr/local/etc/redis
+              readOnly: true
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: conf
+          configMap:
+            name: redis-cluster-config
+            items:
+              - key: redis.conf
+                path: redis.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Mi
+
+---
+# Headless service for StatefulSet DNS pod discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster-nodes
+  namespace: dispatch
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - port: 6379
+      name: client
+    - port: 16379
+      name: gossip
+  selector:
+    app: redis-cluster
+
+---
+# Automated cluster bootstrap job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init-job
+  namespace: dispatch
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      containers:
+        - name: cluster-init
+          image: redis:7.2-alpine
+          command: ["/bin/sh", "/config/bootstrap-cluster.sh"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+      restartPolicy: OnFailure
+      volumes:
+        - name: config-volume
+          configMap:
+            name: redis-cluster-config
+            defaultMode: 0755

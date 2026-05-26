@@ -58,6 +58,19 @@ func main() {
 
 	// 3. Initialize Redis Cluster Driver (Explicitly bypassing Sentinel to eliminate failover lag)
 	nodeList := strings.Split(redisNodes, ",")
+
+	// Support local port-forwarded routing mapping
+	ipMapStr := os.Getenv("REDIS_IP_MAP")
+	ipMap := make(map[string]string)
+	if ipMapStr != "" {
+		for _, pair := range strings.Split(ipMapStr, ",") {
+			parts := strings.Split(pair, "=")
+			if len(parts) == 2 {
+				ipMap[parts[0]] = parts[1]
+			}
+		}
+	}
+
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:        nodeList,
 		ReadOnly:     false,
@@ -65,6 +78,13 @@ func main() {
 		DialTimeout:  2 * time.Second,
 		ReadTimeout:  500 * time.Millisecond, // Strict sub-500ms lifecycle enforcement
 		WriteTimeout: 500 * time.Millisecond,
+		Dialer: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if localAddr, ok := ipMap[addr]; ok {
+				addr = localAddr
+			}
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, network, addr)
+		},
 	})
 	defer redisClusterClient.Close()
 

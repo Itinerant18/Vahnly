@@ -154,7 +154,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			defer wg.Done()
 
 			// Allocate its own dedicated short-lived context to isolate network overhead
-			orderCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+			orderCtx, cancel := context.WithTimeout(ctx, 2000*time.Millisecond)
 			defer cancel()
 
 			// 1. Spatial Reduction Phase: Fetch candidates via O(1) Redis Cluster lookups [cite: 12, 23]
