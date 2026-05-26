@@ -19,12 +19,12 @@ import (
 
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
+	intelligenceUsecase "github.com/platform/driver-delivery/internal/intelligence/usecase"
 	"github.com/platform/driver-delivery/internal/routing/graph"
-	pb "github.com/platform/driver-delivery/pkg/api/telemetry/v1"
 	grpcDelivery "github.com/platform/driver-delivery/internal/telemetry/delivery/grpc"
 	telemetryRepo "github.com/platform/driver-delivery/internal/telemetry/repository"
 	telemetryUsecase "github.com/platform/driver-delivery/internal/telemetry/usecase"
-	intelligenceUsecase "github.com/platform/driver-delivery/internal/intelligence/usecase"
+	pb "github.com/platform/driver-delivery/pkg/api/telemetry/v1"
 )
 
 type simpleRoutingService struct {
@@ -117,7 +117,7 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 		"osm_node_id":              "1001",
 		"acceptance_rate":          "0.95",
 		"cancellation_probability": "0.01",
-		"is_inside_surge_zone":       "1",
+		"is_inside_surge_zone":     "1",
 		"idle_seconds":             "300.0",
 	}).Err()
 	if err != nil {
@@ -165,6 +165,7 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 		strings.Split(kafkaBrokers, ","),
 		"dispatch-integration-test-group",
 		spatialScanner,
+		redisClient,
 		dbPool,
 		"GREEDY",
 		etaCorrector,

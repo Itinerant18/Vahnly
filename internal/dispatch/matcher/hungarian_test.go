@@ -4,9 +4,24 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/platform/driver-delivery/internal/dispatch/domain"
 )
+
+type capturedDensity struct {
+	demand float32
+	supply float32
+}
+
+type densityCapturingCorrector struct {
+	captured chan capturedDensity
+}
+
+func (d *densityCapturingCorrector) ComputeCorrectedETA(ctx context.Context, sourceNodeID, targetNodeID int64, demandDensity, supplyDensity float32) (float64, error) {
+	d.captured <- capturedDensity{demand: demandDensity, supply: supplyDensity}
+	return 12.0, nil
+}
 
 // TestSolveKuhnMunkres_SquareMatrix validates a known-optimal 3×3 assignment
 func TestSolveKuhnMunkres_SquareMatrix(t *testing.T) {
@@ -97,6 +112,48 @@ func TestSolveKuhnMunkres_LargeIdentity(t *testing.T) {
 
 	if totalCost != 0.0 {
 		t.Errorf("Expected total cost 0.0, got %.1f", totalCost)
+	}
+}
+
+func TestEvaluateHungarianBatch_UsesMarketplaceMetrics(t *testing.T) {
+	order := domain.OrderCreatedPayload{
+		OrderID:         "test-order-density",
+		PickupOSMNodeID: 100,
+	}
+	driver := CandidateDriver{
+		DriverID:       "test-driver-density",
+		OSMNodeID:      200,
+		H3Cell:         "882a100d2dfffff",
+		DistanceMeters: 1000,
+		AcceptanceRate: 0.95,
+		IdleSeconds:    300,
+	}
+	corrector := &densityCapturingCorrector{captured: make(chan capturedDensity, 1)}
+
+	results, err := EvaluateHungarianBatch(
+		context.Background(),
+		[]domain.OrderCreatedPayload{order},
+		[]CandidateDriver{driver},
+		map[string][]CandidateDriver{order.OrderID: {driver}},
+		corrector,
+		map[string]MarketplaceMetrics{
+			order.OrderID: {DemandDensity: 7, SupplyDensity: 3},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 match, got %d", len(results))
+	}
+
+	select {
+	case got := <-corrector.captured:
+		if got.demand != 7 || got.supply != 3 {
+			t.Fatalf("Expected live densities demand=7 supply=3, got demand=%v supply=%v", got.demand, got.supply)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Timed out waiting for ETA corrector density inputs")
 	}
 }
 

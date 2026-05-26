@@ -79,7 +79,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// ============================================================================
 	// 2. INFRASTRUCTURE PLUMBING INITIALIZATION
 	// ============================================================================
-	
+
 	// Initialize PostgreSQL Pool
 	dbPool, err := pgxpool.New(ctx, postgresURL)
 	if err != nil {
@@ -119,7 +119,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 		kafkaCancel()
 		t.Fatalf("Kafka broker cluster connection handshake timed out: %v", err)
 	}
-	
+
 	// Programmatically guarantee test topic partitions are established
 	topicErr := conn.CreateTopics(
 		kafka.TopicConfig{Topic: "order.created", NumPartitions: 1, ReplicationFactor: 1},
@@ -144,12 +144,12 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	lngRad := testLng * (math.Pi / 180.0)
 	testH3Cell := h3.ToString(h3.FromGeo(h3.GeoCoord{Latitude: latRad, Longitude: lngRad}, 8))
 	t.Logf("Computed test H3 cell (radian-based): %s", testH3Cell)
-	
+
 	_, _ = dbPool.Exec(ctx, "DELETE FROM dispatch_match_logs WHERE order_id = $1::uuid", testOrderID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM orders WHERE id = $1::uuid", testOrderID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM drivers WHERE id = $1::uuid", testDriverID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM regional_cities WHERE city_prefix = 'KOL'")
-	
+
 	// Clear the targeted H3 spatial cache index ZSET and driver profile hash
 	_ = rClient.Del(ctx, fmt.Sprintf("drivers:zset:KOL:%s", testH3Cell), fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID))
 
@@ -187,11 +187,11 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 
 	profileKey := fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID)
 	err = rClient.HSet(ctx, profileKey, map[string]interface{}{
-		"osm_node_id":               "10001",
-		"acceptance_rate":           "0.98",
-		"cancellation_probability":  "0.01",
-		"is_inside_surge_zone":      "1",
-		"idle_seconds":              "600.0",
+		"osm_node_id":              "10001",
+		"acceptance_rate":          "0.98",
+		"cancellation_probability": "0.01",
+		"is_inside_surge_zone":     "1",
+		"idle_seconds":             "600.0",
 	}).Err()
 	if err != nil {
 		t.Fatalf("Failed seeding Redis driver profile: %v", err)
@@ -201,7 +201,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// ============================================================================
 	// 3. SERVICE ASSEMBLY & RUN-LOOP INITIATION
 	// ============================================================================
-	
+
 	// Start Mock Triton Inference Server
 	tritonListener, err := net.Listen("tcp", "127.0.0.1:"+tritonMockPort)
 	if err != nil {
@@ -240,8 +240,8 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 
 	// Boot the Batch Order Matching Consumer Engine
 	scanner := dispatchRepo.NewSpatialScanner(rClient)
-	matchingConsumer := dispatchConsumer.NewOrderCreatedConsumer(brokers, "e2e-test-matching-group", scanner, dbPool, "GREEDY", etaCorrector)
-	
+	matchingConsumer := dispatchConsumer.NewOrderCreatedConsumer(brokers, "e2e-test-matching-group", scanner, rClient, dbPool, "GREEDY", etaCorrector)
+
 	consumerCtx, stopConsumer := context.WithCancel(context.Background())
 	defer stopConsumer()
 	go matchingConsumer.StartExecutionPipeline(consumerCtx)
@@ -297,7 +297,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 		PickupOSMNodeID: 1001, // node pre-seeded in cmd/dispatch/main.go CH graph
 	}
 	payloadBytes, _ := json.Marshal(orderPayload)
-	
+
 	err = kafkaWriter.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(testOrderID),
 		Value: payloadBytes,
@@ -313,10 +313,10 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// ============================================================================
 	// 5. TRANSACTION STATE VERIFICATION & ASSERTIONS
 	// ============================================================================
-	
+
 	var currentStatus string
 	var assignedDriver sql.NullString
-	
+
 	// Query current persistent relational status state
 	checkQuery := "SELECT status::text, assigned_driver_id::text FROM orders WHERE id = $1::uuid"
 	err = dbPool.QueryRow(ctx, checkQuery, testOrderID).Scan(&currentStatus, &assignedDriver)
@@ -344,6 +344,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 }
 
 type mockKafkaProducer struct{}
+
 func (m *mockKafkaProducer) PublishLocationUpdate(ctx context.Context, loc *telemetryDomain.DriverLocation) error {
 	return nil
 }

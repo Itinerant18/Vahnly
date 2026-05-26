@@ -21,10 +21,14 @@ func NewSpatialScanner(client *redis.ClusterClient) *SpatialScanner {
 }
 
 // ScanNearbyDrivers retrieves all available driver IDs and hydates their true graph metadata
-func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix string, targetCellStr string) ([]matcher.CandidateDriver, error) {
+func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix string, targetCellStr string) ([]matcher.CandidateDriver, matcher.MarketplaceMetrics, error) {
+	metrics := matcher.MarketplaceMetrics{}
 	targetCell := h3.FromString(targetCellStr)
 	if !h3.IsValid(targetCell) {
-		return nil, fmt.Errorf("invalid_spatial_token: %s", targetCellStr)
+		return nil, metrics, fmt.Errorf("invalid_spatial_token: %s", targetCellStr)
+	}
+	if s.clusterClient == nil {
+		return nil, metrics, fmt.Errorf("redis_cluster_client_unavailable")
 	}
 
 	// Fetch k-ring index array (Target cell + 6 immediate neighbors)
@@ -34,6 +38,10 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	staleThreshold := now - 30 // 30-second stale sliding window threshold
 
 	discoveredDriverCells := make(map[string]string)
+	metrics, metricErr := s.scanMarketplaceMetrics(ctx, cityPrefix, targetCellStr, spatialRing, now)
+	if metricErr != nil {
+		log.Printf("[SPATIAL_SCANNER] marketplace metrics pipeline error: %v", metricErr)
+	}
 
 	// 1. Gather all active driver IDs across localized rings
 	for _, cell := range spatialRing {
@@ -46,7 +54,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		}).Result()
 
 		if err != nil && err != redis.Nil {
-			return nil, fmt.Errorf("redis cluster zset fetch failed on key %s: %w", zsetKey, err)
+			return nil, metrics, fmt.Errorf("redis cluster zset fetch failed on key %s: %w", zsetKey, err)
 		}
 
 		for _, driverID := range driverIDs {
@@ -57,7 +65,11 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	}
 
 	if len(discoveredDriverCells) == 0 {
-		return nil, nil
+		return nil, metrics, nil
+	}
+
+	if metrics.SupplyDensity == 0 {
+		metrics.SupplyDensity = float32(len(discoveredDriverCells))
 	}
 
 	// 2. High-Performance Metadata Hydration Phase via Cluster Pipelines
@@ -131,7 +143,40 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		})
 	}
 
-	return candidates, nil
+	return candidates, metrics, nil
+}
+
+func (s *SpatialScanner) scanMarketplaceMetrics(ctx context.Context, cityPrefix string, targetCellStr string, spatialRing []h3.H3Index, now int64) (matcher.MarketplaceMetrics, error) {
+	metrics := matcher.MarketplaceMetrics{}
+	staleCutoff := fmt.Sprintf("(%d)", now)
+	demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, targetCellStr)
+
+	pipe := s.clusterClient.Pipeline()
+	pipe.ZRemRangeByScore(ctx, demandKey, "-inf", staleCutoff)
+	demandCountCmd := pipe.ZCard(ctx, demandKey)
+
+	supplyCountCmds := make([]*redis.IntCmd, 0, len(spatialRing))
+	seenSupplyKeys := make(map[string]struct{}, len(spatialRing))
+	for _, cell := range spatialRing {
+		supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, h3.ToString(cell))
+		if _, exists := seenSupplyKeys[supplyKey]; exists {
+			continue
+		}
+		seenSupplyKeys[supplyKey] = struct{}{}
+		pipe.ZRemRangeByScore(ctx, supplyKey, "-inf", staleCutoff)
+		supplyCountCmds = append(supplyCountCmds, pipe.ZCard(ctx, supplyKey))
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return metrics, err
+	}
+
+	metrics.DemandDensity = float32(demandCountCmd.Val())
+	for _, cmd := range supplyCountCmds {
+		metrics.SupplyDensity += float32(cmd.Val())
+	}
+
+	return metrics, nil
 }
 
 func (s *SpatialScanner) EvictDriverFromCell(ctx context.Context, cityPrefix, h3Cell, driverID string) error {

@@ -37,8 +37,8 @@ func main() {
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
-	algoStrategy := getEnv("ALGORITHM_STRATEGY", "HUNGARIAN") // Defaulting to global batch matrix matching
-	tritonURL := getEnv("TRITON_SERVER_URL", "127.0.0.1:8001")    // Enforcing IPv4 explicit coordinate mapping
+	algoStrategy := getEnv("ALGORITHM_STRATEGY", "HUNGARIAN")  // Defaulting to global batch matrix matching
+	tritonURL := getEnv("TRITON_SERVER_URL", "127.0.0.1:8001") // Enforcing IPv4 explicit coordinate mapping
 
 	log.Printf("Starting Dispatch Matching Service. Target Strategy Matrix: %s", algoStrategy)
 
@@ -131,6 +131,7 @@ func main() {
 		brokersList,
 		"dispatch-matching-group",
 		spatialScanner,
+		redisClusterClient,
 		dbPool,
 		algoStrategy,
 		etaCorrector,

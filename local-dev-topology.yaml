@@ -1,0 +1,284 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dispatch
+---
+# ============================================================================
+# 1. POSTGRESQL + POSTGIS SPATIAL DATA TIER
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: dispatch
+data:
+  01-init-spatial.sql: |
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE TYPE driver_state_enum AS ENUM ('ONLINE_AVAILABLE', 'ONLINE_EN_ROUTE', 'ONLINE_DELIVERING', 'OFFLINE', 'BUSY_BATCH');
+    CREATE TYPE order_status_enum AS ENUM ('CREATED', 'ASSIGNED', 'EN_ROUTE_TO_PICKUP', 'DELIVERING', 'COMPLETED', 'CANCELLED');
+    
+    CREATE TABLE regional_cities (
+        city_prefix VARCHAR(10) PRIMARY KEY,
+        city_name VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT true NOT NULL,
+        geofence GEOGRAPHY(MultiPolygon, 4326)
+    );
+    CREATE TABLE drivers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        city_prefix VARCHAR(10) REFERENCES regional_cities(city_prefix) NOT NULL,
+        current_state driver_state_enum DEFAULT 'OFFLINE' NOT NULL,
+        acceptance_rate NUMERIC(4,3) DEFAULT 1.000 NOT NULL,
+        cancellation_rate NUMERIC(4,3) DEFAULT 0.000 NOT NULL,
+        last_known_location GEOGRAPHY(Point, 4326)
+    );
+    CREATE TABLE orders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        city_prefix VARCHAR(10) REFERENCES regional_cities(city_prefix) NOT NULL,
+        status order_status_enum DEFAULT 'CREATED' NOT NULL,
+        pickup_location GEOGRAPHY(Point, 4326) NOT NULL,
+        dropoff_location GEOGRAPHY(Point, 4326) NOT NULL,
+        pickup_h3_cell VARCHAR(15) NOT NULL,
+        assigned_driver_id UUID REFERENCES drivers(id),
+        base_fare_paise INT NOT NULL
+    );
+    CREATE TABLE dispatch_match_logs (
+        id BIGSERIAL PRIMARY KEY,
+        order_id UUID NOT NULL,
+        algorithm_used VARCHAR(50) NOT NULL,
+        chosen_driver_id UUID NOT NULL,
+        computed_eta_seconds INT NOT NULL,
+        assignment_score NUMERIC(10,4) NOT NULL
+    );
+    CREATE INDEX idx_cities_geofence ON regional_cities USING GIST(geofence);
+    CREATE INDEX idx_drivers_location ON drivers USING GIST(last_known_location);
+    CREATE INDEX idx_orders_pickup ON orders USING GIST(pickup_location);
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: dispatch
+spec:
+  serviceName: postgresql-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgis/postgis:15-3.3
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "password"
+        - name: POSTGRES_DB
+          value: "delivery_platform"
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: init-script-vol
+          mountPath: /docker-entrypoint-initdb.d
+        - name: pgdata-vol
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: init-script-vol
+        configMap:
+          name: postgres-init-script
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata-vol
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-service
+  namespace: dispatch
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: postgresql
+---
+# ============================================================================
+# 2. APACHE KAFKA EVENT STREAMING BACKBONE (KRaft Mode)
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-kraft
+  namespace: dispatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-kraft
+  template:
+    metadata:
+      labels:
+        app: kafka-kraft
+    spec:
+      containers:
+      - name: kafka
+        image: confluentinc/cp-kafka:7.5.0
+        env:
+        - name: KAFKA_NODE_ID
+          value: "1"
+        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT"
+        - name: KAFKA_LISTENERS
+          value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:19092"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://kafka-service.dispatch.svc.cluster.local:9092,EXTERNAL://localhost:19092"
+        - name: KAFKA_CONTROLLER_LISTENERS
+          value: "CONTROLLER://0.0.0.0:9093"
+        - name: KAFKA_INTER_BROKER_LISTENER_NAME
+          value: "PLAINTEXT"
+        - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+          value: "1@0.0.0.0:9093"
+        - name: KAFKA_PROCESS_ROLES
+          value: "broker,controller"
+        - name: KAFKA_LOG_DIRS
+          value: "/tmp/kraft-combined-logs"
+        - name: CLUSTER_ID
+          value: "MkU3OEVBNTcwNTJENDM2Qk"
+        ports:
+        - containerPort: 9092
+          name: internal
+        - containerPort: 19092
+          name: external
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: dispatch
+spec:
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: internal
+  - port: 19092
+    targetPort: 19092
+    name: external
+  selector:
+    app: kafka-kraft
+---
+# ============================================================================
+# 3. 6-SHARD REDIS CLUSTER TOPOLOGY (3 Master + 3 Replica)
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-config
+  namespace: dispatch
+data:
+  redis.conf: |
+    port 6379
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 5000
+    appendonly yes
+    protected-mode no
+    bind 0.0.0.0
+  bootstrap-cluster.sh: |
+    #!/bin/sh
+    apk add --no-cache bind-tools
+    echo "Waiting for all Redis nodes to resolve and come online..."
+    until [ "$(nslookup redis-cluster-nodes.dispatch.svc.cluster.local | grep Address | wc -l)" -eq 7 ]; do
+      sleep 2
+    done
+    
+    # Resolve physical cluster IPs dynamically
+    IPs=$(nslookup redis-cluster-nodes.dispatch.svc.cluster.local | grep Address | awk '{print $2}' | tail -n 6)
+    CLUSTER_NODES=""
+    for ip in $IPs; do
+      CLUSTER_NODES="$CLUSTER_NODES $ip:6379"
+    done
+
+    echo "Executing cluster setup across discovered IPs: $CLUSTER_NODES"
+    echo "yes" | redis-cli --cluster create $CLUSTER_NODES --cluster-replicas 1
+    echo "Redis 6-Shard consistent hashing topology initialized successfully."
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: dispatch
+spec:
+  serviceName: redis-cluster-nodes
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        volumeMounts:
+        - name: conf
+          mountPath: /usr/local/etc/redis
+  volumeClaimTemplates:
+  - metadata:
+      name: conf
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster-nodes
+  namespace: dispatch
+spec:
+  clusterIP: None
+  ports:
+  - port: 6379
+    name: client
+  selector:
+    app: redis-cluster
+---
+# Automated Orchestration Bootstrapper Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init-job
+  namespace: dispatch
+spec:
+  template:
+    spec:
+      containers:
+      - name: cluster-init
+        image: redis:7.2-alpine
+        command: ["/bin/sh", "/config/bootstrap-cluster.sh"]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+      restartPolicy: OnFailure
+      volumes:
+      - name: config-volume
+        configMap:
+          name: redis-cluster-config

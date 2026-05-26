@@ -12,6 +12,8 @@ import (
 	"github.com/platform/driver-delivery/internal/observability"
 )
 
+const maxMatrixCellWorkers = 128
+
 type RoutingService interface {
 	ComputeShortestPathETA(ctx context.Context, sourceID, targetID int64) (float64, error)
 }
@@ -31,6 +33,11 @@ type CandidateDriver struct {
 	IdleSeconds             float64
 }
 
+type MarketplaceMetrics struct {
+	DemandDensity float32
+	SupplyDensity float32
+}
+
 type MatchResult struct {
 	OrderID             string
 	DriverID            string
@@ -41,7 +48,7 @@ type MatchResult struct {
 }
 
 // ComputeSingleEdgeCost calculates the objective function score for an individual driver-order pair
-func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload, driver CandidateDriver, etaCorrector ETACorrector) (float64, float64) {
+func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload, driver CandidateDriver, etaCorrector ETACorrector, metricArgs ...MarketplaceMetrics) (float64, float64) {
 	const (
 		alpha   = 0.45 // Weight for ETA
 		beta    = 0.25 // Weight for Acceptance Rate
@@ -56,13 +63,15 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 	routingCtx, cancel := context.WithTimeout(ctx, 15*time.Millisecond)
 	defer cancel()
 
-	demandDensity := float32(50.0)
-	supplyDensity := float32(12.0)
+	metrics := MarketplaceMetrics{}
+	if len(metricArgs) > 0 {
+		metrics = metricArgs[0]
+	}
 
 	if etaCorrector != nil {
 		rpcStart := time.Now()
 		estimatedEtaSeconds, err = observability.ExecuteWithBreaker(routingCtx, func(cbCtx context.Context) (float64, error) {
-			return etaCorrector.ComputeCorrectedETA(cbCtx, driver.OSMNodeID, order.PickupOSMNodeID, demandDensity, supplyDensity)
+			return etaCorrector.ComputeCorrectedETA(cbCtx, driver.OSMNodeID, order.PickupOSMNodeID, metrics.DemandDensity, metrics.SupplyDensity)
 		})
 		observability.TritonRPCDurationSeconds.Observe(time.Since(rpcStart).Seconds())
 	} else {
@@ -88,11 +97,15 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 }
 
 // EvaluateHungarianBatch processes pooled entries together using global cost matrix constraints
-func EvaluateHungarianBatch(ctx context.Context, orders []domain.OrderCreatedPayload, uniqueDrivers []CandidateDriver, driverLocationMap map[string][]CandidateDriver, etaCorrector ETACorrector) ([]MatchResult, error) {
+func EvaluateHungarianBatch(ctx context.Context, orders []domain.OrderCreatedPayload, uniqueDrivers []CandidateDriver, driverLocationMap map[string][]CandidateDriver, etaCorrector ETACorrector, metricMapArgs ...map[string]MarketplaceMetrics) ([]MatchResult, error) {
 	nOrders := len(orders)
 	nDrivers := len(uniqueDrivers)
 	if nOrders == 0 || nDrivers == 0 {
 		return nil, nil
+	}
+	orderMetrics := map[string]MarketplaceMetrics{}
+	if len(metricMapArgs) > 0 && metricMapArgs[0] != nil {
+		orderMetrics = metricMapArgs[0]
 	}
 
 	// Size boundaries based on the larger dimension to support rectangular configurations
@@ -113,34 +126,72 @@ func EvaluateHungarianBatch(ctx context.Context, orders []domain.OrderCreatedPay
 		etaCache[i] = make([]int, nDrivers)
 	}
 
-	// Populate the cost matrix in parallel — each (i,j) cell is independent and writes
-	// to a unique slot, so no mutex is needed. Parallelism is critical: sequential calls
-	// to ComputeSingleEdgeCost (each up to 15ms for Triton) would exhaust the 400ms
-	// batchCtx deadline long before a 150×150 matrix completes.
-	var wg sync.WaitGroup
-	for i, order := range orders {
-		localCandidates := driverLocationMap[order.OrderID]
-		localMap := make(map[string]CandidateDriver, len(localCandidates))
-		for _, d := range localCandidates {
-			localMap[d.DriverID] = d
-		}
-		for j, driver := range uniqueDrivers {
-			wg.Add(1)
-			go func(row int, col int, ord domain.OrderCreatedPayload, drv CandidateDriver, lm map[string]CandidateDriver) {
-				defer wg.Done()
-				if matchedDriver, available := lm[drv.DriverID]; available {
-					cost, etaVal := ComputeSingleEdgeCost(ctx, ord, matchedDriver, etaCorrector)
-					costMatrix[row][col] = cost
-					etaCache[row][col] = int(etaVal)
-				} else {
-					// High penalty for out-of-spatial-range pairs
-					costMatrix[row][col] = 1e7
-					etaCache[row][col] = 9999
-				}
-			}(i, j, order, driver, localMap)
+	for i := 0; i < nOrders; i++ {
+		for j := 0; j < nDrivers; j++ {
+			costMatrix[i][j] = 1e7
+			etaCache[i][j] = 9999
 		}
 	}
+
+	driverIndex := make(map[string]int, nDrivers)
+	for j, driver := range uniqueDrivers {
+		driverIndex[driver.DriverID] = j
+	}
+
+	type edgeJob struct {
+		row     int
+		col     int
+		order   domain.OrderCreatedPayload
+		driver  CandidateDriver
+		metrics MarketplaceMetrics
+	}
+
+	// Bound edge-cost compilation to avoid M×N goroutine storms. Only eligible
+	// spatial edges are evaluated; non-candidate pairs retain the high penalty.
+	jobs := make(chan edgeJob)
+	workerCount := min(maxMatrixCellWorkers, max(1, nOrders*nDrivers))
+	var wg sync.WaitGroup
+
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				cost, etaVal := ComputeSingleEdgeCost(ctx, job.order, job.driver, etaCorrector, job.metrics)
+				costMatrix[job.row][job.col] = cost
+				etaCache[job.row][job.col] = int(etaVal)
+			}
+		}()
+	}
+
+	var enqueueErr error
+enqueueJobs:
+	for i, order := range orders {
+		metrics := orderMetrics[order.OrderID]
+		seenCols := make(map[int]struct{})
+		for _, driver := range driverLocationMap[order.OrderID] {
+			col, ok := driverIndex[driver.DriverID]
+			if !ok {
+				continue
+			}
+			if _, exists := seenCols[col]; exists {
+				continue
+			}
+			seenCols[col] = struct{}{}
+
+			select {
+			case jobs <- edgeJob{row: i, col: col, order: order, driver: driver, metrics: metrics}:
+			case <-ctx.Done():
+				enqueueErr = ctx.Err()
+				break enqueueJobs
+			}
+		}
+	}
+	close(jobs)
 	wg.Wait()
+	if enqueueErr != nil {
+		return nil, enqueueErr
+	}
 
 	// 2. Pad rows if orders < drivers, initializing with neutral costs
 	for i := nOrders; i < matrixSize; i++ {
@@ -260,7 +311,7 @@ func SolveKuhnMunkres(matrix [][]float64) map[int]int {
 }
 
 // EvaluateGreedyMatch scores and returns the immediate minimum cost driver profile using live CH ETAs
-func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, etaCorrector ETACorrector) (*MatchResult, error) {
+func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, etaCorrector ETACorrector, metricArgs ...MarketplaceMetrics) (*MatchResult, error) {
 	if len(candidates) == 0 {
 		return nil, errors.New("dispatch_starvation: zero available supply within spatial grid")
 	}
@@ -268,7 +319,11 @@ func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, 
 	for _, c := range candidates {
 		localPool = append(localPool, c)
 	}
-	res, err := EvaluateHungarianBatch(ctx, []domain.OrderCreatedPayload{order}, localPool, map[string][]CandidateDriver{order.OrderID: localPool}, etaCorrector)
+	metricsByOrder := map[string]MarketplaceMetrics{}
+	if len(metricArgs) > 0 {
+		metricsByOrder[order.OrderID] = metricArgs[0]
+	}
+	res, err := EvaluateHungarianBatch(ctx, []domain.OrderCreatedPayload{order}, localPool, map[string][]CandidateDriver{order.OrderID: localPool}, etaCorrector, metricsByOrder)
 	if err != nil || len(res) == 0 {
 		return nil, fmt.Errorf("greedy_fallback_failed: %w", err)
 	}

@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: matching-engine-sla-alerts
+  namespace: dispatch
+spec:
+  groups:
+  - name: dispatch.sla.rules
+    rules:
+    - alert: MatchingEngineSub500msSLAViolation
+      expr: dispatch_match_latency_seconds{quantile="0.99"} > 0.400
+      for: 2m # Triggers if latency violates the SLA limit for 2 consecutive minutes
+      labels:
+        severity: critical
+        tier: platform
+      annotations:
+        summary: "Critical Dispatch Latency Spike detected on cluster node."
+        description: "The matching engine's p99 latency is currently {{ $value }}s, violating the sub-500ms platform SLA requirement."

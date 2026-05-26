@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 
 	"github.com/platform/driver-delivery/internal/dispatch/domain"
@@ -19,13 +20,22 @@ import (
 	"github.com/platform/driver-delivery/internal/observability"
 )
 
+const maxHungarianCommitWorkers = 16
+
+type hungarianCommitResult struct {
+	match    matcher.MatchResult
+	err      error
+	duration time.Duration
+}
+
 type OrderCreatedConsumer struct {
-	kafkaReader       *kafka.Reader
-	kafkaWriter       *kafka.Writer
-	driverStateWriter *kafka.Writer
-	spatialScanner    *repository.SpatialScanner
-	dbPool            *pgxpool.Pool
-	etaCorrector      matcher.ETACorrector
+	kafkaReader        *kafka.Reader
+	kafkaWriter        *kafka.Writer
+	driverStateWriter  *kafka.Writer
+	spatialScanner     *repository.SpatialScanner
+	redisClusterClient *redis.ClusterClient
+	dbPool             *pgxpool.Pool
+	etaCorrector       matcher.ETACorrector
 
 	// Batch window synchronization structures
 	mu           sync.Mutex
@@ -36,7 +46,7 @@ type OrderCreatedConsumer struct {
 	currentAlgo  string
 }
 
-func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, optionalArgs ...matcher.ETACorrector) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, redisClient *redis.ClusterClient, db *pgxpool.Pool, algoStrategy string, optionalArgs ...matcher.ETACorrector) *OrderCreatedConsumer {
 	var etaCorrector matcher.ETACorrector
 	if len(optionalArgs) > 0 {
 		etaCorrector = optionalArgs[0]
@@ -62,13 +72,14 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
-		spatialScanner: scanner,
-		dbPool:         db,
-		etaCorrector:   etaCorrector,
-		batchWindow:    300 * time.Millisecond,
-		maxBatchSize:   150,
-		orderBuffer:    make([]domain.OrderCreatedPayload, 0),
-		currentAlgo:    algoStrategy,
+		spatialScanner:     scanner,
+		redisClusterClient: redisClient,
+		dbPool:             db,
+		etaCorrector:       etaCorrector,
+		batchWindow:        300 * time.Millisecond,
+		maxBatchSize:       150,
+		orderBuffer:        make([]domain.OrderCreatedPayload, 0),
+		currentAlgo:        algoStrategy,
 	}
 }
 
@@ -178,7 +189,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			orderCtx, cancel := context.WithTimeout(ctx, 350*time.Millisecond)
 			defer cancel()
 
-			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
+			candidates, metrics, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
 			if err != nil || len(candidates) == 0 {
 				log.Printf("Greedy worker starvation or failure on order %s. Advancing offset.", o.OrderID)
 				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
@@ -188,7 +199,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 				return
 			}
 
-			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
+			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector, metrics)
 			if matchErr != nil {
 				log.Printf("Greedy match failed for order %s: %v. Advancing offset.", o.OrderID, matchErr)
 				observability.OrdersUnmatchedTotal.WithLabelValues("match_failure").Inc()
@@ -252,6 +263,7 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	defer cancel()
 
 	driverLocationMap := make(map[string][]matcher.CandidateDriver)
+	orderMetricsMap := make(map[string]matcher.MarketplaceMetrics)
 	uniqueDriverTracker := make(map[string]matcher.CandidateDriver)
 	var mapMu sync.Mutex
 	var wg sync.WaitGroup
@@ -261,13 +273,14 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 		wg.Add(1)
 		go func(o domain.OrderCreatedPayload) {
 			defer wg.Done()
-			candidates, err := c.spatialScanner.ScanNearbyDrivers(batchCtx, o.CityPrefix, o.PickupH3Cell)
+			candidates, metrics, err := c.spatialScanner.ScanNearbyDrivers(batchCtx, o.CityPrefix, o.PickupH3Cell)
 			if err != nil {
 				return
 			}
 
 			mapMu.Lock()
 			driverLocationMap[o.OrderID] = candidates
+			orderMetricsMap[o.OrderID] = metrics
 			for _, d := range candidates {
 				uniqueDriverTracker[d.DriverID] = d
 			}
@@ -284,7 +297,7 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	observability.CostMatrixDimension.Observe(float64(max(len(orders), len(uniqueDrivers))))
 
 	// Pass compiled pools directly to the global solver
-	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector)
+	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector, orderMetricsMap)
 	if err != nil {
 		log.Printf("[HUNGARIAN_BATCH_ERROR] Matrix optimization failed: %v", err)
 		return
@@ -297,14 +310,12 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	}
 
 	matchedOrderIDs := make(map[string]bool)
+	failedCommitOrderIDs := make(map[string]bool)
 
-	// Commit assignments sequentially inside separate row transaction frames
-	for _, match := range matches {
-		matchItem := match
-		txStart := time.Now()
-		err = c.commitAssignmentTransaction(batchCtx, &matchItem)
-		if err == nil {
-			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(time.Since(txStart).Seconds())
+	for _, result := range c.commitHungarianMatches(batchCtx, matches) {
+		matchItem := result.match
+		if result.err == nil {
+			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(result.duration.Seconds())
 			observability.OrdersMatchedTotal.WithLabelValues("HUNGARIAN", "").Inc()
 			matchedOrderIDs[matchItem.OrderID] = true
 			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
@@ -328,20 +339,25 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 				}
 			}
 			emitCancel()
-		} else if errors.Is(err, pgx.ErrNoRows) {
-			observability.DBTransactionDurationSeconds.WithLabelValues("idempotent").Observe(time.Since(txStart).Seconds())
+		} else if errors.Is(result.err, pgx.ErrNoRows) {
+			observability.DBTransactionDurationSeconds.WithLabelValues("idempotent").Observe(result.duration.Seconds())
 			// Idempotency: already assigned by a concurrent batch
 			matchedOrderIDs[matchItem.OrderID] = true
 			if oEvent, found := orderMap[matchItem.OrderID]; found {
 				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
 			}
 		} else {
-			observability.DBTransactionDurationSeconds.WithLabelValues("error").Observe(time.Since(txStart).Seconds())
+			observability.DBTransactionDurationSeconds.WithLabelValues("error").Observe(result.duration.Seconds())
+			failedCommitOrderIDs[matchItem.OrderID] = true
 		}
 	}
 
-	// Advance offsets for ALL unmatched orders — not just zero-candidate ones.
+	// Advance offsets for all solver-unmatched orders; retry transient DB failures.
 	for _, o := range orders {
+		if failedCommitOrderIDs[o.OrderID] {
+			log.Printf("Hungarian: DB commit failed for order %s. Leaving offset uncommitted for retry.", o.OrderID)
+			continue
+		}
 		if !matchedOrderIDs[o.OrderID] {
 			if len(driverLocationMap[o.OrderID]) == 0 {
 				log.Printf("Marketplace Starvation (HUNGARIAN): No available drivers near cell %s. Advancing offset.", o.PickupH3Cell)
@@ -360,6 +376,63 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 			log.Printf("[HUNGARIAN_COMMIT_ERROR] Failed batch partition progression: %v", err)
 		}
 	}
+}
+
+func (c *OrderCreatedConsumer) commitHungarianMatches(ctx context.Context, matches []matcher.MatchResult) []hungarianCommitResult {
+	if len(matches) == 0 {
+		return nil
+	}
+
+	workerCount := min(maxHungarianCommitWorkers, len(matches))
+	jobs := make(chan matcher.MatchResult)
+	results := make(chan hungarianCommitResult, len(matches))
+
+	var wg sync.WaitGroup
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for match := range jobs {
+				matchItem := match
+				txStart := time.Now()
+				err := c.commitAssignmentTransaction(ctx, &matchItem)
+				results <- hungarianCommitResult{
+					match:    matchItem,
+					err:      err,
+					duration: time.Since(txStart),
+				}
+			}
+		}()
+	}
+
+	var enqueueErr error
+enqueueMatches:
+	for _, match := range matches {
+		select {
+		case jobs <- match:
+		case <-ctx.Done():
+			enqueueErr = ctx.Err()
+			break enqueueMatches
+		}
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+
+	collected := make([]hungarianCommitResult, 0, len(matches))
+	for result := range results {
+		collected = append(collected, result)
+	}
+	if enqueueErr != nil {
+		for _, match := range matches[len(collected):] {
+			collected = append(collected, hungarianCommitResult{
+				match: match,
+				err:   enqueueErr,
+			})
+		}
+	}
+
+	return collected
 }
 
 func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, match *matcher.MatchResult) error {
