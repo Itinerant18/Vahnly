@@ -1,5 +1,9 @@
-2026/05/26 10:50:28 Starting Dispatch Matching Service. Strategy: GREEDY
-2026/05/26 10:50:28 PostgreSQL connection pool initialized successfully.
-2026/05/26 10:50:28 Redis 6-shard Cluster state discovery finalized.
-2026/05/26 10:50:28 Starting Order Matching Engine loop. Running strategy: GREEDY
-2026/05/26 10:50:28 Marketplace Starvation: No available drivers near cell 88754cb247fffff
+2026/05/26 11:18:59 Starting Dispatch Matching Service. Strategy: GREEDY, Triton: localhost:8001
+2026/05/26 11:18:59 PostgreSQL connection pool initialized successfully.
+2026/05/26 11:18:59 Redis 6-shard Cluster state discovery finalized.
+2026/05/26 11:18:59 Connected to Triton Inference Server at localhost:8001
+2026/05/26 11:18:59 Starting Order Matching Engine loop. Running strategy: GREEDY
+2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
+2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
+2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
+2026/05/26 11:19:11 [INTELLIGENCE_FALLBACK] Triton inference failed. Using baseline CH ETA: triton_inference_failed: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it."

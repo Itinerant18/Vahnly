@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton-inference-server
+  namespace: dispatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton-server
+  template:
+    metadata:
+      labels:
+        app: triton-server
+    spec:
+      volumes:
+      - name: model-repo-volume
+        hostPath:
+          path: /absolute/path/to/your/model_repository # Update with your true host filesystem path
+          type: Directory
+      containers:
+      - name: tritonserver
+        image: nvcr.io/nvidia/tritanserver:24.01-py3 # Contains native FIL backend engines
+        command: ["tritonserver", "--model-repository=/models"]
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8001
+          name: grpc # This is the primary high-velocity target port for your Go client
+        - containerPort: 8002
+          name: metrics
+        volumeMounts:
+        - name: model-repo-volume
+          mountPath: /models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: triton-service
+  namespace: dispatch
+spec:
+  ports:
+  - port: 8000
+    name: http
+  - port: 8001
+    name: grpc
+  - port: 8002
+    name: metrics
+  selector:
+    app: triton-server

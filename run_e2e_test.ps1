@@ -39,6 +39,11 @@ foreach ($item in $pods.items) {
 }
 $env:REDIS_IP_MAP = $ipMapList -join ","
 Write-Host "  Generated REDIS_IP_MAP: $env:REDIS_IP_MAP"
+$env:DATABASE_URL = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
+$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
+$env:KAFKA_BROKERS = "localhost:19092"
+$env:GOARCH = "amd64"
+$env:CGO_ENABLED = "1"
 
 # 4. Port forward PostgreSQL (5432) and Kafka (19092)
 Write-Host "Establishing data tier port forwards..."
@@ -208,15 +213,28 @@ Write-Host "=== PostgreSQL Verification ==="
 & $kubectl exec -n dispatch postgresql-0 -- psql -U postgres -d delivery_platform -c "SELECT order_id, algorithm_used, chosen_driver_id, computed_eta_seconds, assignment_score FROM dispatch_match_logs ORDER BY id DESC LIMIT 1;"
 
 # 10. Clean up background tasks
-Write-Host "Terminating background service instances and port forwards..."
+Write-Host "Terminating background service instances..."
 if ($ingestionProc) { Stop-Process -Id $ingestionProc.Id -Force -ErrorAction SilentlyContinue }
 if ($dispatchProc) { Stop-Process -Id $dispatchProc.Id -Force -ErrorAction SilentlyContinue }
+
+# 11. Run Go E2E Integration Test Suite (Ports 50051, 5432, 19092 are open, background apps are down)
+Write-Host "Running Go E2E Integration Test Suite..."
+& $go test -v -tags=integration ./test/integration/...
+$testCode = $LASTEXITCODE
+
+Write-Host "Running Phase 2 E2E Validation Runner..."
+& $go test -v ./internal/test/...
+$test2Code = $LASTEXITCODE
+
+# 12. Clean up port forwards
+Write-Host "Terminating port forwards..."
 Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue
 
 Write-Host "======================================================"
-if ($simCode -eq 0) {
-    Write-Host "  Smoke Integration Test Process Finalized: SUCCESS"
+if ($simCode -eq 0 -and $testCode -eq 0 -and $test2Code -eq 0) {
+    Write-Host "  Smoke Integration Test, Go Integration, & E2E Validation Suite Finalized: SUCCESS"
 } else {
-    Write-Host "  Smoke Integration Test Execution Failed: FAIL"
+    Write-Host "  E2E Validation Failed: (Simulator: $simCode, GoTest: $testCode, E2ETest: $test2Code)"
+    exit 1
 }
 Write-Host "======================================================"

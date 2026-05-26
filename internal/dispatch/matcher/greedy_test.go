@@ -22,6 +22,14 @@ func (m *mockRoutingService) ComputeShortestPathETA(ctx context.Context, sourceI
 	return float64(sourceID) / 10.0, nil
 }
 
+type dummyETACorrector struct {
+	routingSvc matcher.RoutingService
+}
+
+func (d *dummyETACorrector) ComputeCorrectedETA(ctx context.Context, sourceNodeID, targetNodeID int64, demandDensity, supplyDensity float32) (float64, error) {
+	return d.routingSvc.ComputeShortestPathETA(ctx, sourceNodeID, targetNodeID)
+}
+
 func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	ctx := context.Background()
 
@@ -67,8 +75,9 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	}
 
 	mockSvc := &mockRoutingService{}
+	corrector := &dummyETACorrector{routingSvc: mockSvc}
 
-	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, mockSvc)
+	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, corrector)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -103,8 +112,9 @@ func TestEvaluateGreedyMatch_Starvation(t *testing.T) {
 	ctx := context.Background()
 	order := domain.OrderCreatedPayload{OrderID: "order-empty"}
 	mockSvc := &mockRoutingService{}
+	corrector := &dummyETACorrector{routingSvc: mockSvc}
 
-	_, err := matcher.EvaluateGreedyMatch(ctx, order, 9999, nil, mockSvc)
+	_, err := matcher.EvaluateGreedyMatch(ctx, order, 9999, nil, corrector)
 	if err == nil {
 		t.Fatal("Expected starvation error, got nil")
 	}
@@ -141,8 +151,9 @@ func TestEvaluateGreedyMatch_CircuitBreakerFallback(t *testing.T) {
 			return 0, fmt.Errorf("network lookup failure")
 		},
 	}
+	corrector := &dummyETACorrector{routingSvc: failingSvc}
 
-	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, failingSvc)
+	res, err := matcher.EvaluateGreedyMatch(ctx, order, order.PickupOSMNodeID, candidates, corrector)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

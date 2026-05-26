@@ -15,6 +15,10 @@ type RoutingService interface {
 	ComputeShortestPathETA(ctx context.Context, sourceID, targetID int64) (float64, error)
 }
 
+type ETACorrector interface {
+	ComputeCorrectedETA(ctx context.Context, sourceNodeID, targetNodeID int64, demandDensity, supplyDensity float32) (float64, error)
+}
+
 type CandidateDriver struct {
 	DriverID                string
 	OSMNodeID               int64 // Pre-mapped closest OpenStreetMap node identifier
@@ -34,7 +38,7 @@ type MatchResult struct {
 }
 
 // EvaluateGreedyMatch scores and returns the immediate minimum cost driver profile using live CH ETAs
-func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, routingSvc RoutingService) (*MatchResult, error) {
+func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, etaCorrector ETACorrector) (*MatchResult, error) {
 	if len(candidates) == 0 {
 		return nil, errors.New("dispatch_starvation: zero available supply within spatial grid")
 	}
@@ -59,8 +63,15 @@ func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, 
 		// Enforce an isolated sub-context timeout budget (<1000ms) for the graph lookup stage
 		routingCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
 		
-		// 1. Compute road-graph travel time via Contraction Hierarchies Service
-		estimatedEtaSeconds, err = routingSvc.ComputeShortestPathETA(routingCtx, driver.OSMNodeID, pickupOSMNodeID)
+		// 1. Compute road-graph travel time (topological path + Triton XGBoost correction)
+		demandDensity := float32(50.0) // Mock values or pull directly from surge matrix registers
+		supplyDensity := float32(12.0)
+
+		if etaCorrector != nil {
+			estimatedEtaSeconds, err = etaCorrector.ComputeCorrectedETA(routingCtx, driver.OSMNodeID, pickupOSMNodeID, demandDensity, supplyDensity)
+		} else {
+			estimatedEtaSeconds = driver.DistanceMeters / 11.1
+		}
 		cancel()
 
 		if err != nil {
@@ -98,7 +109,7 @@ func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, 
 }
 
 // EvaluateHungarianOptimization handles complex combinatorial mapping models
-func EvaluateHungarianOptimization(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, routingSvc RoutingService) (*MatchResult, error) {
+func EvaluateHungarianOptimization(ctx context.Context, order domain.OrderCreatedPayload, pickupOSMNodeID int64, candidates []CandidateDriver, etaCorrector ETACorrector) (*MatchResult, error) {
 	// At launch scales (<500 concurrent items), traffic is safely channeled through the greedy score function
-	return EvaluateGreedyMatch(ctx, order, pickupOSMNodeID, candidates, routingSvc)
+	return EvaluateGreedyMatch(ctx, order, pickupOSMNodeID, candidates, etaCorrector)
 }

@@ -22,7 +22,7 @@ type OrderCreatedConsumer struct {
 	kafkaWriter    *kafka.Writer
 	spatialScanner *repository.SpatialScanner
 	dbPool         *pgxpool.Pool
-	routingSvc     matcher.RoutingService
+	etaCorrector   matcher.ETACorrector
 	
 	// Batch window synchronization structures
 	mu            sync.Mutex
@@ -33,7 +33,7 @@ type OrderCreatedConsumer struct {
 	currentAlgo   string // Runtime strategy flag: 'GREEDY', 'HUNGARIAN', 'AUCTION'
 }
 
-func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, routingSvc matcher.RoutingService) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, etaCorrector matcher.ETACorrector) *OrderCreatedConsumer {
 	return &OrderCreatedConsumer{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
@@ -51,7 +51,7 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 		},
 		spatialScanner: scanner,
 		dbPool:         db,
-		routingSvc:     routingSvc,
+		etaCorrector:   etaCorrector,
 		batchWindow:    300 * time.Millisecond, // Configurable 200-400ms window [cite: 61]
 		maxBatchSize:   150,                    // Size trigger mandate [cite: 62]
 		orderBuffer:    make([]domain.OrderCreatedPayload, 0),
@@ -175,11 +175,11 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 
 			switch c.currentAlgo {
 			case "HUNGARIAN": // Scaled approach for 500-5,000 concurrent metrics [cite: 69]
-				optimalMatch, matchErr = matcher.EvaluateHungarianOptimization(orderCtx, o, o.PickupOSMNodeID, candidates, c.routingSvc)
+				optimalMatch, matchErr = matcher.EvaluateHungarianOptimization(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
 			case "GREEDY":    // Default deployment configuration [cite: 69]
 				fallthrough
 			default:
-				optimalMatch, matchErr = matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.routingSvc)
+				optimalMatch, matchErr = matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
 			}
 
 			if matchErr != nil {

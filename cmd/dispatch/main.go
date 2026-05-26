@@ -16,6 +16,8 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/routing/graph"
+	"github.com/platform/driver-delivery/internal/intelligence/client"
+	"github.com/platform/driver-delivery/internal/intelligence/usecase"
 )
 
 // simpleRoutingService wraps the contraction hierarchies service, pre-seeded with node 1001
@@ -37,8 +39,9 @@ func main() {
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
 	algoStrategy := getEnv("ALGORITHM_STRATEGY", "GREEDY")
+	tritonAddr := getEnv("TRITON_SERVER_ADDR", "localhost:8001")
 
-	log.Printf("Starting Dispatch Matching Service. Strategy: %s", algoStrategy)
+	log.Printf("Starting Dispatch Matching Service. Strategy: %s, Triton: %s", algoStrategy, tritonAddr)
 
 	// 2. Initialize PostgreSQL Connection Pool via pgxpool
 	pgxConfig, err := pgxpool.ParseConfig(postgresURL)
@@ -104,9 +107,27 @@ func main() {
 	chService := graph.NewContractionHierarchiesService()
 	// Pre-seed node 1001 so that our smoke test matching doesn't hit disconnected routing error
 	chService.AddNode(&graph.CHNode{ID: 1001, Latitude: 22.5726, Longitude: 88.3639, Order: 1})
+	// Pre-seed node 9999 for fallback routing
+	chService.AddNode(&graph.CHNode{ID: 9999, Latitude: 22.5726, Longitude: 88.3639, Order: 2})
+	chService.AddEdge(1001, 9999, 10.0, false)
+	chService.AddEdge(9999, 1001, 10.0, false)
 	routingSvc := &simpleRoutingService{chService: chService}
 
-	// 5. Initialize Scanner and Order Created Consumer
+	// 5. Initialize Intelligence Layer
+	var tritonClient *client.TritonClient
+	if tritonAddr != "" {
+		var err error
+		tritonClient, err = client.NewTritonClient(tritonAddr)
+		if err != nil {
+			log.Printf("[WARNING] Triton Inference Server client initialization failed: %v. Running in pure-graph mode.", err)
+		} else {
+			log.Printf("Connected to Triton Inference Server at %s", tritonAddr)
+			defer tritonClient.Close()
+		}
+	}
+	etaCorrector := usecase.NewETACorrectorUseCase(tritonClient, routingSvc)
+
+	// 6. Initialize Scanner and Order Created Consumer
 	spatialScanner := dispatchRepo.NewSpatialScanner(redisClusterClient)
 	brokersList := strings.Split(kafkaBrokers, ",")
 
@@ -116,7 +137,7 @@ func main() {
 		spatialScanner,
 		dbPool,
 		algoStrategy,
-		routingSvc,
+		etaCorrector,
 	)
 	defer func() {
 		if err := orderConsumer.Close(); err != nil {
