@@ -11,20 +11,21 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/segmentio/kafka-go"
-	
+
 	"github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
+	"github.com/platform/driver-delivery/internal/events"
 	"github.com/platform/driver-delivery/internal/observability"
 )
 
 type OrderCreatedConsumer struct {
-	kafkaReader        *kafka.Reader
-	kafkaWriter        *kafka.Writer
-	driverStateWriter  *kafka.Writer
-	spatialScanner     *repository.SpatialScanner
-	dbPool             *pgxpool.Pool
-	etaCorrector       matcher.ETACorrector
+	kafkaReader       *kafka.Reader
+	kafkaWriter       *kafka.Writer
+	driverStateWriter *kafka.Writer
+	spatialScanner    *repository.SpatialScanner
+	dbPool            *pgxpool.Pool
+	etaCorrector      matcher.ETACorrector
 
 	// Batch window synchronization structures
 	mu           sync.Mutex
@@ -32,7 +33,7 @@ type OrderCreatedConsumer struct {
 	maxBatchSize int
 	orderBuffer  []domain.OrderCreatedPayload
 	windowTimer  *time.Timer
-	currentAlgo  string 
+	currentAlgo  string
 }
 
 func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, optionalArgs ...matcher.ETACorrector) *OrderCreatedConsumer {
@@ -43,37 +44,37 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 	return &OrderCreatedConsumer{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
-			Topic:          "order.created", 
-			GroupID:        groupID,         
+			Topic:          "order.created",
+			GroupID:        groupID,
 			MinBytes:       10,
 			MaxBytes:       10e6,
 			CommitInterval: 0, // Explicit synchronous manual commits only
 		}),
 		kafkaWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
-			Topic:        "order.assigned", 
-			Balancer:     &kafka.Hash{},    
+			Topic:        "order.assigned",
+			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
 		driverStateWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
-			Topic:        "driver.state.changed", 
+			Topic:        "driver.state.changed",
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
 		spatialScanner: scanner,
 		dbPool:         db,
 		etaCorrector:   etaCorrector,
-		batchWindow:    300 * time.Millisecond, 
-		maxBatchSize:   150,                    
+		batchWindow:    300 * time.Millisecond,
+		maxBatchSize:   150,
 		orderBuffer:    make([]domain.OrderCreatedPayload, 0),
-		currentAlgo:    algoStrategy, 
+		currentAlgo:    algoStrategy,
 	}
 }
 
 func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 	log.Printf("Starting Order Matching Engine loop. Running strategy: %s", c.currentAlgo)
-	
+
 	c.mu.Lock()
 	c.windowTimer = time.NewTimer(c.batchWindow)
 	c.mu.Unlock()
@@ -97,15 +98,15 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 			var order domain.OrderCreatedPayload
 			if err := json.Unmarshal(msg.Value, &order); err != nil {
 				log.Printf("Malformed JSON event dropped: %v", err)
-				_ = c.kafkaReader.CommitMessages(ctx, msg) 
+				_ = c.kafkaReader.CommitMessages(ctx, msg)
 				continue
 			}
-			
+
 			order.KafkaMessageContext = msg
 
 			c.mu.Lock()
 			c.orderBuffer = append(c.orderBuffer, order)
-			
+
 			if len(c.orderBuffer) >= c.maxBatchSize {
 				c.triggerBatchFlush()
 			}
@@ -211,6 +212,9 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			}
 			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(time.Since(txStart).Seconds())
 			observability.OrdersMatchedTotal.WithLabelValues("GREEDY", o.CityPrefix).Inc()
+			if err := c.evictAssignedDriver(ctx, o.CityPrefix, optimalMatch); err != nil {
+				log.Printf("Redis spatial eviction failed for driver %s: %v", optimalMatch.DriverID, err)
+			}
 
 			// Collect offset BEFORE emit attempts — DB is already mutated so we must
 			// advance the partition regardless of downstream publish success.
@@ -227,7 +231,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 				log.Printf("order.assigned emit failed for order %s: %v", o.OrderID, err)
 				observability.KafkaEmitErrorsTotal.WithLabelValues("order.assigned").Inc()
 			}
-			if err := c.emitDriverStateChanged(emitCtx, optimalMatch.DriverID, "ONLINE_EN_ROUTE"); err != nil {
+			if err := c.emitDriverStateChanged(emitCtx, o.CityPrefix, optimalMatch.DriverH3Cell, optimalMatch.DriverID, "ONLINE_AVAILABLE", "ONLINE_EN_ROUTE"); err != nil {
 				log.Printf("Driver state event publish failed for driver %s: %v", optimalMatch.DriverID, err)
 				observability.KafkaEmitErrorsTotal.WithLabelValues("driver.state.changed").Inc()
 			}
@@ -305,6 +309,9 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 			matchedOrderIDs[matchItem.OrderID] = true
 			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
 			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				if err := c.evictAssignedDriver(ctx, oEvent.CityPrefix, &matchItem); err != nil {
+					log.Printf("Redis spatial eviction failed for driver %s: %v", matchItem.DriverID, err)
+				}
 				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
 			}
 
@@ -314,9 +321,11 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 				log.Printf("order.assigned emit failed for order %s: %v", matchItem.OrderID, err)
 				observability.KafkaEmitErrorsTotal.WithLabelValues("order.assigned").Inc()
 			}
-			if err := c.emitDriverStateChanged(emitCtx, matchItem.DriverID, "ONLINE_EN_ROUTE"); err != nil {
-				log.Printf("Driver state event publish failed for driver %s: %v", matchItem.DriverID, err)
-				observability.KafkaEmitErrorsTotal.WithLabelValues("driver.state.changed").Inc()
+			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				if err := c.emitDriverStateChanged(emitCtx, oEvent.CityPrefix, matchItem.DriverH3Cell, matchItem.DriverID, "ONLINE_AVAILABLE", "ONLINE_EN_ROUTE"); err != nil {
+					log.Printf("Driver state event publish failed for driver %s: %v", matchItem.DriverID, err)
+					observability.KafkaEmitErrorsTotal.WithLabelValues("driver.state.changed").Inc()
+				}
 			}
 			emitCancel()
 		} else if errors.Is(err, pgx.ErrNoRows) {
@@ -360,7 +369,7 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 	}
 	defer tx.Rollback(ctx)
 
-	// Enforce linear state trajectory constraint 
+	// Enforce linear state trajectory constraint
 	query := `
 		UPDATE orders
 		SET 
@@ -377,12 +386,12 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 		return err
 	}
 
-	// If row count is 0, the state check failed or another thread processed the order 
+	// If row count is 0, the state check failed or another thread processed the order
 	if res.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
 
-	// Update the localized driver status to ONLINE_EN_ROUTE in relational storage 
+	// Update the localized driver status to ONLINE_EN_ROUTE in relational storage
 	driverQuery := `
 		UPDATE drivers
 		SET current_state = 'ONLINE_EN_ROUTE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP
@@ -393,7 +402,7 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 		return err
 	}
 
-	// Log metrics metadata to the immutable audit ledger 
+	// Log metrics metadata to the immutable audit ledger
 	logQuery := `
 		INSERT INTO dispatch_match_logs (
 			order_id, batch_window_started_at, batch_window_ended_at, 
@@ -401,14 +410,14 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 			computed_eta_seconds, assignment_score
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 	`
-	_, err = tx.Exec(ctx, logQuery, 
-		match.OrderID, 
-		time.Now().Add(-300*time.Millisecond), 
-		time.Now(), 
-		c.currentAlgo, 
-		match.CandidatesCount, 
-		match.DriverID, 
-		match.EstimatedEtaSeconds, 
+	_, err = tx.Exec(ctx, logQuery,
+		match.OrderID,
+		time.Now().Add(-300*time.Millisecond),
+		time.Now(),
+		c.currentAlgo,
+		match.CandidatesCount,
+		match.DriverID,
+		match.EstimatedEtaSeconds,
 		match.Score,
 	)
 	if err != nil {
@@ -418,11 +427,20 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 	return tx.Commit(ctx)
 }
 
-func (c *OrderCreatedConsumer) emitDriverStateChanged(ctx context.Context, driverID, newState string) error {
-	payload := map[string]interface{}{
-		"driver_id":  driverID,
-		"new_state":  newState,
-		"changed_at": time.Now().Unix(),
+func (c *OrderCreatedConsumer) evictAssignedDriver(ctx context.Context, cityPrefix string, match *matcher.MatchResult) error {
+	evictCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	return c.spatialScanner.EvictDriverFromCell(evictCtx, cityPrefix, match.DriverH3Cell, match.DriverID)
+}
+
+func (c *OrderCreatedConsumer) emitDriverStateChanged(ctx context.Context, cityPrefix, h3Cell, driverID, previousState, currentState string) error {
+	payload := events.DriverStateChangedEvent{
+		DriverID:      driverID,
+		CityPrefix:    cityPrefix,
+		PreviousState: previousState,
+		CurrentState:  currentState,
+		H3Cell:        h3Cell,
+		Timestamp:     time.Now(),
 	}
 	bytes, err := json.Marshal(payload)
 	if err != nil {
@@ -447,7 +465,7 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	}
 
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(match.OrderID), // Explicit hashing key for order.assigned 
+		Key:   []byte(match.OrderID), // Explicit hashing key for order.assigned
 		Value: bytes,
 	})
 }

@@ -8,18 +8,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/events"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
-
-type DriverStateChangedEvent struct {
-	DriverID      string    `json:"driver_id"`
-	CityPrefix    string    `json:"city_prefix"`
-	PreviousState string    `json:"previous_state"`
-	CurrentState  string    `json:"current_state"`
-	H3Cell        string    `json:"h3_cell"`
-	Timestamp     time.Time `json:"timestamp"`
-}
 
 type SupplyAggregatorStream struct {
 	kafkaReader   *kafka.Reader
@@ -59,7 +51,7 @@ func (s *SupplyAggregatorStream) StartAggregationEngine(ctx context.Context) {
 				continue
 			}
 
-			var event DriverStateChangedEvent
+			var event events.DriverStateChangedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
 				log.Printf("Dropped unparseable surge telemetry packet: %v", err)
 				continue
@@ -76,11 +68,11 @@ func (s *SupplyAggregatorStream) StartAggregationEngine(ctx context.Context) {
 	}
 }
 
-func (s *SupplyAggregatorStream) mutateRollingSupplyWindow(ctx context.Context, event DriverStateChangedEvent) error {
+func (s *SupplyAggregatorStream) mutateRollingSupplyWindow(ctx context.Context, event events.DriverStateChangedEvent) error {
 	// Build a predictable, slot-safe Redis key using hashtags
 	// Target layout: surge:supply:{city}:cellID
 	redisKey := fmt.Sprintf("surge:supply:{%s}:%s", event.CityPrefix, event.H3Cell)
-	
+
 	now := time.Now().Unix()
 	windowExpiration := now + int64(s.windowSize.Seconds())
 
@@ -100,7 +92,7 @@ func (s *SupplyAggregatorStream) mutateRollingSupplyWindow(ctx context.Context, 
 
 	// Clean out any stale entries across the historical window boundary
 	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d)", now))
-	
+
 	// Keep the cache key alive for twice the window size to prevent data gaps
 	pipe.Expire(ctx, redisKey, s.windowSize*2)
 
@@ -127,4 +119,8 @@ func (s *SupplyAggregatorStream) GetAvailableDriverCount(ctx context.Context, ci
 	}
 
 	return count, nil
+}
+
+func (s *SupplyAggregatorStream) Close() error {
+	return s.kafkaReader.Close()
 }

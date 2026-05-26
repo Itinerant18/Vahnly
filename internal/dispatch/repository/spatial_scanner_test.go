@@ -30,7 +30,7 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 	city := "NYC"
 	targetCellStr := "882a100d2dfffff"
 	targetCell := h3.FromString(targetCellStr)
-	
+
 	// Add some driver data to the target cell and a neighbor cell using ZSet structure
 	spatialRing := h3.KRing(targetCell, 1)
 	cell1 := h3.ToString(targetCell)
@@ -57,8 +57,10 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 
 	// Verify we got all 3 drivers
 	found := make(map[string]bool)
+	cells := make(map[string]string)
 	for _, c := range candidates {
 		found[c.DriverID] = true
+		cells[c.DriverID] = c.H3Cell
 	}
 
 	expectedDrivers := []string{"driver-1", "driver-2", "driver-3"}
@@ -66,6 +68,9 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 		if !found[d] {
 			t.Errorf("Expected candidate driver %s was not found in scanner results", d)
 		}
+	}
+	if cells["driver-1"] != cell1 || cells["driver-3"] != cell2 {
+		t.Errorf("Expected candidate H3 cells to be preserved, got driver-1=%s driver-3=%s", cells["driver-1"], cells["driver-3"])
 	}
 }
 

@@ -267,13 +267,18 @@ flowchart LR
 - `run_e2e_test.ps1` is the Windows orchestration script for E2E verification.
 - `bin/*` contains prebuilt binaries and local run logs for convenience.
 
-## Biggest Architectural Risks And Wiring Gaps
+## Closed Wiring Gaps
+
+| Former gap | Mitigation now in code |
+|---|---|
+| Surge and pricing packages had no service entrypoint. | Added `cmd/surge` for demand aggregation, supply aggregation, and surge calculation. Added `cmd/pricing` for `surge.zone.updated` cache sync. `cmd/surge` requires `SURGE_TRACKED_CELLS` to publish multipliers. |
+| `driver.state.changed` producer and consumer schemas did not match. | Added shared `internal/events.DriverStateChangedEvent`; dispatch emits it and the supply aggregator consumes it. |
+| Assignment updated Postgres but left the Redis spatial index available. | Spatial scanner now preserves candidate driver H3 cells, matcher propagates that cell into `MatchResult`, and dispatch evicts the assigned driver from the exact `drivers:zset:{city}:{h3_cell}` after DB commit. |
+
+## Remaining Architectural Risks
 
 | Risk / gap | Why it matters | Suggested fix |
 |---|---|---|
-| Surge and pricing packages have no service entrypoint. | Demand aggregation, supply aggregation, surge calculation, and pricing sync exist as packages, but nothing in `cmd/*` starts them. In a local or deployed run, pricing will not update unless another process is added. | Add explicit `cmd/surge` and `cmd/pricing` services, or intentionally fold those loops into an existing service with clear ownership. |
-| `driver.state.changed` producer and consumer schemas do not match. | Dispatch emits `driver_id`, `new_state`, and `changed_at`; the supply aggregator expects `driver_id`, `city_prefix`, `previous_state`, `current_state`, `h3_cell`, and `timestamp`. As written, supply aggregation cannot reliably update supply windows. | Define one shared event struct or protobuf schema and use it from both dispatch and surge aggregation. Include city and H3 cell in the emitted event. |
-| Assignment updates Postgres but does not update Redis availability state. | Dispatch marks the driver `ONLINE_EN_ROUTE` in Postgres and emits Kafka, but the Redis spatial index/profile can still make the driver look available until TTL or another telemetry update changes state. | On assignment, remove or mark the driver in Redis as unavailable in the same operational path, or make spatial scanning filter by the Redis status key. |
 | `driver.location.updated` is published but has no local consumer. | The topic exists and telemetry emits to it, but this checkout does not show a consumer for stale-driver detection, traffic probes, or surge supply updates. | Add the intended consumer or document the topic as integration output for an external service. |
 | `order.assigned` is published but has no local consumer. | Assignment events are useful for notifications, order state machines, and analytics, but this repo only emits them. | Add/point to the downstream consumer, or mark it as an external integration contract. |
 | Runtime CH graph is only a tiny seeded placeholder. | The architecture describes city-scale OSM/CH routing, but `cmd/dispatch` seeds only two nodes and two edges. ETA quality will be unrealistic outside tests or demos. | Add graph loading/preprocessing, or make the fallback behavior explicit in local/dev mode. |

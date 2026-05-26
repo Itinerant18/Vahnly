@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/redis/go-redis/v9"
 	"github.com/uber/h3-go/v3"
-	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 )
 
 type SpatialScanner struct {
@@ -33,7 +33,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	now := time.Now().Unix()
 	staleThreshold := now - 30 // 30-second stale sliding window threshold
 
-	var discoveredDriverIDs []string
+	discoveredDriverCells := make(map[string]string)
 
 	// 1. Gather all active driver IDs across localized rings
 	for _, cell := range spatialRing {
@@ -49,10 +49,14 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			return nil, fmt.Errorf("redis cluster zset fetch failed on key %s: %w", zsetKey, err)
 		}
 
-		discoveredDriverIDs = append(discoveredDriverIDs, driverIDs...)
+		for _, driverID := range driverIDs {
+			if _, exists := discoveredDriverCells[driverID]; !exists {
+				discoveredDriverCells[driverID] = cellStr
+			}
+		}
 	}
 
-	if len(discoveredDriverIDs) == 0 {
+	if len(discoveredDriverCells) == 0 {
 		return nil, nil
 	}
 
@@ -61,10 +65,10 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	pipe := s.clusterClient.Pipeline()
 	cmdMap := make(map[string]*redis.SliceCmd)
 
-	for _, driverID := range discoveredDriverIDs {
+	for driverID := range discoveredDriverCells {
 		// Target profile key schema enforcing strict slot uniformity via city hashtags
 		profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, driverID)
-		
+
 		// Queue HMGET to extract live metrics from the active caching layer
 		cmdMap[driverID] = pipe.HMGet(ctx, profileKey, "osm_node_id", "acceptance_rate", "cancellation_probability", "is_inside_surge_zone", "idle_seconds")
 	}
@@ -79,6 +83,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	// 3. Unpack Redis fields and map them to domain CandidateDriver structs
 	for driverID, cmd := range cmdMap {
 		fields, err := cmd.Result()
+		driverCell := discoveredDriverCells[driverID]
 
 		// Guard every field individually — a partial HASH write (e.g. crash mid-pipeline)
 		// leaves some slots nil, causing a type-assertion panic if only fields[0] is checked.
@@ -97,6 +102,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			candidates = append(candidates, matcher.CandidateDriver{
 				DriverID:                driverID,
 				OSMNodeID:               9999, // General city center vertex fallback
+				H3Cell:                  driverCell,
 				AcceptanceRate:          0.85,
 				CancellationProbability: 0.05,
 				IsInsideSurgeZone:       false,
@@ -116,6 +122,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		candidates = append(candidates, matcher.CandidateDriver{
 			DriverID:                driverID,
 			OSMNodeID:               osmNodeID,
+			H3Cell:                  driverCell,
 			AcceptanceRate:          float32(acceptanceRate),
 			CancellationProbability: float32(cancellationProb),
 			IsInsideSurgeZone:       isInsideSurge,
@@ -125,4 +132,15 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	}
 
 	return candidates, nil
+}
+
+func (s *SpatialScanner) EvictDriverFromCell(ctx context.Context, cityPrefix, h3Cell, driverID string) error {
+	if h3Cell == "" {
+		return fmt.Errorf("missing_driver_h3_cell: %s", driverID)
+	}
+	spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, h3Cell)
+	if err := s.clusterClient.ZRem(ctx, spatialZSetKey, driverID).Err(); err != nil {
+		return fmt.Errorf("redis spatial eviction failed on key %s: %w", spatialZSetKey, err)
+	}
+	return nil
 }

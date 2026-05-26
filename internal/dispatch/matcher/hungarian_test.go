@@ -134,6 +134,7 @@ func TestEvaluateHungarianBatch_SingleOrderSingleDriver(t *testing.T) {
 	driver := CandidateDriver{
 		DriverID:       "test-driver-1",
 		OSMNodeID:      200,
+		H3Cell:         "882a100d2dfffff",
 		DistanceMeters: 1000,
 		AcceptanceRate: 0.95,
 		IdleSeconds:    300,
@@ -158,6 +159,9 @@ func TestEvaluateHungarianBatch_SingleOrderSingleDriver(t *testing.T) {
 	}
 	if results[0].OrderID != "test-order-1" || results[0].DriverID != "test-driver-1" {
 		t.Errorf("Wrong match: %+v", results[0])
+	}
+	if results[0].DriverH3Cell != driver.H3Cell {
+		t.Errorf("Expected driver H3 cell %s, got %s", driver.H3Cell, results[0].DriverH3Cell)
 	}
 }
 
@@ -271,7 +275,7 @@ func TestComputeSingleEdgeCost_Deterministic(t *testing.T) {
 	}
 	driver := CandidateDriver{
 		DriverID:                "test-driver",
-		DistanceMeters:          1110,  // 1110 / 11.1 = 100 seconds
+		DistanceMeters:          1110, // 1110 / 11.1 = 100 seconds
 		AcceptanceRate:          0.90,
 		CancellationProbability: 0.05,
 		IsInsideSurgeZone:       true,

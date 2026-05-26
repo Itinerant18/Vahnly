@@ -22,7 +22,8 @@ type ETACorrector interface {
 
 type CandidateDriver struct {
 	DriverID                string
-	OSMNodeID               int64 
+	OSMNodeID               int64
+	H3Cell                  string
 	DistanceMeters          float64
 	AcceptanceRate          float32
 	CancellationProbability float32
@@ -33,6 +34,7 @@ type CandidateDriver struct {
 type MatchResult struct {
 	OrderID             string
 	DriverID            string
+	DriverH3Cell        string
 	Score               float64
 	EstimatedEtaSeconds int
 	CandidatesCount     int
@@ -162,12 +164,20 @@ func EvaluateHungarianBatch(ctx context.Context, orders []domain.OrderCreatedPay
 		if row < nOrders && col < nDrivers {
 			targetDriver := uniqueDrivers[col]
 			targetOrder := orders[row]
-			
+			matchedDriver := targetDriver
+			for _, candidate := range driverLocationMap[targetOrder.OrderID] {
+				if candidate.DriverID == targetDriver.DriverID {
+					matchedDriver = candidate
+					break
+				}
+			}
+
 			// Exclude invalid high-penalty assignments to enforce spatial limits
 			if costMatrix[row][col] < 1e6 {
 				results = append(results, MatchResult{
 					OrderID:             targetOrder.OrderID,
-					DriverID:            targetDriver.DriverID,
+					DriverID:            matchedDriver.DriverID,
+					DriverH3Cell:        matchedDriver.H3Cell,
 					Score:               costMatrix[row][col],
 					EstimatedEtaSeconds: etaCache[row][col],
 					CandidatesCount:     nDrivers,
