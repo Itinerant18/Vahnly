@@ -1,9 +1,13 @@
-2026/05/26 11:18:59 Starting Dispatch Matching Service. Strategy: GREEDY, Triton: localhost:8001
-2026/05/26 11:18:59 PostgreSQL connection pool initialized successfully.
-2026/05/26 11:18:59 Redis 6-shard Cluster state discovery finalized.
-2026/05/26 11:18:59 Connected to Triton Inference Server at localhost:8001
-2026/05/26 11:18:59 Starting Order Matching Engine loop. Running strategy: GREEDY
-2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
-2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
-2026/05/26 11:18:59 Marketplace Starvation: No available drivers near cell 88754cb247fffff
-2026/05/26 11:19:11 [INTELLIGENCE_FALLBACK] Triton inference failed. Using baseline CH ETA: triton_inference_failed: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it."
+2026/05/26 11:28:40 Starting Dispatch Matching Service. Strategy: GREEDY, Triton: 127.0.0.1:8001
+2026/05/26 11:28:40 PostgreSQL connection pool initialized successfully.
+2026/05/26 11:28:40 Redis 6-shard Cluster state discovery finalized.
+2026/05/26 11:28:40 Connected to Triton Inference Server at 127.0.0.1:8001
+2026/05/26 11:28:40 Starting Order Matching Engine loop. Running strategy: GREEDY
+2026/05/26 11:28:41 Marketplace Starvation: No available drivers near cell 88754cb247fffff. Progressing offset.
+2026/05/26 11:28:41 Marketplace Starvation: No available drivers near cell 88754cb247fffff. Progressing offset.
+2026/05/26 11:30:05 [INTELLIGENCE_FALLBACK] Triton inference failed. Using baseline CH ETA: triton_inference_failed: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:8001: connectex: No connection could be made because the target machine actively refused it."
+2026/05/26 11:30:06 Critical downstream event streaming partition lost: context deadline exceeded
+2026/05/26 11:30:38 [INTELLIGENCE_FALLBACK] Triton inference failed. Using baseline CH ETA: triton_inference_failed: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:8001: connectex: No connection could be made because the target machine actively refused it."
+2026/05/26 11:30:38 Idempotency Intercept: Order f47ac10b-58cc-4372-a567-0e02b2c3d479 already mutated by concurrent worker
+2026/05/26 11:31:02 [ROUTING_CIRCUIT_BREAKER] Fallback triggered for driver a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11: routing_error: unresolvable graph disconnected state
+2026/05/26 11:31:02 Idempotency Intercept: Order f47ac10b-58cc-4372-a567-0e02b2c3d479 already mutated by concurrent worker

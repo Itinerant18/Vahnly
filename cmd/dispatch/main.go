@@ -15,18 +15,16 @@ import (
 
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
-	"github.com/platform/driver-delivery/internal/routing/graph"
 	"github.com/platform/driver-delivery/internal/intelligence/client"
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
+	"github.com/platform/driver-delivery/internal/routing/graph"
 )
 
-// simpleRoutingService wraps the contraction hierarchies service, pre-seeded with node 1001
 type simpleRoutingService struct {
 	chService *graph.ContractionHierarchiesService
 }
 
 func (s *simpleRoutingService) ComputeShortestPathETA(ctx context.Context, sourceID, targetID int64) (float64, error) {
-	// Fall back to the in-memory Contraction Hierarchies engine
 	return s.chService.ComputeShortestPathETA(ctx, sourceID, targetID)
 }
 
@@ -38,19 +36,18 @@ func main() {
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
-	algoStrategy := getEnv("ALGORITHM_STRATEGY", "GREEDY")
-	tritonAddr := getEnv("TRITON_SERVER_ADDR", "localhost:8001")
+	algoStrategy := getEnv("ALGORITHM_STRATEGY", "HUNGARIAN") // Defaulting to global batch matrix matching
+	tritonURL := getEnv("TRITON_SERVER_URL", "127.0.0.1:8001")    // Enforcing IPv4 explicit coordinate mapping
 
-	log.Printf("Starting Dispatch Matching Service. Strategy: %s, Triton: %s", algoStrategy, tritonAddr)
+	log.Printf("Starting Dispatch Matching Service. Target Strategy Matrix: %s", algoStrategy)
 
 	// 2. Initialize PostgreSQL Connection Pool via pgxpool
 	pgxConfig, err := pgxpool.ParseConfig(postgresURL)
 	if err != nil {
 		log.Fatalf("Unable to parse PostgreSQL connection string: %v", err)
 	}
-
-	pgxConfig.MaxConns = 10
-	pgxConfig.MinConns = 2
+	pgxConfig.MaxConns = 20
+	pgxConfig.MinConns = 4
 	pgxConfig.MaxConnIdleTime = 15 * time.Minute
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
@@ -59,16 +56,15 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	// Verify DB connectivity before proceeding
 	if err := dbPool.Ping(ctx); err != nil {
 		log.Fatalf("PostgreSQL database ping failed: %v", err)
 	}
 	log.Println("PostgreSQL connection pool initialized successfully.")
 
-	// 3. Initialize Redis Cluster Driver (Explicitly bypassing Sentinel to eliminate failover lag)
+	// 3. Initialize Redis Cluster Driver (Bypassing Sentinel to eliminate failover lag)
 	nodeList := strings.Split(redisNodes, ",")
 
-	// Support local port-forwarded routing mapping
+	// Support local port-forwarded routing mapping (required for k8s dev environments)
 	ipMapStr := os.Getenv("REDIS_IP_MAP")
 	ipMap := make(map[string]string)
 	if ipMapStr != "" {
@@ -97,37 +93,36 @@ func main() {
 	})
 	defer redisClusterClient.Close()
 
-	// Verify Redis Cluster health
 	if err := redisClusterClient.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Redis Cluster connection discovery failed: %v", err)
 	}
 	log.Println("Redis 6-shard Cluster state discovery finalized.")
 
-	// 4. Initialize Contraction Hierarchies Routing Service
+	// 4. Initialize Triton Inference Server Client
+	var tritonClient *client.TritonClient
+	if tritonURL != "" {
+		var tritonErr error
+		tritonClient, tritonErr = client.NewTritonClient(tritonURL)
+		if tritonErr != nil {
+			log.Printf("[WARNING] Triton client init failed: %v. Running in pure-graph mode.", tritonErr)
+		} else {
+			log.Printf("Connected to Triton Inference Server at %s", tritonURL)
+			defer tritonClient.Close()
+		}
+	}
+
+	// 5. Initialize Contraction Hierarchies Routing Service
 	chService := graph.NewContractionHierarchiesService()
-	// Pre-seed node 1001 so that our smoke test matching doesn't hit disconnected routing error
 	chService.AddNode(&graph.CHNode{ID: 1001, Latitude: 22.5726, Longitude: 88.3639, Order: 1})
-	// Pre-seed node 9999 for fallback routing
+	// Node 9999 is the fallback OSM node for drivers with stale Redis profiles
 	chService.AddNode(&graph.CHNode{ID: 9999, Latitude: 22.5726, Longitude: 88.3639, Order: 2})
 	chService.AddEdge(1001, 9999, 10.0, false)
 	chService.AddEdge(9999, 1001, 10.0, false)
 	routingSvc := &simpleRoutingService{chService: chService}
 
-	// 5. Initialize Intelligence Layer
-	var tritonClient *client.TritonClient
-	if tritonAddr != "" {
-		var err error
-		tritonClient, err = client.NewTritonClient(tritonAddr)
-		if err != nil {
-			log.Printf("[WARNING] Triton Inference Server client initialization failed: %v. Running in pure-graph mode.", err)
-		} else {
-			log.Printf("Connected to Triton Inference Server at %s", tritonAddr)
-			defer tritonClient.Close()
-		}
-	}
 	etaCorrector := usecase.NewETACorrectorUseCase(tritonClient, routingSvc)
 
-	// 6. Initialize Scanner and Order Created Consumer
+	// 6. Assemble Structural Abstractions & Matching Consumer
 	spatialScanner := dispatchRepo.NewSpatialScanner(redisClusterClient)
 	brokersList := strings.Split(kafkaBrokers, ",")
 
@@ -142,27 +137,23 @@ func main() {
 	defer func() {
 		if err := orderConsumer.Close(); err != nil {
 			log.Printf("Failed to close order consumer: %v", err)
-		} else {
-			log.Println("Order consumer closed gracefully.")
 		}
 	}()
 
-	// 6. Start the match execution loop in the background
-	go func() {
-		orderConsumer.StartExecutionPipeline(ctx)
-	}()
+	// 7. Start Match Execution Loop in Background Thread
+	go orderConsumer.StartExecutionPipeline(ctx) //
 
-	// 7. System Signal Intercept and Graceful Shutdown Protocol
+	// 8. System Signal Intercept and Graceful Shutdown Protocol
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	<-shutdownSignal
-	log.Println("Shutdown request intercepted. Stopping engine...")
+	log.Println("Shutdown request intercepted. Stopping core dispatch match loops...")
 }
 
 func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
+	if value, exists := os.LookupEnv(key); exists { //
 		return value
 	}
-	return defaultValue
+	return defaultValue //
 }

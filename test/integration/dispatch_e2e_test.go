@@ -112,7 +112,7 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 
 	// 4. Seed Redis Cluster Driver Profile
 	t.Log("Seeding Redis driver profile...")
-	profileKey := "driver:{KOL}:profile:a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+	profileKey := "driver:{KOL:a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}:profile"
 	err = redisClient.HSet(ctx, profileKey, map[string]interface{}{
 		"osm_node_id":              "1001",
 		"acceptance_rate":          "0.95",
@@ -136,7 +136,7 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 		}
 	}()
 
-	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka)
+	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil)
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUC)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:50051")

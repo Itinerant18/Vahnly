@@ -18,48 +18,58 @@ import (
 )
 
 type OrderCreatedConsumer struct {
-	kafkaReader    *kafka.Reader
-	kafkaWriter    *kafka.Writer
-	spatialScanner *repository.SpatialScanner
-	dbPool         *pgxpool.Pool
-	etaCorrector   matcher.ETACorrector
-	
+	kafkaReader        *kafka.Reader
+	kafkaWriter        *kafka.Writer
+	driverStateWriter  *kafka.Writer
+	spatialScanner     *repository.SpatialScanner
+	dbPool             *pgxpool.Pool
+	etaCorrector       matcher.ETACorrector
+
 	// Batch window synchronization structures
-	mu            sync.Mutex
-	batchWindow   time.Duration
-	maxBatchSize  int
-	orderBuffer   []domain.OrderCreatedPayload
-	windowTimer   *time.Timer
-	currentAlgo   string // Runtime strategy flag: 'GREEDY', 'HUNGARIAN', 'AUCTION'
+	mu           sync.Mutex
+	batchWindow  time.Duration
+	maxBatchSize int
+	orderBuffer  []domain.OrderCreatedPayload
+	windowTimer  *time.Timer
+	currentAlgo  string 
 }
 
-func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, etaCorrector matcher.ETACorrector) *OrderCreatedConsumer {
+func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, db *pgxpool.Pool, algoStrategy string, optionalArgs ...matcher.ETACorrector) *OrderCreatedConsumer {
+	var etaCorrector matcher.ETACorrector
+	if len(optionalArgs) > 0 {
+		etaCorrector = optionalArgs[0]
+	}
 	return &OrderCreatedConsumer{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
-			Topic:          "order.created", // [cite: 76]
-			GroupID:        groupID,         // Concurrency balancing via KEDA [cite: 33, 107]
+			Topic:          "order.created", 
+			GroupID:        groupID,         
 			MinBytes:       10,
 			MaxBytes:       10e6,
-			CommitInterval: 0,               // Explicit synchronous manual commits only
+			CommitInterval: 0, // Explicit synchronous manual commits only
 		}),
 		kafkaWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
-			Topic:        "order.assigned", // [cite: 76]
-			Balancer:     &kafka.Hash{},    // Partitioned by order_id [cite: 76]
+			Topic:        "order.assigned", 
+			Balancer:     &kafka.Hash{},    
+			RequiredAcks: kafka.RequireOne,
+		},
+		driverStateWriter: &kafka.Writer{
+			Addr:         kafka.TCP(brokers...),
+			Topic:        "driver.state.changed", 
+			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
 		spatialScanner: scanner,
 		dbPool:         db,
 		etaCorrector:   etaCorrector,
-		batchWindow:    300 * time.Millisecond, // Configurable 200-400ms window [cite: 61]
-		maxBatchSize:   150,                    // Size trigger mandate [cite: 62]
+		batchWindow:    300 * time.Millisecond, 
+		maxBatchSize:   150,                    
 		orderBuffer:    make([]domain.OrderCreatedPayload, 0),
-		currentAlgo:    algoStrategy,           // Strategy Pattern abstraction [cite: 70]
+		currentAlgo:    algoStrategy, 
 	}
 }
 
-// StartExecutionPipeline starts the time-windowed event consumer loop
 func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 	log.Printf("Starting Order Matching Engine loop. Running strategy: %s", c.currentAlgo)
 	
@@ -67,7 +77,6 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 	c.windowTimer = time.NewTimer(c.batchWindow)
 	c.mu.Unlock()
 
-	// Background worker processing discrete batch windows when timers expire
 	go c.processBatchLoop(ctx)
 
 	for {
@@ -87,17 +96,15 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 			var order domain.OrderCreatedPayload
 			if err := json.Unmarshal(msg.Value, &order); err != nil {
 				log.Printf("Malformed JSON event dropped: %v", err)
-				_ = c.kafkaReader.CommitMessages(ctx, msg) // Evict broken packets
+				_ = c.kafkaReader.CommitMessages(ctx, msg) 
 				continue
 			}
 			
-			// Store message context to allow explicit offset commit post-assignment
 			order.KafkaMessageContext = msg
 
 			c.mu.Lock()
 			c.orderBuffer = append(c.orderBuffer, order)
 			
-			// Immediate evaluation trigger if volume threshold exceeded [cite: 62]
 			if len(c.orderBuffer) >= c.maxBatchSize {
 				c.triggerBatchFlush()
 			}
@@ -113,7 +120,7 @@ func (c *OrderCreatedConsumer) triggerBatchFlush() {
 		default:
 		}
 	}
-	c.windowTimer.Reset(0) // Forces immediate selection channel case execution
+	c.windowTimer.Reset(0)
 }
 
 func (c *OrderCreatedConsumer) processBatchLoop(ctx context.Context) {
@@ -129,19 +136,28 @@ func (c *OrderCreatedConsumer) processBatchLoop(ctx context.Context) {
 				continue
 			}
 
-			// Extract data pool from memory context and clear active slice
 			batchToProcess := c.orderBuffer
 			c.orderBuffer = make([]domain.OrderCreatedPayload, 0)
 			c.windowTimer.Reset(c.batchWindow)
 			c.mu.Unlock()
 
-			// Route multi-order batch to execution solver
 			c.executeMatchingBatch(ctx, batchToProcess)
 		}
 	}
 }
 
 func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders []domain.OrderCreatedPayload) {
+	if len(orders) == 0 {
+		return
+	}
+
+	// 1. Route to Global Hungarian Solver if specified by the runtime configuration
+	if c.currentAlgo == "HUNGARIAN" {
+		c.executeHungarianBatchPool(ctx, orders)
+		return
+	}
+
+	// 2. Fallback to fixed high-speed parallel greedy loop execution paths
 	var wg sync.WaitGroup
 	var (
 		collectedMessages []kafka.Message
@@ -153,70 +169,153 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 		go func(o domain.OrderCreatedPayload) {
 			defer wg.Done()
 
-			// Allocate its own dedicated short-lived context to isolate network overhead
-			orderCtx, cancel := context.WithTimeout(ctx, 2000*time.Millisecond)
+			orderCtx, cancel := context.WithTimeout(ctx, 350*time.Millisecond)
 			defer cancel()
 
-			// 1. Spatial Reduction Phase: Fetch candidates via O(1) Redis Cluster lookups [cite: 12, 23]
 			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
-			if err != nil {
-				log.Printf("Spatial reduction mapping failed for order %s: %v", o.OrderID, err)
+			if err != nil || len(candidates) == 0 {
+				log.Printf("Greedy worker starvation or failure on order %s. Advancing offset.", o.OrderID)
+				mu.Lock()
+				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
+				mu.Unlock()
 				return
 			}
 
-			if len(candidates) == 0 {
-				log.Printf("Marketplace Starvation: No available drivers near cell %s", o.PickupH3Cell)
-				return
-			}
-
-			// 2. Select Algorithm via Strategy Pattern based on runtime profiles [cite: 70, 71]
-			var optimalMatch *matcher.MatchResult
-			var matchErr error
-
-			switch c.currentAlgo {
-			case "HUNGARIAN": // Scaled approach for 500-5,000 concurrent metrics [cite: 69]
-				optimalMatch, matchErr = matcher.EvaluateHungarianOptimization(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
-			case "GREEDY":    // Default deployment configuration [cite: 69]
-				fallthrough
-			default:
-				optimalMatch, matchErr = matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
-			}
-
+			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
 			if matchErr != nil {
-				log.Printf("Combinatorial computation error on order %s: %v", o.OrderID, matchErr)
+				log.Printf("Greedy match failed for order %s: %v. Advancing offset.", o.OrderID, matchErr)
+				mu.Lock()
+				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
+				mu.Unlock()
 				return
 			}
 
-			// 3. Persistent Transaction Verification & Mutex Commitment
 			err = c.commitAssignmentTransaction(orderCtx, optimalMatch)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					log.Printf("Idempotency Intercept: Order %s already mutated by concurrent worker", o.OrderID)
-				} else {
-					log.Printf("Critical database write failure: %v", err)
+					// Idempotency: order already assigned by a concurrent worker
+					mu.Lock()
+					collectedMessages = append(collectedMessages, o.KafkaMessageContext)
+					mu.Unlock()
 				}
 				return
 			}
 
-			// 4. Downstream Notification & Downstream Event Emission
-			if err := c.emitAssignedEvent(orderCtx, optimalMatch); err != nil {
-				log.Printf("Critical downstream event streaming partition lost: %v", err)
-				return
-			}
-
-			// Collect Kafka message context thread-safely for batch commit
+			// Collect offset BEFORE emit attempts — DB is already mutated so we must
+			// advance the partition regardless of downstream publish success.
 			mu.Lock()
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 			mu.Unlock()
+
+			if err := c.emitAssignedEvent(orderCtx, optimalMatch); err != nil {
+				log.Printf("order.assigned emit failed for order %s: %v", o.OrderID, err)
+			}
+			if err := c.emitDriverStateChanged(orderCtx, optimalMatch.DriverID, "ONLINE_EN_ROUTE"); err != nil {
+				log.Printf("Driver state event publish failed for driver %s: %v", optimalMatch.DriverID, err)
+			}
 		}(order)
 	}
-
 	wg.Wait()
 
-	// 5. Explicitly acknowledge processing completion back to Kafka log as a batch commit
+	if len(collectedMessages) > 0 {
+		_ = c.kafkaReader.CommitMessages(ctx, collectedMessages...)
+	}
+}
+
+// executeHungarianBatchPool resolves matching logic globally across all buffered entries
+func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, orders []domain.OrderCreatedPayload) {
+	batchCtx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
+	defer cancel()
+
+	driverLocationMap := make(map[string][]matcher.CandidateDriver)
+	uniqueDriverTracker := make(map[string]matcher.CandidateDriver)
+	var mapMu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Fetch candidates across cells concurrently using separate threads to satisfy the SLA limits
+	for _, order := range orders {
+		wg.Add(1)
+		go func(o domain.OrderCreatedPayload) {
+			defer wg.Done()
+			candidates, err := c.spatialScanner.ScanNearbyDrivers(batchCtx, o.CityPrefix, o.PickupH3Cell)
+			if err != nil {
+				return
+			}
+
+			mapMu.Lock()
+			driverLocationMap[o.OrderID] = candidates
+			for _, d := range candidates {
+				uniqueDriverTracker[d.DriverID] = d
+			}
+			mapMu.Unlock()
+		}(order)
+	}
+	wg.Wait()
+
+	var uniqueDrivers []matcher.CandidateDriver
+	for _, d := range uniqueDriverTracker {
+		uniqueDrivers = append(uniqueDrivers, d)
+	}
+
+	// Pass compiled pools directly to the global solver
+	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector)
+	if err != nil {
+		log.Printf("[HUNGARIAN_BATCH_ERROR] Matrix optimization failed: %v", err)
+		return
+	}
+
+	var collectedMessages []kafka.Message
+	orderMap := make(map[string]domain.OrderCreatedPayload)
+	for _, o := range orders {
+		orderMap[o.OrderID] = o
+	}
+
+	matchedOrderIDs := make(map[string]bool)
+
+	// Commit assignments sequentially inside separate row transaction frames
+	for _, match := range matches {
+		matchItem := match
+		err = c.commitAssignmentTransaction(batchCtx, &matchItem)
+		if err == nil {
+			matchedOrderIDs[matchItem.OrderID] = true
+			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
+			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
+			}
+			if err := c.emitAssignedEvent(batchCtx, &matchItem); err != nil {
+				log.Printf("order.assigned emit failed for order %s: %v", matchItem.OrderID, err)
+			}
+			if err := c.emitDriverStateChanged(batchCtx, matchItem.DriverID, "ONLINE_EN_ROUTE"); err != nil {
+				log.Printf("Driver state event publish failed for driver %s: %v", matchItem.DriverID, err)
+			}
+		} else if errors.Is(err, pgx.ErrNoRows) {
+			// Idempotency: already assigned by a concurrent batch
+			matchedOrderIDs[matchItem.OrderID] = true
+			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				collectedMessages = append(collectedMessages, oEvent.KafkaMessageContext)
+			}
+		}
+	}
+
+	// Advance offsets for ALL unmatched orders — not just zero-candidate ones.
+	// An order can be unmatched because all nearby drivers were assigned to other orders
+	// in the same batch, or because the cost matrix filtered every assignment above 1e6.
+	// Either way the offset must advance or the partition stalls permanently.
+	for _, o := range orders {
+		if !matchedOrderIDs[o.OrderID] {
+			if len(driverLocationMap[o.OrderID]) == 0 {
+				log.Printf("Marketplace Starvation (HUNGARIAN): No available drivers near cell %s. Advancing offset.", o.PickupH3Cell)
+			} else {
+				log.Printf("Hungarian: Order %s had %d candidates but no valid assignment (all drivers allocated). Advancing offset.", o.OrderID, len(driverLocationMap[o.OrderID]))
+			}
+			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
+		}
+	}
+
+	// Acknowledge all processed offsets cleanly inside a single network pass
 	if len(collectedMessages) > 0 {
 		if err := c.kafkaReader.CommitMessages(ctx, collectedMessages...); err != nil {
-			log.Printf("[KAFKA_COMMIT_ERROR] Failed batch offset commit: %v", err)
+			log.Printf("[HUNGARIAN_COMMIT_ERROR] Failed batch partition progression: %v", err)
 		}
 	}
 }
@@ -228,7 +327,7 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 	}
 	defer tx.Rollback(ctx)
 
-	// Enforce linear state trajectory constraint [cite: 19]
+	// Enforce linear state trajectory constraint 
 	query := `
 		UPDATE orders
 		SET 
@@ -245,12 +344,12 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 		return err
 	}
 
-	// If row count is 0, the state check failed or another thread processed the order [cite: 109]
+	// If row count is 0, the state check failed or another thread processed the order 
 	if res.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
 
-	// Update the localized driver status to ONLINE_EN_ROUTE in relational storage [cite: 38]
+	// Update the localized driver status to ONLINE_EN_ROUTE in relational storage 
 	driverQuery := `
 		UPDATE drivers
 		SET current_state = 'ONLINE_EN_ROUTE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP
@@ -261,7 +360,7 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 		return err
 	}
 
-	// Log metrics metadata to the immutable audit ledger [cite: 99]
+	// Log metrics metadata to the immutable audit ledger 
 	logQuery := `
 		INSERT INTO dispatch_match_logs (
 			order_id, batch_window_started_at, batch_window_ended_at, 
@@ -286,6 +385,22 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 	return tx.Commit(ctx)
 }
 
+func (c *OrderCreatedConsumer) emitDriverStateChanged(ctx context.Context, driverID, newState string) error {
+	payload := map[string]interface{}{
+		"driver_id":  driverID,
+		"new_state":  newState,
+		"changed_at": time.Now().Unix(),
+	}
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return c.driverStateWriter.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(driverID),
+		Value: bytes,
+	})
+}
+
 func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *matcher.MatchResult) error {
 	payload := map[string]interface{}{
 		"order_id":    match.OrderID,
@@ -299,12 +414,13 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	}
 
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(match.OrderID), // Explicit hashing key for order.assigned [cite: 76]
+		Key:   []byte(match.OrderID), // Explicit hashing key for order.assigned 
 		Value: bytes,
 	})
 }
 
 func (c *OrderCreatedConsumer) Close() error {
 	_ = c.kafkaReader.Close()
+	_ = c.driverStateWriter.Close()
 	return c.kafkaWriter.Close()
 }

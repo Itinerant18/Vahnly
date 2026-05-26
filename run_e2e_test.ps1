@@ -149,6 +149,8 @@ $dispatchWrapper = @"
 `$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
 `$env:KAFKA_BROKERS       = "localhost:19092"
 `$env:ALGORITHM_STRATEGY  = "GREEDY"
+`$env:TRITON_SERVER_ADDR  = "127.0.0.1:8001"
+`$env:TRITON_SERVER_URL   = "127.0.0.1:8001"
 `$env:REDIS_IP_MAP        = "$($env:REDIS_IP_MAP)"
 & "C:\workspace\Driver\bin\dispatch.exe"
 "@

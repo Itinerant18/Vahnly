@@ -96,7 +96,7 @@ func main() {
 
 	// 4. Initialize Dependency Tree Layers
 	redisRepo := repository.NewRedisRepository(redisClusterClient)
-	
+
 	// Initialize real Kafka Producer
 	brokersList := strings.Split(kafkaBrokers, ",")
 	kafkaProducer := repository.NewKafkaProducer(brokersList)
@@ -110,7 +110,8 @@ func main() {
 		}
 	}()
 
-	telemetryUseCase := usecase.NewTelemetryUseCase(redisRepo, kafkaProducer)
+	driverMetrics := repository.NewPostgresDriverMetrics(dbPool)
+	telemetryUseCase := usecase.NewTelemetryUseCase(redisRepo, kafkaProducer, driverMetrics)
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUseCase)
 
 	// 5. Initialize and Bind the gRPC TCP Server Loop

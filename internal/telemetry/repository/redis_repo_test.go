@@ -32,10 +32,10 @@ func TestSetDriverLocation_GhostDriverEviction(t *testing.T) {
 	cell2 := "882a100d2d2ffff"
 
 	// Define keys
-	statusKey := fmt.Sprintf("driver:{%s}:status:%s", city, driverID)
-	trackerKey := fmt.Sprintf("driver:{%s}:current_cell:%s", city, driverID)
-	zsetKey1 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell1)
-	zsetKey2 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell2)
+	statusKey := fmt.Sprintf("driver:{%s:%s}:status", city, driverID)
+	trackerKey := fmt.Sprintf("driver:{%s:%s}:current_cell", city, driverID)
+	zsetKey1 := fmt.Sprintf("drivers:zset:%s:%s", city, cell1)
+	zsetKey2 := fmt.Sprintf("drivers:zset:%s:%s", city, cell2)
 
 	// Clean up before and after
 	cleanup := func() {

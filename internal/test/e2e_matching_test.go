@@ -132,8 +132,8 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	_, _ = dbPool.Exec(ctx, "DELETE FROM drivers WHERE id = $1::uuid", testDriverID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM regional_cities WHERE city_prefix = 'KOL'")
 	
-	// Clear the targeted H3 spatial cache index ZSET slot and driver profile hash
-	_ = rClient.Del(ctx, "drivers:zset:{KOL}:88754cb247fffff", fmt.Sprintf("driver:{KOL}:profile:%s", testDriverID))
+	// Clear the targeted H3 spatial cache index ZSET and driver profile hash
+	_ = rClient.Del(ctx, "drivers:zset:KOL:88754cb247fffff", fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID))
 
 	// Pre-seed Required Relational Structural Dependencies
 	_, err = dbPool.Exec(ctx, "INSERT INTO regional_cities (city_prefix, city_name, is_active) VALUES ('KOL', 'Kolkata', true)")
@@ -158,7 +158,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	}
 
 	// Pre-populate the driver profile hash parameters inside Redis cache to satisfy the hydrator pipeline
-	profileKey := fmt.Sprintf("driver:{KOL}:profile:%s", testDriverID)
+	profileKey := fmt.Sprintf("driver:{KOL:%s}:profile", testDriverID)
 	err = rClient.HSet(ctx, profileKey, map[string]interface{}{
 		"osm_node_id":               "10001",
 		"acceptance_rate":           "0.98",
@@ -199,7 +199,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// Boot the gRPC Driver Telemetry Ingestion Node
 	telemetryRedis := telemetryRepo.NewRedisRepository(rClient)
 	mockProducerPlaceholder := &mockKafkaProducer{} // Ingestion fallback stub
-	tUseCase := telemetryUseCase.NewTelemetryUseCase(telemetryRedis, mockProducerPlaceholder)
+	tUseCase := telemetryUseCase.NewTelemetryUseCase(telemetryRedis, mockProducerPlaceholder, nil)
 	grpcHandler := telemetryGrpc.NewLocationIngestionHandler(tUseCase)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:"+gRPCtestPort)
@@ -261,12 +261,13 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	defer kafkaWriter.Close()
 
 	orderPayload := domain.OrderCreatedPayload{
-		OrderID:      testOrderID,
-		CityPrefix:   "KOL",
-		CustomerID:   "c81d4e2e-bcf2-11e6-869b-7df243852131",
-		PickupH3Cell: "88754cb247fffff",
-		PickupLat:    22.5726,
-		PickupLng:    88.3639,
+		OrderID:         testOrderID,
+		CityPrefix:      "KOL",
+		CustomerID:      "c81d4e2e-bcf2-11e6-869b-7df243852131",
+		PickupH3Cell:    "88754cb247fffff",
+		PickupLat:       22.5726,
+		PickupLng:       88.3639,
+		PickupOSMNodeID: 1001, // node pre-seeded in cmd/dispatch/main.go CH graph
 	}
 	payloadBytes, _ := json.Marshal(orderPayload)
 	

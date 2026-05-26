@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -37,7 +38,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	// 1. Gather all active driver IDs across localized rings
 	for _, cell := range spatialRing {
 		cellStr := h3.ToString(cell)
-		zsetKey := fmt.Sprintf("drivers:zset:{%s}:%s", cityPrefix, cellStr)
+		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cellStr)
 
 		driverIDs, err := s.clusterClient.ZRevRangeByScore(ctx, zsetKey, &redis.ZRangeBy{
 			Max: fmt.Sprintf("%d", now),
@@ -62,21 +63,36 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 
 	for _, driverID := range discoveredDriverIDs {
 		// Target profile key schema enforcing strict slot uniformity via city hashtags
-		profileKey := fmt.Sprintf("driver:{%s}:profile:%s", cityPrefix, driverID)
+		profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, driverID)
 		
 		// Queue HMGET to extract live metrics from the active caching layer
 		cmdMap[driverID] = pipe.HMGet(ctx, profileKey, "osm_node_id", "acceptance_rate", "cancellation_probability", "is_inside_surge_zone", "idle_seconds")
 	}
 
 	// Execute pipelined reads concurrently across cluster shards
-	_, _ = pipe.Exec(ctx)
+	if _, err := pipe.Exec(ctx); err != nil {
+		log.Printf("[SPATIAL_SCANNER] profile pipeline exec error: %v", err)
+	}
 
 	var candidates []matcher.CandidateDriver
 
 	// 3. Unpack Redis fields and map them to domain CandidateDriver structs
 	for driverID, cmd := range cmdMap {
 		fields, err := cmd.Result()
-		if err != nil || len(fields) != 5 || fields[0] == nil {
+
+		// Guard every field individually — a partial HASH write (e.g. crash mid-pipeline)
+		// leaves some slots nil, causing a type-assertion panic if only fields[0] is checked.
+		anyNil := len(fields) != 5
+		if !anyNil {
+			for _, f := range fields {
+				if f == nil {
+					anyNil = true
+					break
+				}
+			}
+		}
+
+		if err != nil || anyNil {
 			// Fallback configuration if a driver's ephemeral profile metadata cache expires
 			candidates = append(candidates, matcher.CandidateDriver{
 				DriverID:                driverID,

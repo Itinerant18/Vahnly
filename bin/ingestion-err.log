@@ -1,4 +1,4 @@
-2026/05/26 11:18:59 Starting Location Ingestion Service. Target Scale: 100K active drivers.
-2026/05/26 11:18:59 PostgreSQL connection pool initialized successfully.
-2026/05/26 11:18:59 Redis 6-shard Cluster state discovery finalized.
-2026/05/26 11:18:59 Inbound gRPC telemetry hub actively listening on port 50051...
+2026/05/26 11:28:40 Starting Location Ingestion Service. Target Scale: 100K active drivers.
+2026/05/26 11:28:40 PostgreSQL connection pool initialized successfully.
+2026/05/26 11:28:40 Redis 6-shard Cluster state discovery finalized.
+2026/05/26 11:28:40 Inbound gRPC telemetry hub actively listening on port 50051...

@@ -36,9 +36,9 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 	cell1 := h3.ToString(targetCell)
 	cell2 := h3.ToString(spatialRing[1])
 
-	// Key names must follow hashtagging layout: drivers:zset:{cityPrefix}:h3cell
-	key1 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell1)
-	key2 := fmt.Sprintf("drivers:zset:{%s}:%s", city, cell2)
+	// Key names must follow decoupled layout: drivers:zset:cityPrefix:h3cell
+	key1 := fmt.Sprintf("drivers:zset:%s:%s", city, cell1)
+	key2 := fmt.Sprintf("drivers:zset:%s:%s", city, cell2)
 
 	// Clean up keys afterwards
 	defer func() {
