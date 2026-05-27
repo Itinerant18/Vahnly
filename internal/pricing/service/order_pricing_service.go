@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
+	"strconv"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -21,14 +23,11 @@ type SurgeZoneUpdatedEvent struct {
 }
 
 type OrderPricingService struct {
-	kafkaReader *kafka.Reader
-	mu          sync.RWMutex
-	// In-memory grid joining pricing indices across localized regional scopes
-	// Compound map key structure: {city_prefix}:{h3_cell}
-	surgeMatrix map[string]float64
+	kafkaReader   *kafka.Reader
+	clusterClient *redis.ClusterClient // MILESTONE 4: Shared distributed cache replaces process-local map
 }
 
-func NewOrderPricingService(brokers []string, groupID string) *OrderPricingService {
+func NewOrderPricingService(brokers []string, groupID string, client *redis.ClusterClient) *OrderPricingService {
 	return &OrderPricingService{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  brokers,
@@ -37,13 +36,13 @@ func NewOrderPricingService(brokers []string, groupID string) *OrderPricingServi
 			MinBytes: 10,
 			MaxBytes: 10e6,
 		}),
-		surgeMatrix: make(map[string]float64),
+		clusterClient: client,
 	}
 }
 
-// StartSurgeMatrixSync pumps event loops from Kafka to continuously update the in-memory pricing state
+// StartSurgeMatrixSync pumps event loops from Kafka to continuously update the shared cluster state
 func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
-	log.Println("Order Pricing Service: Safely synchronized with surge.zone.updated pipeline.")
+	log.Println("Order Pricing Service: Safely synchronized distributed surge cache paths.")
 	
 	for {
 		select {
@@ -66,33 +65,47 @@ func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 				continue
 			}
 
-			// Generate slot-safe uniform map reference layout
-			mapKey := fmt.Sprintf("%s:%s", event.CityPrefix, event.H3Cell)
+			// MILESTONE 4 KEY SCHEMA: Un-bracketed to enforce uniform shard scattering across all 6 nodes
+			matrixKey := fmt.Sprintf("surge:matrix:%s:%s", event.CityPrefix, event.H3Cell)
 
-			// Safely write the updated multiplier to the matrix cache
-			s.mu.Lock()
-			s.surgeMatrix[mapKey] = event.SurgeMultiplier
-			s.mu.Unlock()
+			// Store the live multiplier directly inside the Redis Cluster storage tier
+			// with a defensive 12-hour expiration safety TTL boundary
+			err = s.clusterClient.Set(ctx, matrixKey, event.SurgeMultiplier, 12*time.Hour).Err()
+			if err != nil {
+				log.Printf("[PRICING_CACHE_WRITE_ERROR] Failed saving distributed key %s: %v", matrixKey, err)
+			}
 		}
 	}
 }
 
-// CalculateFare joins base operational metrics with live multipliers to output exact trip costs
-func (s *OrderPricingService) CalculateFare(cityPrefix string, pickupH3Cell string, baseFarePaise int64) (int64, float64) {
-	mapKey := fmt.Sprintf("%s:%s", cityPrefix, pickupH3Cell)
+// CalculateFare joins base operational metrics with live multipliers via high-velocity Redis reads
+func (s *OrderPricingService) CalculateFare(ctx context.Context, cityPrefix string, pickupH3Cell string, baseFarePaise int64) (int64, float64, error) {
+	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", cityPrefix, pickupH3Cell)
 	multiplier := 1.0
 
-	// Instant O(1) read lock evaluation protecting the sub-500ms processing loop
-	s.mu.RLock()
-	if liveMultiplier, exists := s.surgeMatrix[mapKey]; exists {
-		multiplier = liveMultiplier
+	// Enforce a tight context read timeout deadline (15ms) to protect the sub-500ms API latency SLA
+	readCtx, cancel := context.WithTimeout(ctx, 15*time.Millisecond)
+	defer cancel()
+
+	// Extract the active regional coefficient from the shared Redis Cluster tier
+	val, err := s.clusterClient.Get(readCtx, matrixKey).Result()
+	if err == nil {
+		if parsedMultiplier, parseErr := strconv.ParseFloat(val, 64); parseErr == nil {
+			multiplier = parsedMultiplier
+		}
+	} else if !errors.Is(err, redis.Nil) {
+		// Log the error but maintain fallback baseline calculation execution
+		log.Printf("[PRICING_CACHE_READ_ERROR] Fallback triggered for key %s: %v", matrixKey, err)
 	}
-	s.mu.RUnlock()
 
 	// Calculate final pricing allocation mapping using integer paise bounds to prevent data loss
 	finalFarePaise := int64(float64(baseFarePaise) * multiplier)
 
-	return finalFarePaise, multiplier
+	// redis.Nil is a cache miss — not an error; fallback to 1.0 is the correct behaviour.
+	if errors.Is(err, redis.Nil) {
+		err = nil
+	}
+	return finalFarePaise, multiplier, err
 }
 
 // Close cleanly releases network stream context resources

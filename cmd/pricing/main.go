@@ -8,6 +8,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/platform/driver-delivery/internal/pricing/service"
 )
 
@@ -17,8 +19,14 @@ func main() {
 
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
 	groupID := getEnv("PRICING_GROUP_ID", "pricing-service-consumer-group")
+	redisAddrs := getEnv("REDIS_CLUSTER_ADDRS", "localhost:6379")
 
-	pricingService := service.NewOrderPricingService(parseCSV(kafkaBrokers), groupID)
+	clusterClient := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs: parseCSV(redisAddrs),
+	})
+	defer clusterClient.Close()
+
+	pricingService := service.NewOrderPricingService(parseCSV(kafkaBrokers), groupID, clusterClient)
 	defer pricingService.Close()
 
 	go pricingService.StartSurgeMatrixSync(ctx)
