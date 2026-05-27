@@ -50,7 +50,7 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 	client.ZAdd(ctx, key2, redis.Z{Score: now, Member: "driver-3"})
 
 	// Scan
-	candidates, _, err := scanner.ScanNearbyDrivers(ctx, city, targetCellStr)
+	candidates, err := scanner.ScanNearbyDrivers(ctx, city, targetCellStr)
 	if err != nil {
 		t.Fatalf("Failed to scan nearby drivers: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestScanNearbyDrivers_LocalIntegration(t *testing.T) {
 
 func TestScanNearbyDrivers_InvalidToken(t *testing.T) {
 	scanner := repository.NewSpatialScanner(nil)
-	_, _, err := scanner.ScanNearbyDrivers(context.Background(), "NYC", "invalid-token")
+	_, err := scanner.ScanNearbyDrivers(context.Background(), "NYC", "invalid-token")
 	if err == nil {
 		t.Fatal("Expected error for invalid H3 token, got nil")
 	}

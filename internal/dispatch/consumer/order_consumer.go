@@ -32,6 +32,7 @@ type OrderCreatedConsumer struct {
 	kafkaReader        *kafka.Reader
 	kafkaWriter        *kafka.Writer
 	driverStateWriter  *kafka.Writer
+	orderRetryWriter   *kafka.Writer // MILESTONE 3: Re-injects starved orders back onto the stream
 	spatialScanner     *repository.SpatialScanner
 	redisClusterClient *redis.ClusterClient
 	dbPool             *pgxpool.Pool
@@ -69,6 +70,12 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 		driverStateWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
 			Topic:        "driver.state.changed",
+			Balancer:     &kafka.Hash{},
+			RequiredAcks: kafka.RequireOne,
+		},
+		orderRetryWriter: &kafka.Writer{
+			Addr:         kafka.TCP(brokers...),
+			Topic:        "order.created", // MILESTONE 3: Loops back onto the main matching input stream
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
@@ -189,20 +196,22 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			orderCtx, cancel := context.WithTimeout(ctx, 350*time.Millisecond)
 			defer cancel()
 
-			candidates, metrics, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
+			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
 			if err != nil || len(candidates) == 0 {
-				log.Printf("Greedy worker starvation or failure on order %s. Advancing offset.", o.OrderID)
+				log.Printf("Greedy worker starvation or failure on order %s. Routing to re-queue.", o.OrderID)
 				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
+				c.requeueUnmatchedOrder(ctx, o) // MILESTONE 3
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
 				return
 			}
 
-			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector, metrics)
+			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
 			if matchErr != nil {
-				log.Printf("Greedy match failed for order %s: %v. Advancing offset.", o.OrderID, matchErr)
+				log.Printf("Greedy match failed for order %s: %v. Routing to recovery path.", o.OrderID, matchErr)
 				observability.OrdersUnmatchedTotal.WithLabelValues("match_failure").Inc()
+				c.requeueUnmatchedOrder(ctx, o) // MILESTONE 3
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
@@ -263,7 +272,6 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	defer cancel()
 
 	driverLocationMap := make(map[string][]matcher.CandidateDriver)
-	orderMetricsMap := make(map[string]matcher.MarketplaceMetrics)
 	uniqueDriverTracker := make(map[string]matcher.CandidateDriver)
 	var mapMu sync.Mutex
 	var wg sync.WaitGroup
@@ -273,14 +281,13 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 		wg.Add(1)
 		go func(o domain.OrderCreatedPayload) {
 			defer wg.Done()
-			candidates, metrics, err := c.spatialScanner.ScanNearbyDrivers(batchCtx, o.CityPrefix, o.PickupH3Cell)
+			candidates, err := c.spatialScanner.ScanNearbyDrivers(batchCtx, o.CityPrefix, o.PickupH3Cell)
 			if err != nil {
 				return
 			}
 
 			mapMu.Lock()
 			driverLocationMap[o.OrderID] = candidates
-			orderMetricsMap[o.OrderID] = metrics
 			for _, d := range candidates {
 				uniqueDriverTracker[d.DriverID] = d
 			}
@@ -297,7 +304,7 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	observability.CostMatrixDimension.Observe(float64(max(len(orders), len(uniqueDrivers))))
 
 	// Pass compiled pools directly to the global solver
-	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector, orderMetricsMap)
+	matches, err := matcher.EvaluateHungarianBatch(batchCtx, orders, uniqueDrivers, driverLocationMap, c.etaCorrector)
 	if err != nil {
 		log.Printf("[HUNGARIAN_BATCH_ERROR] Matrix optimization failed: %v", err)
 		return
@@ -360,12 +367,13 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 		}
 		if !matchedOrderIDs[o.OrderID] {
 			if len(driverLocationMap[o.OrderID]) == 0 {
-				log.Printf("Marketplace Starvation (HUNGARIAN): No available drivers near cell %s. Advancing offset.", o.PickupH3Cell)
+				log.Printf("Marketplace Starvation (HUNGARIAN): No available drivers near cell %s. Routing to re-queue.", o.PickupH3Cell)
 				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
 			} else {
-				log.Printf("Hungarian: Order %s had %d candidates but no valid assignment (all drivers allocated). Advancing offset.", o.OrderID, len(driverLocationMap[o.OrderID]))
+				log.Printf("Hungarian: Order %s had %d candidates but no valid assignment (contention conflict). Routing to re-queue.", o.OrderID, len(driverLocationMap[o.OrderID]))
 				observability.OrdersUnmatchedTotal.WithLabelValues("fully_allocated").Inc()
 			}
+			c.requeueUnmatchedOrder(ctx, o) // MILESTONE 3
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 		}
 	}
@@ -433,6 +441,45 @@ enqueueMatches:
 	}
 
 	return collected
+}
+// MILESTONE 3: Execute state-bounded re-injection onto the stream with exponential delay backing
+func (c *OrderCreatedConsumer) requeueUnmatchedOrder(ctx context.Context, o domain.OrderCreatedPayload) {
+	const maxMarketplaceRetries = 3
+	if o.RetryCount >= maxMarketplaceRetries {
+		log.Printf("[DLQ_EXPIRED] Order %s crossed max execution threshold (%d). Discarding booking request permanently.", o.OrderID, maxMarketplaceRetries)
+		observability.OrdersUnmatchedTotal.WithLabelValues("dlq_expired").Inc()
+		return
+	}
+
+	o.RetryCount++
+	payloadBytes, err := json.Marshal(o)
+	if err != nil {
+		log.Printf("Failed marshaling retry context payload: %v", err)
+		return
+	}
+
+	// Calculate a backoff delay value based on retry depth to prevent network thrashing
+	backoffWait := time.Duration(o.RetryCount*150) * time.Millisecond
+
+	go func(delay time.Duration, key string, val []byte) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay): // Holds execution line briefly matching backoff constraints
+			writeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			err := c.orderRetryWriter.WriteMessages(writeCtx, kafka.Message{
+				Key:   []byte(key),
+				Value: val,
+			})
+			if err != nil {
+				log.Printf("[REQUEUE_STREAM_ERROR] Failed re-emitting order %s onto bus: %v", key, err)
+			} else {
+				log.Printf("[REQUEUE_SUCCESS] Order %s successfully re-injected onto stream. Retry Depth: %d/%d", key, o.RetryCount, maxMarketplaceRetries)
+			}
+		}
+	}(backoffWait, o.OrderID, payloadBytes)
 }
 
 func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, match *matcher.MatchResult) error {
@@ -546,5 +593,6 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 func (c *OrderCreatedConsumer) Close() error {
 	_ = c.kafkaReader.Close()
 	_ = c.driverStateWriter.Close()
+	_ = c.orderRetryWriter.Close() // MILESTONE 3: Cleanly disconnect recovery channel
 	return c.kafkaWriter.Close()
 }

@@ -20,15 +20,14 @@ func NewSpatialScanner(client *redis.ClusterClient) *SpatialScanner {
 	return &SpatialScanner{clusterClient: client}
 }
 
-// ScanNearbyDrivers retrieves all available driver IDs and hydates their true graph metadata
-func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix string, targetCellStr string) ([]matcher.CandidateDriver, matcher.MarketplaceMetrics, error) {
-	metrics := matcher.MarketplaceMetrics{}
+// ScanNearbyDrivers retrieves all available driver IDs and hydrates their true graph metadata
+func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix string, targetCellStr string) ([]matcher.CandidateDriver, error) {
 	targetCell := h3.FromString(targetCellStr)
 	if !h3.IsValid(targetCell) {
-		return nil, metrics, fmt.Errorf("invalid_spatial_token: %s", targetCellStr)
+		return nil, fmt.Errorf("invalid_spatial_token: %s", targetCellStr)
 	}
 	if s.clusterClient == nil {
-		return nil, metrics, fmt.Errorf("redis_cluster_client_unavailable")
+		return nil, fmt.Errorf("redis_cluster_client_unavailable")
 	}
 
 	// Fetch k-ring index array (Target cell + 6 immediate neighbors)
@@ -38,25 +37,49 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	staleThreshold := now - 30 // 30-second stale sliding window threshold
 
 	discoveredDriverCells := make(map[string]string)
-	metrics, metricErr := s.scanMarketplaceMetrics(ctx, cityPrefix, targetCellStr, spatialRing, now)
-	if metricErr != nil {
-		log.Printf("[SPATIAL_SCANNER] marketplace metrics pipeline error: %v", metricErr)
+
+	// MILESTONE 2: Unified cluster pipeline — driver IDs + surge metric cardinalities in single roundtrip
+	type cellSurgeCommands struct {
+		driverIDsCmd *redis.StringSliceCmd
+		supplyCmd    *redis.IntCmd
+		demandCmd    *redis.IntCmd
 	}
 
-	// 1. Gather all active driver IDs across localized rings
+	surgePipe := s.clusterClient.Pipeline()
+	cellCmds := make(map[string]cellSurgeCommands, len(spatialRing))
+
 	for _, cell := range spatialRing {
 		cellStr := h3.ToString(cell)
 		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cellStr)
+		supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, cellStr)
+		demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, cellStr)
 
-		driverIDs, err := s.clusterClient.ZRevRangeByScore(ctx, zsetKey, &redis.ZRangeBy{
-			Max: fmt.Sprintf("%d", now),
-			Min: fmt.Sprintf("%d", staleThreshold),
-		}).Result()
-
-		if err != nil && err != redis.Nil {
-			return nil, metrics, fmt.Errorf("redis cluster zset fetch failed on key %s: %w", zsetKey, err)
+		cellCmds[cellStr] = cellSurgeCommands{
+			driverIDsCmd: surgePipe.ZRevRangeByScore(ctx, zsetKey, &redis.ZRangeBy{
+				Max: fmt.Sprintf("%d", now),
+				Min: fmt.Sprintf("%d", staleThreshold),
+			}),
+			supplyCmd: surgePipe.ZCard(ctx, supplyKey),
+			demandCmd: surgePipe.ZCard(ctx, demandKey),
 		}
+	}
 
+	if _, err := surgePipe.Exec(ctx); err != nil && err != redis.Nil {
+		log.Printf("[SPATIAL_SCANNER] surge pipeline exec error: %v", err)
+	}
+
+	// Unpack driver IDs and per-cell surge counts
+	cellSupplyCount := make(map[string]int64, len(spatialRing))
+	cellDemandCount := make(map[string]int64, len(spatialRing))
+
+	for cellStr, cmds := range cellCmds {
+		cellSupplyCount[cellStr] = cmds.supplyCmd.Val()
+		cellDemandCount[cellStr] = cmds.demandCmd.Val()
+
+		driverIDs, err := cmds.driverIDsCmd.Result()
+		if err != nil && err != redis.Nil {
+			continue
+		}
 		for _, driverID := range driverIDs {
 			if _, exists := discoveredDriverCells[driverID]; !exists {
 				discoveredDriverCells[driverID] = cellStr
@@ -65,11 +88,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	}
 
 	if len(discoveredDriverCells) == 0 {
-		return nil, metrics, nil
-	}
-
-	if metrics.SupplyDensity == 0 {
-		metrics.SupplyDensity = float32(len(discoveredDriverCells))
+		return nil, nil
 	}
 
 	// 2. High-Performance Metadata Hydration Phase via Cluster Pipelines
@@ -120,6 +139,8 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 				IsInsideSurgeZone:       false,
 				IdleSeconds:             60.0,
 				DistanceMeters:          1500,
+				LocalDemandCount:        cellDemandCount[driverCell],
+				LocalSupplyCount:        cellSupplyCount[driverCell],
 			})
 			continue
 		}
@@ -140,43 +161,12 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			IsInsideSurgeZone:       isInsideSurge,
 			IdleSeconds:             idleSecs,
 			DistanceMeters:          1000, // Replaced dynamically by Phase 2 graph weights
+			LocalDemandCount:        cellDemandCount[driverCell],
+			LocalSupplyCount:        cellSupplyCount[driverCell],
 		})
 	}
 
-	return candidates, metrics, nil
-}
-
-func (s *SpatialScanner) scanMarketplaceMetrics(ctx context.Context, cityPrefix string, targetCellStr string, spatialRing []h3.H3Index, now int64) (matcher.MarketplaceMetrics, error) {
-	metrics := matcher.MarketplaceMetrics{}
-	staleCutoff := fmt.Sprintf("(%d)", now)
-	demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, targetCellStr)
-
-	pipe := s.clusterClient.Pipeline()
-	pipe.ZRemRangeByScore(ctx, demandKey, "-inf", staleCutoff)
-	demandCountCmd := pipe.ZCard(ctx, demandKey)
-
-	supplyCountCmds := make([]*redis.IntCmd, 0, len(spatialRing))
-	seenSupplyKeys := make(map[string]struct{}, len(spatialRing))
-	for _, cell := range spatialRing {
-		supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, h3.ToString(cell))
-		if _, exists := seenSupplyKeys[supplyKey]; exists {
-			continue
-		}
-		seenSupplyKeys[supplyKey] = struct{}{}
-		pipe.ZRemRangeByScore(ctx, supplyKey, "-inf", staleCutoff)
-		supplyCountCmds = append(supplyCountCmds, pipe.ZCard(ctx, supplyKey))
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
-		return metrics, err
-	}
-
-	metrics.DemandDensity = float32(demandCountCmd.Val())
-	for _, cmd := range supplyCountCmds {
-		metrics.SupplyDensity += float32(cmd.Val())
-	}
-
-	return metrics, nil
+	return candidates, nil
 }
 
 func (s *SpatialScanner) EvictDriverFromCell(ctx context.Context, cityPrefix, h3Cell, driverID string) error {

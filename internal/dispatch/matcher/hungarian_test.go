@@ -115,18 +115,20 @@ func TestSolveKuhnMunkres_LargeIdentity(t *testing.T) {
 	}
 }
 
-func TestEvaluateHungarianBatch_UsesMarketplaceMetrics(t *testing.T) {
+func TestEvaluateHungarianBatch_UsesLiveDensityFields(t *testing.T) {
 	order := domain.OrderCreatedPayload{
 		OrderID:         "test-order-density",
 		PickupOSMNodeID: 100,
 	}
 	driver := CandidateDriver{
-		DriverID:       "test-driver-density",
-		OSMNodeID:      200,
-		H3Cell:         "882a100d2dfffff",
-		DistanceMeters: 1000,
-		AcceptanceRate: 0.95,
-		IdleSeconds:    300,
+		DriverID:         "test-driver-density",
+		OSMNodeID:        200,
+		H3Cell:           "882a100d2dfffff",
+		DistanceMeters:   1000,
+		AcceptanceRate:   0.95,
+		IdleSeconds:      300,
+		LocalDemandCount: 7,
+		LocalSupplyCount: 3,
 	}
 	corrector := &densityCapturingCorrector{captured: make(chan capturedDensity, 1)}
 
@@ -136,9 +138,6 @@ func TestEvaluateHungarianBatch_UsesMarketplaceMetrics(t *testing.T) {
 		[]CandidateDriver{driver},
 		map[string][]CandidateDriver{order.OrderID: {driver}},
 		corrector,
-		map[string]MarketplaceMetrics{
-			order.OrderID: {DemandDensity: 7, SupplyDensity: 3},
-		},
 	)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
