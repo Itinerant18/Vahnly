@@ -23,6 +23,10 @@ func (d *densityCapturingCorrector) ComputeCorrectedETA(ctx context.Context, sou
 	return 12.0, nil
 }
 
+func (d *densityCapturingCorrector) ComputeCancellationRisk(ctx context.Context, features []float32) (float64, error) {
+	return 0.1, nil
+}
+
 // TestSolveKuhnMunkres_SquareMatrix validates a known-optimal 3×3 assignment
 func TestSolveKuhnMunkres_SquareMatrix(t *testing.T) {
 	// Classic example: optimal is (0→2, 1→0, 2→1) with total cost = 3+2+3 = 8
@@ -346,10 +350,47 @@ func TestComputeSingleEdgeCost_Deterministic(t *testing.T) {
 		t.Errorf("Expected ETA %.2f, got %.2f", expectedEta, eta)
 	}
 
-	// Cost = 0.45*100 + 0.25*(1-0.9) + 0.15*0.05 + 0.10*0 + 0.05*(1/100)
-	//      = 45 + 0.025 + 0.0075 + 0 + 0.0005 = 45.033
-	expectedCost := 45.033
+	// Cost = 0.40*100 + 0.20*(1-0.9) + 0.15*0.05 + 0.10*0 + 0.05*(1/100) + 0.10*0
+	//      = 40 + 0.02 + 0.0075 + 0 + 0.0005 = 40.028
+	expectedCost := 40.028
 	if math.Abs(cost-expectedCost) > 0.01 {
 		t.Errorf("Expected cost ~%.3f, got %.3f", expectedCost, cost)
+	}
+}
+
+type riskTestingCorrector struct {
+	riskProb float64
+}
+
+func (r *riskTestingCorrector) ComputeCorrectedETA(ctx context.Context, sourceNodeID, targetNodeID int64, demandDensity, supplyDensity float32) (float64, error) {
+	return 12.0, nil
+}
+
+func (r *riskTestingCorrector) ComputeCancellationRisk(ctx context.Context, features []float32) (float64, error) {
+	return r.riskProb, nil
+}
+
+func TestComputeSingleEdgeCost_HighCancellationRiskPruning(t *testing.T) {
+	order := domain.OrderCreatedPayload{
+		OrderID:         "test-order-prune",
+		PickupOSMNodeID: 100,
+	}
+	driver := CandidateDriver{
+		DriverID:       "test-driver-prune",
+		DistanceMeters: 1000,
+	}
+
+	// 1. Safe probability (e.g., 20%) -> Should not prune
+	safeCorrector := &riskTestingCorrector{riskProb: 0.20}
+	cost, _ := ComputeSingleEdgeCost(context.Background(), order, driver, safeCorrector)
+	if cost >= 1e7 {
+		t.Errorf("Expected driver not to be pruned with safe cancellation risk, but got cost: %f", cost)
+	}
+
+	// 2. High probability (e.g., 80%) -> Should prune with 1e7 cost penalty
+	highRiskCorrector := &riskTestingCorrector{riskProb: 0.80}
+	cost, _ = ComputeSingleEdgeCost(context.Background(), order, driver, highRiskCorrector)
+	if cost != 1e7 {
+		t.Errorf("Expected driver to be pruned (cost 1e7) under high cancellation risk (80%%), but got cost: %f", cost)
 	}
 }

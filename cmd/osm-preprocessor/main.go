@@ -55,14 +55,14 @@ func speedForHighway(hw string) float64 {
 
 func main() {
 	// Use the full 231 MB file
-	// inputPath := "./data/kolkata_full.osm.pbf"
-	// nodesCSV := "./data/kolkata_nodes.csv"
-	// edgesCSV := "./data/kolkata_edges.csv"
-
-	// use the 4.2 mb file for ram sortage
-	inputPath := "./data/kolkata_roads.osm.pbf"
+	inputPath := "./data/kolkata_full.osm.pbf"
 	nodesCSV := "./data/kolkata_nodes.csv"
 	edgesCSV := "./data/kolkata_edges.csv"
+
+	// use the 4.2 mb file for ram sortage
+	// inputPath := "./data/kolkata_roads.osm.pbf"
+	// nodesCSV := "./data/kolkata_nodes.csv"
+	// edgesCSV := "./data/kolkata_edges.csv"
 
 	f, err := os.Open(inputPath)
 	if err != nil {

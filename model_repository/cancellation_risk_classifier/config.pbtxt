@@ -1,0 +1,29 @@
+name: "cancellation_risk_classifier"
+backend: "fil"
+max_batch_size: 1024
+
+input [
+  {
+    name: "input__0"
+    data_type: TYPE_FP32
+    # Expects 4 structural driver profile variables:
+    # [Rolling Acceptance Rate, Cancellation History Avg, Local Supply Density, Driver Idle Time Seconds]
+    dims: [ 4 ]
+  }
+]
+
+output [
+  {
+    name: "output__0"
+    data_type: TYPE_FP32
+    # Returns a continuous scalar probability value between 0.0 and 1.0
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]

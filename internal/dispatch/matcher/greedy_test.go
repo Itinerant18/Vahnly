@@ -30,6 +30,11 @@ func (d *dummyETACorrector) ComputeCorrectedETA(ctx context.Context, sourceNodeI
 	return d.routingSvc.ComputeShortestPathETA(ctx, sourceNodeID, targetNodeID)
 }
 
+func (d *dummyETACorrector) ComputeCancellationRisk(ctx context.Context, features []float32) (float64, error) {
+	// Return a default safe probability of cancellation (e.g., 10%) for tests
+	return 0.1, nil
+}
+
 func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	ctx := context.Background()
 
@@ -94,14 +99,15 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	// Calculate expected score precisely as the algorithm does:
 	// estimatedEtaSeconds := 1.0 (from mockRoutingService)
 	// surgePenalty := 0.0 (inside surge zone)
-	// costScore := (0.45 * 1.0) + (0.25 * float64(1.0 - 0.90)) + (0.15 * float64(0.01)) + (0.10 * 0.0) + (0.05 * (1.0 / 11.0))
+	// costScore := (0.40 * 1.0) + (0.20 * float64(1.0 - 0.90)) + (0.15 * float64(0.01)) + (0.10 * 0.0) + (0.05 * (1.0 / 11.0)) + (0.10 * 0.1)
 	etaVal := 1.0
 	arVal := float64(1.0 - float32(0.90))
 	cpVal := float64(float32(0.01))
 	surgeVal := 0.0
 	idleVal := 1.0 / (10.0 + 1.0)
+	riskVal := 0.1
 	
-	expectedScore := (0.45 * etaVal) + (0.25 * arVal) + (0.15 * cpVal) + (0.10 * surgeVal) + (0.05 * idleVal)
+	expectedScore := (0.40 * etaVal) + (0.20 * arVal) + (0.15 * cpVal) + (0.10 * surgeVal) + (0.05 * idleVal) + (0.10 * riskVal)
 	
 	if math.Abs(res.Score-expectedScore) > 1e-9 {
 		t.Errorf("Expected Score close to %f, got %f (diff: %e)", expectedScore, res.Score, math.Abs(res.Score-expectedScore))

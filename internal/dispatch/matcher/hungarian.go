@@ -20,6 +20,7 @@ type RoutingService interface {
 
 type ETACorrector interface {
 	ComputeCorrectedETA(ctx context.Context, sourceNodeID, targetNodeID int64, demandDensity, supplyDensity float32) (float64, error)
+	ComputeCancellationRisk(ctx context.Context, features []float32) (float64, error)
 }
 
 type CandidateDriver struct {
@@ -47,11 +48,12 @@ type MatchResult struct {
 // ComputeSingleEdgeCost calculates the objective function score for an individual driver-order pair
 func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload, driver CandidateDriver, etaCorrector ETACorrector) (float64, float64) {
 	const (
-		alpha   = 0.45 // Weight for ETA
-		beta    = 0.25 // Weight for Acceptance Rate
+		alpha   = 0.40 // Weight for ETA
+		beta    = 0.20 // Weight for Acceptance Rate
 		gamma   = 0.15 // Weight for Cancellation Probability
 		delta   = 0.10 // Weight for Surge Penalty
 		epsilon = 0.05 // Weight for Driver Idle Time
+		zeta    = 0.10 // Weight for Live ML Cancellation Risk Score (NEW)
 	)
 
 	var estimatedEtaSeconds float64
@@ -78,16 +80,41 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 		estimatedEtaSeconds = driver.DistanceMeters / 11.1 // Circuit-breaker fallback
 	}
 
+	// Model 2: Compute Live Cancellation Risk Assessment via Triton Classifier (NEW)
+	var cancellationRiskScore float64 = 0.0
+	if etaCorrector != nil {
+		// Package specific driver behavioral features into the classification tensor vector
+		riskFeatures := []float32{
+			driver.AcceptanceRate,
+			driver.CancellationProbability,
+			supplyDensity,
+			float32(driver.IdleSeconds),
+		}
+		
+		// Query the secondary classification tree model on Triton
+		riskProb, riskErr := etaCorrector.ComputeCancellationRisk(routingCtx, riskFeatures)
+		if riskErr == nil {
+			cancellationRiskScore = riskProb
+			
+			// FENCE VALUE EXCLUSION: Prune high-risk drivers from matching eligibility entirely
+			if cancellationRiskScore >= 0.75 {
+				return 1e7, estimatedEtaSeconds
+			}
+		}
+	}
+
 	surgePenalty := 0.0
 	if !driver.IsInsideSurgeZone {
 		surgePenalty = 1.0
 	}
 
+	// Expand the Multi-Objective Cost Equation to include real-time cancellation risk factors
 	costScore := (alpha * estimatedEtaSeconds) +
 		(beta * float64(1.0-driver.AcceptanceRate)) +
 		(gamma * float64(driver.CancellationProbability)) +
 		(delta * surgePenalty) +
-		(epsilon * (1.0 / (driver.IdleSeconds + 1.0)))
+		(epsilon * (1.0 / (driver.IdleSeconds + 1.0))) +
+		(zeta * cancellationRiskScore)
 
 	return costScore, estimatedEtaSeconds
 }

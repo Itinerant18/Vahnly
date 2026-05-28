@@ -112,13 +112,29 @@ func main() {
 		}
 	}
 
-	// 5. Initialize Contraction Hierarchies Routing Service
+	// 5. Initialize Contraction Hierarchies Routing Service & Loader
+	nodesPath := getEnv("OSM_NODES_DATA_PATH", "./data/kolkata_nodes.csv")
+	edgesPath := getEnv("OSM_EDGES_DATA_PATH", "./data/kolkata_edges.csv")
+
 	chService := graph.NewContractionHierarchiesService()
-	chService.AddNode(&graph.CHNode{ID: 1001, Latitude: 22.5726, Longitude: 88.3639, Order: 1})
-	// Node 9999 is the fallback OSM node for drivers with stale Redis profiles
-	chService.AddNode(&graph.CHNode{ID: 9999, Latitude: 22.5726, Longitude: 88.3639, Order: 2})
-	chService.AddEdge(1001, 9999, 10.0, false)
-	chService.AddEdge(9999, 1001, 10.0, false)
+	graphLoader := graph.NewGraphLoader(chService)
+
+	if _, err := os.Stat(nodesPath); err == nil {
+		loadCtx, loadCancel := context.WithTimeout(ctx, 30*time.Second)
+		if err := graphLoader.IngestContractedTopology(loadCtx, nodesPath, edgesPath); err != nil {
+			loadCancel()
+			log.Fatalf("Critical error during road network graph initialization: %v", err)
+		}
+		loadCancel()
+	} else {
+		log.Printf("[WARNING] Dataset files missing at %s. Bootstrapping container with minimum local seed node configurations.", nodesPath)
+		chService.AddNode(&graph.CHNode{ID: 1001, Latitude: 22.5726, Longitude: 88.3639, Order: 1})
+		// Node 9999 is the fallback OSM node for drivers with stale Redis profiles
+		chService.AddNode(&graph.CHNode{ID: 9999, Latitude: 22.5726, Longitude: 88.3639, Order: 2})
+		chService.AddEdge(1001, 9999, 10.0, false)
+		chService.AddEdge(9999, 1001, 10.0, false)
+	}
+
 	routingSvc := &simpleRoutingService{chService: chService}
 
 	etaCorrector := usecase.NewETACorrectorUseCase(tritonClient, routingSvc)
