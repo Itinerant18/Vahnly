@@ -20,10 +20,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/entrypoint"]
           env:
-            - name: TARGET_SERVICE
-              value: "pruner"
             - name: DATABASE_URL
-              value: {{ .Values.global.env.databaseUrl | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "drivers-for-u.name" . }}-db-credentials
+                  key: database-url
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
           resources:

@@ -1,17 +1,62 @@
-2026/05/28 09:30:44 Starting Location Ingestion Service. Target Scale: 100K active drivers.
-2026/05/28 09:30:44 PostgreSQL connection pool initialized successfully.
-redis: 2026/05/28 09:30:54 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.36:6379: i/o timeout
-redis: 2026/05/28 09:30:54 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.36:6379: i/o timeout
-redis: 2026/05/28 09:30:54 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.34:6379: i/o timeout
-redis: 2026/05/28 09:30:54 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.32:6379: i/o timeout
-redis: 2026/05/28 09:31:05 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.34:6379: i/o timeout
-redis: 2026/05/28 09:31:05 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.36:6379: i/o timeout
-redis: 2026/05/28 09:31:05 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.32:6379: i/o timeout
-redis: 2026/05/28 09:31:05 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.34:6379: i/o timeout
-redis: 2026/05/28 09:31:15 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.32:6379: i/o timeout
-redis: 2026/05/28 09:31:15 osscluster.go:2296: getting command info: dial tcp 10.244.0.36:6379: i/o timeout
-redis: 2026/05/28 09:31:15 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.36:6379: i/o timeout
-redis: 2026/05/28 09:31:15 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.32:6379: i/o timeout
-redis: 2026/05/28 09:31:15 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.34:6379: i/o timeout
-redis: 2026/05/28 09:31:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 10.244.0.34:6379: i/o timeout
-2026/05/28 09:31:26 Redis Cluster connection discovery failed: dial tcp 10.244.0.34:6379: i/o timeout
+2026/05/28 14:51:25 Starting Location Ingestion Service. Target Scale: 100K active drivers.
+2026/05/28 14:51:25 PostgreSQL connection pool initialized successfully.
+2026/05/28 14:51:25 Redis 6-shard Cluster state discovery finalized.
+2026/05/28 14:51:25 Inbound gRPC telemetry hub actively listening on port 50051...
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:26 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:27 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:28 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:29 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6383: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:29 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:29 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6380: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:37 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:37 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:37 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:38 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:39 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6381: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:40 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:41 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:41 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:41 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6382: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/05/28 14:52:41 pool.go:717: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:6384: connectex: No connection could be made because the target machine actively refused it.

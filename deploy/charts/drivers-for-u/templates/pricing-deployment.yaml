@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-pricing
+  labels:
+    app: pricing
+spec:
+  replicas: {{ .Values.pricing.replicaCount }}
+  selector:
+    matchLabels:
+      app: pricing
+  template:
+    metadata:
+      labels:
+        app: pricing
+    spec:
+      containers:
+        - name: pricing
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/entrypoint"]
+          env:
+            - name: KAFKA_BROKERS
+              value: {{ .Values.global.env.kafkaBrokers | quote }}
+            - name: REDIS_CLUSTER_ADDRS
+              value: {{ .Values.global.env.redisClusterNodes | quote }}
+            - name: PRICING_GROUP_ID
+              value: {{ .Values.pricing.groupID | quote }}
+          resources:
+            {{- toYaml .Values.pricing.resources | nindent 12 }}

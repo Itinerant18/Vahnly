@@ -56,3 +56,27 @@ reconciler:
     requests:
       cpu: "50m"
       memory: "64Mi"
+
+# 5. Surge Aggregation & Calculator Engine
+surge:
+  replicaCount: 1
+  trackedCells: "88754cb247fffff,88283473fffffff"
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+# 6. Distributed Pricing Cache Sync Worker
+pricing:
+  replicaCount: 1
+  groupID: "pricing-service-consumer-group"
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"

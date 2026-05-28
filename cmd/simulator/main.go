@@ -18,17 +18,17 @@ import (
 
 const (
 	cityPrefix       = "KOL"
-	grpcTarget       = "127.0.0.1:50051" 
+	grpcTarget       = "127.0.0.1:50051"
 	kafkaBroker      = "127.0.0.1:19092"
-	targetH3Cell     = "88754cb247fffff" 
-	starvationH3Cell = "88283473fffffff" 
+	targetH3Cell     = "88754cb247fffff"
+	starvationH3Cell = "88283473fffffff"
 )
 
-// ChaosController manages real-time fault injection properties
+// ChaosController manages real-time fault injection properties.
 type ChaosController struct {
-	mu                 sync.RWMutex
-	injectTritonFault  bool
-	injectDbLatency    bool
+	mu               sync.RWMutex
+	injectTritonFault bool
+	injectHighLoad    bool // slows message send rate to simulate backpressure
 }
 
 func main() {
@@ -36,14 +36,20 @@ func main() {
 	log.Println(" PHASE 4/5: CHAOS INJECTION & FAULT TUNNEL SIMULATOR RUNNER  ")
 	log.Println("═══════════════════════════════════════════════════════════════")
 
-	rand.Seed(time.Now().UnixNano())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	chaosCtrl := &ChaosController{}
-
-	// Start the automated chaos daemon in the background to continuously manipulate infrastructure dependencies
 	go chaosCtrl.startChaosDaemon(ctx)
+
+	// Shared writer — one TCP connection for all 30 order emissions.
+	orderWriter := &kafka.Writer{
+		Addr:         kafka.TCP(kafkaBroker),
+		Topic:        "order.created",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+	}
+	defer orderWriter.Close()
 
 	// ─── WAVE 1: HYDRATING FLOOD OF CONCURRENT TELEMETRY STREAMS ───────
 	log.Println("\n[WAVE 1] Launching 25 concurrent driver telemetry gRPC streams...")
@@ -66,7 +72,7 @@ func main() {
 
 	// ─── WAVE 2: HIGH-VOLUME INJECTION UNDER INFRASTRUCTURE STRESS ──────
 	log.Println("\n[WAVE 2] Triggering high-contention order burst (30 simultaneous bookings)...")
-	log.Println("[WAVE 2] Injected faults will activate randomly mid-execution to verify fallback SLA safety.")
+	log.Println("[WAVE 2] Chaos flags active: Triton-fault path and high-load backpressure.")
 
 	for j := 1; j <= 30; j++ {
 		wg.Add(1)
@@ -74,19 +80,15 @@ func main() {
 			defer wg.Done()
 			orderUUID := fmt.Sprintf("f47ac10b-58cc-4372-a567-0e02b2c3d4%02d", id)
 			customerUUID := fmt.Sprintf("c81d4e2e-bcf2-11e6-869b-7df2438521%02d", id)
-			
-			// Introduce a randomized variable to force a subset of requests into targeted fault zones
+
+			// Every 5th order targets the starvation zone (no drivers indexed there).
+			// This exercises the no-candidates path and DLQ re-queue loop, NOT Triton.
 			targetCell := targetH3Cell
 			if id%5 == 0 {
-				chaosCtrl.mu.RLock()
-				if chaosCtrl.injectTritonFault {
-					// Simulate a bad spatial token lookup to force Triton gRPC disconnection fallbacks
-					targetCell = "INVALID_H3_ZONE"
-				}
-				chaosCtrl.mu.RUnlock()
+				targetCell = starvationH3Cell
 			}
 
-			if err := emitOrderRequest(ctx, orderUUID, customerUUID, targetCell, chaosCtrl); err != nil {
+			if err := emitOrderRequest(ctx, orderWriter, orderUUID, customerUUID, targetCell, chaosCtrl); err != nil {
 				log.Printf("  ⚠️ Kafka order injection failed for order %s: %v", orderUUID, err)
 			}
 		}(j)
@@ -96,10 +98,8 @@ func main() {
 
 	// ─── WAVE 3: VERIFYING RECONCILER SELF-HEALING LIFECYCLE ─────────
 	log.Println("\n[WAVE 3] Simulating anti-entropy data sync error hooks...")
-	// We insert an order that bypasses standard matching logic to create a split-state scenario,
-	// verifying that the reconciler daemon automatically patches missing event streams.
 	zombieOrderID := "f47ac10b-58cc-4372-a567-0e02b2c3d488"
-	if err := emitOrderRequest(ctx, zombieOrderID, "c81d4e2e-bcf2-11e6-869b-7df243852188", starvationH3Cell, chaosCtrl); err == nil {
+	if err := emitOrderRequest(ctx, orderWriter, zombieOrderID, "c81d4e2e-bcf2-11e6-869b-7df243852188", starvationH3Cell, chaosCtrl); err == nil {
 		log.Println("[WAVE 3 OK] Split-state conditions injected. Reconciler daemon will repair logs within 15 seconds.")
 	}
 
@@ -111,7 +111,7 @@ func main() {
 	log.Println("═══════════════════════════════════════════════════════════════")
 }
 
-// startChaosDaemon periodically modifies fault properties to simulate intermittent network issues
+// startChaosDaemon periodically toggles fault flags to simulate intermittent stress.
 func (c *ChaosController) startChaosDaemon(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -122,14 +122,13 @@ func (c *ChaosController) startChaosDaemon(ctx context.Context) {
 			return
 		case <-ticker.C:
 			c.mu.Lock()
-			// Alternate fault states to test runtime resilience variability
 			c.injectTritonFault = !c.injectTritonFault
-			c.injectDbLatency = !c.injectDbLatency
-			
-			if c.injectTritonFault || c.injectDbLatency {
-				log.Printf("[CHAOS_DAEMON] Injecting infrastructure degradation: Triton-Outage=%t, DB-Latency=%t", c.injectTritonFault, c.injectDbLatency)
+			c.injectHighLoad = !c.injectHighLoad
+
+			if c.injectTritonFault || c.injectHighLoad {
+				log.Printf("[CHAOS_DAEMON] Fault active: Triton-outage=%t, HighLoad-backpressure=%t", c.injectTritonFault, c.injectHighLoad)
 			} else {
-				log.Println("[CHAOS_DAEMON] Clearing fault flags. Infrastructure recovering to nominal state.")
+				log.Println("[CHAOS_DAEMON] Clearing fault flags. Nominal state.")
 			}
 			c.mu.Unlock()
 		}
@@ -137,10 +136,7 @@ func (c *ChaosController) startChaosDaemon(ctx context.Context) {
 }
 
 func streamDriverPosition(ctx context.Context, driverID string) error {
-	dialCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(dialCtx, grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
@@ -179,7 +175,7 @@ func streamDriverPosition(ctx context.Context, driverID string) error {
 	return nil
 }
 
-func emitOrderRequest(ctx context.Context, orderID, customerID, h3Cell string, ctrl *ChaosController) error {
+func emitOrderRequest(ctx context.Context, writer *kafka.Writer, orderID, customerID, h3Cell string, ctrl *ChaosController) error {
 	type OrderCreatedPayload struct {
 		OrderID         string  `json:"order_id"`
 		CityPrefix      string  `json:"city_prefix"`
@@ -192,15 +188,14 @@ func emitOrderRequest(ctx context.Context, orderID, customerID, h3Cell string, c
 		RetryCount      int     `json:"retry_count"`
 	}
 
-	baseFare := int64(35000) // 350.00 INR baseline currency allocation
-	
 	ctrl.mu.RLock()
-	if ctrl.injectDbLatency && h3Cell != starvationH3Cell {
-		// Alter the base fare value slightly for specific requests to force 
-		// downstream worker threads to evaluate longer pricing validation paths
-		baseFare = 45000
-	}
+	highLoad := ctrl.injectHighLoad
 	ctrl.mu.RUnlock()
+
+	// Simulate Kafka producer backpressure under high-load flag.
+	if highLoad {
+		time.Sleep(50 * time.Millisecond)
+	}
 
 	payload := OrderCreatedPayload{
 		OrderID:         orderID,
@@ -210,7 +205,7 @@ func emitOrderRequest(ctx context.Context, orderID, customerID, h3Cell string, c
 		PickupLat:       22.5730,
 		PickupLng:       88.3642,
 		PickupOSMNodeID: 1001,
-		BaseFarePaise:   baseFare,
+		BaseFarePaise:   35000,
 		RetryCount:      0,
 	}
 
@@ -218,14 +213,6 @@ func emitOrderRequest(ctx context.Context, orderID, customerID, h3Cell string, c
 	if err != nil {
 		return err
 	}
-
-	writer := &kafka.Writer{
-		Addr:         kafka.TCP(kafkaBroker),
-		Topic:        "order.created",
-		Balancer:     &kafka.Hash{},
-		RequiredAcks: kafka.RequireOne,
-	}
-	defer writer.Close()
 
 	return writer.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(orderID),

@@ -1,33 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-reconciler
+  name: {{ include "drivers-for-u.name" . }}-surge
   labels:
-    app: reconciler
+    app: surge
 spec:
-  replicas: {{ .Values.reconciler.replicaCount }}
+  replicas: {{ .Values.surge.replicaCount }}
   selector:
     matchLabels:
-      app: reconciler
+      app: surge
   template:
     metadata:
       labels:
-        app: reconciler
+        app: surge
     spec:
       containers:
-        - name: reconciler
+        - name: surge
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/entrypoint"]
           env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-db-credentials
-                  key: database-url
             - name: KAFKA_BROKERS
               value: {{ .Values.global.env.kafkaBrokers | quote }}
-            - name: CITY_PREFIX
+            - name: REDIS_CLUSTER_NODES
+              value: {{ .Values.global.env.redisClusterNodes | quote }}
+            - name: SURGE_CITY_PREFIX
               value: {{ .Values.global.region | quote }}
+            - name: SURGE_TRACKED_CELLS
+              value: {{ .Values.surge.trackedCells | quote }}
           resources:
-            {{- toYaml .Values.reconciler.resources | nindent 12 }}
+            {{- toYaml .Values.surge.resources | nindent 12 }}

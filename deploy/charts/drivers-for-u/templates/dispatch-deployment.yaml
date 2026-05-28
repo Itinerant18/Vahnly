@@ -23,27 +23,30 @@ spec:
             - name: TARGET_SERVICE
               value: "dispatch"
             - name: DATABASE_URL
-              value: {{ .Values.global.env.databaseUrl | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "drivers-for-u.name" . }}-db-credentials
+                  key: database-url
             - name: KAFKA_BROKERS
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
             - name: TRITON_SERVER_URL
               value: {{ .Values.global.env.tritonServerUrl | quote }}
-            - name: MATCHING_ALGORITHM
+            - name: ALGORITHM_STRATEGY
               value: {{ .Values.dispatch.algorithmStrategy | quote }}
           ports:
             - containerPort: 8080
               name: metrics
           livenessProbe:
             httpGet:
-              path: /metrics
+              path: /health
               port: metrics
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /metrics
+              path: /ready
               port: metrics
             initialDelaySeconds: 5
             periodSeconds: 10

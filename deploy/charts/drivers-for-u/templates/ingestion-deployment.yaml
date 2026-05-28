@@ -32,17 +32,14 @@ spec:
               name: grpc
             - containerPort: 8080
               name: metrics
-          # Hooking into your live Prometheus HTTP endpoints for container health checks
           livenessProbe:
-            httpGet:
-              path: /metrics
-              port: metrics
+            tcpSocket:
+              port: grpc
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /metrics
-              port: metrics
+            tcpSocket:
+              port: grpc
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
