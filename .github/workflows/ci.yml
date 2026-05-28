@@ -61,5 +61,22 @@ jobs:
         run: go build -o bin/dispatch ./cmd/dispatch/
       - name: Build ingestion service
         run: go build -o bin/ingestion ./cmd/ingestion/
+      - name: Build gateway service
+        run: go build -o bin/gateway ./cmd/gateway/
+      - name: Build reconciler service
+        run: go build -o bin/reconciler ./cmd/reconciler/
+      - name: Build pruner service
+        run: go build -o bin/pruner ./cmd/pruner/
+      - name: Build pricing service
+        run: go build -o bin/pricing ./cmd/pricing/
+      - name: Build surge service
+        run: go build -o bin/surge ./cmd/surge/
+      - name: Build migrate utility
+        run: go build -o bin/migrate ./cmd/migrate/
+      - name: Build osm-preprocessor utility
+        run: go build -o bin/osm-preprocessor ./cmd/osm-preprocessor/
+      - name: Build simulator runner
+        run: go build -o bin/simulator ./cmd/simulator/
       - name: Verify binaries exist
         run: ls -la bin/
+
