@@ -1,4 +1,11 @@
 data/kolkata_full.osm.pbf
 data/kolkata_raw.osm.pbf
 data/kolkata_edges.csv
-data/kolkata_nodes.csv*.csv
+data/kolkata_nodes.csv
+*.csv
+.agent/
+.agents/
+.claude/
+.code-review-graph/
+.codex/
+graphify-out/
