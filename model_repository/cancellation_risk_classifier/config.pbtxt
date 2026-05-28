@@ -21,6 +21,17 @@ output [
   }
 ]
 
+parameters [
+  {
+    key: "model_type"
+    value: { string_value: "xgboost_json" }
+  },
+  {
+    key: "output_class"
+    value: { string_value: "false" }
+  }
+]
+
 instance_group [
   {
     count: 1

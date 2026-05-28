@@ -26,6 +26,10 @@ parameters [
   {
     key: "predict_elemental_count"
     value: { string_value: "false" }
+  },
+  {
+    key: "output_class"
+    value: { string_value: "false" }
   }
 ]
 

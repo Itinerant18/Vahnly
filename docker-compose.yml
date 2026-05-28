@@ -56,7 +56,7 @@ services:
     networks:
       - dispatch-tier
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 5s
       timeout: 5s
       retries: 5
