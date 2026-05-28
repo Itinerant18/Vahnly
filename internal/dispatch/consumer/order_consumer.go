@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -115,7 +117,7 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 		default:
 			msg, err := c.kafkaReader.FetchMessage(ctx)
 			if err != nil {
-				if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				if errors.Is(err, context.Canceled) || ctx.Err() != nil || errors.Is(err, io.EOF) || strings.Contains(err.Error(), "closed") {
 					return
 				}
 				log.Printf("Kafka bus read error: %v", err)
