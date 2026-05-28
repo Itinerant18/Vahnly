@@ -115,7 +115,7 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 		default:
 			msg, err := c.kafkaReader.FetchMessage(ctx)
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
+				if errors.Is(err, context.Canceled) || ctx.Err() != nil {
 					return
 				}
 				log.Printf("Kafka bus read error: %v", err)
