@@ -1,0 +1,384 @@
+# Graph Report - Driver  (2026-05-28)
+
+## Corpus Check
+- 78 files · ~74,290 words
+- Verdict: corpus is large enough that graph structure adds value.
+
+## Summary
+- 831 nodes · 934 edges · 81 communities (68 shown, 13 thin omitted)
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 118 edges (avg confidence: 0.8)
+- Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `19758fa2`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
+
+## Community Hubs (Navigation)
+- [[_COMMUNITY_Community 0|Community 0]]
+- [[_COMMUNITY_Community 1|Community 1]]
+- [[_COMMUNITY_Community 2|Community 2]]
+- [[_COMMUNITY_Community 3|Community 3]]
+- [[_COMMUNITY_Community 4|Community 4]]
+- [[_COMMUNITY_Community 5|Community 5]]
+- [[_COMMUNITY_Community 6|Community 6]]
+- [[_COMMUNITY_Community 7|Community 7]]
+- [[_COMMUNITY_Community 8|Community 8]]
+- [[_COMMUNITY_Community 9|Community 9]]
+- [[_COMMUNITY_Community 10|Community 10]]
+- [[_COMMUNITY_Community 11|Community 11]]
+- [[_COMMUNITY_Community 12|Community 12]]
+- [[_COMMUNITY_Community 13|Community 13]]
+- [[_COMMUNITY_Community 14|Community 14]]
+- [[_COMMUNITY_Community 15|Community 15]]
+- [[_COMMUNITY_Community 16|Community 16]]
+- [[_COMMUNITY_Community 17|Community 17]]
+- [[_COMMUNITY_Community 18|Community 18]]
+- [[_COMMUNITY_Community 19|Community 19]]
+- [[_COMMUNITY_Community 20|Community 20]]
+- [[_COMMUNITY_Community 21|Community 21]]
+- [[_COMMUNITY_Community 22|Community 22]]
+- [[_COMMUNITY_Community 23|Community 23]]
+- [[_COMMUNITY_Community 24|Community 24]]
+- [[_COMMUNITY_Community 25|Community 25]]
+- [[_COMMUNITY_Community 26|Community 26]]
+- [[_COMMUNITY_Community 27|Community 27]]
+- [[_COMMUNITY_Community 28|Community 28]]
+- [[_COMMUNITY_Community 29|Community 29]]
+- [[_COMMUNITY_Community 30|Community 30]]
+- [[_COMMUNITY_Community 31|Community 31]]
+- [[_COMMUNITY_Community 32|Community 32]]
+- [[_COMMUNITY_Community 33|Community 33]]
+- [[_COMMUNITY_Community 34|Community 34]]
+- [[_COMMUNITY_Community 35|Community 35]]
+- [[_COMMUNITY_Community 36|Community 36]]
+- [[_COMMUNITY_Community 37|Community 37]]
+- [[_COMMUNITY_Community 38|Community 38]]
+- [[_COMMUNITY_Community 39|Community 39]]
+- [[_COMMUNITY_Community 40|Community 40]]
+- [[_COMMUNITY_Community 41|Community 41]]
+- [[_COMMUNITY_Community 42|Community 42]]
+- [[_COMMUNITY_Community 43|Community 43]]
+- [[_COMMUNITY_Community 44|Community 44]]
+- [[_COMMUNITY_Community 45|Community 45]]
+- [[_COMMUNITY_Community 46|Community 46]]
+- [[_COMMUNITY_Community 47|Community 47]]
+- [[_COMMUNITY_Community 48|Community 48]]
+- [[_COMMUNITY_Community 49|Community 49]]
+- [[_COMMUNITY_Community 50|Community 50]]
+- [[_COMMUNITY_Community 51|Community 51]]
+- [[_COMMUNITY_Community 52|Community 52]]
+- [[_COMMUNITY_Community 53|Community 53]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 55|Community 55]]
+- [[_COMMUNITY_Community 56|Community 56]]
+- [[_COMMUNITY_Community 57|Community 57]]
+- [[_COMMUNITY_Community 58|Community 58]]
+- [[_COMMUNITY_Community 59|Community 59]]
+- [[_COMMUNITY_Community 60|Community 60]]
+- [[_COMMUNITY_Community 61|Community 61]]
+- [[_COMMUNITY_Community 62|Community 62]]
+- [[_COMMUNITY_Community 63|Community 63]]
+- [[_COMMUNITY_Community 64|Community 64]]
+- [[_COMMUNITY_Community 65|Community 65]]
+- [[_COMMUNITY_Community 66|Community 66]]
+- [[_COMMUNITY_Community 67|Community 67]]
+- [[_COMMUNITY_Community 75|Community 75]]
+- [[_COMMUNITY_Community 76|Community 76]]
+- [[_COMMUNITY_Community 77|Community 77]]
+- [[_COMMUNITY_Community 78|Community 78]]
+- [[_COMMUNITY_Community 79|Community 79]]
+- [[_COMMUNITY_Community 80|Community 80]]
+
+## God Nodes (most connected - your core abstractions)
+1. `Driver Delivery Platform — Complete Production Blueprint` - 22 edges
+2. `/graphify` - 15 edges
+3. `/graphify` - 14 edges
+4. `What You Must Do When Invoked` - 14 edges
+5. `What You Must Do When Invoked` - 14 edges
+6. `OrderCreatedConsumer` - 13 edges
+7. `EvaluateHungarianBatch()` - 13 edges
+8. `IngestionRequest` - 13 edges
+9. `Driver Delivery Platform Architecture Map` - 13 edges
+10. `TestEndToEnd_DispatchMatchingPipeline()` - 12 edges
+
+## Surprising Connections (you probably didn't know these)
+- `main()` --calls--> `NewTritonClient()`  [INFERRED]
+  cmd/dispatch/main.go → internal/intelligence/client/triton_client.go
+- `main()` --calls--> `NewSpatialScanner()`  [INFERRED]
+  cmd/dispatch/main.go → internal/dispatch/repository/spatial_scanner.go
+- `main()` --calls--> `NewOrderCreatedConsumer()`  [INFERRED]
+  cmd/dispatch/main.go → internal/dispatch/consumer/order_consumer.go
+- `main()` --calls--> `NewHealthServer()`  [INFERRED]
+  cmd/dispatch/main.go → internal/observability/server.go
+- `main()` --calls--> `NewRedisRepository()`  [INFERRED]
+  cmd/ingestion/main.go → internal/telemetry/repository/redis_repo.go
+
+## Communities (81 total, 13 thin omitted)
+
+### Community 0 - "Community 0"
+Cohesion: 0.16
+Nodes (11): CandidateDriver, dummyETACorrector, ETACorrector, TestEvaluateGreedyMatch_CircuitBreakerFallback(), TestEvaluateGreedyMatch_Starvation(), TestEvaluateGreedyMatch_Success(), EvaluateGreedyMatch(), EvaluateHungarianOptimization() (+3 more)
+
+### Community 1 - "Community 1"
+Cohesion: 0.04
+Nodes (46): 1. High-Level Architecture, 2.1 Download OSM extract, 2. Data Sources, 3.1 Install Osmium, 3.2 Copy the `.osm.pbf` into WSL, 3.3 (Optional) Extract BBox and Filter Roads, 3. WSL + Osmium Setup (Data Filtering), 4.1 Dependency: `osmpbf` (+38 more)
+
+### Community 2 - "Community 2"
+Cohesion: 0.05
+Nodes (43): code:block10 (You are a graphify extraction subagent. Read the files liste), code:bash ($(cat graphify-out/.graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash (mkdir -p graphify-out), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c ") (+35 more)
+
+### Community 3 - "Community 3"
+Cohesion: 0.05
+Nodes (42): code:powershell (& (Get-Content graphify-out\.graphify_python) -c "), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:powershell (New-Item -ItemType Directory -Force -Path graphify-out | Out), code:powershell (@'), code:powershell (@'), code:powershell (@') (+34 more)
+
+### Community 4 - "Community 4"
+Cohesion: 0.08
+Nodes (14): getEnv(), main(), simpleRoutingService, NewContractionHierarchiesService(), TestComputeShortestPathETA_Disconnected(), TestComputeShortestPathETA_SameNode(), TestComputeShortestPathETA_SimplePath(), GraphLoader (+6 more)
+
+### Community 5 - "Community 5"
+Cohesion: 0.05
+Nodes (36): code:block1 (/graphify                                             # full), code:powershell (@'), code:powershell (@'), code:powershell (if (-not (Test-Path graphify-out\.graphify_extract.json)) {), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:powershell (@') (+28 more)
+
+### Community 6 - "Community 6"
+Cohesion: 0.06
+Nodes (34): code:block1 (/graphify                                             # full), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash (if [ ! -f graphify-out/.graphify_extract.json ]; then), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c "), code:bash ($(cat .graphify_python) -c ") (+26 more)
+
+### Community 7 - "Community 7"
+Cohesion: 0.07
+Nodes (14): NewDemandAggregatorStream(), TestGetRecentDemandRate_Integration(), DemandAggregatorStream, OrderCreatedEvent, NewSupplyAggregatorStream(), TestGetAvailableDriverCount_Integration(), SupplyAggregatorStream, NewSurgeCalculatorEngine() (+6 more)
+
+### Community 8 - "Community 8"
+Cohesion: 0.08
+Nodes (6): ModelInferRequest, ModelInferRequest_InferInputTensor, ModelInferResponse, file_api_proto_triton_triton_proto_init(), file_api_proto_triton_triton_proto_rawDescGZIP(), init()
+
+### Community 9 - "Community 9"
+Cohesion: 0.09
+Nodes (5): IngestionRequest, IngestionResponse, file_telemetry_v1_telemetry_proto_init(), file_telemetry_v1_telemetry_proto_rawDescGZIP(), init()
+
+### Community 10 - "Community 10"
+Cohesion: 0.10
+Nodes (20): API Contracts, Closed Wiring Gaps, code:mermaid (flowchart TB), code:mermaid (flowchart LR), Community And Package Map, Compact Dependency Diagram, Dispatch And Matching, Driver Delivery Platform Architecture Map (+12 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.10
+Nodes (20): 10. The Three-Phase Matching Engine, Algorithm Detail, Atomic Assignment Transaction, Batch Window Configuration, code:block25 (Input:  order.pickup_h3_cell (H3 resolution 8 string)), code:block26 (Preprocessing (one-time per city road graph):), code:block27 (Model:   xgboost_spatial_corrector (Triton model repository)), code:go (correctedETA, err := tritonClient.ModelInfer(ctx, features)) (+12 more)
+
+### Community 12 - "Community 12"
+Cohesion: 0.13
+Nodes (9): NewTritonClient(), TritonClient, GRPCInferenceServiceClient, GRPCInferenceServiceServer, _GRPCInferenceService_ModelInfer_Handler(), NewGRPCInferenceServiceClient(), RegisterGRPCInferenceServiceServer(), UnimplementedGRPCInferenceServiceServer (+1 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.14
+Nodes (10): 7. Database Design, code:block16 (OFFLINE ──────────────► ONLINE_AVAILABLE), code:block18 (CREATED ──► ASSIGNED ──► EN_ROUTE_TO_PICKUP ──► DELIVERING ─), code:sql (CREATE OR REPLACE FUNCTION verify_order_state_transition() R), Connection Pool Tuning, PostgreSQL 15 + PostGIS 3.3, Table: `dispatch_match_logs` (Audit Ledger), Table: `drivers` (+2 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.25
+Nodes (3): hungarianCommitResult, NewOrderCreatedConsumer(), OrderCreatedConsumer
+
+### Community 15 - "Community 15"
+Cohesion: 0.15
+Nodes (13): 15. Local Development Setup, code:block44 (- Go 1.26.3+), code:bash (# Bash), code:bash (# Build all services), code:bash (# Terminal 1: Location Ingestion Service), code:powershell (powershell -ExecutionPolicy Bypass -File .\run_e2e_test.ps1), code:bash (./deploy/local/teardown-local-infra.sh), Prerequisites (+5 more)
+
+### Community 16 - "Community 16"
+Cohesion: 0.21
+Nodes (6): getEnv(), main(), NewOrderReconcilerSyncWorker(), TestOrderReconcilerSyncWorker_ExecuteStateReconciliation(), OrderReconcilerSyncWorker, ReconcileTarget
+
+### Community 17 - "Community 17"
+Cohesion: 0.18
+Nodes (10): num_trees, size_leaf_vector, model, learner, gradient_booster, objective, gbtree_model_param, trees (+2 more)
+
+### Community 18 - "Community 18"
+Cohesion: 0.18
+Nodes (11): 3.1 Time-Window Optimization Boundaries, 3.2 Thread-Safe Kafka Commit Accumulators (Storm Prevention), 3.3 Poison-Pill Starvation Protection, 3.4 Relational State-Machine Transaction Fences, code:block11 (OrderCreatedConsumer.StartExecutionPipeline()), code:go (batchWindow:  300 * time.Millisecond, // Configurable 200–40), code:go (// internal/dispatch/consumer/order_consumer.go), code:go (// Handle Marketplace Starvation safely without blocking the) (+3 more)
+
+### Community 19 - "Community 19"
+Cohesion: 0.22
+Nodes (6): getEnv(), main(), parseCSV(), NewOrderPricingService(), OrderPricingService, SurgeZoneUpdatedEvent
+
+### Community 20 - "Community 20"
+Cohesion: 0.22
+Nodes (5): NewLocationIngestionHandler(), TestClientStreamPositions_Success(), LocationIngestionHandler, mockTelemetryUseCase, NewLocationIngestionServiceClient()
+
+### Community 21 - "Community 21"
+Cohesion: 0.22
+Nodes (6): LocationIngestionServiceClient, LocationIngestionServiceServer, _LocationIngestionService_ClientStreamPositions_Handler(), RegisterLocationIngestionServiceServer(), UnimplementedLocationIngestionServiceServer, UnsafeLocationIngestionServiceServer
+
+### Community 22 - "Community 22"
+Cohesion: 0.20
+Nodes (10): 4. Infrastructure Blueprint, Apache Kafka — StatefulSet (KRaft Mode), code:yaml (Kind:      StatefulSet), code:yaml (Kind:      StatefulSet), code:yaml (Kind:      StatefulSet (6 pods: redis-0 through redis-5)), code:block6 (Step 1:  kubectl apply -f local-dev-topology.yaml), Infrastructure Bootstrap Sequence, Kubernetes Manifests (`deploy/local/local-dev-topology.yaml`) (+2 more)
+
+### Community 23 - "Community 23"
+Cohesion: 0.33
+Nodes (5): 20. Glossary, 2. Repository Layout, code:block2 (C:\workspace\Driver\), Driver Delivery Platform — Complete Production Blueprint, Table of Contents
+
+### Community 24 - "Community 24"
+Cohesion: 0.20
+Nodes (5): mockKafkaProducer, mockRedisRepo, NewTelemetryUseCase(), TestProcessLocationUpdate_RadianConversion(), telemetryUseCase
+
+### Community 25 - "Community 25"
+Cohesion: 0.22
+Nodes (9): 1.1 The Ingestion Topography, 1.2 Mathematical Ingestion Rectification (The Radian Trap), 1.3 High-Scale Redis Shard Scattering Configuration, code:block1 (Driver Mobile App), code:go (// internal/telemetry/usecase/telemetry_usecase.go), code:block3 (Key Type              Naming Template Scheme                ), code:go (// internal/telemetry/repository/redis_repo.go), code:go (// Atomic cell migration pipeline) (+1 more)
+
+### Community 26 - "Community 26"
+Cohesion: 0.22
+Nodes (9): 4.1 The Residual Learning Pattern, 4.2 High-Velocity Tensor Packing via gRPC, 4.3 Multi-Tier Circuit Breaker Fallback Latency Guardrails, code:go (// internal/intelligence/usecase/eta_corrector.go), code:go (// internal/intelligence/client/triton_client.go), code:block19 ([ Total Assignment Batch SLA: < 350ms Context Budget ]), code:go (// internal/intelligence/usecase/eta_corrector.go), code:go (// internal/dispatch/matcher/ — greedy_test.go circuit break) (+1 more)
+
+### Community 27 - "Community 27"
+Cohesion: 0.22
+Nodes (8): code:yaml (# deploy/local/local-dev-topology.yaml), code:bash (# Step 1: Deploy all resources into the dispatch namespace), ENTERPRISE SYSTEMS BLUEPRINT: DRIVER DELIVERY PLATFORM, Infrastructure Bootstrap Sequence, Real-Time Dispatch Matching Engine & Surge Pricing Stream Architecture, SECTION 6: LOCAL PRODUCTION VERIFICATION TOPOLOGY, SYSTEM CONFIGURATION PROFILE, TABLE OF CONTENTS
+
+### Community 28 - "Community 28"
+Cohesion: 0.22
+Nodes (9): APPENDIX: QUICK REFERENCE CHEATSHEET, code:block32 (driver:{city:driverID}:status          →  ONLINE_AVAILABLE /), code:block33 (order.created          →  partitioned by city_prefix), code:block34 (cost = (0.45 × ETA_seconds)), code:block35 (Total batch SLA:          < 350ms  (order ctx)), Cost Function Weights, Kafka Topics, Redis Key Patterns (+1 more)
+
+### Community 29 - "Community 29"
+Cohesion: 0.22
+Nodes (9): 8. Redis Spatial Index Design, Client Configuration, code:block21 (Primary 0  (slots 0 – 5460)    ←→  Replica 3), code:block22 (ZREMRANGEBYSCORE driver:location:{city}:{cell}  0  (now - 30), code:go (redis.ClusterOptions{), H3 Resolution 8, Key Schema, Stale Driver Pruning (+1 more)
+
+### Community 30 - "Community 30"
+Cohesion: 0.22
+Nodes (9): 12. ML Intelligence Layer (Triton), Architecture, code:block37 (Triton Inference Server), code:block38 (TritonClient.ModelInfer(ctx, modelName, version, inputTensor), code:block39 (if tritonAddr == "" OR connection fails at startup:), code:block40 (model_repository/), Fallback Strategy, gRPC Integration (`internal/intelligence/client/`) (+1 more)
+
+### Community 31 - "Community 31"
+Cohesion: 0.25
+Nodes (8): 7.1 PowerShell Runtime Injection Commands, 7.2 Core Verification Commands, code:powershell (# Core Production Target State Parameter Bindings), code:bash (# Compile production deployment binaries), code:bash (# Unit tests (no infrastructure required)), code:bash (# Monitor consumer group lag across the streaming backbone), code:powershell ($env:ALGORITHM_STRATEGY = "HUNGARIAN"  # For 500–5,000 concu), SECTION 7: PRODUCTION DEPLOYMENT & TESTING COMMAND PATTERNS
+
+### Community 32 - "Community 32"
+Cohesion: 0.25
+Nodes (8): 2.1 Sequential Ring Scanning (CROSSSLOT Protection), 2.2 High-Performance Pipelined Metadata Hydration, code:go (// Fallback configuration if profile cache has expired), code:block6 ([ Step 2.1: Spatial Ring Lookups ]), code:go (// internal/dispatch/repository/spatial_scanner.go), code:block8 (staleThreshold = time.Now().Unix() - 30), code:go (// internal/dispatch/repository/spatial_scanner.go), SECTION 2: SPATIAL RETRIEVAL & METADATA HYDRATION
+
+### Community 33 - "Community 33"
+Cohesion: 0.25
+Nodes (8): 5. Service Architecture, code:block10 (Phase 1 → gRPC stream driver locations → triggers Redis ZSET), code:block7 (1. Parse env: GRPC_PORT, DATABASE_URL, REDIS_CLUSTER_NODES, ), code:block8 (MaxConnectionIdle:     15 minutes), code:block9 (1. Parse env: DATABASE_URL, REDIS_CLUSTER_NODES, KAFKA_BROKE), Service 1: Location Ingestion Service (`cmd/ingestion/main.go`), Service 2: Dispatch Matching Service (`cmd/dispatch/main.go`), Service 3: Simulator (`cmd/simulator/main.go`)
+
+### Community 34 - "Community 34"
+Cohesion: 0.39
+Nodes (7): Edge, haversine(), main(), speedForHighway(), writeEdgesCSV(), writeNodesCSV(), Node
+
+### Community 35 - "Community 35"
+Cohesion: 0.29
+Nodes (7): 19. Production Hardening Checklist, CI/CD (Missing — add these), Observability, Production Kafka, Production PostgreSQL, Road Graph, Security
+
+### Community 36 - "Community 36"
+Cohesion: 0.29
+Nodes (7): 11. Surge Pricing Pipeline, code:block35 (effective_supply = max(supply_count, 0.5)   ← prevent divisi), code:block36 (order arrives), Component Responsibilities, Design Principle, Formula, Surge Data Lifecycle
+
+### Community 37 - "Community 37"
+Cohesion: 0.29
+Nodes (7): 6. Data Flow & Event Pipeline, code:block11 (Driver App), code:block12 (Order API (external)), code:block13 (Kafka: order.created ──────► DemandAggregator), Flow A: Driver Location Update, Flow B: Order Dispatch (Critical Path — SLA < 500 ms), Flow C: Surge Pricing (Async — 30-second cadence)
+
+### Community 38 - "Community 38"
+Cohesion: 0.29
+Nodes (6): DriverLocation, DriverMetrics, DriverMetricsProvider, KafkaProducer, RedisRepository, TelemetryUseCase
+
+### Community 39 - "Community 39"
+Cohesion: 0.28
+Nodes (14): capturedDensity, EvaluateHungarianBatch(), SolveKuhnMunkres(), TestEvaluateHungarianBatch_AllHighPenalty(), TestEvaluateHungarianBatch_RectangularMoreDrivers(), TestEvaluateHungarianBatch_RectangularMoreOrders(), TestEvaluateHungarianBatch_SingleOrderSingleDriver(), TestEvaluateHungarianBatch_UsesLiveDensityFields() (+6 more)
+
+### Community 40 - "Community 40"
+Cohesion: 0.33
+Nodes (4): getEnv(), main(), NewPostgresDriverMetrics(), postgresDriverMetrics
+
+### Community 41 - "Community 41"
+Cohesion: 0.25
+Nodes (4): DummyRoutingService, TestEndToEnd_DispatchMatchingPipeline(), mockKafkaProducer, mockTritonServer
+
+### Community 42 - "Community 42"
+Cohesion: 0.33
+Nodes (5): start-local-infra.sh script, DATABASE_URL, GRPC_PORT, KAFKA_BROKERS, REDIS_CLUSTER_NODES
+
+### Community 43 - "Community 43"
+Cohesion: 0.33
+Nodes (6): 5.1 Streaming Aggregator Mechanics, 5.2 Real-Time In-Memory Matrix Joins, code:go (// internal/surge/aggregator/demand_aggregator.go), code:go (// internal/surge/calculator/surge_calculator.go), code:block24 (Kafka: surge.zone.updated), SECTION 5: TRIPLE-JOB REVENUE STREAM AGGREGATION
+
+### Community 44 - "Community 44"
+Cohesion: 0.33
+Nodes (6): 9. Kafka Topic Topology, Cluster Configuration, code:block24 (Mode:         KRaft (no ZooKeeper)), Consumer Groups, Partition Key Rationale, Topic Reference
+
+### Community 45 - "Community 45"
+Cohesion: 0.60
+Nodes (5): setupTestRedis(), TestCalculateFare_ConcurrentSafety(), TestCalculateFare_NoSurge(), TestCalculateFare_WithSurge(), TestSurgeMatrixKeyFormat()
+
+### Community 46 - "Community 46"
+Cohesion: 0.33
+Nodes (3): NewRedisRepository(), TestSetDriverLocation_GhostDriverEviction(), redisRepo
+
+### Community 47 - "Community 47"
+Cohesion: 0.40
+Nodes (5): 16. Testing Strategy, code:bash (# Unit tests only (no infrastructure needed)), Key Test Scenarios, Running Tests, Test Coverage Map
+
+### Community 48 - "Community 48"
+Cohesion: 0.40
+Nodes (5): 17. Scalability Model, Driver Scale vs. Infrastructure, H3 Spatial Partitioning for Multi-City, Horizontal Scaling Triggers, Throughput Estimates
+
+### Community 49 - "Community 49"
+Cohesion: 0.40
+Nodes (5): 18. Resilience & Failure Modes, code:block51 (SIGTERM received), code:block52 (SIGTERM received), Failure Scenarios & Mitigations, Graceful Shutdown Protocol
+
+### Community 50 - "Community 50"
+Cohesion: 0.40
+Nodes (5): 1. System Overview, code:block1 (┌───────────────────────────────────────────────────────────), Core Design Principle, High-Level Architecture Diagram, System Capabilities
+
+### Community 51 - "Community 51"
+Cohesion: 0.40
+Nodes (5): 13. gRPC API Contracts, code:protobuf (service LocationIngestionService {), code:protobuf (service GRPCInferenceService {), Service 1: LocationIngestionService, Service 2: GRPCInferenceService (Triton)
+
+### Community 52 - "Community 52"
+Cohesion: 0.22
+Nodes (4): TestE2E_TelemetryAndDispatchPipeline(), simpleRoutingService, NewKafkaProducer(), kafkaProducer
+
+### Community 53 - "Community 53"
+Cohesion: 0.18
+Nodes (5): CHEdge, CHNode, ContractionHierarchiesService, Item, PriorityQueue
+
+### Community 54 - "Community 54"
+Cohesion: 0.50
+Nodes (3): permissions, allow, prefersReducedMotion
+
+### Community 55 - "Community 55"
+Cohesion: 0.50
+Nodes (4): 14. Configuration & Environment Variables, code:bash (export DATABASE_URL="postgres://postgres:password@localhost:), Complete Reference, Environment File (`.env.local` — do not commit)
+
+### Community 58 - "Community 58"
+Cohesion: 0.24
+Nodes (5): getEnv(), main(), NewStaleTelemetryPruner(), TestStaleTelemetryPruner_ExecuteGarbageCollection(), StaleTelemetryPruner
+
+### Community 75 - "Community 75"
+Cohesion: 0.29
+Nodes (4): NewSpatialScanner(), TestScanNearbyDrivers_InvalidToken(), TestScanNearbyDrivers_LocalIntegration(), SpatialScanner
+
+### Community 76 - "Community 76"
+Cohesion: 0.33
+Nodes (4): ComputeSingleEdgeCost(), TestComputeSingleEdgeCost_Deterministic(), TestComputeSingleEdgeCost_HighCancellationRiskPruning(), ExecuteWithBreaker()
+
+### Community 77 - "Community 77"
+Cohesion: 0.83
+Nodes (3): emitOrderRequest(), main(), streamDriverPosition()
+
+### Community 78 - "Community 78"
+Cohesion: 0.50
+Nodes (4): 3. Technology Stack, Core Runtime, Data Stores, Key Go Dependencies
+
+## Knowledge Gaps
+- **303 isolated node(s):** `PreToolUse`, `allow`, `prefersReducedMotion`, `PreToolUse`, `Node` (+298 more)
+  These have ≤1 connection - possible missing edges or undocumented components.
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+
+## Suggested Questions
+_Questions this graph is uniquely positioned to answer:_
+
+- **Why does `TestEndToEnd_DispatchMatchingPipeline()` connect `Community 41` to `Community 4`, `Community 39`, `Community 75`, `Community 12`, `Community 46`, `Community 14`, `Community 20`, `Community 21`, `Community 24`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `Driver Delivery Platform — Complete Production Blueprint` connect `Community 23` to `Community 33`, `Community 35`, `Community 36`, `Community 37`, `Community 11`, `Community 44`, `Community 13`, `Community 78`, `Community 15`, `Community 47`, `Community 48`, `Community 50`, `Community 51`, `Community 49`, `Community 22`, `Community 55`, `Community 29`, `Community 30`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `main()` connect `Community 7` to `Community 39`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **What connects `PreToolUse`, `allow`, `prefersReducedMotion` to the rest of the system?**
+  _303 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Community 1` be split into smaller, more focused modules?**
+  _Cohesion score 0.0425531914893617 - nodes in this community are weakly interconnected._
+- **Should `Community 2` be split into smaller, more focused modules?**
+  _Cohesion score 0.046511627906976744 - nodes in this community are weakly interconnected._
+- **Should `Community 3` be split into smaller, more focused modules?**
+  _Cohesion score 0.047619047619047616 - nodes in this community are weakly interconnected._

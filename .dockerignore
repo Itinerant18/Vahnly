@@ -1,0 +1,11 @@
+# Exclude heavy folders and build outputs from the Docker build context
+bin
+graphify-out
+data
+*.exe
+.git
+.github
+.agents
+.claude
+.codex
+.gemini

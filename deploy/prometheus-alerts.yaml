@@ -1,18 +1,62 @@
-apiVersion: monitoring.coreos.com/v1
-kind: PrometheusRule
-metadata:
-  name: matching-engine-sla-alerts
-  namespace: dispatch
-spec:
-  groups:
-  - name: dispatch.sla.rules
+groups:
+  - name: dispatch_platform_alerts
     rules:
-    - alert: MatchingEngineSub500msSLAViolation
-      expr: dispatch_match_latency_seconds{quantile="0.99"} > 0.400
-      for: 2m # Triggers if latency violates the SLA limit for 2 consecutive minutes
-      labels:
-        severity: critical
-        tier: platform
-      annotations:
-        summary: "Critical Dispatch Latency Spike detected on cluster node."
-        description: "The matching engine's p99 latency is currently {{ $value }}s, violating the sub-500ms platform SLA requirement."
+      # 1. CRITICAL: Batch Allocation SLA Breach
+      - alert: DispatchBatchSLABreach
+        expr: histogram_quantile(0.99, sum(rate(dispatch_batch_duration_seconds_bucket[1m])) by (le, algo)) > 0.500
+        for: 1m
+        labels:
+          severity: critical
+          tier: dispatch
+          region: KOL
+        annotations:
+          summary: "Global Kuhn-Munkres matching SLA breach detected for algo: {{ $labels.algo }}"
+          description: "The 99th percentile matching batch runtime has reached {{ $value }}s, breaching the maximum allowed platform threshold of 500ms."
+
+      # 2. WARNING: Triton Model RPC Latency Degradation
+      - alert: TritonInferenceLatencySpike
+        expr: histogram_quantile(0.95, sum(rate(triton_rpc_duration_seconds_bucket[1m])) by (le)) > 0.050
+        for: 2m
+        labels:
+          severity: warning
+          tier: intelligence
+          region: KOL
+        annotations:
+          summary: "Triton XGBoost inference RPC latency is degrading"
+          description: "The 95th percentile of travel-time tensor corrections is taking {{ $value }}s, exceeding the target safety buffer of 50ms."
+
+      # 3. CRITICAL: Ingestion Pipeline Message Emit Failures
+      - alert: KafkaBrokerEmitFailures
+        expr: sum(rate(kafka_emit_errors_total[1m])) by (topic) > 2
+        for: 30s
+        labels:
+          severity: critical
+          tier: streaming
+          region: KOL
+        annotations:
+          summary: "High error rate detected when publishing to topic: {{ $labels.topic }}"
+          description: "The consumer loop is dropping out-bound events on topic {{ $labels.topic }} at a rate of {{ $value }} errors/sec. Downstream notifications are starved."
+
+      # 4. WARNING: Elevated Marketplace Supply Starvation
+      - alert: MarketplaceDriverStarvationSpike
+        expr: sum(rate(orders_unmatched_total{reason="starvation"}[2m])) > 10
+        for: 3m
+        labels:
+          severity: warning
+          tier: marketplace
+          region: KOL
+        annotations:
+          summary: "Rapid driver starvation detected in localized hexagons"
+          description: "Ride orders are failing matching sweeps due to zero driver availability at a rate of {{ $value }} orders/sec. Local surge multipliers may need re-calibration."
+
+      # 5. WARNING: Relational Data Mutation Inefficiencies
+      - alert: PostgresCommitLatencySpike
+        expr: histogram_quantile(0.99, sum(rate(dispatch_db_transaction_duration_seconds_bucket[1m])) by (le, status)) > 0.150
+        for: 1m
+        labels:
+          severity: warning
+          tier: storage
+          region: KOL
+        annotations:
+          summary: "PostgreSQL assignment commit latency spike with status: {{ $labels.status }}"
+          description: "The 99th percentile of parallel assignment transaction commits is taking {{ $value }}s, risking consumer group rebalances."

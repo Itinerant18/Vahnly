@@ -93,6 +93,11 @@ services:
       - "6379:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-node-2:
     image: redis:7.2-alpine
@@ -102,6 +107,11 @@ services:
       - "6380:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-node-3:
     image: redis:7.2-alpine
@@ -111,6 +121,11 @@ services:
       - "6381:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-node-4:
     image: redis:7.2-alpine
@@ -120,6 +135,11 @@ services:
       - "6382:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-node-5:
     image: redis:7.2-alpine
@@ -129,6 +149,11 @@ services:
       - "6383:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-node-6:
     image: redis:7.2-alpine
@@ -138,18 +163,29 @@ services:
       - "6384:6379"
     networks:
       - dispatch-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # Automation service that initializes cluster state across nodes on startup
   redis-cluster-orchestrator:
     image: redis:7.2-alpine
     container_name: redis_cluster_bootstrap
     depends_on:
-      - redis-node-1
-      - redis-node-2
-      - redis-node-3
-      - redis-node-4
-      - redis-node-5
-      - redis-node-6
+      redis-node-1:
+        condition: service_healthy
+      redis-node-2:
+        condition: service_healthy
+      redis-node-3:
+        condition: service_healthy
+      redis-node-4:
+        condition: service_healthy
+      redis-node-5:
+        condition: service_healthy
+      redis-node-6:
+        condition: service_healthy
     networks:
       - dispatch-tier
     entrypoint: [ "/bin/sh", "-c" ]
@@ -168,3 +204,124 @@ services:
         echo "Initializing 6-Shard Redis Topology across nodes: $$NODES"
         echo "yes" | redis-cli --cluster create $$NODES --cluster-replicas 1
         echo "Cluster handshake complete."
+
+  reconciler-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: reconciler
+    container_name: dispatch_reconciler_prod
+    environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
+      - KAFKA_BROKERS=kafka-broker:9092
+      - CITY_PREFIX=KOL
+    depends_on:
+      spatial-db:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - dispatch-tier
+
+  telemetry-ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: ingestion
+    container_name: dispatch_ingestion_prod
+    environment:
+      - KAFKA_BROKERS=kafka-broker:9092
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+    ports:
+      - "50051:50051"
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier
+
+  matching-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: dispatch
+    container_name: dispatch_matcher_prod
+    environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
+      - KAFKA_BROKERS=kafka-broker:9092
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+      - TRITON_SERVER_URL=triton-server:8001
+      - ALGORITHM_STRATEGY=GREEDY
+    depends_on:
+      spatial-db:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+      triton-server:
+        condition: service_healthy
+    networks:
+      - dispatch-tier
+
+  surge-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: surge
+    container_name: dispatch_surge_prod
+    environment:
+      - KAFKA_BROKERS=kafka-broker:9092
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+      - SURGE_CITY_PREFIX=KOL
+      - SURGE_TRACKED_CELLS=88754cb247fffff,88283473fffffff
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier
+
+  pricing-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: pricing
+    container_name: dispatch_pricing_prod
+    environment:
+      - KAFKA_BROKERS=kafka-broker:9092
+      - REDIS_CLUSTER_ADDRS=redis-node-1:6379
+      - PRICING_GROUP_ID=pricing-service-consumer-group
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier
+
+  telemetry-pruner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: pruner
+    container_name: dispatch_pruner_prod
+    environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+    depends_on:
+      spatial-db:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier

@@ -32,7 +32,7 @@ type OrderCreatedConsumer struct {
 	kafkaReader        *kafka.Reader
 	kafkaWriter        *kafka.Writer
 	driverStateWriter  *kafka.Writer
-	orderRetryWriter   *kafka.Writer // MILESTONE 3: Re-injects starved orders back onto the stream
+	orderRetryWriter   *kafka.Writer
 	spatialScanner     *repository.SpatialScanner
 	redisClusterClient *redis.ClusterClient
 	dbPool             *pgxpool.Pool
@@ -45,6 +45,10 @@ type OrderCreatedConsumer struct {
 	orderBuffer  []domain.OrderCreatedPayload
 	windowTimer  *time.Timer
 	currentAlgo  string
+
+	// MILESTONE 8: Ingestion Velocity Tracker Extensions
+	lastFlushTime      time.Time
+	rollingArrivalRate float64 // EWMA orders calculated per second
 }
 
 func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *repository.SpatialScanner, redisClient *redis.ClusterClient, db *pgxpool.Pool, algoStrategy string, optionalArgs ...matcher.ETACorrector) *OrderCreatedConsumer {
@@ -59,7 +63,7 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 			GroupID:        groupID,
 			MinBytes:       10,
 			MaxBytes:       10e6,
-			CommitInterval: 0, // Explicit synchronous manual commits only
+			CommitInterval: 0,
 		}),
 		kafkaWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
@@ -75,7 +79,7 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 		},
 		orderRetryWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
-			Topic:        "order.created", // MILESTONE 3: Loops back onto the main matching input stream
+			Topic:        "order.created",
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
@@ -83,10 +87,12 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 		redisClusterClient: redisClient,
 		dbPool:             db,
 		etaCorrector:       etaCorrector,
-		batchWindow:        300 * time.Millisecond,
-		maxBatchSize:       150,
+		batchWindow:        300 * time.Millisecond, // Default/Initial baseline window
+		maxBatchSize:       150,                    // Hard limit protection boundary
 		orderBuffer:        make([]domain.OrderCreatedPayload, 0),
 		currentAlgo:        algoStrategy,
+		lastFlushTime:      time.Now(),
+		rollingArrivalRate: 0.0,
 	}
 }
 
@@ -151,6 +157,7 @@ func (c *OrderCreatedConsumer) processBatchLoop(ctx context.Context) {
 		case <-c.windowTimer.C:
 			c.mu.Lock()
 			if len(c.orderBuffer) == 0 {
+				// Reinstate timer matching active dynamically shifted duration metrics
 				c.windowTimer.Reset(c.batchWindow)
 				c.mu.Unlock()
 				continue
@@ -158,6 +165,32 @@ func (c *OrderCreatedConsumer) processBatchLoop(ctx context.Context) {
 
 			batchToProcess := c.orderBuffer
 			c.orderBuffer = make([]domain.OrderCreatedPayload, 0)
+
+			// MILESTONE 8 ALGORITHM: EWMA Velocity Balancing Computation Phase
+			now := time.Now()
+			elapsedSeconds := now.Sub(c.lastFlushTime).Seconds()
+			c.lastFlushTime = now
+
+			if elapsedSeconds > 0 {
+				momentaryRate := float64(len(batchToProcess)) / elapsedSeconds
+				if c.rollingArrivalRate == 0.0 {
+					c.rollingArrivalRate = momentaryRate // Seed value on startup execution
+				} else {
+					// Smooth weighting coefficient filter (alpha = 0.3)
+					c.rollingArrivalRate = (0.3 * momentaryRate) + (0.7 * c.rollingArrivalRate)
+				}
+			}
+
+			// Dynamically adapt batch window scale matching rolling marketplace ingestion constraints
+			if c.rollingArrivalRate < 10.0 {
+				c.batchWindow = 100 * time.Millisecond // Low off-peak rate: drop latency for rapid pairings
+			} else if c.rollingArrivalRate > 60.0 {
+				c.batchWindow = 400 * time.Millisecond // High peak rate: extend window for combinatorial mapping pool sizes
+			} else {
+				// Linear scale transposition matching steady localized growth steps
+				c.batchWindow = time.Duration(100+int((c.rollingArrivalRate-10.0)*6.0)) * time.Millisecond
+			}
+
 			c.windowTimer.Reset(c.batchWindow)
 			c.mu.Unlock()
 
@@ -200,7 +233,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			if err != nil || len(candidates) == 0 {
 				log.Printf("Greedy worker starvation or failure on order %s. Routing to re-queue.", o.OrderID)
 				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
-				c.requeueUnmatchedOrder(ctx, o) // MILESTONE 3
+				c.requeueUnmatchedOrder(ctx, o)
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
@@ -211,7 +244,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			if matchErr != nil {
 				log.Printf("Greedy match failed for order %s: %v. Routing to recovery path.", o.OrderID, matchErr)
 				observability.OrdersUnmatchedTotal.WithLabelValues("match_failure").Inc()
-				c.requeueUnmatchedOrder(ctx, o) // MILESTONE 3
+				c.requeueUnmatchedOrder(ctx, o)
 				mu.Lock()
 				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 				mu.Unlock()
@@ -223,7 +256,6 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			if err != nil {
 				observability.DBTransactionDurationSeconds.WithLabelValues("error").Observe(time.Since(txStart).Seconds())
 				if errors.Is(err, pgx.ErrNoRows) {
-					// Idempotency: order already assigned by a concurrent worker
 					mu.Lock()
 					collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 					mu.Unlock()
@@ -236,14 +268,10 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 				log.Printf("Redis spatial eviction failed for driver %s: %v", optimalMatch.DriverID, err)
 			}
 
-			// Collect offset BEFORE emit attempts — DB is already mutated so we must
-			// advance the partition regardless of downstream publish success.
 			mu.Lock()
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 			mu.Unlock()
 
-			// Use a fresh context for downstream Kafka emits so the tight orderCtx
-			// deadline doesn't starve fire-and-forget event notifications.
 			emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
 			defer emitCancel()
 
@@ -266,7 +294,6 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 	}
 }
 
-// executeHungarianBatchPool resolves matching logic globally across all buffered entries
 func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, orders []domain.OrderCreatedPayload) {
 	batchCtx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
 	defer cancel()
@@ -276,7 +303,6 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 	var mapMu sync.Mutex
 	var wg sync.WaitGroup
 
-	// Fetch candidates across cells concurrently using separate threads to satisfy the SLA limits
 	for _, order := range orders {
 		wg.Add(1)
 		go func(o domain.OrderCreatedPayload) {
@@ -442,6 +468,7 @@ enqueueMatches:
 
 	return collected
 }
+
 // MILESTONE 3: Execute state-bounded re-injection onto the stream with exponential delay backing
 func (c *OrderCreatedConsumer) requeueUnmatchedOrder(ctx context.Context, o domain.OrderCreatedPayload) {
 	const maxMarketplaceRetries = 3
@@ -585,7 +612,7 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	}
 
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(match.OrderID), // Explicit hashing key for order.assigned
+		Key:   []byte(match.OrderID),
 		Value: bytes,
 	})
 }
@@ -593,6 +620,6 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 func (c *OrderCreatedConsumer) Close() error {
 	_ = c.kafkaReader.Close()
 	_ = c.driverStateWriter.Close()
-	_ = c.orderRetryWriter.Close() // MILESTONE 3: Cleanly disconnect recovery channel
+	_ = c.orderRetryWriter.Close()
 	return c.kafkaWriter.Close()
 }
