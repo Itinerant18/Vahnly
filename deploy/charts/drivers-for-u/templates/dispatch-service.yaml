@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-dispatch-svc
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: metrics
+      name: metrics
+  selector:
+    app: dispatch

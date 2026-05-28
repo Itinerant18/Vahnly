@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-pruner
+  labels:
+    app: pruner
+spec:
+  replicas: {{ .Values.pruner.replicaCount }}
+  selector:
+    matchLabels:
+      app: pruner
+  template:
+    metadata:
+      labels:
+        app: pruner
+    spec:
+      containers:
+        - name: pruner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "pruner"
+            - name: DATABASE_URL
+              value: {{ .Values.global.env.databaseUrl | quote }}
+            - name: REDIS_CLUSTER_NODES
+              value: {{ .Values.global.env.redisClusterNodes | quote }}
+          resources:
+            {{- toYaml .Values.pruner.resources | nindent 12 }}

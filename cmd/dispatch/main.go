@@ -19,6 +19,7 @@ import (
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
 	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/routing/graph"
+	"github.com/platform/driver-delivery/internal/storage/migration"
 )
 
 type simpleRoutingService struct {
@@ -39,8 +40,15 @@ func main() {
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
 	algoStrategy := getEnv("ALGORITHM_STRATEGY", "HUNGARIAN")  // Defaulting to global batch matrix matching
 	tritonURL := getEnv("TRITON_SERVER_URL", "127.0.0.1:8001") // Enforcing IPv4 explicit coordinate mapping
+	migrationsPath := getEnv("DATABASE_MIGRATIONS_PATH", "file://database/migrations")
 
 	log.Printf("Starting Dispatch Matching Service. Target Strategy Matrix: %s", algoStrategy)
+
+	// MILESTONE 11 INTEGRATION GATE: Enforce programmatic schema validation before service setup
+	log.Println("Initializing programmatic schema synchronization validations...")
+	if err := migration.AutoRunDatabaseMigrations(postgresURL, migrationsPath); err != nil {
+		log.Fatalf("Database migration setup failed. Halting system components: %v", err)
+	}
 
 	// 2. Initialize PostgreSQL Connection Pool via pgxpool
 	pgxConfig, err := pgxpool.ParseConfig(postgresURL)

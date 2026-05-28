@@ -95,7 +95,7 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 	seedSQL := []string{
 		"DELETE FROM dispatch_match_logs WHERE order_id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'",
 		"DELETE FROM orders WHERE id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'",
-		"DELETE FROM drivers WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'",
+		"DELETE FROM drivers WHERE city_prefix = 'KOL'",
 		"DELETE FROM regional_cities WHERE city_prefix = 'KOL'",
 		`INSERT INTO regional_cities (city_prefix, city_name, timezone, is_active, geofence)
 		 VALUES ('KOL', 'Kolkata', 'Asia/Kolkata', true, ST_GeomFromText('MULTIPOLYGON(((88.3 22.5, 88.4 22.5, 88.4 22.6, 88.3 22.6, 88.3 22.5)))', 4326)::geography)`,
@@ -112,6 +112,10 @@ func TestE2E_TelemetryAndDispatchPipeline(t *testing.T) {
 
 	// 4. Seed Redis Cluster Driver Profile
 	t.Log("Seeding Redis driver profile...")
+	spatialKey := "drivers:zset:KOL:88754cb247fffff"
+	_ = redisClient.Del(ctx, spatialKey)
+	defer redisClient.Del(ctx, spatialKey)
+
 	profileKey := "driver:{KOL:a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}:profile"
 	err = redisClient.HSet(ctx, profileKey, map[string]interface{}{
 		"osm_node_id":              "1001",

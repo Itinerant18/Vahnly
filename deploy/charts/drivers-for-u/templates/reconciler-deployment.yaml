@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-reconciler
+  labels:
+    app: reconciler
+spec:
+  replicas: {{ .Values.reconciler.replicaCount }}
+  selector:
+    matchLabels:
+      app: reconciler
+  template:
+    metadata:
+      labels:
+        app: reconciler
+    spec:
+      containers:
+        - name: reconciler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "reconciler"
+            - name: DATABASE_URL
+              value: {{ .Values.global.env.databaseUrl | quote }}
+            - name: KAFKA_BROKERS
+              value: {{ .Values.global.env.kafkaBrokers | quote }}
+            - name: CITY_PREFIX
+              value: {{ .Values.global.region | quote }}
+          resources:
+            {{- toYaml .Values.reconciler.resources | nindent 12 }}

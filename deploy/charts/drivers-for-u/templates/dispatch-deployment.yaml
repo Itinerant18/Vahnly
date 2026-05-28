@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-dispatch
+  labels:
+    app: dispatch
+spec:
+  replicas: {{ .Values.dispatch.replicaCount }}
+  selector:
+    matchLabels:
+      app: dispatch
+  template:
+    metadata:
+      labels:
+        app: dispatch
+    spec:
+      containers:
+        - name: dispatch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "dispatch"
+            - name: DATABASE_URL
+              value: {{ .Values.global.env.databaseUrl | quote }}
+            - name: KAFKA_BROKERS
+              value: {{ .Values.global.env.kafkaBrokers | quote }}
+            - name: REDIS_CLUSTER_NODES
+              value: {{ .Values.global.env.redisClusterNodes | quote }}
+            - name: TRITON_SERVER_URL
+              value: {{ .Values.global.env.tritonServerUrl | quote }}
+            - name: MATCHING_ALGORITHM
+              value: {{ .Values.dispatch.algorithmStrategy | quote }}
+          ports:
+            - containerPort: 8080
+              name: metrics
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.dispatch.resources | nindent 12 }}

@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-ingestion
+  labels:
+    app: ingestion
+spec:
+  replicas: {{ .Values.ingestion.replicaCount }}
+  selector:
+    matchLabels:
+      app: ingestion
+  template:
+    metadata:
+      labels:
+        app: ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Utilizing multi-stage binary overrides using runtime entrypoint commands
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "ingestion"
+            - name: KAFKA_BROKERS
+              value: {{ .Values.global.env.kafkaBrokers | quote }}
+            - name: REDIS_CLUSTER_NODES
+              value: {{ .Values.global.env.redisClusterNodes | quote }}
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 8080
+              name: metrics
+          # Hooking into your live Prometheus HTTP endpoints for container health checks
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.ingestion.resources | nindent 12 }}

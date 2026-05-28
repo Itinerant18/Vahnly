@@ -1,0 +1,58 @@
+global:
+  region: "KOL"
+  # Coordinates pointing to your infrastructure cluster endpoints
+  env:
+    kafkaBrokers: "kafka-service.dispatch.svc.cluster.local:9092"
+    redisClusterNodes: "redis-cluster-nodes.dispatch.svc.cluster.local:6379"
+    databaseUrl: "postgres://postgres:password@postgresql-service.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=disable"
+    tritonServerUrl: "triton-service.dispatch.svc.cluster.local:8001"
+
+image:
+  repository: "drivers-for-u-service"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# 1. Telemetry Ingestion gRPC Service Properties
+ingestion:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+
+# 2. Kuhn-Munkres Dispatch Engine Properties
+dispatch:
+  replicaCount: 2
+  algorithmStrategy: "HUNGARIAN"
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+
+# 3. Telemetry Session Garbage Collector Daemon
+pruner:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+# 4. Anti-Entropy Self-Healing Sync Worker
+reconciler:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"

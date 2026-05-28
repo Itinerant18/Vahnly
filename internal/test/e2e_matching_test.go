@@ -147,7 +147,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 
 	_, _ = dbPool.Exec(ctx, "DELETE FROM dispatch_match_logs WHERE order_id = $1::uuid", testOrderID)
 	_, _ = dbPool.Exec(ctx, "DELETE FROM orders WHERE id = $1::uuid", testOrderID)
-	_, _ = dbPool.Exec(ctx, "DELETE FROM drivers WHERE id = $1::uuid", testDriverID)
+	_, _ = dbPool.Exec(ctx, "DELETE FROM drivers WHERE city_prefix = 'KOL'")
 	_, _ = dbPool.Exec(ctx, "DELETE FROM regional_cities WHERE city_prefix = 'KOL'")
 
 	// Clear the targeted H3 spatial cache index ZSET and driver profile hash

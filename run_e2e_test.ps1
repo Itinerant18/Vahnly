@@ -80,11 +80,19 @@ if (-not $allConnected) {
 }
 
 # 6. Seed PostgreSQL database state
+Write-Host "Running programmatic migrations..."
+& $go run cmd/migrate/main.go
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Programmatic migration bootstrap failed."
+    Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    exit 1
+}
+
 Write-Host "Seeding PostgreSQL state..."
 $sql = @'
 DELETE FROM dispatch_match_logs WHERE order_id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 DELETE FROM orders WHERE id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-DELETE FROM drivers WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+DELETE FROM drivers WHERE city_prefix = 'KOL';
 DELETE FROM regional_cities WHERE city_prefix = 'KOL';
 
 INSERT INTO regional_cities (city_prefix, city_name, timezone, is_active, geofence)
@@ -152,6 +160,8 @@ $dispatchWrapper = @"
 `$env:TRITON_SERVER_ADDR  = "127.0.0.1:8001"
 `$env:TRITON_SERVER_URL   = "127.0.0.1:8001"
 `$env:REDIS_IP_MAP        = "$($env:REDIS_IP_MAP)"
+`$env:OSM_NODES_DATA_PATH  = "nonexistent_nodes.csv"
+`$env:OSM_EDGES_DATA_PATH  = "nonexistent_edges.csv"
 & "C:\workspace\Driver\bin\dispatch.exe"
 "@
 $dispatchWrapper | Out-File -FilePath "C:\workspace\Driver\bin\run-dispatch.ps1" -Encoding UTF8 -Force

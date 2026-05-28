@@ -1,0 +1,6 @@
+apiVersion: v2
+name: drivers-for-u
+description: Production Helm Chart for the Single-Region Intelligent Matching Backbone
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
