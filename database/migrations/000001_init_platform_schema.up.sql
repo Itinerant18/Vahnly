@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS drivers (
     name VARCHAR(100) DEFAULT 'Unknown' NOT NULL,
     phone VARCHAR(15),
     dl_number VARCHAR(50),
+    osm_node_id BIGINT DEFAULT 9999 NOT NULL,
     current_state driver_state_enum DEFAULT 'OFFLINE' NOT NULL,
     is_verified BOOLEAN DEFAULT false NOT NULL,
     acceptance_rate NUMERIC(4,3) DEFAULT 1.000 NOT NULL,

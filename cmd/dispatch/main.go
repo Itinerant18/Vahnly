@@ -128,7 +128,7 @@ func main() {
 	graphLoader := graph.NewGraphLoader(chService)
 
 	if _, err := os.Stat(nodesPath); err == nil {
-		loadCtx, loadCancel := context.WithTimeout(ctx, 30*time.Second)
+		loadCtx, loadCancel := context.WithTimeout(ctx, 10*time.Minute)
 		if err := graphLoader.IngestContractedTopology(loadCtx, nodesPath, edgesPath); err != nil {
 			loadCancel()
 			log.Fatalf("Critical error during road network graph initialization: %v", err)
