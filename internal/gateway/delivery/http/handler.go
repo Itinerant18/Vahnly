@@ -300,3 +300,151 @@ func (h *GatewayHandler) DrainAndSignalWebSockets(ctx context.Context) {
 		log.Println("[DRAIN_ENGINE] Coordinated WebSocket connection draining completed cleanly. Zero clients dropped abruptly.")
 	}
 }
+
+// HandleAcceptOrder hard locks the driver assignment and advances the trip lifecycle status
+func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID  string `json:"order_id"`
+		DriverID string `json:"driver_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Advance order status from ASSIGNED to EN_ROUTE_TO_PICKUP
+	query := `
+		UPDATE orders 
+		SET status = 'EN_ROUTE_TO_PICKUP'::order_status_enum 
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'ASSIGNED'::order_status_enum;
+	`
+
+	res, err := tx.Exec(ctx, query, req.OrderID, req.DriverID)
+	if err != nil || res.RowsAffected() == 0 {
+		http.Error(w, "offer_lock_failed_or_expired", http.StatusConflict)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Clear the active lease tracking key from the cluster memory space
+	leaseKey := fmt.Sprintf("offer:lease:%s", req.OrderID)
+	_ = h.clusterClient.Del(ctx, leaseKey)
+
+	log.Printf("[STATE_MACHINE] Driver %s successfully accepted trip order %s", req.DriverID, req.OrderID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"EN_ROUTE_TO_PICKUP"}`))
+}
+
+// HandleDeclineOrder processes manual rejections, freeing the driver and re-injecting the booking request to Kafka
+func (h *GatewayHandler) HandleDeclineOrder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID    string `json:"order_id"`
+		DriverID   string `json:"driver_id"`
+		CityPrefix string `json:"city_prefix"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+	defer cancel()
+
+	// Execute rollback process cleanly
+	err := h.RollbackAssignmentToCreated(ctx, req.OrderID, req.DriverID, req.CityPrefix)
+	if err != nil {
+		log.Printf("[STATE_MACHINE_ERROR] Rejection rollback failed for order %s: %v", req.OrderID, err)
+		http.Error(w, "state_rollback_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"RE_QUEUED"}`))
+}
+
+// RollbackAssignmentToCreated returns the entities back to baseline matching loops atomically
+func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderID, driverID, cityPrefix string) error {
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Revert order status back to CREATED
+	orderQuery := `
+		UPDATE orders 
+		SET status = 'CREATED'::order_status_enum, assigned_driver_id = NULL, assigned_at = NULL 
+		WHERE id = $1::uuid AND status = 'ASSIGNED'::order_status_enum;
+	`
+
+	var orderPayload dispatchDomain.OrderCreatedPayload
+
+	// Extract payload fields to compile the exact re-queue configuration block
+	fetchQuery := `
+		SELECT id, city_prefix, customer_id, pickup_h3_cell, pickup_osm_node_id, ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry), base_fare_paise
+		FROM orders WHERE id = $1::uuid;
+	`
+	err = tx.QueryRow(ctx, fetchQuery, orderID).Scan(
+		&orderPayload.OrderID, &orderPayload.CityPrefix, &orderPayload.CustomerID,
+		&orderPayload.PickupH3Cell, &orderPayload.PickupOSMNodeID, &orderPayload.PickupLat, &orderPayload.PickupLng,
+		&orderPayload.BaseFarePaise,
+	)
+	if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(ctx, orderQuery, orderID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return fmt.Errorf("order %s status update failed: status is not ASSIGNED", orderID)
+	}
+
+	// 2. Revert driver status back to ONLINE_AVAILABLE
+	driverQuery := `
+		UPDATE drivers 
+		SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = $1::uuid;
+	`
+	_, err = tx.Exec(ctx, driverQuery, driverID)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	// 3. Clear lease and drop a 30s match cooldown key in Redis to prevent immediate re-matching
+	leaseKey := fmt.Sprintf("offer:lease:%s", orderID)
+	cooldownKey := fmt.Sprintf("cooldown:driver:%s", driverID)
+	
+	_ = h.clusterClient.Del(ctx, leaseKey)
+	_ = h.clusterClient.Set(ctx, cooldownKey, "1", 30*time.Second).Err()
+
+	// 4. Re-inject the order onto the Kafka topic stream to preserve request execution
+	orderPayload.RetryCount = 1
+	bytes, _ := json.Marshal(orderPayload)
+	return h.kafkaWriter.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(orderID),
+		Value: bytes,
+	})
+}
+

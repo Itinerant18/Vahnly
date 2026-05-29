@@ -134,8 +134,8 @@ BEGIN
         RAISE EXCEPTION 'IllegalStateTransition: New orders must move to ASSIGNED or CANCELLED.';
     END IF;
 
-    IF OLD.status = 'ASSIGNED' AND NEW.status NOT IN ('EN_ROUTE_TO_PICKUP', 'CANCELLED') THEN
-        RAISE EXCEPTION 'IllegalStateTransition: Assigned orders must move to EN_ROUTE or CANCELLED.';
+    IF OLD.status = 'ASSIGNED' AND NEW.status NOT IN ('EN_ROUTE_TO_PICKUP', 'CANCELLED', 'CREATED') THEN
+        RAISE EXCEPTION 'IllegalStateTransition: Assigned orders must move to EN_ROUTE, CANCELLED, or CREATED.';
     END IF;
 
     IF OLD.status = 'DELIVERING' AND NEW.status NOT IN ('COMPLETED') THEN

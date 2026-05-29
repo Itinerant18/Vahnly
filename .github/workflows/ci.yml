@@ -77,6 +77,8 @@ jobs:
         run: go build -o bin/osm-preprocessor ./cmd/osm-preprocessor/
       - name: Build simulator runner
         run: go build -o bin/simulator ./cmd/simulator/
+      - name: Build expiry service
+        run: go build -o bin/expiry ./cmd/expiry/
       - name: Verify binaries exist
         run: ls -la bin/
 

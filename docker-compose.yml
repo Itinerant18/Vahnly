@@ -325,3 +325,25 @@ services:
         condition: service_completed_successfully
     networks:
       - dispatch-tier
+
+  offer-expiry-janitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: expiry
+    container_name: dispatch_expiry_janitor_prod
+    environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+      - KAFKA_BROKERS=kafka-broker:9092
+      - CITY_PREFIX=KOL
+    depends_on:
+      spatial-db:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier

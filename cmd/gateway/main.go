@@ -72,6 +72,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/pricing/quote", handler.HandleGetPricingQuote)
 	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder)))
 	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(handler.HandleMatchRealtimeStream))
+	mux.HandleFunc("POST /api/v1/dispatch/accept", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleAcceptOrder)))
+	mux.HandleFunc("POST /api/v1/dispatch/decline", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleDeclineOrder)))
 
 	server := &http.Server{
 		Addr:         ":" + httpPort,
