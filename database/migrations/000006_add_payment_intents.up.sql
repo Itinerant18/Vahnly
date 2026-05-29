@@ -1,4 +1,4 @@
-CREATE TABLE payment_intents (
+CREATE TABLE IF NOT EXISTS payment_intents (
     id VARCHAR(100) PRIMARY KEY,          -- External provider tracking identifier (e.g., 'pi_1Gbf32...')
     order_id UUID NOT NULL REFERENCES orders(id),
     amount_paise BIGINT NOT NULL,        -- Strict 64-bit integer representation of transaction amount
@@ -11,4 +11,4 @@ CREATE TABLE payment_intents (
 );
 
 -- Index order associations for rapid lookups during asynchronous callbacks
-CREATE INDEX idx_payment_intents_order_id ON payment_intents(order_id);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_order_id ON payment_intents(order_id);

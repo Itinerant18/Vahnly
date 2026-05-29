@@ -232,6 +232,16 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	h.localSessions.Store(targetOrderID, sessionMetadata)
 	defer h.localSessions.Delete(targetOrderID)
 
+	// MILESTONE 24: advertise cluster-wide WS presence so OTHER pods skip the push-outbox
+	// fallback while this driver is connected here. Covers the brief assignment-offer window.
+	presenceKey := fmt.Sprintf("ws:presence:%s", targetOrderID)
+	_ = h.clusterClient.Set(r.Context(), presenceKey, "1", 30*time.Minute).Err()
+	defer func() {
+		delCtx, delCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer delCancel()
+		_ = h.clusterClient.Del(delCtx, presenceKey).Err()
+	}()
+
 	const writeWait = 10 * time.Second
 	
 	for {
@@ -297,6 +307,13 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				go func(orderID, driverID string, rawJSON string) {
 					dbCtx, dbCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 					defer dbCancel()
+
+					// Cluster-wide presence guard: if ANY pod holds a live WebSocket for this
+					// order, the client is online — skip the push so connected drivers aren't
+					// double-notified by pods that simply don't host the session locally.
+					if present, _ := h.clusterClient.Exists(dbCtx, fmt.Sprintf("ws:presence:%s", orderID)).Result(); present > 0 {
+						return
+					}
 
 					// Check if a cluster-wide token mapping exists for this backgrounded driver
 					var hasToken bool
@@ -861,9 +878,14 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 		var cityPrefix string
 		_ = tx.QueryRow(ctx, "SELECT city_prefix FROM orders WHERE id = $1::uuid", webhookEvent.Data.OrderID).Scan(&cityPrefix)
 
+		// Record the external card-network settlement as a balanced double-entry pair so the
+		// ledger stays auditable (debits == credits). A lone CREDIT here would leave the
+		// admin auditor permanently unbalanced against the settlement booked at trip completion.
 		ledgerQuery := `
 			INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
-			VALUES ($1::uuid, $2, 'RIDER_EXTERNAL_PAYMENT', 'CREDIT', $3, 'Asynchronous webhook clearance verification from credit card network settlement');
+			VALUES
+				($1::uuid, $2, 'PROVIDER_SETTLEMENT_CASH', 'DEBIT', $3, 'External card network cash settlement inflow (webhook clearance)'),
+				($1::uuid, $2, 'RIDER_EXTERNAL_PAYMENT', 'CREDIT', $3, 'Rider external payment receivable cleared via card network settlement');
 		`
 		_, err = tx.Exec(ctx, ledgerQuery, webhookEvent.Data.OrderID, cityPrefix, webhookEvent.Data.AmountPaise)
 		if err != nil {
@@ -880,9 +902,11 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 			ON CONFLICT (id) DO UPDATE SET payment_status = 'FAILED', updated_at = CURRENT_TIMESTAMP;
 		`
 		_, _ = tx.Exec(ctx, failUpsert, webhookEvent.Data.IntentID, webhookEvent.Data.OrderID, webhookEvent.Data.AmountPaise, webhookEvent.Data.Currency, webhookEvent.EventID)
-		
-		// Flag the order status for collection processing or dispatch cancellations
-		_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'CREATED'::order_status_enum WHERE id = $1::uuid", webhookEvent.Data.OrderID)
+
+		// Roll the order back to CREATED for retry, but ONLY from ASSIGNED — the only
+		// downgrade the state-machine trigger permits. Guarding by status avoids firing the
+		// trigger on terminal/in-flight orders (which would raise and 500 the whole webhook).
+		_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'CREATED'::order_status_enum, assigned_driver_id = NULL, assigned_at = NULL WHERE id = $1::uuid AND status = 'ASSIGNED'::order_status_enum", webhookEvent.Data.OrderID)
 	}
 
 	// Commit entries atomically to disk

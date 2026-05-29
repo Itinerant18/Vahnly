@@ -1,4 +1,4 @@
-CREATE TABLE financial_ledger_entries (
+CREATE TABLE IF NOT EXISTS financial_ledger_entries (
     id BIGSERIAL PRIMARY KEY,
     order_id UUID NOT NULL REFERENCES orders(id),
     city_prefix VARCHAR(10) NOT NULL REFERENCES regional_cities(city_prefix),
@@ -10,5 +10,5 @@ CREATE TABLE financial_ledger_entries (
 );
 
 -- Optimize accounting verification lookups by indexing matching order keys
-CREATE INDEX idx_financial_ledger_order_id ON financial_ledger_entries(order_id);
-CREATE INDEX idx_financial_ledger_city_account ON financial_ledger_entries(city_prefix, account_type);
+CREATE INDEX IF NOT EXISTS idx_financial_ledger_order_id ON financial_ledger_entries(order_id);
+CREATE INDEX IF NOT EXISTS idx_financial_ledger_city_account ON financial_ledger_entries(city_prefix, account_type);

@@ -16,49 +16,50 @@ export class TelemetryRingBuffer {
   private isUploading: boolean = false;
   private uploader: TelemetryUploader;
 
-  constructor(maxSize: number = 100, uploader: TelemetryUploader) {
-    this.bufferSizeLimit = maxSize;
+  constructor(uploader: TelemetryUploader, maxSize: number = 100) {
     this.uploader = uploader;
+    this.bufferSizeLimit = maxSize;
   }
 
   /**
-   * Push high-frequency driver locations into the local ring buffer memory
+   * Push a high-frequency driver location into the local ring buffer.
+   * Evicts the oldest packet once the size limit is breached.
    */
   public logCoordinate(packet: GPSCoordinatePacket, isNetworkOnline: boolean): void {
-    // If the storage limit is breached, evict the oldest point to maintain memory limits
     if (this.ringBuffer.length >= this.bufferSizeLimit) {
-      this.ringBuffer.shift(); 
-      console.warn('[TELEMETRY_CACHE] Buffer size exceeded. Evicting oldest location snapshot packet.');
+      this.ringBuffer.shift();
+      console.warn('[TELEMETRY_CACHE] Buffer full. Evicting oldest location snapshot packet.');
     }
 
     this.ringBuffer.push(packet);
-    console.log(`[TELEMETRY_CACHE] Location logged. Current local window storage count: ${this.ringBuffer.length}`);
 
     if (isNetworkOnline && !this.isUploading) {
-      this.flushCachedTelemetryPools();
+      void this.flushCachedTelemetryPools();
     }
   }
 
   /**
-   * Flush cached telemetry points to the backend once connectivity returns
+   * Flush cached telemetry points to the backend once connectivity returns.
+   *
+   * Successfully-flushed packets are removed BY REFERENCE rather than by index/count, so
+   * coordinates pushed (or evicted) during the awaited upload are never accidentally
+   * dropped or re-sent.
    */
   public async flushCachedTelemetryPools(): Promise<void> {
     if (this.ringBuffer.length === 0 || this.isUploading) return;
 
     this.isUploading = true;
-    // Snapshot the current window contents for the network operation pass
     const recordsToFlush = [...this.ringBuffer];
-    console.log(`[TELEMETRY_CACHE] System online. Flushing ${recordsToFlush.length} points to ingestion engines...`);
 
     try {
       const uploadSuccess = await this.uploader(recordsToFlush);
       if (uploadSuccess) {
-        // Clear only the records that were successfully processed
-        this.ringBuffer = this.ringBuffer.slice(recordsToFlush.length);
-        console.log('[TELEMETRY_CACHE] Location cache flushed successfully. Cache cleared.');
+        const flushed = new Set<GPSCoordinatePacket>(recordsToFlush);
+        this.ringBuffer = this.ringBuffer.filter((p) => !flushed.has(p));
+        console.log('[TELEMETRY_CACHE] Flushed cached points successfully.');
       }
     } catch (err) {
-      console.error('[TELEMETRY_CACHE] Network transmission failed during flush sequence. Preserving local cache lines:', err);
+      console.error('[TELEMETRY_CACHE] Flush failed. Preserving local cache:', err);
     } finally {
       this.isUploading = false;
     }

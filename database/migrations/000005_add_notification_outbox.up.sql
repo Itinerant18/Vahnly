@@ -1,5 +1,5 @@
 -- Track native mobile device tokens mapped to active system entities
-CREATE TABLE user_device_tokens (
+CREATE TABLE IF NOT EXISTS user_device_tokens (
 	user_id UUID PRIMARY KEY,
 	device_token VARCHAR(255) NOT NULL,
 	platform_type VARCHAR(20) NOT NULL, -- 'ANDROID_FCM', 'IOS_APNS'
@@ -7,7 +7,7 @@ CREATE TABLE user_device_tokens (
 );
 
 -- Transactional Append-Only Outbox Table
-CREATE TABLE notification_outbox (
+CREATE TABLE IF NOT EXISTS notification_outbox (
 	id BIGSERIAL PRIMARY KEY,
 	user_id UUID NOT NULL,
 	title VARCHAR(150) NOT NULL,
@@ -20,5 +20,5 @@ CREATE TABLE notification_outbox (
 	processed_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_notification_outbox_status ON notification_outbox(status) WHERE status = 'PENDING';
-CREATE INDEX idx_user_device_tokens_lookup ON user_device_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_user_device_tokens_lookup ON user_device_tokens(user_id);

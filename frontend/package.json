@@ -1,0 +1,16 @@
+{
+  "name": "drivers-for-u-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile client networking core + operations control-room dashboard for the Drivers-for-U dispatch platform.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "react": "^18.2.0",
+    "typescript": "^5.4.0"
+  }
+}

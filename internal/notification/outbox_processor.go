@@ -111,7 +111,11 @@ func (d *OutboxNotificationDaemon) dispatchPushNotification(ctx context.Context,
 		// Payout success: mark record state as SENT cleanly
 		successQuery := "UPDATE notification_outbox SET status = 'SENT', processed_at = CURRENT_TIMESTAMP WHERE id = $1;"
 		_, _ = d.dbPool.Exec(workerCtx, successQuery, item.ID)
-		log.Printf("[NOTIFICATION_SENT] Push alert successfully delivered via %s to device token: %s...", platform, token[:8])
+		tokenPreview := token
+		if len(tokenPreview) > 8 {
+			tokenPreview = tokenPreview[:8]
+		}
+		log.Printf("[NOTIFICATION_SENT] Push alert successfully delivered via %s to device token: %s...", platform, tokenPreview)
 	} else {
 		// Requeue update fallback loop
 		failQuery := "UPDATE notification_outbox SET retry_count = retry_count + 1, error_log = 'provider_timeout' WHERE id = $1;"

@@ -177,7 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_matching_state ON orders(city_prefix, stat
 CREATE INDEX IF NOT EXISTS idx_match_logs_order ON dispatch_match_logs(order_id);
 
 -- ============================================================================
-6. FIAT PAYMENT GATEWAY TRANSACTIONS
+-- 6. FIAT PAYMENT GATEWAY TRANSACTIONS
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS payment_intents (
@@ -194,3 +194,48 @@ CREATE TABLE IF NOT EXISTS payment_intents (
 
 -- Index order associations for rapid lookups during asynchronous callbacks
 CREATE INDEX IF NOT EXISTS idx_payment_intents_order_id ON payment_intents(order_id);
+
+-- ============================================================================
+-- 7. IMMUTABLE DOUBLE-ENTRY FINANCIAL LEDGER (Milestone 21)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS financial_ledger_entries (
+    id BIGSERIAL PRIMARY KEY,
+    order_id UUID NOT NULL REFERENCES orders(id),
+    city_prefix VARCHAR(10) NOT NULL REFERENCES regional_cities(city_prefix),
+    account_type VARCHAR(50) NOT NULL, -- 'RIDER_EXTERNAL_PAYMENT', 'DRIVER_EARNINGS', 'PLATFORM_COMMISSION', 'PROVIDER_SETTLEMENT_CASH'
+    entry_type VARCHAR(10) NOT NULL,    -- 'DEBIT', 'CREDIT'
+    amount_paise BIGINT NOT NULL,       -- Explicit 64-bit precision integer representation
+    description TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_ledger_order_id ON financial_ledger_entries(order_id);
+CREATE INDEX IF NOT EXISTS idx_financial_ledger_city_account ON financial_ledger_entries(city_prefix, account_type);
+
+-- ============================================================================
+-- 8. ASYNCHRONOUS PUSH NOTIFICATION OUTBOX (Milestone 24)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS user_device_tokens (
+    user_id UUID PRIMARY KEY,
+    device_token VARCHAR(255) NOT NULL,
+    platform_type VARCHAR(20) NOT NULL, -- 'ANDROID_FCM', 'IOS_APNS'
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    body TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'PENDING' NOT NULL, -- 'PENDING', 'SENT', 'FAILED'
+    retry_count INT DEFAULT 0 NOT NULL,
+    error_log TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    processed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_user_device_tokens_lookup ON user_device_tokens(user_id);
