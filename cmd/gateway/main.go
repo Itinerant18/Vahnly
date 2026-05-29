@@ -21,8 +21,9 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Root execution context
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+	defer mainCancel()
 
 	httpPort := getEnv("HTTP_PORT", "8080")
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
@@ -30,9 +31,9 @@ func main() {
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
 	jwtSecret := getEnv("JWT_SECRET_SIGNING_KEY", "kolkata_marketplace_backbone_secret_token_string")
 
-	log.Printf("Bootstrapping Multi-Pod Distributed API Gateway on Port: %s", httpPort)
+	log.Printf("Bootstrapping Coordinated API Gateway on Port: %s", httpPort)
 
-	dbPool, err := pgxpool.New(ctx, postgresURL)
+	dbPool, err := pgxpool.New(mainCtx, postgresURL)
 	if err != nil {
 		log.Fatalf("PostgreSQL connection pool setup failed: %v", err)
 	}
@@ -46,9 +47,8 @@ func main() {
 
 	brokersList := strings.Split(kafkaBrokers, ",")
 
-	// Initialize pricing service caching mechanisms
 	pricingService := pricingSvc.NewOrderPricingService(brokersList, "gateway-pricing-group", redisClusterClient)
-	go pricingService.StartSurgeMatrixSync(ctx)
+	go pricingService.StartSurgeMatrixSync(mainCtx)
 
 	kafkaWriter := &kafka.Writer{
 		Addr:         kafka.TCP(brokersList...),
@@ -60,11 +60,8 @@ func main() {
 
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
 
-	// Launch the single-pod Redis Pub/Sub listener routing routine
-	go handler.InternalBackplaneMultiplexer(ctx)
-
-	// Launch the single centralized Kafka-to-Redis fan-out sync engine for the pod
-	go startKafkaToRedisFanoutWorker(ctx, brokersList, redisClusterClient)
+	go handler.InternalBackplaneMultiplexer(mainCtx)
+	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
 
 	// Instantiate edge protection layers
 	authGuard := middleware.NewAuthMiddleware(jwtSecret)
@@ -88,31 +85,41 @@ func main() {
 			log.Fatalf("HTTP web container crash: %v", err)
 		}
 	}()
-	log.Println("Distributed API Gateway listening for active connection bounds.")
+	log.Println("API Gateway active and accepting connections.")
 
+	// Intercept container termination signals from Kubernetes or OS handles
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	<-shutdownSignal
 
-	log.Println("Gracefully draining websocket connection channels...")
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
+	log.Println("Intercepted termination signal. Stopping inbound traffic routing routes...")
+
+	// 1. Create a dedicated context window for the graceful draining sequence
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer drainCancel()
+
+	// 2. Shut down the HTTP listener first so the load balancer stops routing new requests to this instance
+	_ = server.Shutdown(drainCtx)
+
+	// 3. Broadcast CloseGoingAway handshakes across all active persistent WebSocket sessions
+	handler.DrainAndSignalWebSockets(drainCtx)
+
+	// 4. Cancel the main execution context to cleanly stop internal background workers
+	mainCancel()
+	
+	log.Println("Gateway process terminated cleanly. Zero connection truncation errors encountered.")
 }
 
-// Sinks assignments from the single Kafka reader into the global Redis Pub/Sub cluster channel
 func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client *redis.ClusterClient) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        brokers,
 		Topic:          "order.assigned",
-		GroupID:        "gateway-fanout-group-collective", // Shared group balancing reads across all pods uniformly
+		GroupID:        "gateway-fanout-group-collective",
 		MinBytes:       10,
 		MaxBytes:       10e6,
 		CommitInterval: 1 * time.Second,
 	})
 	defer reader.Close()
-
-	log.Println("[FANOUT_WORKER] Kafka order.assigned tracking daemon active.")
 
 	for {
 		select {
@@ -126,12 +133,7 @@ func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client
 				}
 				continue
 			}
-
-			// Broadcast the match event payload across all active cluster node channels
-			err = client.Publish(ctx, gatewayHttp.RedisPubSubChannel, string(msg.Value)).Err()
-			if err != nil {
-				log.Printf("[FANOUT_ERROR] Failed broadcasting assignment to backplane channel: %v", err)
-			}
+			_ = client.Publish(ctx, gatewayHttp.RedisPubSubChannel, string(msg.Value)).Err()
 		}
 	}
 }

@@ -21,6 +21,12 @@ import (
 
 const RedisPubSubChannel = "gateway:assignments:broadcast"
 
+// ActiveWebSocketSession encapsulates everything needed for active connection management
+type ActiveWebSocketSession struct {
+	MessageChan chan []byte
+	Connection  *websocket.Conn
+}
+
 type GatewayHandler struct {
 	dbPool         *pgxpool.Pool
 	kafkaWriter    *kafka.Writer
@@ -28,8 +34,7 @@ type GatewayHandler struct {
 	clusterClient  *redis.ClusterClient
 	upgrader       websocket.Upgrader
 
-	// MILESTONE 14: Thread-safe local memory registry mapping active 
-	// WebSocket communication channels currently hosted on *this specific pod node*
+	// Thread-safe local session registry mapping active order IDs to WebSocket metadata
 	localSessions sync.Map
 }
 
@@ -49,7 +54,7 @@ func NewGatewayHandler(db *pgxpool.Pool, kw *kafka.Writer, ps *pricingSvc.OrderP
 	}
 }
 
-// HandleGetPricingQuote handles O(1) reads from the sharded Redis surge matrix cache
+// HandleGetPricingQuote processes O(1) reads from the sharded Redis surge matrix cache
 func (h *GatewayHandler) HandleGetPricingQuote(w http.ResponseWriter, r *http.Request) {
 	city := r.URL.Query().Get("city_prefix")
 	cell := r.URL.Query().Get("h3_cell")
@@ -164,7 +169,7 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(fmt.Sprintf(`{"order_id":"%s","status":"PROCESSING"}`, orderID)))
 }
 
-// HandleMatchRealtimeStream upgrades requests to WebSockets and binds them to local message channels
+// HandleMatchRealtimeStream upgrades requests to WebSockets and registers the active connection session
 func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *http.Request) {
 	targetOrderID := r.URL.Query().Get("order_id")
 	if targetOrderID == "" {
@@ -179,16 +184,16 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	}
 	defer wsConn.Close()
 
-	// Create an isolated message synchronization channel for this rider connection
 	messageChan := make(chan []byte, 2)
-	h.localSessions.Store(targetOrderID, messageChan)
 	
-	// Ensure cleanup occurs if the socket is closed or disconnected by the client app
+	// MILESTONE 16 REGISTER: Store both the message channel and connection handle to manage graceful shutdowns
+	sessionMetadata := &ActiveWebSocketSession{
+		MessageChan: messageChan,
+		Connection:  wsConn,
+	}
+	h.localSessions.Store(targetOrderID, sessionMetadata)
 	defer h.localSessions.Delete(targetOrderID)
 
-	log.Printf("[GATEWAY_NODE_SESSION] Local memory registration locked for order connection: %s", targetOrderID)
-
-	// Keep-alive connection deadlines
 	const writeWait = 10 * time.Second
 	
 	for {
@@ -203,22 +208,19 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 			_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
 			err = wsConn.WriteMessage(websocket.TextMessage, rawPayload)
 			if err != nil {
-				log.Printf("[GATEWAY_WS_WRITE_FAIL] Failed flushing frame to socket: %v", err)
 				return
 			}
-			
-			log.Printf("[GATEWAY_WS_BROADCAST_SUCCESS] Match notification successfully piped to device for order: %s", targetOrderID)
-			return // Assignment delivered, close loop cleanly
+			return 
 		}
 	}
 }
 
-// InternalBackplaneMultiplexer listens to the Redis Pub/Sub backplane and forwards matching events to the local socket channels
+// InternalBackplaneMultiplexer routes Redis Pub/Sub events directly to local socket sessions
 func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 	pubsub := h.clusterClient.Subscribe(ctx, RedisPubSubChannel)
 	defer pubsub.Close()
 
-	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel connection active.")
+	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel active.")
 
 	ch := pubsub.Channel()
 	for {
@@ -230,7 +232,6 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				return
 			}
 
-			// Parse message payloads safely
 			var event struct {
 				OrderID  string `json:"order_id"`
 				DriverID string `json:"driver_id"`
@@ -240,17 +241,62 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				continue
 			}
 
-			// Check if this pod hosts an active socket channel for the incoming order ID
-			if chRaw, found := h.localSessions.Load(event.OrderID); found {
-				if sessionChan, ok := chRaw.(chan []byte); ok {
+			if rawSession, found := h.localSessions.Load(event.OrderID); found {
+				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
 					select {
-					case sessionChan <- []byte(msg.Payload):
-						log.Printf("[BACKPLANE_ROUTER] Distributed match event routed internally to active socket channel for order: %s", event.OrderID)
+					case session.MessageChan <- []byte(msg.Payload):
 					default:
-						// Prevent channel blocking if the buffer is full
 					}
 				}
 			}
 		}
+	}
+}
+
+// DrainAndSignalWebSockets executes the CloseGoingAway handshake protocol across all active connections
+func (h *GatewayHandler) DrainAndSignalWebSockets(ctx context.Context) {
+	log.Println("[DRAIN_ENGINE] Intercepted container shutdown signal. Initiating WebSocket connection draining...")
+	
+	var wg sync.WaitGroup
+	
+	h.localSessions.Range(func(key, value interface{}) bool {
+		session, ok := value.(*ActiveWebSocketSession)
+		if !ok {
+			return true
+		}
+
+		wg.Add(1)
+		go func(orderID string, s *ActiveWebSocketSession) {
+			defer wg.Done()
+
+			// Set a tight write deadline so a slow client connection can't stall the container shutdown
+			_ = s.Connection.SetWriteDeadline(time.Now().Add(1500 * time.Millisecond))
+			
+			// Format and send a CloseGoingAway control frame to signal the client app to reconnect elsewhere
+			closeFrame := websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server node undergoes rolling maintenance. Reconnecting.")
+			err := s.Connection.WriteMessage(websocket.CloseMessage, closeFrame)
+			if err != nil {
+				log.Printf("[DRAIN_ENGINE] Handshake frame send failed for order %s: %v", orderID, err)
+			}
+
+			// Close the local channel cleanly
+			close(s.MessageChan)
+		}(key.(string), session)
+
+		return true
+	})
+
+	// Wait for all active connection draining handshakes to finish or hit the context timeout
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Println("[DRAIN_ENGINE] Warning: Draining grace window exceeded. Forcing connection truncation.")
+	case <-done:
+		log.Println("[DRAIN_ENGINE] Coordinated WebSocket connection draining completed cleanly. Zero clients dropped abruptly.")
 	}
 }

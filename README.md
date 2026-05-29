@@ -171,6 +171,7 @@ Common local ports:
 Start infrastructure:
 
 If using **Docker Compose**:
+
 ```powershell
 cd C:\workspace\Driver
 docker-compose up -d
@@ -178,6 +179,7 @@ docker-compose up -d
 
 If using **Kubernetes (Local Dev)**:
 To deploy the PostgreSQL, Kafka, and Redis Cluster stack inside a local Kubernetes cluster:
+
 ```powershell
 # 1. Deploy K8s resources into the 'dispatch' namespace
 kubectl apply -f deploy/local/local-dev-topology.yaml
@@ -189,6 +191,7 @@ powershell -ExecutionPolicy Bypass -File .\bin\start-port-forwards.ps1
 Load the standard local environment:
 
 If using **Docker Compose**:
+
 ```powershell
 . .\bin\run-local-env.ps1
 $env:REDIS_CLUSTER_ADDRS = $env:REDIS_CLUSTER_NODES
@@ -196,6 +199,7 @@ $env:REDIS_CLUSTER_ADDRS = $env:REDIS_CLUSTER_NODES
 
 If using **Kubernetes (Local Dev)**:
 Set the environment variables printed by the `start-port-forwards.ps1` script:
+
 ```powershell
 $env:REDIS_IP_MAP = "<IP_MAP_FROM_SCRIPT>"
 $env:DATABASE_URL = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
@@ -206,6 +210,7 @@ $env:KAFKA_BROKERS = "localhost:19092"
 Database Migrations:
 
 On boot, the `dispatch` service automatically executes programmatic schema migrations. To run migrations manually at any time:
+
 ```powershell
 go run .\cmd\migrate
 ```
