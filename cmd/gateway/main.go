@@ -91,6 +91,10 @@ func main() {
 	mux.HandleFunc("POST /api/v1/trip/complete", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCompleteTrip))))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
 
+	// Register administrative control routes, protected by the Admin role gate
+	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireRole("ADMIN", handler.HandleAdminGetLedger))
+	mux.HandleFunc("POST /api/v1/admin/drivers/override", authGuard.RequireRole("ADMIN", handler.HandleAdminDriverOverride))
+
 	server := &http.Server{
 		Addr:         ":" + httpPort,
 		Handler:      mux,

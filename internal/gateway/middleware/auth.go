@@ -67,3 +67,29 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDContextKey).(string)
 	return userID, ok
 }
+
+const UserRoleContextKey ContextKey = "userRole"
+
+// RequireRole guards administrative routes against non-authorized client access
+func (m *AuthMiddleware) RequireRole(targetRole string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		m.AuthenticateJWT(func(w http.ResponseWriter, r *http.Request) {
+			// Extract verified user claims mapped into context during token validation
+			authHeader := r.Header.Get("Authorization")
+			parts := strings.Split(authHeader, " ")
+			tokenStr := parts[1]
+
+			claims := &CustomClaims{}
+			_, _ = jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+				return m.jwtSecretKey, nil
+			})
+
+			if strings.ToUpper(claims.Role) != strings.ToUpper(targetRole) {
+				http.Error(w, "access_denied_insufficient_administrative_privileges", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})(w, r)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -892,5 +893,129 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"RECONCILED"}`))
+}
+
+// HandleAdminGetLedger supports paginated auditing of double-entry ledger logs with live aggregate verification
+func (h *GatewayHandler) HandleAdminGetLedger(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+	defer cancel()
+
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+	cityFilter := r.URL.Query().Get("city_prefix")
+
+	limit := 50
+	offset := 0
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 { limit = l }
+	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 { offset = o }
+
+	var query string
+	var args []interface{}
+
+	if cityFilter != "" {
+		query = `
+			SELECT id, order_id, city_prefix, account_type, entry_type, amount_paise, description, created_at
+			FROM financial_ledger_entries
+			WHERE city_prefix = $1
+			ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+		`
+		args = []interface{}{strings.ToUpper(cityFilter), limit, offset}
+	} else {
+		query = `
+			SELECT id, order_id, city_prefix, account_type, entry_type, amount_paise, description, created_at
+			FROM financial_ledger_entries
+			ORDER BY created_at DESC LIMIT $1 OFFSET $2;
+		`
+		args = []interface{}{limit, offset}
+	}
+
+	rows, err := h.dbPool.Query(ctx, query, args...)
+	if err != nil {
+		http.Error(w, "ledger_fetch_exception", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type ledgerRecord struct {
+		ID          int64     `json:"id"`
+		OrderID     string    `json:"order_id"`
+		CityPrefix  string    `json:"city_prefix"`
+		AccountType string    `json:"account_type"`
+		EntryType   string    `json:"entry_type"`
+		AmountPaise int64     `json:"amount_paise"`
+		Description string    `json:"description"`
+		CreatedAt   time.Time `json:"created_at"`
+	}
+
+	var entries []ledgerRecord
+	var totalDebits, totalCredits int64
+
+	for rows.Next() {
+		var rec ledgerRecord
+		err := rows.Scan(&rec.ID, &rec.OrderID, &rec.CityPrefix, &rec.AccountType, &rec.EntryType, &rec.AmountPaise, &rec.Description, &rec.CreatedAt)
+		if err == nil {
+			entries = append(entries, rec)
+			if rec.EntryType == "DEBIT" {
+				totalDebits += rec.AmountPaise
+			} else {
+				totalCredits += rec.AmountPaise
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"entries":               entries,
+		"batch_total_debits":    totalDebits,
+		"batch_total_credits":   totalCredits,
+		"is_auditable_balanced": totalDebits == totalCredits,
+		"server_timestamp":      time.Now().Unix(),
+	})
+}
+
+// HandleAdminDriverOverride forces a driver's state to reset, eviction-clearing active Redis tracking leases instantly
+func (h *GatewayHandler) HandleAdminDriverOverride(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DriverID     string `json:"driver_id"`
+		TargetState  string `json:"target_state"` // e.g., 'ONLINE_AVAILABLE'
+		Reason       string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1200*time.Millisecond)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Update driver status row inside relational tables cleanly
+	query := "UPDATE drivers SET current_state = $1::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $2::uuid;"
+	res, err := tx.Exec(ctx, query, req.TargetState, req.DriverID)
+	if err != nil || res.RowsAffected() == 0 {
+		http.Error(w, "driver_override_mutation_failed_invalid_id", http.StatusNotFound)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Evict active lease keys from Redis to free up matching loops immediately
+	activeTripKey := fmt.Sprintf("driver:active:trip:%s", req.DriverID)
+	_ = h.clusterClient.Del(ctx, activeTripKey)
+
+	log.Printf("[ADMIN_OVERRIDE] Operator forced Driver %s state to %s. Reason: %s", req.DriverID, req.TargetState, req.Reason)
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"OVERRIDE_SUCCESSFUL","driver_id":"` + req.DriverID + `"}`))
 }
 
