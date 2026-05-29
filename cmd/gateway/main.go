@@ -16,6 +16,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 )
 
@@ -27,6 +28,7 @@ func main() {
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
+	jwtSecret := getEnv("JWT_SECRET_SIGNING_KEY", "kolkata_marketplace_backbone_secret_token_string")
 
 	log.Printf("Bootstrapping Multi-Pod Distributed API Gateway on Port: %s", httpPort)
 
@@ -64,10 +66,15 @@ func main() {
 	// Launch the single centralized Kafka-to-Redis fan-out sync engine for the pod
 	go startKafkaToRedisFanoutWorker(ctx, brokersList, redisClusterClient)
 
+	// Instantiate edge protection layers
+	authGuard := middleware.NewAuthMiddleware(jwtSecret)
+	// Rate Limit parameters: Allow maximum 5 requests per 1 minute rolling window
+	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 5, 1*time.Minute)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/pricing/quote", handler.HandleGetPricingQuote)
-	mux.HandleFunc("POST /api/v1/orders", handler.HandleCreateOrder)
-	mux.HandleFunc("GET /api/v1/dispatch/stream", handler.HandleMatchRealtimeStream)
+	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder)))
+	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(handler.HandleMatchRealtimeStream))
 
 	server := &http.Server{
 		Addr:         ":" + httpPort,
