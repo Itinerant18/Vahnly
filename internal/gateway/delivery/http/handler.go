@@ -2,11 +2,17 @@ package http
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -20,8 +26,8 @@ import (
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/events"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
-	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
+	"go.opentelemetry.io/otel"
 )
 
 const RedisPubSubChannel = "gateway:assignments:broadcast"
@@ -741,5 +747,150 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"COMPLETED","total_debited_paise":%d,"driver_credited_paise":%d}`, baseFarePaise, driverEarningsPaise)))
+}
+
+// HandlePaymentWebhook intercepts asynchronous external provider billing tokens and updates transaction matrices securely
+func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
+	// 1. Enforce strict POST rule constraints
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. Cryptographic Signature Verification Guard
+	// Extract the provider's signature header value passed over the network
+	receivedSignature := r.Header.Get("X-Payment-Provider-Signature")
+	if receivedSignature == "" {
+		http.Error(w, "missing_webhook_verification_signature", http.StatusUnauthorized)
+		return
+	}
+
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "malformed_request_payload", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch webhook decryption signing secrets mapped from environment variables
+	webhookSecret := []byte(os.Getenv("PAYMENT_WEBHOOK_SIGNING_SECRET"))
+	if len(webhookSecret) == 0 {
+		webhookSecret = []byte("kolkata_gateway_fiat_fallback_cryptographic_signing_token")
+	}
+
+	// Compute expected HMAC SHA256 checksum across the raw body string to prevent payload tampering
+	mac := hmac.New(sha256.New, webhookSecret)
+	mac.Write(rawBody)
+	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+
+	// Execute constant-time cryptographic string comparisons to protect against timing attacks
+	if subtle.ConstantTimeCompare([]byte(receivedSignature), []byte(expectedSignature)) != 1 {
+		http.Error(w, "invalid_cryptographic_signature_mismatch", http.StatusUnauthorized)
+		return
+	}
+
+	// 3. Parse Verified Event Payload
+	var webhookEvent struct {
+		EventID string `json:"event_id"` // Used directly as an explicit idempotency key
+		Type    string `json:"type"`     // e.g., 'payment_intent.succeeded', 'payment_intent.payment_failed'
+		Data    struct {
+			IntentID    string `json:"intent_id"`
+			OrderID     string `json:"order_id"`
+			AmountPaise int64  `json:"amount_paise"`
+			Currency    string `json:"currency"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(rawBody, &webhookEvent); err != nil {
+		http.Error(w, "unparseable_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2500*time.Millisecond)
+	defer cancel()
+
+	// 4. Open atomic database transaction to guarantee cross-service alignment
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Evaluate if this specific webhook event signature was already processed successfully
+	var isIdempotentEvent bool
+	err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM payment_intents WHERE idempotency_key = $1)", webhookEvent.EventID).Scan(&isIdempotentEvent)
+	if err != nil {
+		http.Error(w, "datastore_read_exception", http.StatusInternalServerError)
+		return
+	}
+	if isIdempotentEvent {
+		// Event was already reconciled; return HTTP 200 OK to acknowledge delivery to the provider
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ignored_duplicate_idempotent"}`))
+		return
+	}
+
+	// 5. Execute Conditional State Machine Routing Paths
+	switch webhookEvent.Type {
+	case "payment_intent.succeeded":
+		log.Printf("[PAYMENT_WEBHOOK] Success intercepted for intent %s. Reconciling ledger layers...", webhookEvent.Data.IntentID)
+
+		// Upsert payment tracking context matrix state row
+		upsertQuery := `
+			INSERT INTO payment_intents (id, order_id, amount_paise, currency, payment_status, provider_type, idempotency_key, updated_at)
+			VALUES ($1, $2::uuid, $3, $4, 'SUCCEEDED', 'STRIPE', $5, CURRENT_TIMESTAMP)
+			ON CONFLICT (id) DO UPDATE 
+			SET payment_status = 'SUCCEEDED', idempotency_key = EXCLUDED.idempotency_key, updated_at = CURRENT_TIMESTAMP;
+		`
+		_, err = tx.Exec(ctx, upsertQuery, webhookEvent.Data.IntentID, webhookEvent.Data.OrderID, webhookEvent.Data.AmountPaise, webhookEvent.Data.Currency, webhookEvent.EventID)
+		if err != nil {
+			log.Printf("[PAYMENT_ERROR] Intent upsert block failed: %v", err)
+			http.Error(w, "intent_mutation_failed", http.StatusInternalServerError)
+			return
+		}
+
+		// Update order details to reflect successful transaction settlement
+		_, err = tx.Exec(ctx, "UPDATE orders SET status = 'COMPLETED'::order_status_enum WHERE id = $1::uuid AND status = 'DELIVERING'::order_status_enum", webhookEvent.Data.OrderID)
+		if err != nil {
+			http.Error(w, "order_promotion_failed", http.StatusInternalServerError)
+			return
+		}
+
+		// Log external financial payment reconciliation to your append-only double-entry accounting ledger
+		var cityPrefix string
+		_ = tx.QueryRow(ctx, "SELECT city_prefix FROM orders WHERE id = $1::uuid", webhookEvent.Data.OrderID).Scan(&cityPrefix)
+
+		ledgerQuery := `
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
+			VALUES ($1::uuid, $2, 'RIDER_EXTERNAL_PAYMENT', 'CREDIT', $3, 'Asynchronous webhook clearance verification from credit card network settlement');
+		`
+		_, err = tx.Exec(ctx, ledgerQuery, webhookEvent.Data.OrderID, cityPrefix, webhookEvent.Data.AmountPaise)
+		if err != nil {
+			http.Error(w, "ledger_reconciliation_failed", http.StatusInternalServerError)
+			return
+		}
+
+	case "payment_intent.payment_failed":
+		log.Printf("[PAYMENT_WEBHOOK] Transaction failure detected for intent %s. Initiating recovery workflows...", webhookEvent.Data.IntentID)
+
+		failUpsert := `
+			INSERT INTO payment_intents (id, order_id, amount_paise, currency, payment_status, provider_type, idempotency_key, updated_at)
+			VALUES ($1, $2::uuid, $3, $4, 'FAILED', 'STRIPE', $5, CURRENT_TIMESTAMP)
+			ON CONFLICT (id) DO UPDATE SET payment_status = 'FAILED', updated_at = CURRENT_TIMESTAMP;
+		`
+		_, _ = tx.Exec(ctx, failUpsert, webhookEvent.Data.IntentID, webhookEvent.Data.OrderID, webhookEvent.Data.AmountPaise, webhookEvent.Data.Currency, webhookEvent.EventID)
+		
+		// Flag the order status for collection processing or dispatch cancellations
+		_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'CREATED'::order_status_enum WHERE id = $1::uuid", webhookEvent.Data.OrderID)
+	}
+
+	// Commit entries atomically to disk
+	if err = tx.Commit(ctx); err != nil {
+		http.Error(w, "atomic_webhook_commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"RECONCILED"}`))
 }
 

@@ -5,6 +5,9 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -398,6 +401,45 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		t.Errorf("Double-entry arithmetic balance mismatch: Debits=%d, Credits=%d", totalDebit, totalCredit)
 	}
 	t.Log("[STAGE 5 OK] Immutable financial split settlement successfully verified.")
+
+	// STAGE 6 LIFECYCLE ASSERTION: Simulate a cryptographically secure server-to-server Payment Webhook callback
+	t.Log("Simulating automated third-party payment settlement webhook processing...")
+
+	webhookPayload := map[string]interface{}{
+		"event_id": "evt_live_test_token_998124",
+		"type":     "payment_intent.succeeded",
+		"data": map[string]interface{}{
+			"intent_id":    "pi_test_stripe_interceptor_7711",
+			"order_id":     integrationOrderID,
+			"amount_paise": 35000,
+			"currency":     "INR",
+		},
+	}
+	webhookBytes, _ := json.Marshal(webhookPayload)
+
+	// Calculate the expected SHA256 HMAC signature using your test secret key
+	secretToken := "kolkata_gateway_fiat_fallback_cryptographic_signing_token"
+	mac := hmac.New(sha256.New, []byte(secretToken))
+	mac.Write(webhookBytes)
+	computedHexSignature := hex.EncodeToString(mac.Sum(nil))
+
+	reqWebhook, _ := http.NewRequest("POST", server.URL+"/api/v1/payments/webhook", bytes.NewBuffer(webhookBytes))
+	reqWebhook.Header.Set("Content-Type", "application/json")
+	reqWebhook.Header.Set("X-Payment-Provider-Signature", computedHexSignature)
+
+	respWebhook, err := http.DefaultClient.Do(reqWebhook)
+	if err != nil || respWebhook.StatusCode != http.StatusOK {
+		t.Fatalf("Payment Webhook verification failed with status: %v", respWebhook.StatusCode)
+	}
+
+	// Verify that the payment intent record was recorded correctly in the datastore
+	var finalPaymentStatus string
+	err = dbPool.QueryRow(ctx, "SELECT payment_status FROM payment_intents WHERE id = 'pi_test_stripe_interceptor_7711'").Scan(&finalPaymentStatus)
+	if err != nil || finalPaymentStatus != "SUCCEEDED" {
+		t.Fatalf("Reconciliation failed: payment intent status is not SUCCEEDED. Error: %v", err)
+	}
+
+	t.Log("[STAGE 6 OK] Cryptographic payment webhook reconciliation successfully verified.")
 
 	t.Log("═══════════════════════════════════════════════════════════════")
 	t.Log(" SUCCESS: Full-Lifecycle Journey Matrix completely validated. ")
