@@ -519,7 +519,7 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Enforce linear state trajectory constraint
 	query := `

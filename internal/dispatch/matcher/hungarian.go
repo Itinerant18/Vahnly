@@ -332,10 +332,7 @@ func EvaluateGreedyMatch(ctx context.Context, order domain.OrderCreatedPayload, 
 	if len(candidates) == 0 {
 		return nil, errors.New("dispatch_starvation: zero available supply within spatial grid")
 	}
-	var localPool []CandidateDriver
-	for _, c := range candidates {
-		localPool = append(localPool, c)
-	}
+	localPool := append([]CandidateDriver(nil), candidates...)
 	res, err := EvaluateHungarianBatch(ctx, []domain.OrderCreatedPayload{order}, localPool, map[string][]CandidateDriver{order.OrderID: localPool}, etaCorrector)
 	if err != nil || len(res) == 0 {
 		return nil, fmt.Errorf("greedy_fallback_failed: %w", err)

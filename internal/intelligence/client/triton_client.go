@@ -21,7 +21,7 @@ type TritonClient struct {
 
 func NewTritonClient(addr string) (*TritonClient, error) {
 	// Configure aggressive keepalive settings to keep persistent sockets warm across container boundaries
-	conn, err := grpc.Dial(addr, 
+	conn, err := grpc.NewClient(addr, 
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                60 * time.Second,

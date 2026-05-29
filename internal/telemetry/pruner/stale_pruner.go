@@ -54,14 +54,11 @@ func (p *StaleTelemetryPruner) ExecuteGarbageCollection(ctx context.Context, cit
 
 	pipe := p.clusterClient.Pipeline()
 	
-	// Map slice tracking the target keys under compilation
-	zsetKeys := make([]string, 0, len(cells))
-	
 	// 1. Queue atomic sweeps across all tracked H3 spatial cell indices
 	for _, cell := range cells {
 		// Key syntax matches the scattered spatial tracking ZSET contract
 		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cell)
-		zsetKeys = append(zsetKeys, zsetKey)
+
 
 		// First, capture the stale driver IDs before evicting them to sync PostgreSQL
 		pipe.ZRangeByScore(pruneCtx, zsetKey, &redis.ZRangeBy{

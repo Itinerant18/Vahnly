@@ -251,7 +251,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// ============================================================================
 
 	// Step A: Trigger Automated Driver Ingestion Instance via gRPC Stream Channel
-	connGrpc, err := grpc.Dial("127.0.0.1:"+gRPCtestPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	connGrpc, err := grpc.NewClient("127.0.0.1:"+gRPCtestPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("gRPC connector link failed: %v", err)
 	}

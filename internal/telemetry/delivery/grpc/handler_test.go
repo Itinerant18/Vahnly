@@ -50,7 +50,7 @@ func TestClientStreamPositions_Success(t *testing.T) {
 
 	// 2. Setup Client connection
 	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "bufnet", 
+	conn, err := grpc.NewClient("passthrough:///bufnet", 
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}), 
