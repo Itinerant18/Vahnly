@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -54,7 +53,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		t.Skip("Skipping integration test: environment variables DATABASE_URL, REDIS_CLUSTER_NODES, and KAFKA_BROKERS must be set.")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// 1. Initialize PostgreSQL connection pool
@@ -68,7 +67,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 	defer dbPool.Close()
 
-	// 2. Initialize Redis Cluster Client with custom dialing translation properties
+	// 2. Initialize Redis Cluster Client
 	ipMap := make(map[string]string)
 	if redisIPMap != "" {
 		for _, pair := range strings.Split(redisIPMap, ",") {
@@ -94,8 +93,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	consumerCtx, cancelConsumer := context.WithCancel(ctx)
 	defer cancelConsumer()
 
-	// MILESTONE 16: Start the background fan-out reader early so it has time to join the group 
-	// before the match is emitted. Use a unique GroupID to avoid offset conflicts.
+	// Centralized Kafka-to-Redis Pub/Sub Fanout Worker
 	go func() {
 		assignedReader := kafka.NewReader(kafka.ReaderConfig{
 			Brokers:     strings.Split(kafkaBrokers, ","),
@@ -110,15 +108,16 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 			if err != nil {
 				return
 			}
-			// Relay assignments directly to the Redis backplane channel to coordinate multi-pod notification delivery
 			_ = redisClient.Publish(consumerCtx, "gateway:assignments:broadcast", string(msg.Value)).Err()
 		}
 	}()
 
-	// 3. Clear and seed relational PostGIS database schemas
-	t.Log("[TEST_SETUP] Purging historic tables and seeding baseline metrics...")
+	// 3. Purge and seed relational database tables
+	t.Log("[TEST_SETUP] Purging historic tables and seeding multi-region bounds...")
 	const integrationOrderID = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+	const targetDriverID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 	seedSQL := []string{
+		"DELETE FROM financial_ledger_entries",
 		"DELETE FROM dispatch_match_logs",
 		"DELETE FROM orders",
 		"DELETE FROM drivers WHERE city_prefix = 'KOL'",
@@ -126,7 +125,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		`INSERT INTO regional_cities (city_prefix, city_name, is_active, geofence)
 		 VALUES ('KOL', 'Kolkata Grid', true, ST_GeographyFromText('SRID=4326;MULTIPOLYGON(((88.2 22.4, 88.5 22.4, 88.5 22.7, 88.2 22.7, 88.2 22.4)))'))`,
 		`INSERT INTO drivers (id, city_prefix, current_state, acceptance_rate, cancellation_probability)
-		 VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'KOL', 'ONLINE_AVAILABLE', 0.960, 0.010)`,
+		 VALUES ('` + targetDriverID + `', 'KOL', 'ONLINE_AVAILABLE', 0.960, 0.010)`,
 	}
 	for _, query := range seedSQL {
 		if _, err := dbPool.Exec(ctx, query); err != nil {
@@ -134,12 +133,12 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		}
 	}
 
-	// 4. Seed driver tracking profile entries to Redis Cluster indices
+	// 4. Seed driver spatial cache keys in Redis
 	spatialKey := "drivers:zset:KOL:88754cb247fffff"
 	_ = redisClient.Del(ctx, spatialKey)
 	defer redisClient.Del(ctx, spatialKey)
 
-	profileKey := "driver:{KOL:a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}:profile"
+	profileKey := "driver:{KOL:" + targetDriverID + "}:profile"
 	_ = redisClient.Del(ctx, profileKey)
 	err = redisClient.HSet(ctx, profileKey, map[string]interface{}{
 		"osm_node_id":              "1001",
@@ -153,9 +152,11 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 	defer redisClient.Del(ctx, profileKey)
 
-	// 5. Spin up Telemetry Ingestion gRPC stream server endpoints
+	// 5. Spin up Telemetry Ingestion gRPC stream node
 	telemetryRedis := telemetryRepo.NewRedisRepository(redisClient)
 	telemetryKafka := telemetryRepo.NewKafkaProducer(strings.Split(kafkaBrokers, ","))
+	
+	// Injecting Redis cluster client reference to support high-velocity telemetry forking checks
 	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil, redisClient)
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUC)
 
@@ -168,7 +169,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	go func() { _ = grpcServer.Serve(listener) }()
 	defer grpcServer.GracefulStop()
 
-	// 6. Spin up Global Kuhn-Munkres HUNGARIAN Batch Optimization Solver
+	// 6. Spin up Kuhn-Munkres HUNGARIAN Batch Optimization Solver
 	chService := graph.NewContractionHierarchiesService()
 	chService.AddNode(&graph.CHNode{ID: 1001, Latitude: 22.5726, Longitude: 88.3639, Order: 1})
 	chService.AddNode(&graph.CHNode{ID: 9999, Latitude: 22.5726, Longitude: 88.3639, Order: 2})
@@ -183,14 +184,13 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		spatialScanner,
 		redisClient,
 		dbPool,
-		"HUNGARIAN", // Testing global matrix optimizations programmatically
+		"HUNGARIAN",
 		etaCorrector,
 	)
 	defer orderConsumer.Close()
-
 	go orderConsumer.StartExecutionPipeline(consumerCtx)
 
-	// 7. Spin up Phase 5 Public API Gateway & Redis Pub/Sub backplane components
+	// 7. Initialize Public API Gateway with Edge Multi-Region Router Middleware
 	brokersList := strings.Split(kafkaBrokers, ",")
 	pricingService := pricingSvc.NewOrderPricingService(brokersList, "integration-pricing-group", redisClient)
 	
@@ -199,39 +199,40 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		Topic:        "order.created",
 		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireOne,
-		Async:        true,
 	}
 	defer kafkaWriter.Close()
 
 	gatewayHandler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClient)
-	
-	// Boot the multi-pod Pub/Sub listener routing engine
 	go gatewayHandler.InternalBackplaneMultiplexer(consumerCtx)
-
-	// Create a local loopback HTTP router mapping endpoint assertions
+	
 	regionRouter := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/orders", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleCreateOrder))
 	mux.HandleFunc("/api/v1/dispatch/stream", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleMatchRealtimeStream))
+	mux.HandleFunc("/api/v1/dispatch/accept", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleAcceptOrder))
+	mux.HandleFunc("/api/v1/trip/arrive", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleArriveAtPickup))
+	mux.HandleFunc("/api/v1/trip/start", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleStartTrip))
+	mux.HandleFunc("/api/v1/trip/complete", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleCompleteTrip))
 	
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	// 8. Stream driver coordinate location metrics over live gRPC channels
+	// 8. Submit Initial Location via gRPC Stream to make driver searchable
 	conn, err := grpc.NewClient("127.0.0.1:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		t.Fatalf("gRPC initialization connection failed: %v", err)
+		t.Fatalf("gRPC connection failed: %v", err)
 	}
 	defer conn.Close()
 
-	client := pb.NewLocationIngestionServiceClient(conn)
-	stream, err := client.ClientStreamPositions(ctx)
+	grpcClient := pb.NewLocationIngestionServiceClient(conn)
+	stream, err := grpcClient.ClientStreamPositions(ctx)
 	if err != nil {
-		t.Fatalf("gRPC stream activation allocation failed: %v", err)
+		t.Fatalf("gRPC stream activation failed: %v", err)
 	}
 
-	req := &pb.IngestionRequest{
-		DriverId:     "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+	reqInitial := &pb.IngestionRequest{
+		DriverId:     targetDriverID,
 		CityPrefix:   "KOL",
 		Latitude:     22.5726,
 		Longitude:    88.3639,
@@ -239,31 +240,27 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		SpeedKms:     24.5,
 		TimestampUtc: time.Now().Unix(),
 	}
-	if err := stream.Send(req); err != nil {
-		t.Fatalf("gRPC telemetry write packet failed: %v", err)
-	}
+	_ = stream.Send(reqInitial)
 	_ = stream.CloseSend()
-	t.Log("[INTEGRATION] gRPC telemetry pipeline successfully executed.")
 
-	time.Sleep(2000 * time.Millisecond) // Give Kafka consumer group extra time to complete rebalance and join group
+	time.Sleep(1500 * time.Millisecond) // Allow Kafka partition rebalances to complete safely
 
-	// 9. Open a live loopback WebSocket stream to catch real-time driver match events
+	// 9. Open persistent WebSocket Stream
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/v1/dispatch/stream?order_id=" + integrationOrderID + "&city_prefix=KOL"
 	wsDialer := websocket.Dialer{}
-	
 	wsConn, _, err := wsDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
-		t.Fatalf("Failed opening persistent gateway WebSocket session loop: %v", err)
+		t.Fatalf("WebSocket connection failed: %v", err)
 	}
 	defer wsConn.Close()
 
-	// 10. Execute booking request transaction via Public HTTP API Gateway
+	// 10. POST Booking Intent Request
 	orderPayload := map[string]interface{}{
 		"order_id":           integrationOrderID,
 		"city_prefix":        "KOL",
-		"customer_id":        "customer-1",
-		"pickup_h3_cell":     "8828308281fffff",
-		"pickup_lat":         22.5726,
+		"customer_id":        "c81d4e2e-bcf2-11e6-869b-7df243852131",
+		"pickup_h3_cell":     "88754cb247fffff",
+		"pickup_lat":         22.5730,
 		"pickup_lng":         88.3642,
 		"pickup_osm_node_id": 1001,
 		"dropoff_lat":        22.5800,
@@ -272,44 +269,138 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(orderPayload)
 	
-	// Inject the custom region prefix header before firing the POST execution check
-	reqHTTP, err := http.NewRequest("POST", server.URL+"/api/v1/orders", bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		t.Fatalf("Failed compiling request structure: %v", err)
-	}
+	reqHTTP, _ := http.NewRequest("POST", server.URL+"/api/v1/orders", bytes.NewBuffer(bodyBytes))
 	reqHTTP.Header.Set("Content-Type", "application/json")
-	reqHTTP.Header.Set("X-Region-Prefix", "KOL") // Passed to satisfy the Milestone 22 Anycast routing constraints
+	reqHTTP.Header.Set("X-Region-Prefix", "KOL") // Required header evaluated by Milestone 22 Router
 
 	respHTTP, err := http.DefaultClient.Do(reqHTTP)
-	if err != nil {
-		t.Fatalf("HTTP Gateway booking transaction execution failed: %v", err)
+	if err != nil || respHTTP.StatusCode != http.StatusAccepted {
+		t.Fatalf("API Gateway rejected order placement. Status: %v", respHTTP.StatusCode)
 	}
-	if respHTTP.StatusCode != http.StatusAccepted {
-		t.Fatalf("Expected HTTP status 202 Accepted, got: %d", respHTTP.StatusCode)
-	}
-	t.Log("[INTEGRATION] HTTP Gateway endpoint successfully received booking request payload.")
 
-	// 12. Assert that the assignment details stream through the WebSocket correctly
-	t.Log("Awaiting synchronized real-time match events from WebSocket backplane...")
-	
-	_ = wsConn.SetReadDeadline(time.Now().Add(10 * time.Second)) // Changed from SetWriteDeadline, extended to 10s for robust local runs
+	// 11. STAGE 1 LIFECYCLE ASSERTION: Await ASSIGNED Event payload over WebSocket
+	_ = wsConn.SetReadDeadline(time.Now().Add(8 * time.Second))
 	_, wsMsg, err := wsConn.ReadMessage()
 	if err != nil {
-		t.Fatalf("WebSocket stream closed or timed out before matching notification was broadcasted: %v", err)
+		t.Fatalf("WebSocket connection timed out waiting for matching event: %v", err)
 	}
 
 	var matchNotification map[string]interface{}
-	if err := json.Unmarshal(wsMsg, &matchNotification); err != nil {
-		t.Fatalf("Failed unmarshaling WebSocket match data package frame: %v", err)
+	_ = json.Unmarshal(wsMsg, &matchNotification)
+	if matchNotification["driver_id"] != targetDriverID {
+		t.Fatalf("Expected driver match %s, got %v", targetDriverID, matchNotification["driver_id"])
+	}
+	t.Log("[STAGE 1 OK] Combinatorial matching successfully verified over active WebSocket.")
+
+	// 12. STAGE 2 LIFECYCLE ASSERTION: Execute Driver Acceptance Mutation
+	acceptPayload := map[string]string{"order_id": integrationOrderID, "driver_id": targetDriverID}
+	acceptBytes, _ := json.Marshal(acceptPayload)
+	reqAccept, _ := http.NewRequest("POST", server.URL+"/api/v1/dispatch/accept", bytes.NewBuffer(acceptBytes))
+	reqAccept.Header.Set("Content-Type", "application/json")
+	reqAccept.Header.Set("X-Region-Prefix", "KOL")
+
+	respAccept, err := http.DefaultClient.Do(reqAccept)
+	if err != nil || respAccept.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/v1/dispatch/accept failed: %v", respAccept.StatusCode)
+	}
+	t.Log("[STAGE 2 OK] Driver trip offer acceptance successfully verified.")
+
+	// 13. STAGE 3 LIFECYCLE ASSERTION: Driver Arrives at Pickup Point
+	reqArrive, _ := http.NewRequest("POST", server.URL+"/api/v1/trip/arrive", bytes.NewBuffer(acceptBytes))
+	reqArrive.Header.Set("Content-Type", "application/json")
+	reqArrive.Header.Set("X-Region-Prefix", "KOL")
+
+	respArrive, err := http.DefaultClient.Do(reqArrive)
+	if err != nil || respArrive.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/v1/trip/arrive failed")
+	}
+	t.Log("[STAGE 3 OK] Driver point arrival successfully verified.")
+
+	// 14. STAGE 4 LIFECYCLE ASSERTION: Start Journey and Verify Live Telemetry Forking
+	reqStart, _ := http.NewRequest("POST", server.URL+"/api/v1/trip/start", bytes.NewBuffer(acceptBytes))
+	reqStart.Header.Set("Content-Type", "application/json")
+	reqStart.Header.Set("X-Region-Prefix", "KOL")
+
+	respStart, err := http.DefaultClient.Do(reqStart)
+	if err != nil || respStart.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/v1/trip/start failed")
+	}
+	t.Log("[STAGE 4 OK] Active journey transit step initiated.")
+
+	// Stream high-frequency telemetry updates while the trip is active ('DELIVERING')
+	streamActive, err := grpcClient.ClientStreamPositions(ctx)
+	if err != nil {
+		t.Fatalf("gRPC stream update failed: %v", err)
+	}
+	reqTransit := &pb.IngestionRequest{
+		DriverId:     targetDriverID,
+		CityPrefix:   "KOL",
+		Latitude:     22.5805, // Movement coordinate check
+		Longitude:    88.3692,
+		Bearing:      45.0,
+		SpeedKms:     35.0,
+		TimestampUtc: time.Now().Unix(),
+	}
+	_ = streamActive.Send(reqTransit)
+	_ = streamActive.CloseSend()
+
+	// Assert that live telemetry coordinates fork onto Redis Pub/Sub and stream through the WebSocket connection
+	_ = wsConn.SetReadDeadline(time.Now().Add(4 * time.Second))
+	_, wsTelemetryMsg, err := wsConn.ReadMessage()
+	if err != nil {
+		t.Fatalf("WebSocket layer failed to capture live telemetry update frame: %v", err)
 	}
 
-	// Verify target match payload properties are accurate
-	if matchNotification["driver_id"] != "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" {
-		t.Errorf("Expected assigned driver 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', got: %v", matchNotification["driver_id"])
+	var telemetryFrame map[string]interface{}
+	_ = json.Unmarshal(wsTelemetryMsg, &telemetryFrame)
+	if telemetryFrame["latitude"] == nil || telemetryFrame["order_id"] != integrationOrderID {
+		t.Fatalf("Malformed telemetry broadcast frame intercepted: %v", string(wsTelemetryMsg))
 	}
-	
+	t.Logf("[STAGE 4 OK] Real-time telemetry streaming verified: Lat=%v, Lng=%v", telemetryFrame["latitude"], telemetryFrame["longitude"])
+
+	// 15. STAGE 5 LIFECYCLE ASSERTION: Conclude Journey and Verify Double-Entry Financial Ledger Writes
+	reqComplete, _ := http.NewRequest("POST", server.URL+"/api/v1/trip/complete", bytes.NewBuffer(acceptBytes))
+	reqComplete.Header.Set("Content-Type", "application/json")
+	reqComplete.Header.Set("X-Region-Prefix", "KOL")
+
+	respComplete, err := http.DefaultClient.Do(reqComplete)
+	if err != nil || respComplete.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/v1/trip/complete failed")
+	}
+
+	// Read and verify the exact ledger rows inside relational storage maps
+	rows, err := dbPool.Query(ctx, "SELECT account_type, entry_type, amount_paise FROM financial_ledger_entries WHERE order_id = $1::uuid", integrationOrderID)
+	if err != nil {
+		t.Fatalf("Failed querying financial audit ledgers: %v", err)
+	}
+	defer rows.Close()
+
+	var totalDebit, totalCredit int64
+	entryCount := 0
+
+	for rows.Next() {
+		var accountType, entryType string
+		var amount int64
+		_ = rows.Scan(&accountType, &entryType, &amount)
+		entryCount++
+
+		if entryType == "DEBIT" {
+			totalDebit += amount
+		} else if entryType == "CREDIT" {
+			totalCredit += amount
+		}
+	}
+
+	if entryCount != 3 {
+		t.Errorf("Expected exactly 3 accounting ledger splits, got: %d", entryCount)
+	}
+	if totalDebit != 35000 || totalCredit != 35000 {
+		t.Errorf("Double-entry arithmetic balance mismatch: Debits=%d, Credits=%d", totalDebit, totalCredit)
+	}
+	t.Log("[STAGE 5 OK] Immutable financial split settlement successfully verified.")
+
 	t.Log("═══════════════════════════════════════════════════════════════")
-	t.Log(" SUCCESS: End-to-End API Gateway, Redis Pub/Sub Backplane, and ")
-	t.Log(" Kuhn-Munkres Batch Solver verified cleanly without errors.    ")
+	t.Log(" SUCCESS: Full-Lifecycle Journey Matrix completely validated. ")
+	t.Log(" Ingestion, Matching, Streaming, Routing and Accounting OK.    ")
 	t.Log("═══════════════════════════════════════════════════════════════")
 }
