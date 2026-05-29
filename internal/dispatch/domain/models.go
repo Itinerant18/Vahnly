@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/segmentio/kafka-go"
+import (
+	"context"
+
+	"github.com/segmentio/kafka-go"
+)
 
 type OrderCreatedPayload struct {
 	OrderID         string  `json:"order_id"`
@@ -15,4 +19,7 @@ type OrderCreatedPayload struct {
 	
 	// App-level pipeline logging parameter context
 	KafkaMessageContext kafka.Message `json:"-"`
+
+	// MILESTONE 18 / 19 trace context propagation store
+	StoredContext context.Context `json:"-"`
 }

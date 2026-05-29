@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -73,21 +74,18 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 			Topic:        "order.assigned",
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
-			Async:        true,
 		},
 		driverStateWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
 			Topic:        "driver.state.changed",
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
-			Async:        true,
 		},
 		orderRetryWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
 			Topic:        "order.created",
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
-			Async:        true,
 		},
 		spatialScanner:     scanner,
 		redisClusterClient: redisClient,
@@ -137,6 +135,7 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 			}
 
 			order.KafkaMessageContext = msg
+			order.StoredContext = extractedCtx
 
 			// Start a processing execution span linked to the parent trace context
 			tracer := otel.GetTracerProvider().Tracer(observability.GlobalTracerName)
@@ -241,7 +240,11 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 		go func(o domain.OrderCreatedPayload) {
 			defer wg.Done()
 
-			orderCtx, cancel := context.WithTimeout(ctx, 350*time.Millisecond)
+			parentCtx := o.StoredContext
+			if parentCtx == nil {
+				parentCtx = ctx
+			}
+			orderCtx, cancel := context.WithTimeout(parentCtx, 350*time.Millisecond)
 			defer cancel()
 
 			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
@@ -255,7 +258,28 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 				return
 			}
 
-			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, candidates, c.etaCorrector)
+			// Filter out candidates on active match cooldown
+			var validCandidates []matcher.CandidateDriver
+			for _, d := range candidates {
+				cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
+				exists, err := c.redisClusterClient.Exists(orderCtx, cooldownKey).Result()
+				if err == nil && exists > 0 {
+					continue // Skip this driver; they recently declined or timed out an offer
+				}
+				validCandidates = append(validCandidates, d)
+			}
+
+			if len(validCandidates) == 0 {
+				log.Printf("Greedy worker starvation after cooldown filter on order %s. Routing to re-queue.", o.OrderID)
+				observability.OrdersUnmatchedTotal.WithLabelValues("starvation").Inc()
+				c.requeueUnmatchedOrder(ctx, o)
+				mu.Lock()
+				collectedMessages = append(collectedMessages, o.KafkaMessageContext)
+				mu.Unlock()
+				return
+			}
+
+			optimalMatch, matchErr := matcher.EvaluateGreedyMatch(orderCtx, o, o.PickupOSMNodeID, validCandidates, c.etaCorrector)
 			if matchErr != nil {
 				log.Printf("Greedy match failed for order %s: %v. Routing to recovery path.", o.OrderID, matchErr)
 				observability.OrdersUnmatchedTotal.WithLabelValues("match_failure").Inc()
@@ -287,7 +311,11 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			collectedMessages = append(collectedMessages, o.KafkaMessageContext)
 			mu.Unlock()
 
-			emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
+			emitParentCtx := o.StoredContext
+			if emitParentCtx == nil {
+				emitParentCtx = ctx
+			}
+			emitCtx, emitCancel := context.WithTimeout(emitParentCtx, 2*time.Second)
 			defer emitCancel()
 
 			if err := c.emitAssignedEvent(emitCtx, optimalMatch); err != nil {
@@ -327,9 +355,20 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 				return
 			}
 
-			mapMu.Lock()
-			driverLocationMap[o.OrderID] = candidates
+			// Filter out candidates on active match cooldown
+			var validCandidates []matcher.CandidateDriver
 			for _, d := range candidates {
+				cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
+				exists, err := c.redisClusterClient.Exists(batchCtx, cooldownKey).Result()
+				if err == nil && exists > 0 {
+					continue // Skip this driver; they recently declined or timed out an offer
+				}
+				validCandidates = append(validCandidates, d)
+			}
+
+			mapMu.Lock()
+			driverLocationMap[o.OrderID] = validCandidates
+			for _, d := range validCandidates {
 				uniqueDriverTracker[d.DriverID] = d
 			}
 			mapMu.Unlock()
@@ -375,7 +414,11 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 			}
 
 			// Use a fresh context for emits so the tight batchCtx doesn't starve them
-			emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
+			var emitParentCtx context.Context = ctx
+			if oEvent, found := orderMap[matchItem.OrderID]; found && oEvent.StoredContext != nil {
+				emitParentCtx = oEvent.StoredContext
+			}
+			emitCtx, emitCancel := context.WithTimeout(emitParentCtx, 2*time.Second)
 			if err := c.emitAssignedEvent(emitCtx, &matchItem); err != nil {
 				log.Printf("order.assigned emit failed for order %s: %v", matchItem.OrderID, err)
 				observability.KafkaEmitErrorsTotal.WithLabelValues("order.assigned").Inc()
@@ -511,9 +554,18 @@ func (c *OrderCreatedConsumer) requeueUnmatchedOrder(ctx context.Context, o doma
 			writeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
+			var msgHeaders []kafka.Header
+			carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
+			injectCtx := o.StoredContext
+			if injectCtx == nil {
+				injectCtx = writeCtx
+			}
+			otel.GetTextMapPropagator().Inject(injectCtx, carrier)
+
 			err := c.orderRetryWriter.WriteMessages(writeCtx, kafka.Message{
-				Key:   []byte(key),
-				Value: val,
+				Key:     []byte(key),
+				Value:   val,
+				Headers: msgHeaders,
 			})
 			if err != nil {
 				log.Printf("[REQUEUE_STREAM_ERROR] Failed re-emitting order %s onto bus: %v", key, err)
@@ -586,7 +638,19 @@ func (c *OrderCreatedConsumer) commitAssignmentTransaction(ctx context.Context, 
 		return err
 	}
 
-	return tx.Commit(ctx)
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Post-commit: Initialize the 15-second tracking lease inside the Redis Cluster
+	leaseKey := fmt.Sprintf("offer:lease:%s", match.OrderID)
+	err = c.redisClusterClient.Set(ctx, leaseKey, match.DriverID, 15*time.Second).Err()
+	if err != nil {
+		log.Printf("[WARNING] Failed setting Redis offer lease for order %s: %v", match.OrderID, err)
+	}
+
+	return nil
 }
 
 func (c *OrderCreatedConsumer) evictAssignedDriver(ctx context.Context, cityPrefix string, match *matcher.MatchResult) error {
@@ -608,9 +672,15 @@ func (c *OrderCreatedConsumer) emitDriverStateChanged(ctx context.Context, cityP
 	if err != nil {
 		return err
 	}
+
+	var msgHeaders []kafka.Header
+	carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
 	return c.driverStateWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(driverID),
-		Value: bytes,
+		Key:     []byte(driverID),
+		Value:   bytes,
+		Headers: msgHeaders,
 	})
 }
 
@@ -626,9 +696,14 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 		return err
 	}
 
+	var msgHeaders []kafka.Header
+	carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(match.OrderID),
-		Value: bytes,
+		Key:     []byte(match.OrderID),
+		Value:   bytes,
+		Headers: msgHeaders,
 	})
 }
 
