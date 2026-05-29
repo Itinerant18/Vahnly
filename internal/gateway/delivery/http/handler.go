@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
@@ -524,7 +526,7 @@ func (h *GatewayHandler) HandleStartTrip(w http.ResponseWriter, r *http.Request)
 	_, _ = w.Write([]byte(`{"status":"DELIVERING"}`))
 }
 
-// HandleCompleteTrip concludes journey lifetimes and frees drivers back into available sets
+// HandleCompleteTrip concludes journey lifetimes, runs an idempotency fence, and locks in precise financial ledger splits
 func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		OrderID  string `json:"order_id"`
@@ -535,31 +537,105 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 1200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)
 	defer cancel()
+
+	// 1. Idempotency Fence: Prevent duplicate billing/settlement execution under network retries
+	idempotencyKey := fmt.Sprintf("idempotency:settlement:%s", req.OrderID)
+	setSuccess, err := h.clusterClient.SetNX(ctx, idempotencyKey, "PROCESSING", 10*time.Minute).Result()
+	if err != nil {
+		http.Error(w, "cache_verification_failure", http.StatusInternalServerError)
+		return
+	}
+	
+	if !setSuccess {
+		// If the key exists, evaluate if it is processing or already finalized safely
+		status, _ := h.clusterClient.Get(ctx, idempotencyKey).Result()
+		if status == "SUCCESS" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"COMPLETED","msg":"already_settled_idempotent"}`))
+			return
+		}
+		http.Error(w, "transaction_settlement_in_flight", http.StatusConflict)
+		return
+	}
+
+	// Safety cleanup fallback: delete fence token if a panic or error forces a rollback before a commit
+	var settlementStatus string
+	defer func() {
+		if settlementStatus != "SUCCESS" {
+			_ = h.clusterClient.Del(context.Background(), idempotencyKey)
+		}
+	}()
 
 	tx, err := h.dbPool.Begin(ctx)
 	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(ctx)
 
-	// Promote order to completed
-	_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'COMPLETED'::order_status_enum WHERE id = $1::uuid AND status = 'DELIVERING'::order_status_enum", req.OrderID)
-	// Return the vehicle back to available supply vectors cleanly
-	_, _ = tx.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.DriverID)
-
-	if err := tx.Commit(ctx); err != nil {
-		http.Error(w, "commit_failed", http.StatusInternalServerError)
+	// 2. Fetch base fare and prefix within exclusive row-level transactional lock (FOR UPDATE)
+	var baseFarePaise int64
+	var cityPrefix string
+	fetchQuery := `
+		SELECT base_fare_paise, city_prefix FROM orders 
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'DELIVERING'::order_status_enum 
+		FOR UPDATE;
+	`
+	
+	err = tx.QueryRow(ctx, fetchQuery, req.OrderID, req.DriverID).Scan(&baseFarePaise, &cityPrefix)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found_or_invalid_state_transition", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "datastore_read_exception", http.StatusInternalServerError)
 		return
 	}
 
-	// Evict the active telemetry lease out of our cluster cache layers
+	// 3. Promote relational status configurations safely
+	_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'COMPLETED'::order_status_enum WHERE id = $1::uuid", req.OrderID)
+	_, _ = tx.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.DriverID)
+
+	// 4. Calculate Double-Entry Financial Split Constraints (80% Driver Share / 20% Corporate Commission Fee)
+	platformCommissionPaise := (baseFarePaise * 20) / 100
+	driverEarningsPaise := baseFarePaise - platformCommissionPaise // Prevents rounding fractional leak leakages
+
+	ledgerInsertQuery := `
+		INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6);
+	`
+
+	// Leg A: Full Rider Outflow Debit
+	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "RIDER_EXTERNAL_PAYMENT", "DEBIT", baseFarePaise, "Rider automated checkout balance payment processing")
+	if err != nil { return }
+
+	// Leg B: Net Driver Share Credit
+	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "DRIVER_EARNINGS", "CREDIT", driverEarningsPaise, "Driver partner transaction payout share allocation (80%)")
+	if err != nil { return }
+
+	// Leg C: Corporate Commission Take-Rate Credit
+	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "PLATFORM_COMMISSION", "CREDIT", platformCommissionPaise, "Platform take-rate corporate match commission fee adjustment (20%)")
+	if err != nil { return }
+
+	// Commit entries atomically to disk
+	if err = tx.Commit(ctx); err != nil {
+		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Success: Transition the idempotency lock record to prevent future sweep overrides
+	settlementStatus = "SUCCESS"
+	_ = h.clusterClient.Set(ctx, idempotencyKey, "SUCCESS", 24*time.Hour).Err()
+
+	// Clear driver journey session tracking lines from active cache
 	activeTripKey := fmt.Sprintf("driver:active:trip:%s", req.DriverID)
 	_ = h.clusterClient.Del(ctx, activeTripKey)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"COMPLETED"}`))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"COMPLETED","total_debited_paise":%d,"driver_credited_paise":%d}`, baseFarePaise, driverEarningsPaise)))
 }
 
