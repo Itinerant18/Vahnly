@@ -1,82 +1,51 @@
 global:
-  region: "KOL"
-  # Coordinates pointing to your infrastructure cluster endpoints
-  env:
-    kafkaBrokers: "kafka-service.dispatch.svc.cluster.local:9092"
-    redisClusterNodes: "redis-cluster-nodes.dispatch.svc.cluster.local:6379"
-    databaseUrl: "postgres://postgres:password@postgresql-service.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=disable"
-    tritonServerUrl: "triton-service.dispatch.svc.cluster.local:8001"
+  image:
+    repository: "drivers-for-u-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
 
-image:
-  repository: "drivers-for-u-service"
-  pullPolicy: IfNotPresent
-  tag: "latest"
+# Federated Shared-Nothing Region Shards Matrix Definitions
+regions:
+  kolkata:
+    enabled: true
+    cityPrefix: "KOL"
+    replicaCount:
+      ingestion: 3
+      dispatch: 2
+    env:
+      kafkaBrokers: "kafka-kol-svc.dispatch-kol.svc.cluster.local:9092"
+      redisClusterNodes: "redis-kol-svc.dispatch-kol.svc.cluster.local:6379"
+      databaseUrl: "postgres://postgres:password@db-kol-svc.dispatch-kol.svc.cluster.local:5432/delivery_kol?sslmode=disable"
+      tritonServerUrl: "triton-kol-svc.dispatch-kol.svc.cluster.local:8001"
+    resources:
+      dispatch:
+        limits: { cpu: "2000m", memory: "1Gi" }
+        requests: { cpu: "500m", memory: "512Mi" }
 
-# 1. Telemetry Ingestion gRPC Service Properties
-ingestion:
-  replicaCount: 3
-  resources:
-    limits:
-      cpu: "1000m"
-      memory: "512Mi"
-    requests:
-      cpu: "250m"
-      memory: "256Mi"
+  bengaluru:
+    enabled: true
+    cityPrefix: "BLR"
+    replicaCount:
+      ingestion: 4
+      dispatch: 3
+    env:
+      kafkaBrokers: "kafka-blr-svc.dispatch-blr.svc.cluster.local:9092"
+      redisClusterNodes: "redis-blr-svc.dispatch-blr.svc.cluster.local:6379"
+      databaseUrl: "postgres://postgres:password@db-blr-svc.dispatch-blr.svc.cluster.local:5432/delivery_blr?sslmode=disable"
+      tritonServerUrl: "triton-blr-svc.dispatch-blr.svc.cluster.local:8001"
+    resources:
+      dispatch:
+        limits: { cpu: "4000m", memory: "2Gi" }
+        requests: { cpu: "1000m", memory: "1Gi" }
 
-# 2. Kuhn-Munkres Dispatch Engine Properties
-dispatch:
-  replicaCount: 2
-  algorithmStrategy: "HUNGARIAN"
-  resources:
-    limits:
-      cpu: "2000m"
-      memory: "1Gi"
-    requests:
-      cpu: "500m"
-      memory: "512Mi"
-
-# 3. Telemetry Session Garbage Collector Daemon
-pruner:
-  replicaCount: 1
-  resources:
-    limits:
-      cpu: "200m"
-      memory: "128Mi"
-    requests:
-      cpu: "50m"
-      memory: "64Mi"
-
-# 4. Anti-Entropy Self-Healing Sync Worker
-reconciler:
-  replicaCount: 1
-  resources:
-    limits:
-      cpu: "200m"
-      memory: "128Mi"
-    requests:
-      cpu: "50m"
-      memory: "64Mi"
-
-# 5. Surge Aggregation & Calculator Engine
-surge:
-  replicaCount: 1
-  trackedCells: "88754cb247fffff,88283473fffffff"
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
-    requests:
-      cpu: "100m"
-      memory: "128Mi"
-
-# 6. Distributed Pricing Cache Sync Worker
-pricing:
-  replicaCount: 1
-  groupID: "pricing-service-consumer-group"
-  resources:
-    limits:
-      cpu: "200m"
-      memory: "128Mi"
-    requests:
-      cpu: "50m"
-      memory: "64Mi"
+  mumbai:
+    enabled: false # Dormant initialization flag until real-world market entry
+    cityPrefix: "BOM"
+    replicaCount:
+      ingestion: 2
+      dispatch: 1
+    env:
+      kafkaBrokers: "kafka-bom-svc.dispatch-bom.svc.cluster.local:9092"
+      redisClusterNodes: "redis-bom-svc.dispatch-bom.svc.cluster.local:6379"
+      databaseUrl: "postgres://postgres:password@db-bom-svc.dispatch-bom.svc.cluster.local:5432/delivery_bom?sslmode=disable"
+      tritonServerUrl: "triton-bom-svc.dispatch-bom.svc.cluster.local:8001"

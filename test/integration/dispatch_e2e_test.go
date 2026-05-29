@@ -26,6 +26,7 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	intelligenceUsecase "github.com/platform/driver-delivery/internal/intelligence/usecase"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	"github.com/platform/driver-delivery/internal/routing/graph"
@@ -208,9 +209,10 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	go gatewayHandler.InternalBackplaneMultiplexer(consumerCtx)
 
 	// Create a local loopback HTTP router mapping endpoint assertions
+	regionRouter := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/orders", gatewayHandler.HandleCreateOrder)
-	mux.HandleFunc("/api/v1/dispatch/stream", gatewayHandler.HandleMatchRealtimeStream)
+	mux.HandleFunc("/api/v1/orders", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleCreateOrder))
+	mux.HandleFunc("/api/v1/dispatch/stream", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleMatchRealtimeStream))
 	
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -246,7 +248,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	time.Sleep(2000 * time.Millisecond) // Give Kafka consumer group extra time to complete rebalance and join group
 
 	// 9. Open a live loopback WebSocket stream to catch real-time driver match events
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/v1/dispatch/stream?order_id=" + integrationOrderID
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/v1/dispatch/stream?order_id=" + integrationOrderID + "&city_prefix=KOL"
 	wsDialer := websocket.Dialer{}
 	
 	wsConn, _, err := wsDialer.DialContext(ctx, wsURL, nil)
@@ -259,9 +261,9 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	orderPayload := map[string]interface{}{
 		"order_id":           integrationOrderID,
 		"city_prefix":        "KOL",
-		"customer_id":        "c81d4e2e-bcf2-11e6-869b-7df243852131",
-		"pickup_h3_cell":     "88754cb247fffff",
-		"pickup_lat":         22.5730,
+		"customer_id":        "customer-1",
+		"pickup_h3_cell":     "8828308281fffff",
+		"pickup_lat":         22.5726,
 		"pickup_lng":         88.3642,
 		"pickup_osm_node_id": 1001,
 		"dropoff_lat":        22.5800,
@@ -270,8 +272,15 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(orderPayload)
 	
-	// Injecting specific order ID by mimicking database state constraints or overriding handler properties
-	respHTTP, err := http.Post(server.URL+"/api/v1/orders", "application/json", bytes.NewBuffer(bodyBytes))
+	// Inject the custom region prefix header before firing the POST execution check
+	reqHTTP, err := http.NewRequest("POST", server.URL+"/api/v1/orders", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		t.Fatalf("Failed compiling request structure: %v", err)
+	}
+	reqHTTP.Header.Set("Content-Type", "application/json")
+	reqHTTP.Header.Set("X-Region-Prefix", "KOL") // Passed to satisfy the Milestone 22 Anycast routing constraints
+
+	respHTTP, err := http.DefaultClient.Do(reqHTTP)
 	if err != nil {
 		t.Fatalf("HTTP Gateway booking transaction execution failed: %v", err)
 	}

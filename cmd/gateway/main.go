@@ -75,15 +75,20 @@ func main() {
 	// Rate Limit parameters: Allow maximum 5 requests per 1 minute rolling window
 	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 5, 1*time.Minute)
 
+	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
+	rawSupportedRegions := getEnv("SUPPORTED_REGIONS_MATRIX", "KOL,BLR") // Declare active shards
+	supportedRegions := strings.Split(rawSupportedRegions, ",")
+	regionRouter := middleware.NewRegionRouterMiddleware(supportedRegions)
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/pricing/quote", handler.HandleGetPricingQuote)
-	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder)))
-	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(handler.HandleMatchRealtimeStream))
+	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
+	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
+	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
 	mux.HandleFunc("POST /api/v1/dispatch/accept", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleAcceptOrder)))
 	mux.HandleFunc("POST /api/v1/dispatch/decline", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleDeclineOrder)))
-	mux.HandleFunc("POST /api/v1/trip/arrive", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleArriveAtPickup)))
-	mux.HandleFunc("POST /api/v1/trip/start", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleStartTrip)))
-	mux.HandleFunc("POST /api/v1/trip/complete", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleCompleteTrip)))
+	mux.HandleFunc("POST /api/v1/trip/arrive", regionRouter.RouteRegionalTraffic(handler.HandleArriveAtPickup))
+	mux.HandleFunc("POST /api/v1/trip/start", regionRouter.RouteRegionalTraffic(handler.HandleStartTrip))
+	mux.HandleFunc("POST /api/v1/trip/complete", regionRouter.RouteRegionalTraffic(handler.HandleCompleteTrip))
 
 	server := &http.Server{
 		Addr:         ":" + httpPort,
