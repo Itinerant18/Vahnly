@@ -347,3 +347,22 @@ services:
         condition: service_completed_successfully
     networks:
       - dispatch-tier
+
+  spatial-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: analytics
+    container_name: dispatch_spatial_analytics_prod
+    ports:
+      - "8089:8089"
+    environment:
+      - KAFKA_BROKERS=kafka-broker:9092
+      - CITY_PREFIX=KOL
+      - ANALYTICS_PORT=8089
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - dispatch-tier

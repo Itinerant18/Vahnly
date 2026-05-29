@@ -79,6 +79,8 @@ jobs:
         run: go build -o bin/simulator ./cmd/simulator/
       - name: Build expiry service
         run: go build -o bin/expiry ./cmd/expiry/
+      - name: Build analytics service
+        run: go build -o bin/analytics ./cmd/analytics/
       - name: Verify binaries exist
         run: ls -la bin/
 
