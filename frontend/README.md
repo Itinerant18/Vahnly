@@ -21,15 +21,44 @@ Client-side TypeScript for the dispatch platform. Two concerns live here:
   the size limit and flushes cached points on reconnect, removing exactly the flushed
   packets by reference (safe against concurrent pushes/evictions during the flush).
 
-## Setup
+## Operations Control Room (Milestone 27)
+
+A Vite + React + Tailwind dashboard (`src/admin/ControlRoomDashboard.tsx`) mounted by
+`src/main.tsx`. It shows the live SSE supply heatmap, a driver state-override form, and the
+double-entry ledger auditor with a balance banner.
 
 ```bash
 cd frontend
 npm install
-npm run typecheck
+npm run dev        # serves http://localhost:3000
 ```
+
+The dev server proxies API calls so the browser stays same-origin (no CORS):
+
+| Browser path | Proxied to |
+|--------------|-----------|
+| `/api/v1/analytics/*` | analytics SSE service `:8089` |
+| `/api/v1/dispatch/stream` (ws) | gateway `:8080` |
+| `/api/v1/*` | gateway `:8080` |
+
+Override the proxy targets with `API_GATEWAY_URL` / `ANALYTICS_SSE_URL` env vars.
+
+**Prereqs to see data:** the backend stack must be up (`docker compose up -d --build`) and
+producing it. The ledger view (`/api/v1/admin/ledger`) is **ADMIN-gated** — store a valid
+ADMIN-role JWT in `localStorage.admin_jwt_token` or the call returns 401 and the table stays
+empty. The heatmap populates as drivers return to `ONLINE_AVAILABLE` (trip complete/decline).
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | Vite dev server on :3000 (with API proxy) |
+| `npm run build` | Type-check then production build |
+| `npm run typecheck` | `tsc --noEmit` only |
 
 ## Configuration
 
-Endpoints default to localhost and can be overridden via environment variables
-(`API_GATEWAY_URL`, `ANALYTICS_SSE_URL`, `WS_GATEWAY_URL`) — see `src/config.ts`.
+Endpoint bases default to **empty (same-origin)** so the dashboard uses relative paths
+behind the proxy. Native mobile clients (no same origin) must pass absolute hosts via
+`API_GATEWAY_URL` / `ANALYTICS_SSE_URL` / `WS_GATEWAY_URL` or the `ClientCoreEngine`
+constructor — see `src/config.ts`.

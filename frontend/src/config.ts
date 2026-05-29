@@ -12,9 +12,15 @@ function readEnv(key: string, fallback: string): string {
   return fallback;
 }
 
+// Defaults are EMPTY (same-origin) so the browser dashboard issues relative requests that
+// the Vite dev proxy (see vite.config.ts) / a production reverse proxy routes to the right
+// backend — this sidesteps cross-origin CORS entirely. Native mobile clients that have no
+// same origin must supply absolute hosts via these env vars (or the ClientCoreEngine
+// constructor's apiBaseUrl argument).
+
 // REST + WebSocket public API gateway (Milestones 14, 15, 20, 25, 27).
-export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', 'http://localhost:8080');
-export const WS_GATEWAY_BASE_URL = readEnv('WS_GATEWAY_URL', 'ws://localhost:8080');
+export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', '');
+export const WS_GATEWAY_BASE_URL = readEnv('WS_GATEWAY_URL', '');
 
 // Standalone spatial analytics SSE service (Milestone 19).
-export const ANALYTICS_SSE_BASE_URL = readEnv('ANALYTICS_SSE_URL', 'http://localhost:8089');
+export const ANALYTICS_SSE_BASE_URL = readEnv('ANALYTICS_SSE_URL', '');
