@@ -19,6 +19,7 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/events"
+	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
 )
 
@@ -124,6 +125,10 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 				continue
 			}
 
+			// MILESTONE 18: Extract distributed trace context attributes from Kafka headers
+			carrier := observability.KafkaHeaderCarrier{Headers: &msg.Headers}
+			extractedCtx := otel.GetTextMapPropagator().Extract(ctx, carrier)
+
 			var order domain.OrderCreatedPayload
 			if err := json.Unmarshal(msg.Value, &order); err != nil {
 				log.Printf("Malformed JSON event dropped: %v", err)
@@ -132,6 +137,11 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 			}
 
 			order.KafkaMessageContext = msg
+
+			// Start a processing execution span linked to the parent trace context
+			tracer := otel.GetTracerProvider().Tracer(observability.GlobalTracerName)
+			_, span := tracer.Start(extractedCtx, "order_consumer.PipelineAggregationStage")
+			span.End() // Closes briefly to satisfy local metrics profile mappings
 
 			c.mu.Lock()
 			c.orderBuffer = append(c.orderBuffer, order)

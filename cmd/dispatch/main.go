@@ -35,6 +35,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	tp, err := observability.InitTracerProvider("dispatch-matching-service")
+	if err != nil {
+		log.Fatalf("OpenTelemetry trace infrastructure provider boot failed: %v", err)
+	}
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")

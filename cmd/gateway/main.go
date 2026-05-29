@@ -17,6 +17,7 @@ import (
 
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
+	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 )
 
@@ -24,6 +25,12 @@ func main() {
 	// Root execution context
 	mainCtx, mainCancel := context.WithCancel(context.Background())
 	defer mainCancel()
+
+	tp, err := observability.InitTracerProvider("api-gateway-service")
+	if err != nil {
+		log.Fatalf("OpenTelemetry trace infrastructure provider boot failed: %v", err)
+	}
+	defer func() { _ = tp.Shutdown(context.Background()) }()
 
 	httpPort := getEnv("HTTP_PORT", "8080")
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")

@@ -17,6 +17,8 @@ import (
 
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	"go.opentelemetry.io/otel"
+	"github.com/platform/driver-delivery/internal/observability"
 )
 
 const RedisPubSubChannel = "gateway:assignments:broadcast"
@@ -110,7 +112,12 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Millisecond)
+	// MILESTONE 18: Initialize root tracking span at the public API border
+	tracer := otel.GetTracerProvider().Tracer(observability.GlobalTracerName)
+	spanCtx, span := tracer.Start(r.Context(), "gateway.CreateOrderReceived")
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(spanCtx, 1000*time.Millisecond)
 	defer cancel()
 
 	var orderID string
@@ -154,9 +161,15 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	}
 	bytes, _ := json.Marshal(payload)
 
+	// MILESTONE 18: Package trace parameters inside Kafka transmission headers
+	var msgHeaders []kafka.Header
+	carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
 	err = h.kafkaWriter.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(orderID),
-		Value: bytes,
+		Key:     []byte(orderID),
+		Value:   bytes,
+		Headers: msgHeaders, // Inject the tracing metadata bundle securely
 	})
 	if err != nil {
 		log.Printf("[GATEWAY_ERROR] Failed emitting onto order.created: %v", err)
