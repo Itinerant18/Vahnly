@@ -2,33 +2,38 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"time"
 
-	"github.com/uber/h3-go/v3" // Official Uber H3 spatial index library [cite: 12, 107]
+	"github.com/redis/go-redis/v9"
+	"github.com/uber/h3-go/v3" 
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 )
 
+const RedisTelemetryChannel = "gateway:telemetry:broadcast"
+
 type telemetryUseCase struct {
-	redisRepo      domain.RedisRepository
-	kafkaProducer  domain.KafkaProducer
+	redisRepo       domain.RedisRepository
+	kafkaProducer   domain.KafkaProducer
 	metricsProvider domain.DriverMetricsProvider
-	ttl            time.Duration
+	clusterClient   *redis.ClusterClient // Injected to manage high-velocity telemetry multiplexing
+	ttl             time.Duration
 }
 
-func NewTelemetryUseCase(rr domain.RedisRepository, kp domain.KafkaProducer, mp domain.DriverMetricsProvider) domain.TelemetryUseCase {
+func NewTelemetryUseCase(rr domain.RedisRepository, kp domain.KafkaProducer, mp domain.DriverMetricsProvider, client *redis.ClusterClient) domain.TelemetryUseCase {
 	return &telemetryUseCase{
 		redisRepo:       rr,
 		kafkaProducer:   kp,
 		metricsProvider: mp,
-		ttl:             30 * time.Second, // 30-second TTL per architectural mandate [cite: 26, 38]
+		clusterClient:   client,
+		ttl:             30 * time.Second, 
 	}
 }
 
 func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domain.DriverLocation) error {
-	// 1. Compute H3 Resolution 8 Index (~0.7 km² per cell) [cite: 25]
-	// H3 library expects coordinates in radians, not decimal degrees.
+	// 1. Compute H3 Resolution 8 Index (~0.7 km² per cell) 
 	latRad := loc.Latitude * (math.Pi / 180.0)
 	lngRad := loc.Longitude * (math.Pi / 180.0)
 	centerCoord := h3.GeoCoord{Latitude: latRad, Longitude: lngRad}
@@ -36,8 +41,7 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 
 	loc.H3Cell = h3.ToString(resolution8Cell)
 
-	// 2. Enrich location with driver metrics so the :profile HASH is kept current in Redis.
-	//    Without this, SpatialScanner always falls back to default OSMNodeID/AcceptanceRate values.
+	// 2. Enrich location with driver metrics
 	if u.metricsProvider != nil {
 		metrics, err := u.metricsProvider.GetDriverMetrics(ctx, loc.DriverID)
 		if err != nil {
@@ -54,9 +58,34 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 		return fmt.Errorf("failed tracking cache allocation: %w", err)
 	}
 
-	// 4. Fire asynchronous event down the shared Kafka Backbone [cite: 34, 73]
+	// MILESTONE 20 LIVE STREAM FORK: Check if the driver is active on an in-progress trip
+	if u.clusterClient != nil {
+		go func(dID string, lat, lng float64) {
+			forkCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+			defer cancel()
+
+			activeTripKey := fmt.Sprintf("driver:active:trip:%s", dID)
+			orderID, err := u.clusterClient.Get(forkCtx, activeTripKey).Result()
+			
+			// If an active lease is found, broadcast coordinates down the Pub/Sub backplane channel
+			if err == nil && orderID != "" {
+				telemetryPayload := map[string]interface{}{
+					"order_id":   orderID,
+					"driver_id":  dID,
+					"latitude":   lat,
+					"longitude":  lng,
+					"timestamp":  time.Now().Unix(),
+				}
+				bytes, mErr := json.Marshal(telemetryPayload)
+				if mErr == nil {
+					_ = u.clusterClient.Publish(forkCtx, RedisTelemetryChannel, string(bytes)).Err()
+				}
+			}
+		}(loc.DriverID, loc.Latitude, loc.Longitude)
+	}
+
+	// 4. Fire asynchronous event down the shared Kafka Backbone 
 	if err := u.kafkaProducer.PublishLocationUpdate(ctx, loc); err != nil {
-		// Log error internally but do not block client responses; keeps ingestion sub-500ms [cite: 2, 94]
 		fmt.Printf("Non-blocking downstream Kafka producer failure: %v\n", err)
 	}
 

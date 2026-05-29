@@ -111,7 +111,7 @@ func main() {
 	}()
 
 	driverMetrics := repository.NewPostgresDriverMetrics(dbPool)
-	telemetryUseCase := usecase.NewTelemetryUseCase(redisRepo, kafkaProducer, driverMetrics)
+	telemetryUseCase := usecase.NewTelemetryUseCase(redisRepo, kafkaProducer, driverMetrics, redisClusterClient)
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUseCase)
 
 	// 5. Initialize and Bind the gRPC TCP Server Loop

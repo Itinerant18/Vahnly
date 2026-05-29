@@ -44,7 +44,7 @@ func TestProcessLocationUpdate_RadianConversion(t *testing.T) {
 	}
 	producer := &mockKafkaProducer{}
 
-	uc := usecase.NewTelemetryUseCase(repo, producer, nil)
+	uc := usecase.NewTelemetryUseCase(repo, producer, nil, nil)
 
 	// 2. Define input with decimal degrees
 	lat := 22.5726

@@ -155,7 +155,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	// 5. Spin up Telemetry Ingestion gRPC stream server endpoints
 	telemetryRedis := telemetryRepo.NewRedisRepository(redisClient)
 	telemetryKafka := telemetryRepo.NewKafkaProducer(strings.Split(kafkaBrokers, ","))
-	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil)
+	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil, redisClient)
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUC)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:50051")

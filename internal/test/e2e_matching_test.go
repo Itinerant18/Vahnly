@@ -226,7 +226,7 @@ func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
 	// Boot the gRPC Driver Telemetry Ingestion Node
 	telemetryRedis := telemetryRepo.NewRedisRepository(rClient)
 	mockProducerPlaceholder := &mockKafkaProducer{} // Ingestion fallback stub
-	tUseCase := telemetryUseCase.NewTelemetryUseCase(telemetryRedis, mockProducerPlaceholder, nil)
+	tUseCase := telemetryUseCase.NewTelemetryUseCase(telemetryRedis, mockProducerPlaceholder, nil, rClient)
 	grpcHandler := telemetryGrpc.NewLocationIngestionHandler(tUseCase)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:"+gRPCtestPort)

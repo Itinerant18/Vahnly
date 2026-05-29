@@ -22,6 +22,7 @@ import (
 )
 
 const RedisPubSubChannel = "gateway:assignments:broadcast"
+const RedisTelemetryChannel = "gateway:telemetry:broadcast"
 
 // ActiveWebSocketSession encapsulates everything needed for active connection management
 type ActiveWebSocketSession struct {
@@ -228,12 +229,13 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	}
 }
 
-// InternalBackplaneMultiplexer routes Redis Pub/Sub events directly to local socket sessions
+// InternalBackplaneMultiplexer handles multi-pod routing of both assignments and live telemetry coordinates
 func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
-	pubsub := h.clusterClient.Subscribe(ctx, RedisPubSubChannel)
+	// Subscribe concurrently to assignment logs and live telemetry updates
+	pubsub := h.clusterClient.Subscribe(ctx, RedisPubSubChannel, RedisTelemetryChannel)
 	defer pubsub.Close()
 
-	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel active.")
+	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel connection active for assignments and metrics.")
 
 	ch := pubsub.Channel()
 	for {
@@ -245,16 +247,16 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				return
 			}
 
-			var event struct {
-				OrderID  string `json:"order_id"`
-				DriverID string `json:"driver_id"`
+			// Parse incoming data payload packet frames generically to isolate target order IDs
+			var routingEnvelope struct {
+				OrderID string `json:"order_id"`
 			}
-			
-			if err := json.Unmarshal([]byte(msg.Payload), &event); err != nil {
+			if err := json.Unmarshal([]byte(msg.Payload), &routingEnvelope); err != nil || routingEnvelope.OrderID == "" {
 				continue
 			}
 
-			if rawSession, found := h.localSessions.Load(event.OrderID); found {
+			// If the active socket session lives on *this* pod, forward coordinates up to the client device
+			if rawSession, found := h.localSessions.Load(routingEnvelope.OrderID); found {
 				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
 					select {
 					case session.MessageChan <- []byte(msg.Payload):
@@ -335,7 +337,6 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 	}
 	defer tx.Rollback(ctx)
 
-	// Advance order status from ASSIGNED to EN_ROUTE_TO_PICKUP
 	query := `
 		UPDATE orders 
 		SET status = 'EN_ROUTE_TO_PICKUP'::order_status_enum 
@@ -353,7 +354,10 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Clear the active lease tracking key from the cluster memory space
+	// MILESTONE 20 LEASE SET: Map driver tracking sessions to active order IDs inside the cluster cache
+	activeTripKey := fmt.Sprintf("driver:active:trip:%s", req.DriverID)
+	_ = h.clusterClient.Set(ctx, activeTripKey, req.OrderID, 2*time.Hour)
+
 	leaseKey := fmt.Sprintf("offer:lease:%s", req.OrderID)
 	_ = h.clusterClient.Del(ctx, leaseKey)
 
@@ -459,5 +463,103 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 		Key:   []byte(orderID),
 		Value: bytes,
 	})
+}
+
+// HandleArriveAtPickup moves trip states from EN_ROUTE_TO_PICKUP to ARRIVED
+func (h *GatewayHandler) HandleArriveAtPickup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID  string `json:"order_id"`
+		DriverID string `json:"driver_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	defer cancel()
+
+	query := `
+		UPDATE orders SET status = 'ARRIVED_AT_PICKUP'::order_status_enum
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'EN_ROUTE_TO_PICKUP'::order_status_enum;
+	`
+	res, err := h.dbPool.Exec(ctx, query, req.OrderID, req.DriverID)
+	if err != nil || res.RowsAffected() == 0 {
+		http.Error(w, "failed_state_transition", http.StatusConflict)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"ARRIVED_AT_PICKUP"}`))
+}
+
+// HandleStartTrip transitions orders into active transit status (DELIVERING)
+func (h *GatewayHandler) HandleStartTrip(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID  string `json:"order_id"`
+		DriverID string `json:"driver_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	defer cancel()
+
+	query := `
+		UPDATE orders SET status = 'DELIVERING'::order_status_enum
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'ARRIVED_AT_PICKUP'::order_status_enum;
+	`
+	res, err := h.dbPool.Exec(ctx, query, req.OrderID, req.DriverID)
+	if err != nil || res.RowsAffected() == 0 {
+		http.Error(w, "failed_state_transition", http.StatusConflict)
+		return
+	}
+
+	// Update vehicle state mapping inside relational components as well
+	_, _ = h.dbPool.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_DELIVERING'::driver_state_enum WHERE id = $1::uuid", req.DriverID)
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"DELIVERING"}`))
+}
+
+// HandleCompleteTrip concludes journey lifetimes and frees drivers back into available sets
+func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID  string `json:"order_id"`
+		DriverID string `json:"driver_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1200*time.Millisecond)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Promote order to completed
+	_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'COMPLETED'::order_status_enum WHERE id = $1::uuid AND status = 'DELIVERING'::order_status_enum", req.OrderID)
+	// Return the vehicle back to available supply vectors cleanly
+	_, _ = tx.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.DriverID)
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Evict the active telemetry lease out of our cluster cache layers
+	activeTripKey := fmt.Sprintf("driver:active:trip:%s", req.DriverID)
+	_ = h.clusterClient.Del(ctx, activeTripKey)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"COMPLETED"}`))
 }
 
