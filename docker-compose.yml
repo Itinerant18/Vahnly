@@ -250,14 +250,19 @@ services:
         TARGET_SERVICE: ingestion
     container_name: dispatch_ingestion_prod
     environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
       - KAFKA_BROKERS=kafka-broker:9092
       - REDIS_CLUSTER_NODES=redis-node-1:6379
     ports:
       - "50051:50051"
     depends_on:
+      spatial-db:
+        condition: service_healthy
       kafka-broker:
         condition: service_healthy
       redis-cluster-orchestrator:
+        condition: service_completed_successfully
+      db-migrator:
         condition: service_completed_successfully
     networks:
       - dispatch-tier
@@ -430,6 +435,8 @@ services:
       kafka-broker:
         condition: service_healthy
       redis-cluster-orchestrator:
+        condition: service_completed_successfully
+      db-migrator:
         condition: service_completed_successfully
     networks:
       - dispatch-tier
