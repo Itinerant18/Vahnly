@@ -106,9 +106,95 @@ func main() {
 	log.Println("\nKeeping simulator context warm for 8s to process background loops...")
 	time.Sleep(8 * time.Second)
 	log.Println("\n═══════════════════════════════════════════════════════════════")
-	log.Println("  Chaos simulation finalized. Review Prometheus dashboards    ")
-	log.Println("  to confirm that fallbacks executed within the 500ms limit.   ")
+	log.Println("  Chaos simulation wave completed. Transitioning to continuous loop...")
 	log.Println("═══════════════════════════════════════════════════════════════")
+
+	// Start continuous background telemetry for all 25 drivers
+	for i := 1; i <= 25; i++ {
+		go func(id int) {
+			driverUUID := fmt.Sprintf("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a%02d", id)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					if err := streamDriverPositionContinuous(ctx, driverUUID); err != nil {
+						log.Printf("  ⚠️ Continuous telemetry drop for driver %s: %v (reconnecting...)", driverUUID, err)
+						time.Sleep(3 * time.Second)
+					}
+				}
+			}
+		}(i)
+	}
+
+	// Start continuous background order admissions every 6 seconds
+	orderIdx := 100
+	orderTicker := time.NewTicker(6 * time.Second)
+	defer orderTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-orderTicker.C:
+			orderIdx++
+			orderUUID := fmt.Sprintf("f47ac10b-58cc-4372-a567-0e02b2c3d5%02d", orderIdx%100)
+			customerUUID := fmt.Sprintf("c81d4e2e-bcf2-11e6-869b-7df2438522%02d", orderIdx%100)
+
+			targetCell := targetH3Cell
+			if orderIdx%4 == 0 {
+				targetCell = starvationH3Cell
+			}
+
+			if err := emitOrderRequest(ctx, orderWriter, orderUUID, customerUUID, targetCell, chaosCtrl); err != nil {
+				log.Printf("  ⚠️ Kafka order injection failed for order %s: %v", orderUUID, err)
+			} else {
+				log.Printf("[LIVE_SIMULATOR] Committed new active order booking: order=%s cell=%s", orderUUID, targetCell)
+			}
+		}
+	}
+}
+
+func streamDriverPositionContinuous(ctx context.Context, driverID string) error {
+	conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := pb.NewLocationIngestionServiceClient(conn)
+	stream, err := client.ClientStreamPositions(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Loop indefinitely sending updates every 4 seconds
+	ticker := time.NewTicker(4 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			latVariance := (rand.Float64() - 0.5) * 0.01
+			lngVariance := (rand.Float64() - 0.5) * 0.01
+
+			req := &pb.IngestionRequest{
+				DriverId:     driverID,
+				CityPrefix:   cityPrefix,
+				Latitude:     22.5726 + latVariance,
+				Longitude:    88.3639 + lngVariance,
+				Bearing:      float32(rand.Float64() * 360.0),
+				SpeedKms:     float32(15.0 + rand.Float64()*30.0),
+				TimestampUtc: time.Now().Unix(),
+			}
+
+			if err := stream.Send(req); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // startChaosDaemon periodically toggles fault flags to simulate intermittent stress.
