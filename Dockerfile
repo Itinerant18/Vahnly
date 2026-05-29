@@ -17,7 +17,7 @@ ARG TARGET_SERVICE
 
 # Compile statically linked binaries with CGO enabled (required for h3-go) and debug tables stripped
 RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags="-s -w -extldflags '-static'" \
+    -ldflags="-s -w -linkmode external -extldflags '-static'" \
     -o /app/service_binary \
     ./cmd/${TARGET_SERVICE}/main.go
 
