@@ -1,0 +1,742 @@
+{
+  "C:\\workspace\\Driver\\run_e2e_test.ps1": {
+    "mtime": 1779958510.795682,
+    "ast_hash": "21feb625026152dd3c937ef2b28d6df8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.claude\\settings.json": {
+    "mtime": 1779858516.817492,
+    "ast_hash": "5d6ecd96cf065b16e8bb9fbf5d7d8f0d",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.claude\\settings.local.json": {
+    "mtime": 1779777003.9972467,
+    "ast_hash": "0e9df79344e8b824af75b22908a28f48",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.codex\\hooks.json": {
+    "mtime": 1779858524.573447,
+    "ast_hash": "30c678608c6fe5db5b60f8b6f28dbfac",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\bin\\run-dispatch.ps1": {
+    "mtime": 1780054195.4237683,
+    "ast_hash": "6ee2bf8a09c0fa9954d40fe282f3bd57",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\bin\\run-ingestion.ps1": {
+    "mtime": 1780054195.4226801,
+    "ast_hash": "4f8461f943a30601ddbdb160be09fff6",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\bin\\run-local-env.ps1": {
+    "mtime": 1779788841.666474,
+    "ast_hash": "099653ca731b222815407935972e8895",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\bin\\seed.sql": {
+    "mtime": 1779771650.8711221,
+    "ast_hash": "d275b98b3cec4cf2611576ca10932053",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\dispatch\\main.go": {
+    "mtime": 1780031258.4698927,
+    "ast_hash": "daa77e987ff1a0cf55995d59e0e931fc",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\ingestion\\main.go": {
+    "mtime": 1780036826.0930343,
+    "ast_hash": "ed0959fed987a5dfe5bc9fe44fd5cf69",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\osm-preprocessor\\main.go": {
+    "mtime": 1779865940.7588072,
+    "ast_hash": "d8070b18cadec52dc48caea721fa4227",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\pricing\\main.go": {
+    "mtime": 1779858165.695493,
+    "ast_hash": "748abc91f21685e65d1ed7121fd44cb5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\pruner\\main.go": {
+    "mtime": 1779939886.636078,
+    "ast_hash": "8637d07cbea9f0cc474178e5290c59fe",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\reconciler\\main.go": {
+    "mtime": 1779944021.1066692,
+    "ast_hash": "68c6348e518b41f7d2f542fa406539b1",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\simulator\\main.go": {
+    "mtime": 1780057349.9681647,
+    "ast_hash": "2f9287ee8bce2c9bda97484c49c419a0",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\surge\\main.go": {
+    "mtime": 1779798032.311749,
+    "ast_hash": "aee087cd64ef992cb377dd5551dc2178",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\local\\start-local-infra.sh": {
+    "mtime": 1779767088.6678886,
+    "ast_hash": "a69cdadab08c79950c2aa373502ebccb",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\local\\teardown-local-infra.sh": {
+    "mtime": 1779767088.9606147,
+    "ast_hash": "75336342a5f7858816bbda70267d5391",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\consumer\\order_consumer.go": {
+    "mtime": 1780049103.2414553,
+    "ast_hash": "ec215a5588d1ef56888e22ea35182dc8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\consumer\\order_consumer_test.go": {
+    "mtime": 1779944278.2467136,
+    "ast_hash": "744f96804c91054e4df60a20906630b3",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\domain\\models.go": {
+    "mtime": 1780034495.209086,
+    "ast_hash": "7ae00b202a5a5a8669fd2dd802559274",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\matcher\\greedy_test.go": {
+    "mtime": 1779940703.4125082,
+    "ast_hash": "00011bb5b3f7c0da3c3023f5c06eb349",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\matcher\\hungarian.go": {
+    "mtime": 1780026721.3506124,
+    "ast_hash": "05e42a15c7612c8cebb0ad38507936a0",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\matcher\\hungarian_test.go": {
+    "mtime": 1779940685.356568,
+    "ast_hash": "4c871f2faf065c237871dab2b4c3a52f",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\reconciler\\order_reconciler.go": {
+    "mtime": 1779943936.363499,
+    "ast_hash": "43c0681072bf3cc0fcbc91c5d54ac6f1",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\reconciler\\order_reconciler_test.go": {
+    "mtime": 1779943992.071739,
+    "ast_hash": "d9bd34501f65711401d44e38c093c2a2",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\repository\\spatial_scanner.go": {
+    "mtime": 1779856105.1720414,
+    "ast_hash": "51a8bb2025562f9c5c09d8c97b26fa81",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\repository\\spatial_scanner_test.go": {
+    "mtime": 1779856164.2088892,
+    "ast_hash": "42d2923ebc4c76730d74342c9fd071e2",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\events\\driver_state_changed.go": {
+    "mtime": 1779797693.4056654,
+    "ast_hash": "b839615edf700c4039ca03e4aeb73f8d",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\intelligence\\client\\triton_client.go": {
+    "mtime": 1780026739.8339972,
+    "ast_hash": "004e691ecb2a07e14a367712c94564d5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\intelligence\\usecase\\eta_corrector.go": {
+    "mtime": 1779940640.7527337,
+    "ast_hash": "9f0b3a056ca5f9a7b6026c07f5e44463",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\observability\\circuit_breaker.go": {
+    "mtime": 1779794263.4468012,
+    "ast_hash": "6aec9c679778b08aa120e3460c0fcc58",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\observability\\metrics.go": {
+    "mtime": 1779794250.2353463,
+    "ast_hash": "3f1e17698d5426432a596c4313545ec5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\observability\\server.go": {
+    "mtime": 1780026734.2458172,
+    "ast_hash": "c8deae9d08ebce0ad2d407239ec3c0f7",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\pricing\\service\\order_pricing_service.go": {
+    "mtime": 1779860565.319863,
+    "ast_hash": "fb9fe5bdfc212d966d4e17c47935d668",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\pricing\\service\\order_pricing_service_test.go": {
+    "mtime": 1779860583.481307,
+    "ast_hash": "93c31f47e4ec965c2e8e5952fad3a17e",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\routing\\graph\\contraction_hierarchies.go": {
+    "mtime": 1779710818.8787699,
+    "ast_hash": "7d6c6605aa955072f41f75275310951c",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\routing\\graph\\contraction_hierarchies_test.go": {
+    "mtime": 1779710822.9750628,
+    "ast_hash": "1de9fc57c78a89dc1053455d9802c868",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\routing\\graph\\loader.go": {
+    "mtime": 1779866608.7014892,
+    "ast_hash": "6bef7c67e646725d06c34fa6754034dc",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\routing\\graph\\loader_test.go": {
+    "mtime": 1779866613.9109218,
+    "ast_hash": "dc1b4cfd993031d2946fd82ed46e7986",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\aggregator\\demand_aggregator.go": {
+    "mtime": 1779710987.7882547,
+    "ast_hash": "24bc70071d350237da0567ccdd286b44",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\aggregator\\demand_aggregator_test.go": {
+    "mtime": 1779710991.2849314,
+    "ast_hash": "1a9419cf571212707130bad246930d66",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\aggregator\\supply_aggregator.go": {
+    "mtime": 1779798113.2653012,
+    "ast_hash": "015ef9e2011407f67c7fa4cb9accbe80",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\aggregator\\supply_aggregator_test.go": {
+    "mtime": 1779710831.5493734,
+    "ast_hash": "ded071c93549a3a1ca8ef73059668e35",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\calculator\\surge_calculator.go": {
+    "mtime": 1779711747.365076,
+    "ast_hash": "818c27a19d562438d175ba21fa208709",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\surge\\calculator\\surge_calculator_test.go": {
+    "mtime": 1779711113.5578148,
+    "ast_hash": "17c67fe17efb4212707b8badc70893aa",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\delivery\\grpc\\handler.go": {
+    "mtime": 1779707074.0619006,
+    "ast_hash": "676c320890045642a6069c148bf5be61",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\delivery\\grpc\\handler_test.go": {
+    "mtime": 1780026938.6395493,
+    "ast_hash": "f4357ca55ad52cac18e6c4e81729ac73",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\domain\\telemetry.go": {
+    "mtime": 1779780523.3895056,
+    "ast_hash": "272cd82ae3cb70acc37c6764abae61ac",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\pruner\\stale_pruner.go": {
+    "mtime": 1780026714.7442093,
+    "ast_hash": "225858b1f8443d0260356402aa96c7e2",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\pruner\\stale_pruner_test.go": {
+    "mtime": 1779939892.3769298,
+    "ast_hash": "5603b5a43044d89da39f569196897e67",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\repository\\kafka_producer.go": {
+    "mtime": 1779708819.5449264,
+    "ast_hash": "ab6626cc628a70f2352a1f9837da3a87",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\repository\\postgres_driver_repo.go": {
+    "mtime": 1779780559.4478977,
+    "ast_hash": "8a0fc3749a535cb0e005f68a83ddaa9d",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\repository\\redis_repo.go": {
+    "mtime": 1779787081.4799175,
+    "ast_hash": "2e53e67d246c8dcf37499d1c1f35d887",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\repository\\redis_repo_test.go": {
+    "mtime": 1779774960.8501205,
+    "ast_hash": "e570deb999e02b4d586f5f31ad30f8ea",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\usecase\\telemetry_usecase.go": {
+    "mtime": 1780036910.8956988,
+    "ast_hash": "01c5763acf110f1cf28a669c62c7baa3",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\telemetry\\usecase\\telemetry_usecase_test.go": {
+    "mtime": 1780036828.6776302,
+    "ast_hash": "1b5bbb8e5e43b998bc5deb10647741a9",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\test\\e2e_matching_test.go": {
+    "mtime": 1780036830.872745,
+    "ast_hash": "1886158fe15845f2c1781e7a0e9eb2d5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\pkg\\api\\telemetry\\v1\\telemetry.pb.go": {
+    "mtime": 1779706960.3492396,
+    "ast_hash": "04aa11ab46106376c015f81dead3e0df",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\pkg\\api\\telemetry\\v1\\telemetry_grpc.pb.go": {
+    "mtime": 1779706960.3502326,
+    "ast_hash": "31eb905fad5142d332ee6af252161865",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\pkg\\api\\triton\\triton.pb.go": {
+    "mtime": 1779774224.714472,
+    "ast_hash": "5b967d307b4a7a5fe622165af8e8f8e4",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\pkg\\api\\triton\\triton_grpc.pb.go": {
+    "mtime": 1779774224.7154722,
+    "ast_hash": "04162d38e728871ad9cabef8de55255a",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\test\\integration\\dispatch_e2e_test.go": {
+    "mtime": 1780050120.4825785,
+    "ast_hash": "5b27898e8eea3f460a37082fc5e08dfd",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\AGENTS.md": {
+    "mtime": 1779858476.5321195,
+    "ast_hash": "752aa83aa64361ac32860f882dcff932",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\CLAUDE.md": {
+    "mtime": 1779858474.589172,
+    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\docker-compose.yml": {
+    "mtime": 1780056866.9216099,
+    "ast_hash": "cb5a6dfb6f5bc42d5275a179fe67f63d",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\local-dev-topology.yaml": {
+    "mtime": 1779853682.5553088,
+    "ast_hash": "7eaa51efe1649eabf5204f7d5789803f",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\README.md": {
+    "mtime": 1780054877.4204447,
+    "ast_hash": "5b8c4da51914ebdf0267612ae3fb05c6",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.agents\\rules\\graphify.md": {
+    "mtime": 1779858533.251275,
+    "ast_hash": "a0e4d192b9e2e17256124dbfc8e24e6a",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.agents\\skills\\graphify\\SKILL.md": {
+    "mtime": 1779858476.5307078,
+    "ast_hash": "8a98d44ea5c92ab83d0c18efb43b57de",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.agents\\workflows\\graphify.md": {
+    "mtime": 1779858533.2522736,
+    "ast_hash": "84de69efd46ab0b8430393bd4188f8f2",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.claude\\CLAUDE.md": {
+    "mtime": 1779858474.589172,
+    "ast_hash": "817fe671013b35ae0bc9301dfe449a87",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.claude\\skills\\graphify\\SKILL.md": {
+    "mtime": 1779858474.5855083,
+    "ast_hash": "e065bdafac4ca689ffd4e353ffd71160",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.code-review-graph\\graph.html": {
+    "mtime": 1779787358.9496846,
+    "ast_hash": "9fa4e1b0b9a8b99b70f269775d6672bf",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.github\\workflows\\ci.yml": {
+    "mtime": 1780033512.8944278,
+    "ast_hash": "17ef28c7c3b488a336b7b9258012bbf5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\keda-scaler.yaml": {
+    "mtime": 1779960749.5614564,
+    "ast_hash": "9317f4d47aabd48864c512d1c3d91353",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\prometheus-alerts.yaml": {
+    "mtime": 1779944444.356791,
+    "ast_hash": "92bacbb69649453267cf75019d1a9dc4",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\local\\local-dev-topology.yaml": {
+    "mtime": 1780030776.1098287,
+    "ast_hash": "7aa071b63d1db500682e03a130cc9a29",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\local\\triton-dev-manifest.yaml": {
+    "mtime": 1779774515.1722443,
+    "ast_hash": "075989875ffd4ef43f5d741fd8625b03",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\ARCHITECTURE_BREAKDOWN_FOR_TEAM.md": {
+    "mtime": 1779798517.5863247,
+    "ast_hash": "c3d3924e8649a98f396a371bec285eef",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\Driver_Delivery_Platform_Architecture.md": {
+    "mtime": 1779770571.3584404,
+    "ast_hash": "873339fc5eee819abf0c4da5aff359a8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\ENTERPRISE_SYSTEMS_BLUEPRINT.md": {
+    "mtime": 1779778924.4587045,
+    "ast_hash": "b2bf91047c8409e0eb3534e052af5ee4",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\PRODUCTION_BLUEPRINT.md": {
+    "mtime": 1779777410.8800313,
+    "ast_hash": "6ea92edeef47d55dbe003e9490ce7783",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\README-LOCAL-ROUTING.md": {
+    "mtime": 1779939543.195788,
+    "ast_hash": "e8fe936b9db95f4bda77d9a24efbf677",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000001_init_platform_schema.up.sql": {
+    "mtime": 1779968325.2875614,
+    "ast_hash": "2577613b04304ec911a99212ab429f9b",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000002_seed_kolkata_region.up.sql": {
+    "mtime": 1779956888.6382823,
+    "ast_hash": "e058d7922e62f2a32b71c7ef72b9a527",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\storage\\migration\\migrate.go": {
+    "mtime": 1779956892.9053376,
+    "ast_hash": "7cf9ade739cdecbd2b0db0e06881eac3",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\storage\\migration\\migrate_test.go": {
+    "mtime": 1779957418.3688505,
+    "ast_hash": "f00f4843ab2ae8600e9ea5bada72a41c",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\bin\\start-port-forwards.ps1": {
+    "mtime": 1779958861.0136437,
+    "ast_hash": "ba07dd6b25c2b33e7450465b739005ea",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\migrate\\main.go": {
+    "mtime": 1779958201.9542177,
+    "ast_hash": "8f3be74aab5b8f8f93ef06942cb07d9d",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\gateway\\main.go": {
+    "mtime": 1780050635.0380898,
+    "ast_hash": "db9785739bac0ced68e2b734333ff822",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000001_init_platform_schema.down.sql": {
+    "mtime": 1779960893.3451939,
+    "ast_hash": "16c3b0fcaeb8bf83e00880abf1594102",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000002_seed_kolkata_region.down.sql": {
+    "mtime": 1779960889.8561635,
+    "ast_hash": "80c0d15f18612e2d1b32fd690698b3f4",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\delivery\\http\\handler.go": {
+    "mtime": 1780051430.3184369,
+    "ast_hash": "8d88baa7be6f41ab051bcd2e452f14b0",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\Chart.yaml": {
+    "mtime": 1779960125.2000518,
+    "ast_hash": "af039d850a0dc85582cea3fc2cbfb2a8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\values.yaml": {
+    "mtime": 1780046272.6467416,
+    "ast_hash": "9677bfb95ae360daee7e83f3435f71fd",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\dispatch-deployment.yaml": {
+    "mtime": 1779961062.5679862,
+    "ast_hash": "3907311721b0c2575cdd889442765ff6",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\dispatch-service.yaml": {
+    "mtime": 1779960175.293724,
+    "ast_hash": "183367b8d11a82a89dae16e614e27509",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\ingestion-deployment.yaml": {
+    "mtime": 1779960984.52714,
+    "ast_hash": "5c4e506565d933fc8f12b6b1ae96a450",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\ingestion-service.yaml": {
+    "mtime": 1779960160.0967245,
+    "ast_hash": "34cdbef92a91a81d4b5a67bab1800d89",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\pricing-deployment.yaml": {
+    "mtime": 1779961045.8754237,
+    "ast_hash": "0d5ab00c5ad50e577d139a74709ff6f5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\pruner-deployment.yaml": {
+    "mtime": 1779961066.1966798,
+    "ast_hash": "71598e79f45ce59832593850ccff8b6f",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\reconciler-deployment.yaml": {
+    "mtime": 1779961070.1754181,
+    "ast_hash": "3d56f4aa78f587ae97565cc56010f577",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\templates\\surge-deployment.yaml": {
+    "mtime": 1779961082.31865,
+    "ast_hash": "404008e3c6f1e70429410864ccda3388",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\model_repository\\cancellation_risk_classifier\\1\\xgboost.json": {
+    "mtime": 1779970046.4788246,
+    "ast_hash": "875074bbc304f6311d881754d984dad1",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\model_repository\\xgboost_spatial_corrector\\1\\xgboost.json": {
+    "mtime": 1779970046.4758184,
+    "ast_hash": "0fe7cfdd072bcd7951de7b54ec4b30d8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\.golangci.yml": {
+    "mtime": 1779971612.0368094,
+    "ast_hash": "00d721d9ec15a1f003b28dc729b3b6a9",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\auth.go": {
+    "mtime": 1780050619.5098002,
+    "ast_hash": "2ed61b6fd6b74afb751388b7c37b3412",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\auth_test.go": {
+    "mtime": 1780028188.18872,
+    "ast_hash": "dd7bbf95aa485104914eec4bf5db3042",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\ratelimit.go": {
+    "mtime": 1780028219.5298448,
+    "ast_hash": "2595082025c7587c95224694d54fcd0a",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\ratelimit_test.go": {
+    "mtime": 1780028133.244401,
+    "ast_hash": "68dd88435ff32c41bb52fbe3f93f7e30",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\expiry\\main.go": {
+    "mtime": 1780030791.0064754,
+    "ast_hash": "574fde9d0f3cee6f5c7e36554cacf598",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\expiry\\timeout_manager.go": {
+    "mtime": 1780030787.8228545,
+    "ast_hash": "494ceff30bcedfa4b13a8a455851e8c9",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\dispatch\\expiry\\timeout_manager_test.go": {
+    "mtime": 1780030907.778047,
+    "ast_hash": "0a5073f697efbd6d3c1166873c9258ce",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\delivery\\http\\handler_test.go": {
+    "mtime": 1780030909.815825,
+    "ast_hash": "3672cda76b99645c2866be1405d557ad",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\observability\\tracing.go": {
+    "mtime": 1780031446.8330176,
+    "ast_hash": "a5adc759a382d39f7aa524ef9c30600b",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\observability\\tracing_test.go": {
+    "mtime": 1780031260.9833784,
+    "ast_hash": "4e6b0d6dcec0c10df121bb35afc6f664",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\analytics\\main.go": {
+    "mtime": 1780033504.6053417,
+    "ast_hash": "3d79fa914e75ef82ce2f4121bf5a5d02",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\analytics\\service\\heatmap_service.go": {
+    "mtime": 1780033501.4598477,
+    "ast_hash": "2f9b8b2a48840bc3c6dc9a4b92e5308b",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\analytics\\service\\heatmap_service_test.go": {
+    "mtime": 1780033515.4632072,
+    "ast_hash": "a3b30301aa87b33a5f7ff41612173a2f",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000003_add_financial_ledger.down.sql": {
+    "mtime": 1780043348.377256,
+    "ast_hash": "94ce3816c840ee53ea1c985ad13d6668",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000003_add_financial_ledger.up.sql": {
+    "mtime": 1780051480.7897396,
+    "ast_hash": "b3de3441adfa75879d59714ac3ce17b6",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\region_router.go": {
+    "mtime": 1780046276.2999718,
+    "ast_hash": "1d93381e20a66f96ab776b77419d84a7",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\gateway\\middleware\\region_router_test.go": {
+    "mtime": 1780046387.149324,
+    "ast_hash": "c5e9fb74c8ba4c9b0eeab513adcd611c",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\cmd\\notification\\main.go": {
+    "mtime": 1780049478.772994,
+    "ast_hash": "65c979bf647602a8afe3cc2fa6d16cea",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000004_add_arrived_status.down.sql": {
+    "mtime": 1780048453.33255,
+    "ast_hash": "1d86edf79c11926473d02352de8f863f",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000004_add_arrived_status.up.sql": {
+    "mtime": 1780048449.390512,
+    "ast_hash": "6540f42144be7dc2144e3fb1f39835a8",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\notification\\outbox_processor.go": {
+    "mtime": 1780051393.9357245,
+    "ast_hash": "8215487cb87ba0dbbc07551f64cd0d17",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\DOC\\walkthrough.md": {
+    "mtime": 1780055418.4716294,
+    "ast_hash": "0a2cd2e254d42b17541ae9cf3a3c1a67",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000005_add_notification_outbox.down.sql": {
+    "mtime": 1780049697.2674088,
+    "ast_hash": "d076a7812e7fe38a47f20088a2c90b87",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000005_add_notification_outbox.up.sql": {
+    "mtime": 1780051502.1082735,
+    "ast_hash": "e1dee4845b3903b5e75a8d2c71fb67ed",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000006_add_payment_intents.down.sql": {
+    "mtime": 1780050125.570364,
+    "ast_hash": "1c786e852f8453028354bfba84f837b5",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\database\\migrations\\000006_add_payment_intents.up.sql": {
+    "mtime": 1780051514.1125085,
+    "ast_hash": "eb25e96133879c87a1f7552b53c86631",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\package.json": {
+    "mtime": 1780055656.4083042,
+    "ast_hash": "116404dbec7dcd0e96fc14b913c050bf",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\tsconfig.json": {
+    "mtime": 1780052913.7416873,
+    "ast_hash": "4418fa07717105710adaebb0ba5228b1",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\config.ts": {
+    "mtime": 1780055702.4690876,
+    "ast_hash": "307e4d6873eb4e5c467603815c52b322",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\admin\\ControlRoomDashboard.tsx": {
+    "mtime": 1780053044.3876793,
+    "ast_hash": "40ab5db9406de1d8d120545c89509e6b",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\network\\ClientCoreEngine.ts": {
+    "mtime": 1780052959.9641297,
+    "ast_hash": "fb78a18c2767834917349603b8e461a2",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\network\\index.ts": {
+    "mtime": 1780053005.6318367,
+    "ast_hash": "b26dd31ccb2d028f8f8fc32a96f2dc87",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\network\\ResilientStreamManager.ts": {
+    "mtime": 1780052998.0442586,
+    "ast_hash": "a4ed8e450fa25341bdf0d9c0e36c50cc",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\network\\TelemetryRingBuffer.ts": {
+    "mtime": 1780052976.9793909,
+    "ast_hash": "63e5889467dc9272c3143e4d7fc0679b",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\README.md": {
+    "mtime": 1780055726.810461,
+    "ast_hash": "f8fe7059870cc67171b151affb780c2a",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\postcss.config.js": {
+    "mtime": 1780055689.6545892,
+    "ast_hash": "c735540bb63936a123bc867d950c9f69",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\tailwind.config.js": {
+    "mtime": 1780055686.3249433,
+    "ast_hash": "5e9001435b67fd819c59969c30edf830",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\vite.config.ts": {
+    "mtime": 1780055668.828468,
+    "ast_hash": "d7eaf364d2b2b7b2b60d95d7fd751938",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\main.tsx": {
+    "mtime": 1780055678.0186627,
+    "ast_hash": "89708c145fe7aaf23e6628a959f6f0b9",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\src\\vite-env.d.ts": {
+    "mtime": 1780055713.9655156,
+    "ast_hash": "0352474ba2918efe13895edbc3780d94",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\frontend\\index.html": {
+    "mtime": 1780055673.4416976,
+    "ast_hash": "541e5abd4b503690abd15f6db19759a0",
+    "semantic_hash": ""
+  }
+}
