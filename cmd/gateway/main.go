@@ -86,9 +86,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
 	mux.HandleFunc("POST /api/v1/dispatch/accept", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleAcceptOrder)))
 	mux.HandleFunc("POST /api/v1/dispatch/decline", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleDeclineOrder)))
-	mux.HandleFunc("POST /api/v1/trip/arrive", regionRouter.RouteRegionalTraffic(handler.HandleArriveAtPickup))
-	mux.HandleFunc("POST /api/v1/trip/start", regionRouter.RouteRegionalTraffic(handler.HandleStartTrip))
-	mux.HandleFunc("POST /api/v1/trip/complete", regionRouter.RouteRegionalTraffic(handler.HandleCompleteTrip))
+	mux.HandleFunc("POST /api/v1/trip/arrive", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleArriveAtPickup))))
+	mux.HandleFunc("POST /api/v1/trip/start", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleStartTrip))))
+	mux.HandleFunc("POST /api/v1/trip/complete", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCompleteTrip))))
 
 	server := &http.Server{
 		Addr:         ":" + httpPort,

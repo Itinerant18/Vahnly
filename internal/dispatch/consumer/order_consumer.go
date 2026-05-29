@@ -403,7 +403,11 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 		matchItem := result.match
 		if result.err == nil {
 			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(result.duration.Seconds())
-			observability.OrdersMatchedTotal.WithLabelValues("HUNGARIAN", "").Inc()
+			matchedCity := ""
+			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				matchedCity = oEvent.CityPrefix
+			}
+			observability.OrdersMatchedTotal.WithLabelValues("HUNGARIAN", matchedCity).Inc()
 			matchedOrderIDs[matchItem.OrderID] = true
 			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
 			if oEvent, found := orderMap[matchItem.OrderID]; found {

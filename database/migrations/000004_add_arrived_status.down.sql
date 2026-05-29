@@ -1,0 +1,3 @@
+-- PostgreSQL cannot drop a single value from an ENUM type, so this rollback is a
+-- deliberate no-op. Removing ARRIVED_AT_PICKUP would require recreating the type and
+-- rewriting every dependent column, which is unsafe to automate here.

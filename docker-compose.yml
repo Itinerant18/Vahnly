@@ -366,3 +366,18 @@ services:
         condition: service_healthy
     networks:
       - dispatch-tier
+
+  outbox-notification-engine:
+    image: golang:1.21-alpine
+    container_name: dispatch_notification_prod
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - DATABASE_URL=postgres://postgres:password@spatial-db:5432/delivery_platform?sslmode=disable
+    command: ["go", "run", "cmd/notification/main.go"]
+    depends_on:
+      spatial-db:
+        condition: service_healthy
+    networks:
+      - dispatch-tier

@@ -19,6 +19,7 @@ CREATE TYPE order_status_enum AS ENUM (
     'CREATED',
     'ASSIGNED',
     'EN_ROUTE_TO_PICKUP',
+    'ARRIVED_AT_PICKUP',
     'DELIVERING',
     'COMPLETED',
     'CANCELLED'
@@ -111,6 +112,7 @@ CHECK (
     (status = 'CREATED') OR
     (status = 'ASSIGNED' AND assigned_driver_id IS NOT NULL) OR
     (status = 'EN_ROUTE_TO_PICKUP' AND assigned_driver_id IS NOT NULL) OR
+    (status = 'ARRIVED_AT_PICKUP' AND assigned_driver_id IS NOT NULL) OR
     (status = 'DELIVERING' AND assigned_driver_id IS NOT NULL) OR
     (status = 'COMPLETED' AND assigned_driver_id IS NOT NULL) OR
     (status = 'CANCELLED')
@@ -136,6 +138,14 @@ BEGIN
 
     IF OLD.status = 'ASSIGNED' AND NEW.status NOT IN ('EN_ROUTE_TO_PICKUP', 'CANCELLED', 'CREATED') THEN
         RAISE EXCEPTION 'IllegalStateTransition: Assigned orders must move to EN_ROUTE, CANCELLED, or CREATED.';
+    END IF;
+
+    IF OLD.status = 'EN_ROUTE_TO_PICKUP' AND NEW.status NOT IN ('ARRIVED_AT_PICKUP', 'CANCELLED') THEN
+        RAISE EXCEPTION 'IllegalStateTransition: En-route orders must move to ARRIVED_AT_PICKUP or CANCELLED.';
+    END IF;
+
+    IF OLD.status = 'ARRIVED_AT_PICKUP' AND NEW.status NOT IN ('DELIVERING', 'CANCELLED') THEN
+        RAISE EXCEPTION 'IllegalStateTransition: Arrived orders must move to DELIVERING or CANCELLED.';
     END IF;
 
     IF OLD.status = 'DELIVERING' AND NEW.status NOT IN ('COMPLETED') THEN

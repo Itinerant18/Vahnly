@@ -18,6 +18,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
+	"github.com/platform/driver-delivery/internal/events"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
@@ -33,11 +34,12 @@ type ActiveWebSocketSession struct {
 }
 
 type GatewayHandler struct {
-	dbPool         *pgxpool.Pool
-	kafkaWriter    *kafka.Writer
-	pricingService *pricingSvc.OrderPricingService
-	clusterClient  *redis.ClusterClient
-	upgrader       websocket.Upgrader
+	dbPool            *pgxpool.Pool
+	kafkaWriter       *kafka.Writer
+	driverStateWriter *kafka.Writer
+	pricingService    *pricingSvc.OrderPricingService
+	clusterClient     *redis.ClusterClient
+	upgrader          websocket.Upgrader
 
 	// Thread-safe local session registry mapping active order IDs to WebSocket metadata
 	localSessions sync.Map
@@ -45,8 +47,17 @@ type GatewayHandler struct {
 
 func NewGatewayHandler(db *pgxpool.Pool, kw *kafka.Writer, ps *pricingSvc.OrderPricingService, client *redis.ClusterClient) *GatewayHandler {
 	return &GatewayHandler{
-		dbPool:         db,
-		kafkaWriter:    kw,
+		dbPool:      db,
+		kafkaWriter: kw,
+		// Dedicated producer for the "driver became available" half of the
+		// driver.state.changed contract. Reuses the order-writer broker address so
+		// no constructor wiring changes are needed across call sites.
+		driverStateWriter: &kafka.Writer{
+			Addr:         kw.Addr,
+			Topic:        "driver.state.changed",
+			Balancer:     &kafka.Hash{},
+			RequiredAcks: kafka.RequireOne,
+		},
 		pricingService: ps,
 		clusterClient:  client,
 		upgrader: websocket.Upgrader{
@@ -70,8 +81,12 @@ func (h *GatewayHandler) HandleGetPricingQuote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	baseFare, _ := strconv.ParseInt(baseFareStr, 10, 64)
-	
+	baseFare, err := strconv.ParseInt(baseFareStr, 10, 64)
+	if err != nil || baseFare <= 0 {
+		http.Error(w, "base_fare_paise must be a positive integer", http.StatusBadRequest)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 50*time.Millisecond)
 	defer cancel()
 
@@ -226,14 +241,15 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 			if err != nil {
 				return
 			}
-			return 
+			// Keep the connection open: after the initial assignment frame the same
+			// socket streams live telemetry coordinates (Milestone 20) until the client
+			// disconnects, the channel closes, or the request context is cancelled.
 		}
 	}
 }
 
 // InternalBackplaneMultiplexer handles multi-pod routing of both assignments and live telemetry coordinates
 func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
-	// Subscribe concurrently to assignment logs and live telemetry updates
 	pubsub := h.clusterClient.Subscribe(ctx, RedisPubSubChannel, RedisTelemetryChannel)
 	defer pubsub.Close()
 
@@ -251,20 +267,55 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 
 			// Parse incoming data payload packet frames generically to isolate target order IDs
 			var routingEnvelope struct {
-				OrderID string `json:"order_id"`
+				OrderID  string `json:"order_id"`
+				DriverID string `json:"driver_id"`
 			}
 			if err := json.Unmarshal([]byte(msg.Payload), &routingEnvelope); err != nil || routingEnvelope.OrderID == "" {
 				continue
 			}
 
 			// If the active socket session lives on *this* pod, forward coordinates up to the client device
-			if rawSession, found := h.localSessions.Load(routingEnvelope.OrderID); found {
+			rawSession, found := h.localSessions.Load(routingEnvelope.OrderID)
+			if found {
 				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
 					select {
 					case session.MessageChan <- []byte(msg.Payload):
 					default:
 					}
 				}
+			} else if msg.Channel == RedisPubSubChannel && routingEnvelope.DriverID != "" {
+				// MILESTONE 24 OUTBOX ACCUMULATION FALLBACK:
+				// If this is an assignment broadcast and the target session is missing locally, 
+				// verify if any alternate pod handles it. If not found cluster-wide, write an outbox push record.
+				go func(orderID, driverID string, rawJSON string) {
+					dbCtx, dbCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+					defer dbCancel()
+
+					// Check if a cluster-wide token mapping exists for this backgrounded driver
+					var hasToken bool
+					_ = h.dbPool.QueryRow(dbCtx, "SELECT EXISTS(SELECT 1 FROM user_device_tokens WHERE user_id = $1::uuid)", driverID).Scan(&hasToken)
+					if !hasToken {
+						return // Skip if no push registration exists for this user ID
+					}
+
+					// Verify if another pod recently claimed this order ID before logging an outbox record
+					fenceKey := fmt.Sprintf("notification:lock:fence:%s", orderID)
+					lockClaimed, _ := h.clusterClient.SetNX(dbCtx, fenceKey, "CLAIMED", 4*time.Second).Result()
+					if !lockClaimed {
+						return // Prevent duplicate notifications across multiple horizontal gateway pods
+					}
+
+					outboxInsertQuery := `
+						INSERT INTO notification_outbox (user_id, title, body, payload, status)
+						VALUES ($1::uuid, 'New Matching Trip Offer', 'You have received an optimized ride request allocation. 15 seconds to accept.', $2::jsonb, 'PENDING');
+					`
+					_, err := h.dbPool.Exec(dbCtx, outboxInsertQuery, driverID, rawJSON)
+					if err != nil {
+						log.Printf("[OUTBOX_FALLBACK_ERROR] Failed committing append-only push record to datastore: %v", err)
+					} else {
+						log.Printf("[OUTBOX_FALLBACK_COMMITTED] Driver connection offline. Match payload saved to outbox for Order: %s", orderID)
+					}
+				}(routingEnvelope.OrderID, routingEnvelope.DriverID, msg.Payload)
 			}
 		}
 	}
@@ -413,19 +464,27 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 	`
 
 	var orderPayload dispatchDomain.OrderCreatedPayload
+	var assignedDriverID string
 
 	// Extract payload fields to compile the exact re-queue configuration block
 	fetchQuery := `
-		SELECT id, city_prefix, customer_id, pickup_h3_cell, pickup_osm_node_id, ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry), base_fare_paise
+		SELECT assigned_driver_id, city_prefix, customer_id, pickup_h3_cell, pickup_osm_node_id, ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry), base_fare_paise
 		FROM orders WHERE id = $1::uuid;
 	`
 	err = tx.QueryRow(ctx, fetchQuery, orderID).Scan(
-		&orderPayload.OrderID, &orderPayload.CityPrefix, &orderPayload.CustomerID,
+		&assignedDriverID, &orderPayload.CityPrefix, &orderPayload.CustomerID,
 		&orderPayload.PickupH3Cell, &orderPayload.PickupOSMNodeID, &orderPayload.PickupLat, &orderPayload.PickupLng,
 		&orderPayload.BaseFarePaise,
 	)
 	if err != nil {
 		return err
+	}
+	orderPayload.OrderID = orderID
+
+	// Verify the caller-supplied driver actually owns this assignment before freeing it,
+	// so a spoofed/buggy decline can't flip an arbitrary driver to ONLINE_AVAILABLE.
+	if assignedDriverID != driverID {
+		return fmt.Errorf("driver %s is not the assigned driver for order %s", driverID, orderID)
 	}
 
 	res, err := tx.Exec(ctx, orderQuery, orderID)
@@ -458,6 +517,9 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 	_ = h.clusterClient.Del(ctx, leaseKey)
 	_ = h.clusterClient.Set(ctx, cooldownKey, "1", 30*time.Second).Err()
 
+	// Driver returned to the available pool: announce it so surge supply + heatmap recover.
+	h.emitDriverAvailable(ctx, cityPrefix, driverID, "ONLINE_EN_ROUTE")
+
 	// 4. Re-inject the order onto the Kafka topic stream to preserve request execution
 	orderPayload.RetryCount = 1
 	bytes, _ := json.Marshal(orderPayload)
@@ -465,6 +527,36 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 		Key:   []byte(orderID),
 		Value: bytes,
 	})
+}
+
+// emitDriverAvailable publishes the "driver re-entered the available pool" half of the
+// driver.state.changed contract. Without this, the surge supply aggregator and the
+// heatmap analytics consumer only ever observe drivers LEAVING the pool, so their
+// counters drift to (and stay at) zero. The driver's current H3 cell is sourced from the
+// telemetry tracker key written by the ingestion service. Best-effort: a missing cell or
+// broker error is logged and skipped so it never blocks the trip lifecycle response.
+func (h *GatewayHandler) emitDriverAvailable(ctx context.Context, cityPrefix, driverID, previousState string) {
+	cellKey := fmt.Sprintf("driver:{%s:%s}:current_cell", cityPrefix, driverID)
+	h3Cell, err := h.clusterClient.Get(ctx, cellKey).Result()
+	if err != nil || h3Cell == "" {
+		return
+	}
+
+	payload := events.DriverStateChangedEvent{
+		DriverID:      driverID,
+		CityPrefix:    cityPrefix,
+		PreviousState: previousState,
+		CurrentState:  "ONLINE_AVAILABLE",
+		H3Cell:        h3Cell,
+		Timestamp:     time.Now(),
+	}
+	bytes, mErr := json.Marshal(payload)
+	if mErr != nil {
+		return
+	}
+	if wErr := h.driverStateWriter.WriteMessages(ctx, kafka.Message{Key: []byte(driverID), Value: bytes}); wErr != nil {
+		log.Printf("[STATE_EVENT_WARN] Failed emitting ONLINE_AVAILABLE for driver %s: %v", driverID, wErr)
+	}
 }
 
 // HandleArriveAtPickup moves trip states from EN_ROUTE_TO_PICKUP to ARRIVED
@@ -610,15 +702,24 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 
 	// Leg A: Full Rider Outflow Debit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "RIDER_EXTERNAL_PAYMENT", "DEBIT", baseFarePaise, "Rider automated checkout balance payment processing")
-	if err != nil { return }
+	if err != nil {
+		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
+		return
+	}
 
 	// Leg B: Net Driver Share Credit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "DRIVER_EARNINGS", "CREDIT", driverEarningsPaise, "Driver partner transaction payout share allocation (80%)")
-	if err != nil { return }
+	if err != nil {
+		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
+		return
+	}
 
 	// Leg C: Corporate Commission Take-Rate Credit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "PLATFORM_COMMISSION", "CREDIT", platformCommissionPaise, "Platform take-rate corporate match commission fee adjustment (20%)")
-	if err != nil { return }
+	if err != nil {
+		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
+		return
+	}
 
 	// Commit entries atomically to disk
 	if err = tx.Commit(ctx); err != nil {
@@ -633,6 +734,9 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	// Clear driver journey session tracking lines from active cache
 	activeTripKey := fmt.Sprintf("driver:active:trip:%s", req.DriverID)
 	_ = h.clusterClient.Del(ctx, activeTripKey)
+
+	// Driver returned to the available pool: announce it so surge supply + heatmap recover.
+	h.emitDriverAvailable(ctx, cityPrefix, req.DriverID, "ONLINE_DELIVERING")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
