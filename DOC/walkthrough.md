@@ -808,10 +808,160 @@ Completely overhauled the enterprise integration testing suite in `test/integrat
 | **Stage 5 (Settlement)**| ✅ Verified | Balance double-entry ledger audits completed with zero precision losses |
 | **Knowledge Graph** | ✅ Updated | Codebase knowledge map successfully updated via `graphify update .` |
 
+---
 
+## Milestone 24: Asynchronous Outbox Push Notification Layer (FCM / APNs Integration) ✅
 
+### Problem
+Active WebSocket connections serve perfectly while mobile apps are active in the foreground. However, iOS and Android forcefully suspend background TCP connections as soon as the app is minimized or a screen is locked. Under these conditions, the Kuhn-Munkres batch optimizer could assign a backgrounded driver, but the match payload would drop silently at the edge, causing avoidable transaction timeout loops.
 
+### Solution
+We implemented a secure, resilient **Asynchronous Transactional Outbox Pattern**:
+1. **Fallback Outbox Seeding (`internal/gateway/delivery/http/handler.go`)**:
+   - Modified `InternalBackplaneMultiplexer` to handle disconnections.
+   - If an assignment broadcast occurs and the target WebSocket connection session is missing on the local node, it performs a fallback check:
+     - Check if a cluster-wide token mapping exists in the `user_device_tokens` table for this driver.
+     - Acquire an atomic 4-second Redis fence lock `notification:lock:fence:{order_id}` to prevent parallel gateway pods from logging duplicate push alerts.
+     - Insert a new pending push payload row into an append-only relational `notification_outbox` table.
+2. **Guaranteed Delivery Sweeper Daemon (`internal/notification/outbox_processor.go`)**:
+   - Loops continuously every 2 seconds processing pending outbox entries.
+   - Fetches pending entries (under the max retry threshold of 3), extracts the targeted device tokens and platforms (`ANDROID_FCM` or `IOS_APNS`), processes mock FCM/APNs endpoint handshakes, and marks outbox statuses as `SENT` or `FAILED`.
+3. **Outbox Daemon Entrypoint (`cmd/notification/main.go`)**:
+   - Created the standalone service bootstrapper initializing database pools and launching the outbox processing sweeps concurrently with graceful shutdown trapping.
+4. **Container Orchestration (`docker-compose.yml`)**:
+   - Appended the `outbox-notification-engine` service definition running the lightweight Go environment and linking to the PostgreSQL database.
+5. **Database Migration Schema (`000005_add_notification_outbox.up.sql`)**:
+   - Designed schema tables `user_device_tokens` and `notification_outbox` with structured indexes on `status` and `user_id`.
 
+### Verification Results
 
+| Check | Result | Details |
+|-------|--------|---------|
+| `go build ./cmd/...` | ✅ Clean | Statically compiles all 13 microservice binaries cleanly |
+| `go test ./...` | ✅ Pass | 100% of the Go unit tests passed successfully |
+| **Outbox Fallback** | ✅ Active | Automatically intercepts session drops and writes pending outbox notifications |
+| **Outbox Daemon** | ✅ Active | Sweeps notification outbox records and simulates reliable FCM/APNs handshakes |
+| **Docker Compose** | ✅ Integrated | Outbox engine defined and containerized cleanly |
+| **Knowledge Graph** | ✅ Updated | Rebuilt code map successfully (1127 nodes, 1273 edges) |
 
+---
 
+## Milestone 26: Frontend Mobile Client Networking Core & Resilient Reconnection Architecture ✅
+
+### Problem
+Exposing event-driven endpoints is only half the battle. Real-world mobile client applications face environmental challenges like cell tower handovers and tunnels which forcefully sever TCP/WebSocket channels. When this occurs, the driver UI freezes and user actions can become unresponsive, leading to duplicate transaction retry loops if a user taps buttons multiple times out of frustration.
+
+### Solution
+We implemented a robust production-grade **Mobile Client Core Networking Engine** in TypeScript (`src/network/`):
+1. **Request Idempotency & Auth Wrapping (`src/network/ClientCoreEngine.ts`)**:
+   - Outbound mutations are injected with a unique `X-Idempotency-Key` (random UUID-based signature) to prevent duplicate transactions on the backend during retry attempts.
+   - Attaches cryptographic Bearer tokens and regional Anycast parameters (`X-Region-Prefix`).
+2. **Resilient WebSocket Manager with Jittered Backoff (`src/network/ResilientStreamManager.ts`)**:
+   - Intercepts connection drops (including graceful server-side `CloseGoingAway` 1001 frames) and triggers a reconnection sequence.
+   - Uses a full-jitter exponential backoff formula (`Math.random() * boundedDelay`) to space out reconnection retries and prevent overwhelming the API gateway.
+3. **Sliding-Window Offline Telemetry Ring Buffer (`src/network/TelemetryRingBuffer.ts`)**:
+   - Implements a local ring buffer to store coordinates when network is offline.
+   - Automatically evicts the oldest packet if the memory limit (default 100 entries) is exceeded.
+   - Sequentially flushes all cached points to the backend once network connectivity returns.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| **Syntactic Integrity** | ✅ Valid | TypeScript modules conform perfectly to standard ES6 features |
+| **Idempotency** | ✅ Active | Auto-generates unique `X-Idempotency-Key` signatures on mutations |
+| **Jitter Backoff** | ✅ Active | Calibrates retry intervals dynamically to prevent backend storming |
+| **Offline Buffering** | ✅ Active | Restrains memory footprint via eviction and flushes cached GPS points on reconnection |
+| **Knowledge Graph** | ✅ Updated | Rebuilt AST knowledge base successfully indexing TypeScript modules (1148 nodes) |
+
+---
+
+## Milestone 25: Third-Party Fiat Payment Gateway & Webhook Reconciliation Engine ✅
+
+### Problem
+While Milestone 21 established a precise double-entry bookkeeping ledger using Paisa integer limits, it assumed abstract cash availability. Actual marketplace checkout requires secure integration with external fiat card processors (such as Stripe or Razorpay) running asynchronous payments. Inbound client responses cannot be trusted (they can be intercepted or faked); thus, order settlement and ledger finalization must be confirmed through cryptographically validated server-to-server webhook callbacks.
+
+### Solution
+We implemented a cryptographically secure, resilient **Asynchronous Webhook Reconciliation Engine**:
+1. **Cryptographic Webhook Callback Endpoint (`internal/gateway/delivery/http/handler.go`)**:
+   - Exposes `HandlePaymentWebhook` to capture asynchronous webhook payloads pushed directly from payment providers.
+   - Computes expected HMAC SHA256 signatures natively using secret signing tokens and executes constant-time string comparisons (`subtle.ConstantTimeCompare`) to protect against network timing attacks.
+   - Parses the event ID and enforces strict single-event idempotency limits against the database to block duplicate processing.
+   - Implements transaction-bounded state mutations:
+     - **`payment_intent.succeeded`**: Inserts/updates `payment_intents` records, updates order status to `COMPLETED`, and writes rider credit entries dynamically to the `financial_ledger_entries` bookkeeping table.
+     - **`payment_intent.payment_failed`**: Updates `payment_intents` records to `FAILED` and rolls back order status to `CREATED` to allow retry/recovery workflows.
+2. **Exposed Routing path (`cmd/gateway/main.go`)**:
+   - Registered `/api/v1/payments/webhook` outside JWT authentication gates so external provider notification clusters can post event callbacks successfully.
+3. **E2E Integration Testing Extension (`test/integration/dispatch_e2e_test.go`)**:
+   - Extended the end-to-end integration test suite with **Stage 6**: Simulates secure server-to-server webhook callbacks by calculating SHA256 HMAC tokens over event bytes and verifying successful datastore reconciliation.
+4. **Relational Database Migrations (`000006_add_payment_intents.up.sql`)**:
+   - Designed schema tables `payment_intents` tracking payment intents, order links, currencies, amounts, and statuses, with indexes on `order_id` for quick lookups. Updated `schema.sql` accordingly.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go build ./cmd/...` | ✅ Clean | Statically compiles all Go packages cleanly |
+| `go test ./...` | ✅ Pass | All unit tests and full lifecycle integration tests passed successfully |
+| **Stage 6 (Webhook)** | ✅ Verified | Intercepts webhook bytes, verifies signature, upserts intent, and settles ledger cleanly |
+| **Constant-Time Guard**| ✅ Active | Mitigates decryption tampering and signature spoofing securely |
+| **Event Idempotency**  | ✅ Active | Guarantees single-event settlement bounds on payment webhooks |
+| **Knowledge Graph** | ✅ Updated | Rebuilt code graph successfully indexing payment entities (1149 nodes) |
+
+---
+
+## Milestone 27: Centralized Operations Control Room Dashboard Panel (The Admin Portal) ✅
+
+### Problem
+Operations teams need a direct dashboard panel to monitor and troubleshoot the distributed marketplace engine. If a driver's device crashes mid-trip, they can remain stuck in a busy state indefinitely, blocking them from matching loops. Additionally, financial auditors need a visual tool to check double-entry balance sheets and ensure all transaction splits are accurately allocated without direct database access.
+
+### Solution
+We implemented a secure **Centralized Operations Control Room Admin Engine** and reactive frontend dashboard:
+1. **Access Control Role-Based Security Middleware (`internal/gateway/middleware/auth.go`)**:
+   - Extended the JWT auth middleware with the `RequireRole("ADMIN")` guard. It extracts cryptographically verified claims, validates if the user role is `ADMIN`, and blocks unauthorized queries with `403 Forbidden`.
+2. **Administrative Override Endpoints (`internal/gateway/delivery/http/handler.go`)**:
+   - **`HandleAdminGetLedger`**: Provides paginated access to the complete double-entry ledger `financial_ledger_entries`, calculating batch sums and confirming that total debits strictly balance with total credits.
+   - **`HandleAdminDriverOverride`**: Exposes administrative super-overrides. Updates driver states in Postgres and immediately evicts the driver's active Redis trip tracking leases (`driver:active:trip:{driver_id}`) to instantly restore them to matching pools.
+3. **API Routing Mapping (`cmd/gateway/main.go`)**:
+   - Registered `/api/v1/admin/ledger` and `/api/v1/admin/drivers/override` strictly protected under the `RequireRole("ADMIN")` middleware guard.
+4. **Operations Control Room Dashboard UI (`src/admin/ControlRoomDashboard.tsx`)**:
+   - Implemented a premium operations panel in React/TypeScript.
+   - Integrates a real-time heatmap subscriber listening to high-velocity Server-Sent Events (SSE) heatmaps.
+   - Embeds a paginated double-entry financial ledger splits auditor with aggregate balance state indicator.
+   - Hosts a driver status super-override form for instant app lockup resets.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go build ./cmd/...` | ✅ Clean | Statically compiles all Go packages cleanly |
+| `go test ./...` | ✅ Pass | 100% of unit and integration test suites passed successfully |
+| **Admin Middleware** | ✅ Active | Cryptographically denies non-ADMIN access with `403 Forbidden` |
+| **Driver Reset** | ✅ Active | Relational state forced and active Redis session keys evicted on override |
+| **Ledger Auditing** | ✅ Active | Returns paginated entries and verifies debits == credits balancing splits |
+| **Control Dashboard**| ✅ Active | UI panels bind SSE heatmap data and trigger admin reset calls seamlessly |
+| **Knowledge Graph** | ✅ Updated | Rebuilt AST knowledge base successfully indexing admin components (1155 nodes) |
+
+---
+
+## Milestone 28: Local Environment Streamlining & Unified Orchestration Startup ✅
+
+### Problem
+As the platform has scaled across 27 milestones to include sharded spatial databases, Kafka event backbones, dynamic pricing syncers, Redis Cluster bootstraps, matching engines, and Triton ML servers, running the entire stack locally became fragmented. Developers had to run multiple scripts, manage port conflicts, clean hanging Docker resources, and manually spin up the Public API Gateway (`cmd/gateway`). 
+
+### Solution
+1. **Containerized API Gateway (`docker-compose.yml`)**:
+   - Containerized the `public-gateway` service using target Go multi-stage compile flags (`TARGET_SERVICE: gateway`) directly pointing to the shared `Dockerfile`.
+   - Exposed external HTTP client routing on port `8080:8080` with explicit region matrices (`KOL,BLR`), JWT secret keys, and database/broker nodes environment bindings.
+   - Configured robust dependency sequencing, ensuring it blocks execution until the PostGIS data layer (`spatial-db`), messaging brokers (`kafka-broker`), and Redis Cluster nodes bootstrap (`redis-cluster-orchestrator`) are fully active and healthy.
+2. **Unified Backend Onboarding Pipeline (`README.md`)**:
+   - Created a dedicated developer orientation section titled `## 🚀 Complete Backend Unified Startup Command`.
+   - Documented the single-line PowerShell command pipeline that aggressively cleans stale resource traces, terminates legacy Kubernetes port-forwards to free memory, shuts down native background PostgreSQL databases to avoid port collisions on `5432`, compiles the latest Go binary changes, and boots the entire multi-service backend mesh concurrently in background detached mode.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `docker-compose.yml` | ✅ Integrated | Gateway service defined and containerized with proper health conditions |
+| `README.md` | ✅ Updated | Unified startup pipeline section successfully documented |
+| **AST Graph Sync** | ✅ Updated | Rebuilt AST knowledge base successfully indexing new modifications (1288 nodes) |

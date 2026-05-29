@@ -59,7 +59,7 @@ driver telemetry
 | `model_repository` | Triton model repository for ETA correction. |
 | `deploy` | Kubernetes-oriented manifests and alerts. |
 | `docker-compose.yml` | Local infrastructure stack for Postgres, Kafka, Redis Cluster, Triton, and reconciler. |
-| `schema.sql` | Database schema and seed structure for local Postgres. |
+| `database/migrations` | golang-migrate up/down scripts — the single source of truth for the DB schema and seed data. Applied by the `db-migrator` service (and at dispatch startup). |
 
 ## Main Services
 
@@ -167,6 +167,21 @@ Common local ports:
 | `50051` | Telemetry gRPC |
 | `8000`-`8002` | Triton HTTP/gRPC/metrics |
 | `8080` | Dispatch health, readiness, metrics, and stats |
+
+## 🚀 Complete Backend Unified Startup Command
+
+To spin up the entire multi-service backend environment concurrently—including data nodes, stream workers, model engines, and public gateways (excluding frontend layouts)—paste this single execution chain command into your terminal:
+
+```powershell
+docker-compose down -v; Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue; Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue; docker-compose up -d --build
+```
+
+### What this single command handles:
+
+1. **`docker-compose down -v`** - Clears stale local test resource traces and containers.
+2. **`Get-Process ... Stop-Process`** - Shuts down legacy Kubernetes port-forwarding processes to free up system memory and prevent connection issues.
+3. **`Stop-Service ...`** - Stops any native Windows PostgreSQL databases running directly on your host machine to prevent port collisions on `5432`.
+4. **`docker-compose up -d --build`** - Compiles the latest source code transformations across all 27 milestones and boots the entire backend mesh seamlessly in detached background mode.
 
 Start infrastructure:
 

@@ -29,7 +29,8 @@ FROM scratch AS runner
 # Import security certificates from the builder stage
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Import migration SQL files so dispatch service can run AutoRunDatabaseMigrations at startup
+# Import migration SQL files — consumed by the db-migrator (cmd/migrate) one-shot and by
+# the dispatch service's startup AutoRunDatabaseMigrations call.
 COPY --from=builder /app/database /database
 
 # Import the compiled static artifact cleanly
