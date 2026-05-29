@@ -6,5 +6,10 @@
       "Bash(Format-Table -AutoSize)"
     ]
   },
+  "enabledPlugins": {
+    "carta-investors@claude-plugins-official": true,
+    "mcp-server-dev@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true
+  },
   "prefersReducedMotion": true
 }
