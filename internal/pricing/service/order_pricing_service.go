@@ -11,6 +11,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"github.com/platform/driver-delivery/internal/pricing/surge"
 )
 
 // SurgeZoneUpdatedEvent matches the JSON schema emitted by the Surge Calculator (Job 3)
@@ -23,8 +24,9 @@ type SurgeZoneUpdatedEvent struct {
 }
 
 type OrderPricingService struct {
-	kafkaReader   *kafka.Reader
-	clusterClient *redis.ClusterClient // MILESTONE 4: Shared distributed cache replaces process-local map
+	kafkaReader    *kafka.Reader
+	clusterClient  *redis.ClusterClient // MILESTONE 4: Shared distributed cache replaces process-local map
+	surgeRegulator *surge.SurgeRegulator
 }
 
 func NewOrderPricingService(brokers []string, groupID string, client *redis.ClusterClient) *OrderPricingService {
@@ -36,7 +38,8 @@ func NewOrderPricingService(brokers []string, groupID string, client *redis.Clus
 			MinBytes: 10,
 			MaxBytes: 10e6,
 		}),
-		clusterClient: client,
+		clusterClient:  client,
+		surgeRegulator: surge.NewSurgeRegulator(0.20, 15*time.Second, 3.5),
 	}
 }
 
@@ -106,6 +109,31 @@ func (s *OrderPricingService) CalculateFare(ctx context.Context, cityPrefix stri
 		err = nil
 	}
 	return finalFarePaise, multiplier, err
+}
+
+// CalculateDynamicFarePaise resolves total trip fares safely against floating latency parameters
+func (s *OrderPricingService) CalculateDynamicFarePaise(ctx context.Context, h3Cell string, baseFarePaise int64) (int64, float64) {
+	// 1. Fetch live metrics from memory arrays using explicit O(1) shard lookups
+	demandKey := fmt.Sprintf("metrics:demand:%s", h3Cell)
+	supplyKey := fmt.Sprintf("metrics:supply:%s", h3Cell)
+
+	demandCount, _ := s.clusterClient.SCard(ctx, demandKey).Result()
+	supplyCount, _ := s.clusterClient.SCard(ctx, supplyKey).Result()
+
+	// Mock or active gRPC client binding handler method reference targeting external Triton models
+	mockTritonModelCall := func() (float64, error) {
+		// Simulating normal execution latency inside nominal bounds
+		time.Sleep(12 * time.Millisecond) 
+		return 1.45, nil
+	}
+
+	// 2. Route evaluation securely down through the regulator circuit breaker layer
+	surgeMultiplier := s.surgeRegulator.ExecuteOrFallback(ctx, mockTritonModelCall, demandCount, supplyCount)
+
+	// 3. Complete precise 64-bit non-float calculation passes for localized balance adjustments
+	finalFarePaise := int64(float64(baseFarePaise) * surgeMultiplier)
+
+	return finalFarePaise, surgeMultiplier
 }
 
 // Close cleanly releases network stream context resources

@@ -18,7 +18,7 @@ import (
 
 const (
 	cityPrefix       = "KOL"
-	grpcTarget       = "127.0.0.1:50051"
+	grpcTarget       = "127.0.0.1:50051" // standard loopback notation for telemetry gRPC service
 	kafkaBroker      = "127.0.0.1:19092"
 	targetH3Cell     = "88754cb247fffff"
 	starvationH3Cell = "88283473fffffff"

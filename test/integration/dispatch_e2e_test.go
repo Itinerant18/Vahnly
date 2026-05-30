@@ -441,6 +441,35 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 
 	t.Log("[STAGE 6 OK] Cryptographic payment webhook reconciliation successfully verified.")
 
+	// STAGE 7 LIFECYCLE ASSERTION: Dynamic Surge Pricing & Circuit Breaker Verification Pass
+	t.Log("Validating Closed-Loop Surge Pricing Heuristics & Circuit Breaker Backpressure boundaries...")
+
+	// Seed artificial imbalance states inside local Redis shards
+	demandKey := "metrics:demand:88754cb247fffff"
+	supplyKey := "metrics:supply:88754cb247fffff"
+
+	_ = redisClient.SAdd(ctx, demandKey, "rider_id_alpha", "rider_id_beta", "rider_id_gamma").Err()
+	_ = redisClient.SAdd(ctx, supplyKey, "driver_id_alpha").Err() // 3 to 1 demand-to-supply imbalance ratio
+
+	pricingUrl := fmt.Sprintf("%s/api/v1/pricing/quote?h3_cell=88754cb247fffff&base_fare_paise=10000&city_prefix=KOL", server.URL)
+	reqPricing, _ := http.NewRequest("GET", pricingUrl, nil)
+	reqPricing.Header.Set("X-Region-Prefix", "KOL")
+
+	respPricing, err := http.DefaultClient.Do(reqPricing)
+	if err != nil || respPricing.StatusCode != http.StatusOK {
+		t.Fatalf("Pricing quotation lookup endpoint failed under stress testing: %v", err)
+	}
+
+	var pricingResponse map[string]interface{}
+	_ = json.NewDecoder(respPricing.Body).Decode(&pricingResponse)
+
+	activeMultiplier := pricingResponse["active_surge_multiplier"].(float64)
+	if activeMultiplier <= 1.0 {
+		t.Errorf("Imbalance ratio calculation failed to scale surge pricing appropriately. Got Multiplier: %v", activeMultiplier)
+	}
+
+	t.Logf("[STAGE 7 OK] Closed-Loop Surge Engine responsive under pressure. Computed Multiplier: %.2f", activeMultiplier)
+
 	t.Log("═══════════════════════════════════════════════════════════════")
 	t.Log(" SUCCESS: Full-Lifecycle Journey Matrix completely validated. ")
 	t.Log(" Ingestion, Matching, Streaming, Routing and Accounting OK.    ")

@@ -1,16 +1,16 @@
-# Graph Report - Driver  (2026-05-29)
+# Graph Report - Driver  (2026-05-30)
 
 ## Corpus Check
-- 120 files · ~74,032 words
+- 122 files · ~75,995 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1325 nodes · 1503 edges · 129 communities (111 shown, 18 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 170 edges (avg confidence: 0.8)
+- 1349 nodes · 1537 edges · 140 communities (118 shown, 22 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 176 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d796adb5`
+- Built from commit: `cd9bc1e8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -129,6 +129,17 @@
 - [[_COMMUNITY_Community 122|Community 122]]
 - [[_COMMUNITY_Community 123|Community 123]]
 - [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 129|Community 129]]
+- [[_COMMUNITY_Community 130|Community 130]]
+- [[_COMMUNITY_Community 131|Community 131]]
+- [[_COMMUNITY_Community 132|Community 132]]
+- [[_COMMUNITY_Community 133|Community 133]]
+- [[_COMMUNITY_Community 134|Community 134]]
+- [[_COMMUNITY_Community 135|Community 135]]
+- [[_COMMUNITY_Community 136|Community 136]]
+- [[_COMMUNITY_Community 137|Community 137]]
+- [[_COMMUNITY_Community 138|Community 138]]
+- [[_COMMUNITY_Community 139|Community 139]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Dispatch Engine — Milestone Walkthrough` - 45 edges
@@ -145,16 +156,16 @@
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `NewHealthServer()`  [INFERRED]
   cmd/dispatch/main.go → internal/observability/server.go
+- `main()` --calls--> `NewOfferTimeoutJanitor()`  [INFERRED]
+  cmd/expiry/main.go → internal/dispatch/expiry/timeout_manager.go
 - `main()` --calls--> `InitTracerProvider()`  [INFERRED]
   cmd/dispatch/main.go → internal/observability/tracing.go
 - `main()` --calls--> `AutoRunDatabaseMigrations()`  [INFERRED]
   cmd/dispatch/main.go → internal/storage/migration/migrate.go
-- `main()` --calls--> `NewContractionHierarchiesService()`  [INFERRED]
-  cmd/dispatch/main.go → internal/routing/graph/contraction_hierarchies.go
-- `main()` --calls--> `NewGraphLoader()`  [INFERRED]
-  cmd/dispatch/main.go → internal/routing/graph/loader.go
+- `main()` --calls--> `NewTritonClient()`  [INFERRED]
+  cmd/dispatch/main.go → internal/intelligence/client/triton_client.go
 
-## Communities (129 total, 18 thin omitted)
+## Communities (140 total, 22 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.16
@@ -173,8 +184,8 @@ Cohesion: 0.05
 Nodes (42): code:powershell (& (Get-Content graphify-out\.graphify_python) -c "), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:powershell (New-Item -ItemType Directory -Force -Path graphify-out | Out), code:powershell (@'), code:powershell (@'), code:powershell (@') (+34 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.22
-Nodes (5): NewTritonClient(), TritonClient, getEnv(), main(), simpleRoutingService
+Cohesion: 0.50
+Nodes (3): getEnv(), main(), simpleRoutingService
 
 ### Community 5 - "Community 5"
 Cohesion: 0.05
@@ -205,8 +216,8 @@ Cohesion: 0.10
 Nodes (20): 10. The Three-Phase Matching Engine, Algorithm Detail, Atomic Assignment Transaction, Batch Window Configuration, code:block25 (Input:  order.pickup_h3_cell (H3 resolution 8 string)), code:block26 (Preprocessing (one-time per city road graph):), code:block27 (Model:   xgboost_spatial_corrector (Triton model repository)), code:go (correctedETA, err := tritonClient.ModelInfer(ctx, features)) (+12 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.20
-Nodes (7): GRPCInferenceServiceClient, GRPCInferenceServiceServer, _GRPCInferenceService_ModelInfer_Handler(), NewGRPCInferenceServiceClient(), RegisterGRPCInferenceServiceServer(), UnimplementedGRPCInferenceServiceServer, UnsafeGRPCInferenceServiceServer
+Cohesion: 0.13
+Nodes (9): NewTritonClient(), TritonClient, GRPCInferenceServiceClient, GRPCInferenceServiceServer, _GRPCInferenceService_ModelInfer_Handler(), NewGRPCInferenceServiceClient(), RegisterGRPCInferenceServiceServer(), UnimplementedGRPCInferenceServiceServer (+1 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.14
@@ -233,12 +244,8 @@ Cohesion: 0.18
 Nodes (11): 3.1 Time-Window Optimization Boundaries, 3.2 Thread-Safe Kafka Commit Accumulators (Storm Prevention), 3.3 Poison-Pill Starvation Protection, 3.4 Relational State-Machine Transaction Fences, code:block11 (OrderCreatedConsumer.StartExecutionPipeline()), code:go (batchWindow:  300 * time.Millisecond, // Configurable 200–40), code:go (// internal/dispatch/consumer/order_consumer.go), code:go (// Handle Marketplace Starvation safely without blocking the) (+3 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.06
-Nodes (26): getEnv(), main(), startKafkaToRedisFanoutWorker(), GetUserIDFromContext(), NewAuthMiddleware(), TestAuthMiddleware_AuthenticateJWT(), TestGetUserIDFromContext_Empty(), AuthMiddleware (+18 more)
-
-### Community 20 - "Community 20"
-Cohesion: 0.13
-Nodes (10): getEnv(), main(), OfferTimeoutJanitor, NewOfferTimeoutJanitor(), getEnv(), main(), parseCSV(), NewOrderPricingService() (+2 more)
+Cohesion: 0.24
+Nodes (7): GetUserIDFromContext(), NewAuthMiddleware(), TestAuthMiddleware_AuthenticateJWT(), TestGetUserIDFromContext_Empty(), AuthMiddleware, ContextKey, CustomClaims
 
 ### Community 21 - "Community 21"
 Cohesion: 0.22
@@ -253,8 +260,8 @@ Cohesion: 0.20
 Nodes (9): 20. Glossary, 2. Repository Layout, 3. Technology Stack, code:block2 (C:\workspace\Driver\), Core Runtime, Data Stores, Driver Delivery Platform — Complete Production Blueprint, Key Go Dependencies (+1 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.33
-Nodes (3): mockKafkaProducer, mockRedisRepo, TestProcessLocationUpdate_RadianConversion()
+Cohesion: 0.20
+Nodes (5): mockKafkaProducer, mockRedisRepo, NewTelemetryUseCase(), TestProcessLocationUpdate_RadianConversion(), telemetryUseCase
 
 ### Community 25 - "Community 25"
 Cohesion: 0.22
@@ -313,12 +320,12 @@ Cohesion: 0.29
 Nodes (6): DriverLocation, DriverMetrics, DriverMetricsProvider, KafkaProducer, RedisRepository, TelemetryUseCase
 
 ### Community 40 - "Community 40"
-Cohesion: 0.20
-Nodes (6): getEnv(), main(), NewPostgresDriverMetrics(), postgresDriverMetrics, NewTelemetryUseCase(), telemetryUseCase
+Cohesion: 0.33
+Nodes (4): getEnv(), main(), NewPostgresDriverMetrics(), postgresDriverMetrics
 
 ### Community 41 - "Community 41"
-Cohesion: 0.18
-Nodes (7): NewSpatialScanner(), TestScanNearbyDrivers_InvalidToken(), TestScanNearbyDrivers_LocalIntegration(), DummyRoutingService, TestEndToEnd_DispatchMatchingPipeline(), mockKafkaProducer, mockTritonServer
+Cohesion: 0.25
+Nodes (4): DummyRoutingService, TestEndToEnd_DispatchMatchingPipeline(), mockKafkaProducer, mockTritonServer
 
 ### Community 42 - "Community 42"
 Cohesion: 0.33
@@ -360,6 +367,10 @@ Nodes (5): 1. System Overview, code:block1 (┌───────────
 Cohesion: 0.40
 Nodes (5): 13. gRPC API Contracts, code:protobuf (service LocationIngestionService {), code:protobuf (service GRPCInferenceService {), Service 1: LocationIngestionService, Service 2: GRPCInferenceService (Triton)
 
+### Community 52 - "Community 52"
+Cohesion: 0.29
+Nodes (4): NewSpatialScanner(), TestScanNearbyDrivers_InvalidToken(), TestScanNearbyDrivers_LocalIntegration(), SpatialScanner
+
 ### Community 53 - "Community 53"
 Cohesion: 0.24
 Nodes (5): getEnv(), main(), NewStaleTelemetryPruner(), TestStaleTelemetryPruner_ExecuteGarbageCollection(), StaleTelemetryPruner
@@ -376,13 +387,17 @@ Nodes (4): NewLocationIngestionHandler(), TestClientStreamPositions_Success(), L
 Cohesion: 0.11
 Nodes (18): Dispatch Engine — Milestone Walkthrough, Milestone 2: Live Feature Hydration ✅, Milestone 3: Request Re-Queuing & Recovery Paths ✅, Milestone 4: Shared Distributed Pricing Cache ✅, Milestone 5: Standalone E2E Simulation Runner ✅, Milestone 6: City-Scale OpenStreetMap Routing Ingestion ✅, Milestone 7: The Stale Telemetry Pruner Daemon ✅, Verification Results (All Milestones) (+10 more)
 
+### Community 62 - "Community 62"
+Cohesion: 0.25
+Nodes (7): 1. Think Before Coding, 2. Simplicity First, 3. Surgical Changes, 4. Goal-Driven Execution, code:block1 (1. [Step] → verify: [check]), graphify, Karpathy Coding Guidelines
+
 ### Community 66 - "Community 66"
-Cohesion: 0.18
-Nodes (5): CHEdge, CHNode, ContractionHierarchiesService, Item, PriorityQueue
+Cohesion: 0.29
+Nodes (4): CHEdge, CHNode, ContractionHierarchiesService, Item
 
 ### Community 73 - "Community 73"
-Cohesion: 0.09
-Nodes (30): code:text (driver telemetry), code:powershell (go run .\cmd\osm-preprocessor), code:powershell (go test .\internal\dispatch\matcher), code:powershell (go test .\internal\test\...), code:powershell (docker-compose down -v; Get-Process | Where-Object { $_.Name), code:powershell (cd C:\workspace\Driver), code:powershell (# 1. Deploy K8s resources into the 'dispatch' namespace), code:powershell (. .\bin\run-local-env.ps1) (+22 more)
+Cohesion: 0.08
+Nodes (33): code:text (driver telemetry), code:powershell (go run .\cmd\osm-preprocessor), code:powershell (go test .\internal\dispatch\matcher), code:powershell (go test .\internal\test\...), code:powershell (docker-compose down -v; Get-Process | Where-Object { $_.Name), code:powershell (docker-compose down -v; Get-Process | Where-Object { $_.Name), code:powershell (cd C:\workspace\Driver), code:powershell (# 1. Deploy K8s resources into the 'dispatch' namespace) (+25 more)
 
 ### Community 75 - "Community 75"
 Cohesion: 0.43
@@ -429,12 +444,8 @@ Cohesion: 0.15
 Nodes (13): Codebase Audit Fixes (Dispatch Matching Consumer Optimization) ✅, Milestone 21: Immutable Financial Settlement & Double-Entry Bookkeeping Ledger ✅, Problem, Problem, Problem, Problem, Solution, Solution (+5 more)
 
 ### Community 90 - "Community 90"
-Cohesion: 0.60
-Nodes (4): NewContractionHierarchiesService(), TestComputeShortestPathETA_Disconnected(), TestComputeShortestPathETA_SameNode(), TestComputeShortestPathETA_SimplePath()
-
-### Community 91 - "Community 91"
-Cohesion: 0.14
-Nodes (9): hungarianCommitResult, NewOrderCreatedConsumer(), ActiveWebSocketSession, NewGatewayHandler(), TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(), TestE2E_TelemetryAndDispatchPipeline(), simpleRoutingService, NewKafkaProducer() (+1 more)
+Cohesion: 0.38
+Nodes (5): NewContractionHierarchiesService(), TestComputeShortestPathETA_Disconnected(), TestComputeShortestPathETA_SameNode(), TestComputeShortestPathETA_SimplePath(), TestGraphLoader_IngestContractedTopology()
 
 ### Community 94 - "Community 94"
 Cohesion: 0.29
@@ -520,10 +531,6 @@ Nodes (7): Milestone 25: Third-Party Fiat Payment Gateway & Webhook Reconciliati
 Cohesion: 0.07
 Nodes (17): ControlRoomDashboard(), LedgerEntry, ClientCoreEngine, delay(), generateUUID(), NonRetryableHttpError, RequestOptions, RetryableHttpError (+9 more)
 
-### Community 115 - "Community 115"
-Cohesion: 0.32
-Nodes (3): GraphLoader, NewGraphLoader(), TestGraphLoader_IngestContractedTopology()
-
 ### Community 116 - "Community 116"
 Cohesion: 0.40
 Nodes (5): Milestone 28: Local Environment Streamlining & Unified Orchestration Startup ✅, Problem, Solution, Verification Results, Verification Results
@@ -536,28 +543,60 @@ Nodes (7): Milestone 27: Centralized Operations Control Room Dashboard Panel (Th
 Cohesion: 0.50
 Nodes (4): 14. Configuration & Environment Variables, code:bash (export DATABASE_URL="postgres://postgres:password@localhost:), Complete Reference, Environment File (`.env.local` — do not commit)
 
+### Community 119 - "Community 119"
+Cohesion: 0.25
+Nodes (7): CircuitState, NewSurgeRegulator(), TestSurgeRegulator_CalculateO1HeuristicFallback(), TestSurgeRegulator_FailureStateTransitions(), TestSurgeRegulator_NominalExecution(), TestSurgeRegulator_TimeoutFallback(), SurgeRegulator
+
 ### Community 120 - "Community 120"
 Cohesion: 0.33
 Nodes (4): main(), AutoRunDatabaseMigrations(), TestAutoRunDatabaseMigrations_IntegrationSkip(), TestAutoRunDatabaseMigrations_InvalidURL()
 
+### Community 121 - "Community 121"
+Cohesion: 0.22
+Nodes (4): TestE2E_TelemetryAndDispatchPipeline(), simpleRoutingService, NewKafkaProducer(), kafkaProducer
+
+### Community 123 - "Community 123"
+Cohesion: 0.36
+Nodes (7): GetRegionFromContext(), NewRegionRouterMiddleware(), TestRegionRouterMiddleware_MissingRegion(), TestRegionRouterMiddleware_SuccessHeader(), TestRegionRouterMiddleware_SuccessQueryParam(), TestRegionRouterMiddleware_UnsupportedRegion(), RegionContextKey
+
+### Community 124 - "Community 124"
+Cohesion: 0.22
+Nodes (4): KafkaHeaderCarrier, InitTracerProvider(), TestInitTracerProvider(), TestKafkaHeaderCarrier()
+
+### Community 129 - "Community 129"
+Cohesion: 0.32
+Nodes (6): getEnv(), main(), ActiveWebSocketSession, NewGatewayHandler(), TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(), NewOrderPricingService()
+
+### Community 130 - "Community 130"
+Cohesion: 0.33
+Nodes (4): NewRateLimiterMiddleware(), TestRateLimiterMiddleware_LimitRouteConcurrency_FailOpenGracefully(), TestRateLimiterMiddleware_LimitRouteConcurrency_MissingContext(), RateLimiterMiddleware
+
+### Community 134 - "Community 134"
+Cohesion: 0.83
+Nodes (3): getEnv(), main(), startKafkaToRedisFanoutWorker()
+
+### Community 135 - "Community 135"
+Cohesion: 0.83
+Nodes (3): getEnv(), main(), parseCSV()
+
 ## Knowledge Gaps
-- **561 isolated node(s):** `Node`, `Edge`, `start-local-infra.sh script`, `DATABASE_URL`, `REDIS_CLUSTER_NODES` (+556 more)
+- **567 isolated node(s):** `Node`, `Edge`, `start-local-infra.sh script`, `DATABASE_URL`, `REDIS_CLUSTER_NODES` (+562 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TestE2E_CompleteGatewayAndMatrixOptimizationPipeline()` connect `Community 91` to `Community 40`, `Community 41`, `Community 75`, `Community 46`, `Community 14`, `Community 19`, `Community 20`, `Community 21`, `Community 55`, `Community 121`, `Community 90`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **Why does `TestEndToEnd_DispatchMatchingPipeline()` connect `Community 41` to `Community 4`, `Community 40`, `Community 75`, `Community 12`, `Community 46`, `Community 14`, `Community 21`, `Community 55`, `Community 121`, `Community 91`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `Dispatch Engine — Milestone Walkthrough` connect `Community 58` to `Community 80`, `Community 84`, `Community 89`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 104`, `Community 105`, `Community 106`, `Community 107`, `Community 108`, `Community 109`, `Community 110`, `Community 111`, `Community 112`, `Community 113`, `Community 116`, `Community 117`?**
+- **Why does `TestE2E_CompleteGatewayAndMatrixOptimizationPipeline()` connect `Community 129` to `Community 136`, `Community 123`, `Community 75`, `Community 46`, `Community 14`, `Community 52`, `Community 21`, `Community 55`, `Community 24`, `Community 121`, `Community 90`, `Community 91`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `main()` connect `Community 4` to `Community 122`, `Community 136`, `Community 12`, `Community 14`, `Community 115`, `Community 52`, `Community 120`, `Community 90`, `Community 91`, `Community 124`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
+- **Why does `file_telemetry_v1_telemetry_proto_rawDescGZIP()` connect `Community 9` to `Community 14`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **Are the 14 inferred relationships involving `TestE2E_CompleteGatewayAndMatrixOptimizationPipeline()` (e.g. with `.Len()` and `NewRedisRepository()`) actually correct?**
   _`TestE2E_CompleteGatewayAndMatrixOptimizationPipeline()` has 14 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Node`, `Edge`, `start-local-infra.sh script` to the rest of the system?**
-  _561 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _567 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.0425531914893617 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**

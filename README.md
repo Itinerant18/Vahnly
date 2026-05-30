@@ -176,7 +176,7 @@ To spin up the entire multi-service backend environment concurrently—including
 docker-compose down -v; Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue; Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue; docker-compose up -d --build
 ```
 
-### What this single command handles:
+### What this single command handles
 
 1. **`docker-compose down -v`** - Clears stale local test resource traces and containers.
 2. **`Get-Process ... Stop-Process`** - Shuts down legacy Kubernetes port-forwarding processes to free up system memory and prevent connection issues.
@@ -318,3 +318,20 @@ The largest gaps to keep in mind when developing against this repo:
 | `DOC/README-LOCAL-ROUTING.md` | OSM routing data preparation and dispatch routing integration. |
 | `DOC\ASSIGNMENT_FLOW.md` | Assignment workflow details. |
 | `DOC\OPS_ACCEPTANCE_CHECKLIST.md` | Operational readiness checklist. |
+
+## 🚀 Local Standalone Sandbox Quickstart
+
+To clear lingering system port conflicts, initialize the background microservices cluster, and run the simulator to stress-test your pipelines (leaving the frontend decoupled), execute this unified command pipeline inside an **Administrator PowerShell terminal**:
+
+```powershell
+docker-compose down -v; Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue; Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue; docker-compose up -d --build; Write-Host "Waiting 12s for data tier initialization..." -ForegroundColor Cyan; Start-Sleep -Seconds 12; go run cmd/simulator/main.go
+```
+
+### What this unified pipeline handles
+
+1. **`docker-compose down -v`** - Purges active local test container networks and drops database volumes to reset the local stack.
+2. **`Stop-Process -Name "kubectl"`** - Clears any hidden cluster port forwards to prevent connection blocks.
+3. **`Stop-Service -Name "postgresql*"`** - Stops any native Windows PostgreSQL installations to prevent port conflicts on `5432`.
+4. **`docker-compose up -d --build`** - Compiles the updated codebase across all 27 milestones and launches the backend microservices concurrently.
+5. **`Start-Sleep -Seconds 12`** - Pauses execution for 12 seconds to let data schemas sync, internal components spin up, and Kafka partitions align.
+6. **`go run cmd/simulator/main.go`** - Launches the virtual fleet runner to stream simulated ride requests, active vehicle telemetry updates, and transactional data loops........

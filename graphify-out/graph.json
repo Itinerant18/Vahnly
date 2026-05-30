@@ -126,7 +126,7 @@
       "source_file": "cmd/expiry/main.go",
       "source_location": "L1",
       "id": "cmd_expiry_main_go",
-      "community": 20,
+      "community": 129,
       "norm_label": "main.go"
     },
     {
@@ -135,7 +135,7 @@
       "source_file": "cmd/expiry/main.go",
       "source_location": "L20",
       "id": "expiry_main_main",
-      "community": 20,
+      "community": 129,
       "norm_label": "main()"
     },
     {
@@ -144,7 +144,7 @@
       "source_file": "cmd/expiry/main.go",
       "source_location": "L65",
       "id": "expiry_main_getenv",
-      "community": 20,
+      "community": 129,
       "norm_label": "getenv()"
     },
     {
@@ -153,7 +153,7 @@
       "source_file": "cmd/gateway/main.go",
       "source_location": "L1",
       "id": "cmd_gateway_main_go",
-      "community": 19,
+      "community": 134,
       "norm_label": "main.go"
     },
     {
@@ -162,7 +162,7 @@
       "source_file": "cmd/gateway/main.go",
       "source_location": "L24",
       "id": "gateway_main_main",
-      "community": 19,
+      "community": 134,
       "norm_label": "main()"
     },
     {
@@ -171,7 +171,7 @@
       "source_file": "cmd/gateway/main.go",
       "source_location": "L135",
       "id": "gateway_main_startkafkatoredisfanoutworker",
-      "community": 19,
+      "community": 134,
       "norm_label": "startkafkatoredisfanoutworker()"
     },
     {
@@ -180,7 +180,7 @@
       "source_file": "cmd/gateway/main.go",
       "source_location": "L163",
       "id": "gateway_main_getenv",
-      "community": 19,
+      "community": 134,
       "norm_label": "getenv()"
     },
     {
@@ -333,7 +333,7 @@
       "source_file": "cmd/pricing/main.go",
       "source_location": "L1",
       "id": "cmd_pricing_main_go",
-      "community": 20,
+      "community": 135,
       "norm_label": "main.go"
     },
     {
@@ -342,7 +342,7 @@
       "source_file": "cmd/pricing/main.go",
       "source_location": "L16",
       "id": "pricing_main_main",
-      "community": 20,
+      "community": 135,
       "norm_label": "main()"
     },
     {
@@ -351,7 +351,7 @@
       "source_file": "cmd/pricing/main.go",
       "source_location": "L42",
       "id": "pricing_main_getenv",
-      "community": 20,
+      "community": 135,
       "norm_label": "getenv()"
     },
     {
@@ -360,7 +360,7 @@
       "source_file": "cmd/pricing/main.go",
       "source_location": "L49",
       "id": "pricing_main_parsecsv",
-      "community": 20,
+      "community": 135,
       "norm_label": "parsecsv()"
     },
     {
@@ -1463,7 +1463,7 @@
       "source_file": "internal/dispatch/consumer/order_consumer.go",
       "source_location": "L1",
       "id": "internal_dispatch_consumer_order_consumer_go",
-      "community": 91,
+      "community": 136,
       "norm_label": "order_consumer.go"
     },
     {
@@ -1472,7 +1472,7 @@
       "source_file": "internal/dispatch/consumer/order_consumer.go",
       "source_location": "L29",
       "id": "consumer_hungariancommitresult",
-      "community": 91,
+      "community": 136,
       "norm_label": "hungariancommitresult"
     },
     {
@@ -1490,7 +1490,7 @@
       "source_file": "internal/dispatch/consumer/order_consumer.go",
       "source_location": "L58",
       "id": "consumer_order_consumer_newordercreatedconsumer",
-      "community": 91,
+      "community": 136,
       "norm_label": "newordercreatedconsumer()"
     },
     {
@@ -1652,7 +1652,7 @@
       "source_file": "internal/dispatch/expiry/timeout_manager.go",
       "source_location": "L1",
       "id": "internal_dispatch_expiry_timeout_manager_go",
-      "community": 20,
+      "community": 133,
       "norm_label": "timeout_manager.go"
     },
     {
@@ -1661,7 +1661,7 @@
       "source_file": "internal/dispatch/expiry/timeout_manager.go",
       "source_location": "L15",
       "id": "expiry_offertimeoutjanitor",
-      "community": 20,
+      "community": 133,
       "norm_label": "offertimeoutjanitor"
     },
     {
@@ -1670,7 +1670,7 @@
       "source_file": "internal/dispatch/expiry/timeout_manager.go",
       "source_location": "L23",
       "id": "expiry_timeout_manager_newoffertimeoutjanitor",
-      "community": 20,
+      "community": 133,
       "norm_label": "newoffertimeoutjanitor()"
     },
     {
@@ -1679,7 +1679,7 @@
       "source_file": "internal/dispatch/expiry/timeout_manager.go",
       "source_location": "L33",
       "id": "expiry_offertimeoutjanitor_startjanitorloop",
-      "community": 20,
+      "community": 133,
       "norm_label": ".startjanitorloop()"
     },
     {
@@ -1688,7 +1688,7 @@
       "source_file": "internal/dispatch/expiry/timeout_manager.go",
       "source_location": "L48",
       "id": "expiry_offertimeoutjanitor_sweepexpiredoffers",
-      "community": 20,
+      "community": 133,
       "norm_label": ".sweepexpiredoffers()"
     },
     {
@@ -1904,7 +1904,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L17",
       "id": "matcher_densitycapturingcorrector",
-      "community": 123,
+      "community": 137,
       "norm_label": "densitycapturingcorrector"
     },
     {
@@ -1913,7 +1913,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L21",
       "id": "matcher_densitycapturingcorrector_computecorrectedeta",
-      "community": 123,
+      "community": 137,
       "norm_label": ".computecorrectedeta()"
     },
     {
@@ -1922,7 +1922,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L26",
       "id": "matcher_densitycapturingcorrector_computecancellationrisk",
-      "community": 123,
+      "community": 137,
       "norm_label": ".computecancellationrisk()"
     },
     {
@@ -2039,7 +2039,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L361",
       "id": "matcher_risktestingcorrector",
-      "community": 124,
+      "community": 138,
       "norm_label": "risktestingcorrector"
     },
     {
@@ -2048,7 +2048,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L365",
       "id": "matcher_risktestingcorrector_computecorrectedeta",
-      "community": 124,
+      "community": 138,
       "norm_label": ".computecorrectedeta()"
     },
     {
@@ -2057,7 +2057,7 @@
       "source_file": "internal/dispatch/matcher/hungarian_test.go",
       "source_location": "L369",
       "id": "matcher_risktestingcorrector_computecancellationrisk",
-      "community": 124,
+      "community": 138,
       "norm_label": ".computecancellationrisk()"
     },
     {
@@ -2174,7 +2174,7 @@
       "source_file": "internal/dispatch/repository/spatial_scanner.go",
       "source_location": "L19",
       "id": "repository_spatial_scanner_newspatialscanner",
-      "community": 41,
+      "community": 52,
       "norm_label": "newspatialscanner()"
     },
     {
@@ -2201,7 +2201,7 @@
       "source_file": "internal/dispatch/repository/spatial_scanner_test.go",
       "source_location": "L1",
       "id": "internal_dispatch_repository_spatial_scanner_test_go",
-      "community": 41,
+      "community": 52,
       "norm_label": "spatial_scanner_test.go"
     },
     {
@@ -2210,7 +2210,7 @@
       "source_file": "internal/dispatch/repository/spatial_scanner_test.go",
       "source_location": "L15",
       "id": "repository_spatial_scanner_test_testscannearbydrivers_localintegration",
-      "community": 41,
+      "community": 52,
       "norm_label": "testscannearbydrivers_localintegration()"
     },
     {
@@ -2219,7 +2219,7 @@
       "source_file": "internal/dispatch/repository/spatial_scanner_test.go",
       "source_location": "L77",
       "id": "repository_spatial_scanner_test_testscannearbydrivers_invalidtoken",
-      "community": 41,
+      "community": 52,
       "norm_label": "testscannearbydrivers_invalidtoken()"
     },
     {
@@ -2246,7 +2246,7 @@
       "source_file": "internal/gateway/delivery/http/handler.go",
       "source_location": "L1",
       "id": "internal_gateway_delivery_http_handler_go",
-      "community": 91,
+      "community": 129,
       "norm_label": "handler.go"
     },
     {
@@ -2255,7 +2255,7 @@
       "source_file": "internal/gateway/delivery/http/handler.go",
       "source_location": "L38",
       "id": "http_activewebsocketsession",
-      "community": 91,
+      "community": 129,
       "norm_label": "activewebsocketsession"
     },
     {
@@ -2264,7 +2264,7 @@
       "source_file": "internal/gateway/delivery/http/handler.go",
       "source_location": "L43",
       "id": "http_gatewayhandler",
-      "community": 119,
+      "community": 20,
       "norm_label": "gatewayhandler"
     },
     {
@@ -2273,7 +2273,7 @@
       "source_file": "internal/gateway/delivery/http/handler.go",
       "source_location": "L55",
       "id": "http_handler_newgatewayhandler",
-      "community": 91,
+      "community": 129,
       "norm_label": "newgatewayhandler()"
     },
     {
@@ -2282,133 +2282,133 @@
       "source_file": "internal/gateway/delivery/http/handler.go",
       "source_location": "L81",
       "id": "http_gatewayhandler_handlegetpricingquote",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlegetpricingquote()"
     },
     {
       "label": ".HandleCreateOrder()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L121",
+      "source_location": "L109",
       "id": "http_gatewayhandler_handlecreateorder",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlecreateorder()"
     },
     {
       "label": ".HandleMatchRealtimeStream()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L211",
+      "source_location": "L199",
       "id": "http_gatewayhandler_handlematchrealtimestream",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlematchrealtimestream()"
     },
     {
       "label": ".InternalBackplaneMultiplexer()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L269",
+      "source_location": "L257",
       "id": "http_gatewayhandler_internalbackplanemultiplexer",
-      "community": 119,
+      "community": 20,
       "norm_label": ".internalbackplanemultiplexer()"
     },
     {
       "label": ".DrainAndSignalWebSockets()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L349",
+      "source_location": "L337",
       "id": "http_gatewayhandler_drainandsignalwebsockets",
-      "community": 119,
+      "community": 20,
       "norm_label": ".drainandsignalwebsockets()"
     },
     {
       "label": ".HandleAcceptOrder()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L397",
+      "source_location": "L385",
       "id": "http_gatewayhandler_handleacceptorder",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handleacceptorder()"
     },
     {
       "label": ".HandleDeclineOrder()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L448",
+      "source_location": "L436",
       "id": "http_gatewayhandler_handledeclineorder",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handledeclineorder()"
     },
     {
       "label": ".RollbackAssignmentToCreated()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L476",
+      "source_location": "L464",
       "id": "http_gatewayhandler_rollbackassignmenttocreated",
-      "community": 119,
+      "community": 20,
       "norm_label": ".rollbackassignmenttocreated()"
     },
     {
       "label": ".emitDriverAvailable()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L562",
+      "source_location": "L550",
       "id": "http_gatewayhandler_emitdriveravailable",
-      "community": 119,
+      "community": 20,
       "norm_label": ".emitdriveravailable()"
     },
     {
       "label": ".HandleArriveAtPickup()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L587",
+      "source_location": "L575",
       "id": "http_gatewayhandler_handlearriveatpickup",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlearriveatpickup()"
     },
     {
       "label": ".HandleStartTrip()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L615",
+      "source_location": "L603",
       "id": "http_gatewayhandler_handlestarttrip",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlestarttrip()"
     },
     {
       "label": ".HandleCompleteTrip()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L646",
+      "source_location": "L634",
       "id": "http_gatewayhandler_handlecompletetrip",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlecompletetrip()"
     },
     {
       "label": ".HandlePaymentWebhook()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L771",
+      "source_location": "L759",
       "id": "http_gatewayhandler_handlepaymentwebhook",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handlepaymentwebhook()"
     },
     {
       "label": ".HandleAdminGetLedger()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L923",
+      "source_location": "L911",
       "id": "http_gatewayhandler_handleadmingetledger",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handleadmingetledger()"
     },
     {
       "label": ".HandleAdminDriverOverride()",
       "file_type": "code",
       "source_file": "internal/gateway/delivery/http/handler.go",
-      "source_location": "L1001",
+      "source_location": "L989",
       "id": "http_gatewayhandler_handleadmindriveroverride",
-      "community": 119,
+      "community": 20,
       "norm_label": ".handleadmindriveroverride()"
     },
     {
@@ -2534,7 +2534,7 @@
       "source_file": "internal/gateway/middleware/ratelimit.go",
       "source_location": "L1",
       "id": "internal_gateway_middleware_ratelimit_go",
-      "community": 19,
+      "community": 130,
       "norm_label": "ratelimit.go"
     },
     {
@@ -2543,7 +2543,7 @@
       "source_file": "internal/gateway/middleware/ratelimit.go",
       "source_location": "L12",
       "id": "middleware_ratelimitermiddleware",
-      "community": 19,
+      "community": 130,
       "norm_label": "ratelimitermiddleware"
     },
     {
@@ -2552,7 +2552,7 @@
       "source_file": "internal/gateway/middleware/ratelimit.go",
       "source_location": "L18",
       "id": "middleware_ratelimit_newratelimitermiddleware",
-      "community": 19,
+      "community": 130,
       "norm_label": "newratelimitermiddleware()"
     },
     {
@@ -2561,7 +2561,7 @@
       "source_file": "internal/gateway/middleware/ratelimit.go",
       "source_location": "L27",
       "id": "middleware_ratelimitermiddleware_limitrouteconcurrency",
-      "community": 19,
+      "community": 130,
       "norm_label": ".limitrouteconcurrency()"
     },
     {
@@ -2570,7 +2570,7 @@
       "source_file": "internal/gateway/middleware/ratelimit_test.go",
       "source_location": "L1",
       "id": "internal_gateway_middleware_ratelimit_test_go",
-      "community": 19,
+      "community": 130,
       "norm_label": "ratelimit_test.go"
     },
     {
@@ -2579,7 +2579,7 @@
       "source_file": "internal/gateway/middleware/ratelimit_test.go",
       "source_location": "L14",
       "id": "middleware_ratelimit_test_testratelimitermiddleware_limitrouteconcurrency_missingcontext",
-      "community": 19,
+      "community": 130,
       "norm_label": "testratelimitermiddleware_limitrouteconcurrency_missingcontext()"
     },
     {
@@ -2588,7 +2588,7 @@
       "source_file": "internal/gateway/middleware/ratelimit_test.go",
       "source_location": "L34",
       "id": "middleware_ratelimit_test_testratelimitermiddleware_limitrouteconcurrency_failopengracefully",
-      "community": 19,
+      "community": 130,
       "norm_label": "testratelimitermiddleware_limitrouteconcurrency_failopengracefully()"
     },
     {
@@ -2597,7 +2597,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L1",
       "id": "internal_gateway_middleware_region_router_go",
-      "community": 19,
+      "community": 123,
       "norm_label": "region_router.go"
     },
     {
@@ -2606,7 +2606,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L9",
       "id": "middleware_regioncontextkey",
-      "community": 19,
+      "community": 123,
       "norm_label": "regioncontextkey"
     },
     {
@@ -2615,7 +2615,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L12",
       "id": "middleware_regionroutermiddleware",
-      "community": 19,
+      "community": 139,
       "norm_label": "regionroutermiddleware"
     },
     {
@@ -2624,7 +2624,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L16",
       "id": "middleware_region_router_newregionroutermiddleware",
-      "community": 19,
+      "community": 123,
       "norm_label": "newregionroutermiddleware()"
     },
     {
@@ -2633,7 +2633,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L25",
       "id": "middleware_regionroutermiddleware_routeregionaltraffic",
-      "community": 19,
+      "community": 139,
       "norm_label": ".routeregionaltraffic()"
     },
     {
@@ -2642,7 +2642,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L52",
       "id": "middleware_regionroutermiddleware_getjoinedregions",
-      "community": 19,
+      "community": 139,
       "norm_label": ".getjoinedregions()"
     },
     {
@@ -2651,7 +2651,7 @@
       "source_file": "internal/gateway/middleware/region_router.go",
       "source_location": "L61",
       "id": "middleware_region_router_getregionfromcontext",
-      "community": 19,
+      "community": 123,
       "norm_label": "getregionfromcontext()"
     },
     {
@@ -2660,7 +2660,7 @@
       "source_file": "internal/gateway/middleware/region_router_test.go",
       "source_location": "L1",
       "id": "internal_gateway_middleware_region_router_test_go",
-      "community": 19,
+      "community": 123,
       "norm_label": "region_router_test.go"
     },
     {
@@ -2669,7 +2669,7 @@
       "source_file": "internal/gateway/middleware/region_router_test.go",
       "source_location": "L11",
       "id": "middleware_region_router_test_testregionroutermiddleware_successheader",
-      "community": 19,
+      "community": 123,
       "norm_label": "testregionroutermiddleware_successheader()"
     },
     {
@@ -2678,7 +2678,7 @@
       "source_file": "internal/gateway/middleware/region_router_test.go",
       "source_location": "L37",
       "id": "middleware_region_router_test_testregionroutermiddleware_successqueryparam",
-      "community": 19,
+      "community": 123,
       "norm_label": "testregionroutermiddleware_successqueryparam()"
     },
     {
@@ -2687,7 +2687,7 @@
       "source_file": "internal/gateway/middleware/region_router_test.go",
       "source_location": "L62",
       "id": "middleware_region_router_test_testregionroutermiddleware_missingregion",
-      "community": 19,
+      "community": 123,
       "norm_label": "testregionroutermiddleware_missingregion()"
     },
     {
@@ -2696,7 +2696,7 @@
       "source_file": "internal/gateway/middleware/region_router_test.go",
       "source_location": "L79",
       "id": "middleware_region_router_test_testregionroutermiddleware_unsupportedregion",
-      "community": 19,
+      "community": 123,
       "norm_label": "testregionroutermiddleware_unsupportedregion()"
     },
     {
@@ -2705,7 +2705,7 @@
       "source_file": "internal/intelligence/client/triton_client.go",
       "source_location": "L1",
       "id": "internal_intelligence_client_triton_client_go",
-      "community": 4,
+      "community": 12,
       "norm_label": "triton_client.go"
     },
     {
@@ -2714,7 +2714,7 @@
       "source_file": "internal/intelligence/client/triton_client.go",
       "source_location": "L17",
       "id": "client_tritonclient",
-      "community": 4,
+      "community": 12,
       "norm_label": "tritonclient"
     },
     {
@@ -2723,7 +2723,7 @@
       "source_file": "internal/intelligence/client/triton_client.go",
       "source_location": "L22",
       "id": "client_triton_client_newtritonclient",
-      "community": 4,
+      "community": 12,
       "norm_label": "newtritonclient()"
     },
     {
@@ -2732,7 +2732,7 @@
       "source_file": "internal/intelligence/client/triton_client.go",
       "source_location": "L43",
       "id": "client_tritonclient_predictetamultiplier",
-      "community": 4,
+      "community": 12,
       "norm_label": ".predictetamultiplier()"
     },
     {
@@ -2741,7 +2741,7 @@
       "source_file": "internal/intelligence/client/triton_client.go",
       "source_location": "L89",
       "id": "client_tritonclient_close",
-      "community": 4,
+      "community": 12,
       "norm_label": ".close()"
     },
     {
@@ -2750,7 +2750,7 @@
       "source_file": "internal/intelligence/usecase/eta_corrector.go",
       "source_location": "L1",
       "id": "internal_intelligence_usecase_eta_corrector_go",
-      "community": 121,
+      "community": 91,
       "norm_label": "eta_corrector.go"
     },
     {
@@ -2759,7 +2759,7 @@
       "source_file": "internal/intelligence/usecase/eta_corrector.go",
       "source_location": "L12",
       "id": "usecase_etacorrectorusecase",
-      "community": 121,
+      "community": 91,
       "norm_label": "etacorrectorusecase"
     },
     {
@@ -2768,7 +2768,7 @@
       "source_file": "internal/intelligence/usecase/eta_corrector.go",
       "source_location": "L18",
       "id": "usecase_eta_corrector_newetacorrectorusecase",
-      "community": 121,
+      "community": 91,
       "norm_label": "newetacorrectorusecase()"
     },
     {
@@ -2777,7 +2777,7 @@
       "source_file": "internal/intelligence/usecase/eta_corrector.go",
       "source_location": "L27",
       "id": "usecase_etacorrectorusecase_computecorrectedeta",
-      "community": 121,
+      "community": 91,
       "norm_label": ".computecorrectedeta()"
     },
     {
@@ -2786,7 +2786,7 @@
       "source_file": "internal/intelligence/usecase/eta_corrector.go",
       "source_location": "L68",
       "id": "usecase_etacorrectorusecase_computecancellationrisk",
-      "community": 121,
+      "community": 91,
       "norm_label": ".computecancellationrisk()"
     },
     {
@@ -2966,7 +2966,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L1",
       "id": "internal_observability_tracing_go",
-      "community": 19,
+      "community": 124,
       "norm_label": "tracing.go"
     },
     {
@@ -2975,7 +2975,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L16",
       "id": "observability_tracing_inittracerprovider",
-      "community": 19,
+      "community": 124,
       "norm_label": "inittracerprovider()"
     },
     {
@@ -2984,7 +2984,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L33",
       "id": "observability_kafkaheadercarrier",
-      "community": 19,
+      "community": 124,
       "norm_label": "kafkaheadercarrier"
     },
     {
@@ -2993,7 +2993,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L38",
       "id": "observability_kafkaheadercarrier_get",
-      "community": 19,
+      "community": 124,
       "norm_label": ".get()"
     },
     {
@@ -3002,7 +3002,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L48",
       "id": "observability_kafkaheadercarrier_set",
-      "community": 19,
+      "community": 124,
       "norm_label": ".set()"
     },
     {
@@ -3011,7 +3011,7 @@
       "source_file": "internal/observability/tracing.go",
       "source_location": "L62",
       "id": "observability_kafkaheadercarrier_keys",
-      "community": 19,
+      "community": 124,
       "norm_label": ".keys()"
     },
     {
@@ -3020,7 +3020,7 @@
       "source_file": "internal/observability/tracing_test.go",
       "source_location": "L1",
       "id": "internal_observability_tracing_test_go",
-      "community": 19,
+      "community": 124,
       "norm_label": "tracing_test.go"
     },
     {
@@ -3029,7 +3029,7 @@
       "source_file": "internal/observability/tracing_test.go",
       "source_location": "L11",
       "id": "observability_tracing_test_testinittracerprovider",
-      "community": 19,
+      "community": 124,
       "norm_label": "testinittracerprovider()"
     },
     {
@@ -3038,7 +3038,7 @@
       "source_file": "internal/observability/tracing_test.go",
       "source_location": "L30",
       "id": "observability_tracing_test_testkafkaheadercarrier",
-      "community": 19,
+      "community": 124,
       "norm_label": "testkafkaheadercarrier()"
     },
     {
@@ -3047,61 +3047,70 @@
       "source_file": "internal/pricing/service/order_pricing_service.go",
       "source_location": "L1",
       "id": "internal_pricing_service_order_pricing_service_go",
-      "community": 20,
+      "community": 131,
       "norm_label": "order_pricing_service.go"
     },
     {
       "label": "SurgeZoneUpdatedEvent",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L17",
+      "source_location": "L18",
       "id": "service_surgezoneupdatedevent",
-      "community": 20,
+      "community": 131,
       "norm_label": "surgezoneupdatedevent"
     },
     {
       "label": "OrderPricingService",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L25",
+      "source_location": "L26",
       "id": "service_orderpricingservice",
-      "community": 20,
+      "community": 131,
       "norm_label": "orderpricingservice"
     },
     {
       "label": "NewOrderPricingService()",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L30",
+      "source_location": "L32",
       "id": "service_order_pricing_service_neworderpricingservice",
-      "community": 20,
+      "community": 129,
       "norm_label": "neworderpricingservice()"
     },
     {
       "label": ".StartSurgeMatrixSync()",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L44",
+      "source_location": "L47",
       "id": "service_orderpricingservice_startsurgematrixsync",
-      "community": 20,
+      "community": 131,
       "norm_label": ".startsurgematrixsync()"
     },
     {
       "label": ".CalculateFare()",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L82",
+      "source_location": "L85",
       "id": "service_orderpricingservice_calculatefare",
-      "community": 20,
+      "community": 131,
       "norm_label": ".calculatefare()"
+    },
+    {
+      "label": ".CalculateDynamicFarePaise()",
+      "file_type": "code",
+      "source_file": "internal/pricing/service/order_pricing_service.go",
+      "source_location": "L115",
+      "id": "service_orderpricingservice_calculatedynamicfarepaise",
+      "community": 131,
+      "norm_label": ".calculatedynamicfarepaise()"
     },
     {
       "label": ".Close()",
       "file_type": "code",
       "source_file": "internal/pricing/service/order_pricing_service.go",
-      "source_location": "L112",
+      "source_location": "L140",
       "id": "service_orderpricingservice_close",
-      "community": 20,
+      "community": 131,
       "norm_label": ".close()"
     },
     {
@@ -3157,6 +3166,132 @@
       "id": "service_order_pricing_service_test_testsurgematrixkeyformat",
       "community": 45,
       "norm_label": "testsurgematrixkeyformat()"
+    },
+    {
+      "label": "regulator.go",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L1",
+      "id": "internal_pricing_surge_regulator_go",
+      "community": 119,
+      "norm_label": "regulator.go"
+    },
+    {
+      "label": "CircuitState",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L11",
+      "id": "surge_circuitstate",
+      "community": 119,
+      "norm_label": "circuitstate"
+    },
+    {
+      "label": "SurgeRegulator",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L19",
+      "id": "surge_surgeregulator",
+      "community": 119,
+      "norm_label": "surgeregulator"
+    },
+    {
+      "label": "NewSurgeRegulator()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L34",
+      "id": "surge_regulator_newsurgeregulator",
+      "community": 119,
+      "norm_label": "newsurgeregulator()"
+    },
+    {
+      "label": ".ExecuteOrFallback()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L47",
+      "id": "surge_surgeregulator_executeorfallback",
+      "community": 119,
+      "norm_label": ".executeorfallback()"
+    },
+    {
+      "label": ".CalculateO1HeuristicFallback()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L95",
+      "id": "surge_surgeregulator_calculateo1heuristicfallback",
+      "community": 119,
+      "norm_label": ".calculateo1heuristicfallback()"
+    },
+    {
+      "label": ".recordFailure()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L111",
+      "id": "surge_surgeregulator_recordfailure",
+      "community": 119,
+      "norm_label": ".recordfailure()"
+    },
+    {
+      "label": ".recordSuccess()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L128",
+      "id": "surge_surgeregulator_recordsuccess",
+      "community": 119,
+      "norm_label": ".recordsuccess()"
+    },
+    {
+      "label": ".getStateChangeTime()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L141",
+      "id": "surge_surgeregulator_getstatechangetime",
+      "community": 119,
+      "norm_label": ".getstatechangetime()"
+    },
+    {
+      "label": "regulator_test.go",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L1",
+      "id": "internal_pricing_surge_regulator_test_go",
+      "community": 119,
+      "norm_label": "regulator_test.go"
+    },
+    {
+      "label": "TestSurgeRegulator_CalculateO1HeuristicFallback()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L10",
+      "id": "surge_regulator_test_testsurgeregulator_calculateo1heuristicfallback",
+      "community": 119,
+      "norm_label": "testsurgeregulator_calculateo1heuristicfallback()"
+    },
+    {
+      "label": "TestSurgeRegulator_NominalExecution()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L37",
+      "id": "surge_regulator_test_testsurgeregulator_nominalexecution",
+      "community": 119,
+      "norm_label": "testsurgeregulator_nominalexecution()"
+    },
+    {
+      "label": "TestSurgeRegulator_TimeoutFallback()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L51",
+      "id": "surge_regulator_test_testsurgeregulator_timeoutfallback",
+      "community": 119,
+      "norm_label": "testsurgeregulator_timeoutfallback()"
+    },
+    {
+      "label": "TestSurgeRegulator_FailureStateTransitions()",
+      "file_type": "code",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L70",
+      "id": "surge_regulator_test_testsurgeregulator_failurestatetransitions",
+      "community": 119,
+      "norm_label": "testsurgeregulator_failurestatetransitions()"
     },
     {
       "label": "contraction_hierarchies.go",
@@ -3236,7 +3371,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L78",
       "id": "graph_priorityqueue",
-      "community": 66,
+      "community": 132,
       "norm_label": "priorityqueue"
     },
     {
@@ -3254,7 +3389,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L81",
       "id": "graph_priorityqueue_less",
-      "community": 66,
+      "community": 132,
       "norm_label": ".less()"
     },
     {
@@ -3263,7 +3398,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L82",
       "id": "graph_priorityqueue_swap",
-      "community": 66,
+      "community": 132,
       "norm_label": ".swap()"
     },
     {
@@ -3272,7 +3407,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L87",
       "id": "graph_priorityqueue_push",
-      "community": 66,
+      "community": 132,
       "norm_label": ".push()"
     },
     {
@@ -3281,7 +3416,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L93",
       "id": "graph_priorityqueue_pop",
-      "community": 66,
+      "community": 132,
       "norm_label": ".pop()"
     },
     {
@@ -3290,7 +3425,7 @@
       "source_file": "internal/routing/graph/contraction_hierarchies.go",
       "source_location": "L104",
       "id": "graph_contractionhierarchiesservice_computeshortestpatheta",
-      "community": 66,
+      "community": 132,
       "norm_label": ".computeshortestpatheta()"
     },
     {
@@ -3389,7 +3524,7 @@
       "source_file": "internal/routing/graph/loader_test.go",
       "source_location": "L1",
       "id": "internal_routing_graph_loader_test_go",
-      "community": 115,
+      "community": 90,
       "norm_label": "loader_test.go"
     },
     {
@@ -3398,7 +3533,7 @@
       "source_file": "internal/routing/graph/loader_test.go",
       "source_location": "L12",
       "id": "graph_loader_test_testgraphloader_ingestcontractedtopology",
-      "community": 115,
+      "community": 90,
       "norm_label": "testgraphloader_ingestcontractedtopology()"
     },
     {
@@ -3920,7 +4055,7 @@
       "source_file": "internal/telemetry/repository/kafka_producer.go",
       "source_location": "L1",
       "id": "internal_telemetry_repository_kafka_producer_go",
-      "community": 91,
+      "community": 121,
       "norm_label": "kafka_producer.go"
     },
     {
@@ -3929,7 +4064,7 @@
       "source_file": "internal/telemetry/repository/kafka_producer.go",
       "source_location": "L12",
       "id": "repository_kafkaproducer",
-      "community": 91,
+      "community": 121,
       "norm_label": "kafkaproducer"
     },
     {
@@ -3938,7 +4073,7 @@
       "source_file": "internal/telemetry/repository/kafka_producer.go",
       "source_location": "L17",
       "id": "repository_kafka_producer_newkafkaproducer",
-      "community": 91,
+      "community": 121,
       "norm_label": "newkafkaproducer()"
     },
     {
@@ -3947,7 +4082,7 @@
       "source_file": "internal/telemetry/repository/kafka_producer.go",
       "source_location": "L30",
       "id": "repository_kafkaproducer_publishlocationupdate",
-      "community": 91,
+      "community": 121,
       "norm_label": ".publishlocationupdate()"
     },
     {
@@ -3956,7 +4091,7 @@
       "source_file": "internal/telemetry/repository/kafka_producer.go",
       "source_location": "L51",
       "id": "repository_kafkaproducer_close",
-      "community": 91,
+      "community": 121,
       "norm_label": ".close()"
     },
     {
@@ -4055,7 +4190,7 @@
       "source_file": "internal/telemetry/usecase/telemetry_usecase.go",
       "source_location": "L1",
       "id": "internal_telemetry_usecase_telemetry_usecase_go",
-      "community": 40,
+      "community": 24,
       "norm_label": "telemetry_usecase.go"
     },
     {
@@ -4064,7 +4199,7 @@
       "source_file": "internal/telemetry/usecase/telemetry_usecase.go",
       "source_location": "L17",
       "id": "usecase_telemetryusecase",
-      "community": 40,
+      "community": 24,
       "norm_label": "telemetryusecase"
     },
     {
@@ -4073,7 +4208,7 @@
       "source_file": "internal/telemetry/usecase/telemetry_usecase.go",
       "source_location": "L25",
       "id": "usecase_telemetry_usecase_newtelemetryusecase",
-      "community": 40,
+      "community": 24,
       "norm_label": "newtelemetryusecase()"
     },
     {
@@ -4082,7 +4217,7 @@
       "source_file": "internal/telemetry/usecase/telemetry_usecase.go",
       "source_location": "L35",
       "id": "usecase_telemetryusecase_processlocationupdate",
-      "community": 40,
+      "community": 24,
       "norm_label": ".processlocationupdate()"
     },
     {
@@ -5414,7 +5549,7 @@
       "source_file": "test/integration/dispatch_e2e_test.go",
       "source_location": "L1",
       "id": "test_integration_dispatch_e2e_test_go",
-      "community": 91,
+      "community": 121,
       "norm_label": "dispatch_e2e_test.go"
     },
     {
@@ -5423,7 +5558,7 @@
       "source_file": "test/integration/dispatch_e2e_test.go",
       "source_location": "L41",
       "id": "integration_simpleroutingservice",
-      "community": 91,
+      "community": 121,
       "norm_label": "simpleroutingservice"
     },
     {
@@ -5432,7 +5567,7 @@
       "source_file": "test/integration/dispatch_e2e_test.go",
       "source_location": "L45",
       "id": "integration_simpleroutingservice_computeshortestpatheta",
-      "community": 91,
+      "community": 121,
       "norm_label": ".computeshortestpatheta()"
     },
     {
@@ -5441,7 +5576,7 @@
       "source_file": "test/integration/dispatch_e2e_test.go",
       "source_location": "L49",
       "id": "integration_dispatch_e2e_test_teste2e_completegatewayandmatrixoptimizationpipeline",
-      "community": 91,
+      "community": 129,
       "norm_label": "teste2e_completegatewayandmatrixoptimizationpipeline()"
     },
     {
@@ -5479,6 +5614,60 @@
       "id": "driver_claude_graphify",
       "community": 62,
       "norm_label": "graphify"
+    },
+    {
+      "label": "Karpathy Coding Guidelines",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L13",
+      "id": "driver_claude_karpathy_coding_guidelines",
+      "community": 62,
+      "norm_label": "karpathy coding guidelines"
+    },
+    {
+      "label": "1. Think Before Coding",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L19",
+      "id": "driver_claude_1_think_before_coding",
+      "community": 62,
+      "norm_label": "1. think before coding"
+    },
+    {
+      "label": "2. Simplicity First",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L29",
+      "id": "driver_claude_2_simplicity_first",
+      "community": 62,
+      "norm_label": "2. simplicity first"
+    },
+    {
+      "label": "3. Surgical Changes",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L41",
+      "id": "driver_claude_3_surgical_changes",
+      "community": 62,
+      "norm_label": "3. surgical changes"
+    },
+    {
+      "label": "4. Goal-Driven Execution",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L57",
+      "id": "driver_claude_4_goal_driven_execution",
+      "community": 62,
+      "norm_label": "4. goal-driven execution"
+    },
+    {
+      "label": "code:block1 (1. [Step] \u2192 verify: [check])",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L67",
+      "id": "driver_claude_codeblock_1",
+      "community": 62,
+      "norm_label": "code:block1 (1. [step] \u2192 verify: [check])"
     },
     {
       "label": "README.md",
@@ -5758,6 +5947,33 @@
       "id": "driver_readme_deeper_documentation",
       "community": 73,
       "norm_label": "deeper documentation"
+    },
+    {
+      "label": "\ud83d\ude80 Local Standalone Sandbox Quickstart",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L322",
+      "id": "driver_readme_local_standalone_sandbox_quickstart",
+      "community": 73,
+      "norm_label": "\ud83d\ude80 local standalone sandbox quickstart"
+    },
+    {
+      "label": "code:powershell (docker-compose down -v; Get-Process | Where-Object { $_.Name)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L326",
+      "id": "driver_readme_codeblock_13",
+      "community": 73,
+      "norm_label": "code:powershell (docker-compose down -v; get-process | where-object { $_.name)"
+    },
+    {
+      "label": "What this unified pipeline handles:",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L330",
+      "id": "driver_readme_what_this_unified_pipeline_handles",
+      "community": 73,
+      "norm_label": "what this unified pipeline handles:"
     },
     {
       "label": "ARCHITECTURE_BREAKDOWN_FOR_TEAM.md",
@@ -10399,7 +10615,7 @@
       "file_type": "code",
       "source_file": "test/integration/dispatch_e2e_test.go",
       "source_location": "L38",
-      "community": 91,
+      "community": 121,
       "norm_label": "teste2e_telemetryanddispatchpipeline()",
       "id": "integration_dispatch_e2e_test_teste2e_telemetryanddispatchpipeline"
     },
@@ -12838,9 +13054,9 @@
       "source_file": "cmd/simulator/main.go",
       "source_location": "L158",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "cmd_simulator_main_go",
-      "target": "simulator_main_streamdriverpositioncontinuous",
-      "confidence_score": 1.0
+      "target": "simulator_main_streamdriverpositioncontinuous"
     },
     {
       "relation": "contains",
@@ -12912,9 +13128,9 @@
       "source_file": "cmd/simulator/main.go",
       "source_location": "L121",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "simulator_main_main",
-      "target": "simulator_main_streamdriverpositioncontinuous",
-      "confidence_score": 1.0
+      "target": "simulator_main_streamdriverpositioncontinuous"
     },
     {
       "relation": "calls",
@@ -13171,9 +13387,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_json",
-      "target": "frontend_package_dependencies",
-      "confidence_score": 1.0
+      "target": "frontend_package_dependencies"
     },
     {
       "relation": "contains",
@@ -13191,9 +13407,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_scripts",
-      "target": "frontend_package_scripts_dev",
-      "confidence_score": 1.0
+      "target": "frontend_package_scripts_dev"
     },
     {
       "relation": "contains",
@@ -13201,9 +13417,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_scripts",
-      "target": "frontend_package_scripts_build",
-      "confidence_score": 1.0
+      "target": "frontend_package_scripts_build"
     },
     {
       "relation": "contains",
@@ -13211,9 +13427,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_scripts",
-      "target": "frontend_package_scripts_preview",
-      "confidence_score": 1.0
+      "target": "frontend_package_scripts_preview"
     },
     {
       "relation": "contains",
@@ -13231,9 +13447,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_dependencies",
-      "target": "frontend_package_dependencies_react",
-      "confidence_score": 1.0
+      "target": "frontend_package_dependencies_react"
     },
     {
       "relation": "contains",
@@ -13241,9 +13457,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_dependencies",
-      "target": "frontend_package_dependencies_react_dom",
-      "confidence_score": 1.0
+      "target": "frontend_package_dependencies_react_dom"
     },
     {
       "relation": "contains",
@@ -13271,9 +13487,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_types_react_dom",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_types_react_dom"
     },
     {
       "relation": "contains",
@@ -13281,9 +13497,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_vitejs_plugin_react",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_vitejs_plugin_react"
     },
     {
       "relation": "contains",
@@ -13291,9 +13507,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L22",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_autoprefixer",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_autoprefixer"
     },
     {
       "relation": "contains",
@@ -13301,9 +13517,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_postcss",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_postcss"
     },
     {
       "relation": "contains",
@@ -13311,9 +13527,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_tailwindcss",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_tailwindcss"
     },
     {
       "relation": "contains",
@@ -13331,9 +13547,9 @@
       "source_file": "frontend/package.json",
       "source_location": "L26",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_package_devdependencies",
-      "target": "frontend_package_devdependencies_vite",
-      "confidence_score": 1.0
+      "target": "frontend_package_devdependencies_vite"
     },
     {
       "relation": "contains",
@@ -13609,9 +13825,9 @@
       "source_file": "frontend/src/main.tsx",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_src_main_tsx",
-      "target": "frontend_src_admin_controlroomdashboard_tsx",
-      "confidence_score": 1.0
+      "target": "frontend_src_admin_controlroomdashboard_tsx"
     },
     {
       "relation": "imports",
@@ -13620,9 +13836,9 @@
       "source_file": "frontend/src/main.tsx",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_src_main_tsx",
-      "target": "admin_controlroomdashboard_controlroomdashboard",
-      "confidence_score": 1.0
+      "target": "admin_controlroomdashboard_controlroomdashboard"
     },
     {
       "relation": "contains",
@@ -13630,9 +13846,9 @@
       "source_file": "frontend/src/main.tsx",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_src_main_tsx",
-      "target": "src_main_rootelement",
-      "confidence_score": 1.0
+      "target": "src_main_rootelement"
     },
     {
       "relation": "contains",
@@ -16983,11 +17199,32 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "internal/pricing/service/order_pricing_service.go",
+      "source_location": "L115",
+      "weight": 1.0,
+      "source": "service_orderpricingservice",
+      "target": "service_orderpricingservice_calculatedynamicfarepaise",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/service/order_pricing_service.go",
       "source_location": "L112",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "service_orderpricingservice",
       "target": "service_orderpricingservice_close"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/service/order_pricing_service.go",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "service_order_pricing_service_neworderpricingservice",
+      "target": "surge_regulator_newsurgeregulator"
     },
     {
       "relation": "calls",
@@ -17093,6 +17330,247 @@
       "confidence_score": 1.0,
       "source": "service_order_pricing_service_test_testsurgematrixkeyformat",
       "target": "service_order_pricing_service_test_setuptestredis"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_go",
+      "target": "surge_circuitstate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_go",
+      "target": "surge_surgeregulator",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_go",
+      "target": "surge_regulator_newsurgeregulator",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_executeorfallback",
+      "target": "surge_circuitstate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L129",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_recordsuccess",
+      "target": "surge_circuitstate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "surge_regulator_test_testsurgeregulator_failurestatetransitions",
+      "target": "surge_circuitstate"
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "surge_surgeregulator",
+      "target": "surge_surgeregulator_executeorfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L95",
+      "weight": 1.0,
+      "source": "surge_surgeregulator",
+      "target": "surge_surgeregulator_calculateo1heuristicfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L111",
+      "weight": 1.0,
+      "source": "surge_surgeregulator",
+      "target": "surge_surgeregulator_recordfailure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L128",
+      "weight": 1.0,
+      "source": "surge_surgeregulator",
+      "target": "surge_surgeregulator_recordsuccess",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L141",
+      "weight": 1.0,
+      "source": "surge_surgeregulator",
+      "target": "surge_surgeregulator_getstatechangetime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "surge_regulator_test_testsurgeregulator_calculateo1heuristicfallback",
+      "target": "surge_regulator_newsurgeregulator"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "surge_regulator_test_testsurgeregulator_nominalexecution",
+      "target": "surge_regulator_newsurgeregulator"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "surge_regulator_test_testsurgeregulator_timeoutfallback",
+      "target": "surge_regulator_newsurgeregulator"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "surge_regulator_test_testsurgeregulator_failurestatetransitions",
+      "target": "surge_regulator_newsurgeregulator"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_executeorfallback",
+      "target": "surge_surgeregulator_getstatechangetime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_executeorfallback",
+      "target": "surge_surgeregulator_calculateo1heuristicfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L81",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_executeorfallback",
+      "target": "surge_surgeregulator_recordfailure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator.go",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "surge_surgeregulator_executeorfallback",
+      "target": "surge_surgeregulator_recordsuccess",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_test_go",
+      "target": "surge_regulator_test_testsurgeregulator_calculateo1heuristicfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_test_go",
+      "target": "surge_regulator_test_testsurgeregulator_nominalexecution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_test_go",
+      "target": "surge_regulator_test_testsurgeregulator_timeoutfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "internal/pricing/surge/regulator_test.go",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "internal_pricing_surge_regulator_test_go",
+      "target": "surge_regulator_test_testsurgeregulator_failurestatetransitions",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -20138,6 +20616,66 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "claude_md",
+      "target": "driver_claude_karpathy_coding_guidelines"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_claude_karpathy_coding_guidelines",
+      "target": "driver_claude_1_think_before_coding"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_claude_karpathy_coding_guidelines",
+      "target": "driver_claude_2_simplicity_first"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L41",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_claude_karpathy_coding_guidelines",
+      "target": "driver_claude_3_surgical_changes"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L57",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_claude_karpathy_coding_guidelines",
+      "target": "driver_claude_4_goal_driven_execution"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L67",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_claude_4_goal_driven_execution",
+      "target": "driver_claude_codeblock_1"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "README.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -20244,6 +20782,16 @@
       "confidence_score": 1.0,
       "source": "driver_readme_drivers_for_u",
       "target": "driver_readme_deeper_documentation"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L322",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_readme_drivers_for_u",
+      "target": "driver_readme_local_standalone_sandbox_quickstart"
     },
     {
       "relation": "contains",
@@ -20554,6 +21102,26 @@
       "confidence_score": 1.0,
       "source": "driver_readme_verification",
       "target": "driver_readme_codeblock_12"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L326",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_readme_local_standalone_sandbox_quickstart",
+      "target": "driver_readme_codeblock_13"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L330",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "driver_readme_local_standalone_sandbox_quickstart",
+      "target": "driver_readme_what_this_unified_pipeline_handles"
     },
     {
       "relation": "contains",
@@ -25451,9 +26019,9 @@
       "source_file": "frontend/README.md",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_readme_drivers_for_u_frontend",
-      "target": "frontend_readme_operations_control_room_milestone_27",
-      "confidence_score": 1.0
+      "target": "frontend_readme_operations_control_room_milestone_27"
     },
     {
       "relation": "contains",
@@ -25461,9 +26029,9 @@
       "source_file": "frontend/README.md",
       "source_location": "L51",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_readme_drivers_for_u_frontend",
-      "target": "frontend_readme_scripts",
-      "confidence_score": 1.0
+      "target": "frontend_readme_scripts"
     },
     {
       "relation": "contains",
@@ -25491,9 +26059,9 @@
       "source_file": "frontend/README.md",
       "source_location": "L30",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "frontend_readme_operations_control_room_milestone_27",
-      "target": "frontend_readme_codeblock_1",
-      "confidence_score": 1.0
+      "target": "frontend_readme_codeblock_1"
     },
     {
       "relation": "contains",
@@ -27267,5 +27835,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d796adb5ad436f75eac5dc42c44a01dc50a6c807"
+  "built_at_commit": "cd9bc1e8e99da2c31e267126b78ae976daec7035"
 }

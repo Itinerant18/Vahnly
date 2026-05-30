@@ -70,8 +70,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\cmd\\simulator\\main.go": {
-    "mtime": 1780057349.9681647,
-    "ast_hash": "2f9287ee8bce2c9bda97484c49c419a0",
+    "mtime": 1780117669.2321415,
+    "ast_hash": "3487bb2cae3ef508326885d684c7bb11",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\cmd\\surge\\main.go": {
@@ -170,8 +170,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\internal\\pricing\\service\\order_pricing_service.go": {
-    "mtime": 1779860565.319863,
-    "ast_hash": "fb9fe5bdfc212d966d4e17c47935d668",
+    "mtime": 1780119865.5690286,
+    "ast_hash": "502c630840e6cf4ce36ae6fec372ecee",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\internal\\pricing\\service\\order_pricing_service_test.go": {
@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\test\\integration\\dispatch_e2e_test.go": {
-    "mtime": 1780050120.4825785,
-    "ast_hash": "5b27898e8eea3f460a37082fc5e08dfd",
+    "mtime": 1780119882.387607,
+    "ast_hash": "9fd7b652f6e418f9993ab872ae40952a",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\AGENTS.md": {
@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\CLAUDE.md": {
-    "mtime": 1779858474.589172,
-    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "mtime": 1780112986.9548664,
+    "ast_hash": "498b4c2478868d0f5aae7da1fb8a4268",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\docker-compose.yml": {
@@ -335,8 +335,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\README.md": {
-    "mtime": 1780054877.4204447,
-    "ast_hash": "5b8c4da51914ebdf0267612ae3fb05c6",
+    "mtime": 1780117664.3769753,
+    "ast_hash": "ba6d7a45f764e0bdbadf8668bbdbc50f",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\.agents\\rules\\graphify.md": {
@@ -465,8 +465,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\internal\\gateway\\delivery\\http\\handler.go": {
-    "mtime": 1780051430.3184369,
-    "ast_hash": "8d88baa7be6f41ab051bcd2e452f14b0",
+    "mtime": 1780119873.8424714,
+    "ast_hash": "088d05bf8e07d4d7245120ecd2d41e4c",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\deploy\\charts\\drivers-for-u\\Chart.yaml": {
@@ -680,8 +680,8 @@
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\frontend\\src\\admin\\ControlRoomDashboard.tsx": {
-    "mtime": 1780053044.3876793,
-    "ast_hash": "40ab5db9406de1d8d120545c89509e6b",
+    "mtime": 1780058127.0706394,
+    "ast_hash": "25068f52ffcb11c687fc1dd98a10b74c",
     "semantic_hash": ""
   },
   "C:\\workspace\\Driver\\frontend\\src\\network\\ClientCoreEngine.ts": {
@@ -737,6 +737,16 @@
   "C:\\workspace\\Driver\\frontend\\index.html": {
     "mtime": 1780055673.4416976,
     "ast_hash": "541e5abd4b503690abd15f6db19759a0",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\pricing\\surge\\regulator.go": {
+    "mtime": 1780119853.0102084,
+    "ast_hash": "f9465cbc8146a2ac93ced048a511281e",
+    "semantic_hash": ""
+  },
+  "C:\\workspace\\Driver\\internal\\pricing\\surge\\regulator_test.go": {
+    "mtime": 1780120072.725917,
+    "ast_hash": "81907b57c6dc2c8298e2fa9fa564f651",
     "semantic_hash": ""
   }
 }
