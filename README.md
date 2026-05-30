@@ -8,13 +8,13 @@ This README is a current developer orientation snapshot. For deeper architecture
 
 Observed with the code review graph on 2026-05-28:
 
-| Area           | Current value |
-| -------------- | ------------- |
-| Files in graph | 52 |
-| Graph nodes | 323 |
-| Graph edges | 2,873 |
-| Main languages | Go, SQL, Bash, PowerShell |
-| Main service entrypoints | `cmd/ingestion`, `cmd/dispatch`, `cmd/surge`, `cmd/pricing`, `cmd/reconciler`, `cmd/pruner`, `cmd/simulator`, `cmd/osm-preprocessor` |
+| Area             | Current value             |
+| ---------------- | ------------------------- |
+| Files in graph   | 52                        |
+| Graph nodes      | 323                       |
+| Graph edges      | 2,873                     |
+| Main languages   | Go, SQL, Bash, PowerShell |
+| Main service     | `cmd/ingestion`, `cmd/dispatch`, `cmd/surge`, `cmd/pricing`, `cmd/reconciler`, `cmd/pruner`, `cmd/simulator`, `cmd/osm-preprocessor` |
 
 High-level runtime path:
 

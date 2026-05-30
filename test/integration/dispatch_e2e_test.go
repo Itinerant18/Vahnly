@@ -223,15 +223,15 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	gatewayHandler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClient)
 	go gatewayHandler.InternalBackplaneMultiplexer(consumerCtx)
 	
-	regionRouter := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
+	regionRouterMiddleware := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/orders", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleCreateOrder))
-	mux.HandleFunc("/api/v1/dispatch/stream", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleMatchRealtimeStream))
-	mux.HandleFunc("/api/v1/dispatch/accept", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleAcceptOrder))
-	mux.HandleFunc("/api/v1/trip/arrive", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleArriveAtPickup))
-	mux.HandleFunc("/api/v1/trip/start", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleStartTrip))
-	mux.HandleFunc("/api/v1/trip/complete", regionRouter.RouteRegionalTraffic(gatewayHandler.HandleCompleteTrip))
+	mux.HandleFunc("/api/v1/orders", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleCreateOrder))
+	mux.HandleFunc("/api/v1/dispatch/stream", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleMatchRealtimeStream))
+	mux.HandleFunc("/api/v1/dispatch/accept", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleAcceptOrder))
+	mux.HandleFunc("/api/v1/trip/arrive", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleArriveAtPickup))
+	mux.HandleFunc("/api/v1/trip/start", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleStartTrip))
+	mux.HandleFunc("/api/v1/trip/complete", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleCompleteTrip))
 	
 	server := httptest.NewServer(mux)
 	defer server.Close()
