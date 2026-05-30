@@ -9,3 +9,11 @@ data
 .claude
 .codex
 .gemini
+
+# Frontend / Web dependencies and builds
+**/node_modules
+**/.next
+**/out
+**/dist
+**/build
+

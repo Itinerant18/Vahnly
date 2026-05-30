@@ -1,4 +1,5 @@
 import { API_GATEWAY_BASE_URL } from '../config';
+import { useAuthStore } from '../store/useAuthStore';
 
 export interface RequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -107,8 +108,9 @@ export class ClientCoreEngine {
     };
 
     // Milestone 15: cryptographic bearer signature token.
-    if (this.jwtToken) {
-      headers['Authorization'] = `Bearer ${this.jwtToken}`;
+    const token = this.jwtToken || (typeof window !== 'undefined' ? useAuthStore.getState().token : null);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     // Milestones 15 & 21: idempotency fingerprint (stable across retries).
@@ -133,6 +135,10 @@ export class ClientCoreEngine {
       throw new NonRetryableHttpError('RATE_LIMIT_EXCEEDED: inbound traffic blocked by gateway.', 429);
     }
     if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        useAuthStore.getState().logout();
+        window.location.href = '/';
+      }
       throw new NonRetryableHttpError('UNAUTHORIZED: access signature invalid or expired.', 401);
     }
     if (response.status >= 500) {
@@ -148,3 +154,38 @@ export class ClientCoreEngine {
     return (await response.json()) as T;
   }
 }
+
+export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const { token, logout } = useAuthStore.getState();
+  
+  const headers = new Headers(options.headers);
+  headers.set('X-Region-Prefix', 'KOL'); // Standardized regional anycast
+  headers.set('X-Idempotency-Key', generateUUID());
+  
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const baseUrl = (process.env.NEXT_PUBLIC_API_GATEWAY || API_GATEWAY_BASE_URL).replace(/\/$/, '');
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    console.warn(`[ClientEngine] API connection refused for ${endpoint}. Falling back to offline operations.`);
+    throw new Error(`network_failure: ${String(networkErr)}`);
+  }
+
+  if (response.status === 401) {
+    // Cryptographic JWT signature failed or expired
+    logout();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/'; 
+    }
+    throw new Error('Session expired');
+  }
+
+  return response.json();
+};

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,6 +28,7 @@ import (
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/events"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
 	"go.opentelemetry.io/otel"
 )
@@ -47,6 +49,7 @@ type GatewayHandler struct {
 	pricingService    *pricingSvc.OrderPricingService
 	clusterClient     *redis.ClusterClient
 	upgrader          websocket.Upgrader
+	jwtSecretKey      []byte
 
 	// Thread-safe local session registry mapping active order IDs to WebSocket metadata
 	localSessions sync.Map
@@ -67,6 +70,7 @@ func NewGatewayHandler(db *pgxpool.Pool, kw *kafka.Writer, ps *pricingSvc.OrderP
 		},
 		pricingService: ps,
 		clusterClient:  client,
+		jwtSecretKey:   nil,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -1030,4 +1034,98 @@ func (h *GatewayHandler) HandleAdminDriverOverride(w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"OVERRIDE_SUCCESSFUL","driver_id":"` + req.DriverID + `"}`))
 }
+
+func (h *GatewayHandler) SetJWTSecret(secret string) {
+	h.jwtSecretKey = []byte(secret)
+}
+
+func (h *GatewayHandler) HandleRiderLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	userID := "usr-mock-11"
+	claims := &middleware.CustomClaims{
+		UserID: userID,
+		Role:   "RIDER",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.jwtSecretKey)
+	if err != nil {
+		http.Error(w, "failed_to_generate_token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": tokenString,
+		"user": map[string]string{
+			"id":    userID,
+			"role":  "RIDER",
+			"name":  "Sarah Connor",
+			"phone": req.Phone,
+		},
+	})
+}
+
+func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Phone    string `json:"phone"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	userID := "drv-mock-99"
+	claims := &middleware.CustomClaims{
+		UserID: userID,
+		Role:   "DRIVER",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.jwtSecretKey)
+	if err != nil {
+		http.Error(w, "failed_to_generate_token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": tokenString,
+		"user": map[string]string{
+			"id":    userID,
+			"role":  "DRIVER",
+			"name":  "Alex Mercer",
+			"phone": req.Phone,
+		},
+	})
+}
+
 

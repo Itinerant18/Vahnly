@@ -66,6 +66,7 @@ func main() {
 	defer kafkaWriter.Close()
 
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
+	handler.SetJWTSecret(jwtSecret)
 
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
@@ -81,6 +82,11 @@ func main() {
 	regionRouter := middleware.NewRegionRouterMiddleware(supportedRegions)
 
 	mux := http.NewServeMux()
+	
+	// Authentication / Access routes
+	mux.HandleFunc("POST /api/v1/auth/rider/login", handler.HandleRiderLogin)
+	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
+
 	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
 	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
 	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
@@ -95,9 +101,11 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireRole("ADMIN", handler.HandleAdminGetLedger))
 	mux.HandleFunc("POST /api/v1/admin/drivers/override", authGuard.RequireRole("ADMIN", handler.HandleAdminDriverOverride))
 
+	corsMiddleware := middleware.NewCORSMiddleware()
+
 	server := &http.Server{
 		Addr:         ":" + httpPort,
-		Handler:      mux,
+		Handler:      corsMiddleware.Handler(mux),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
