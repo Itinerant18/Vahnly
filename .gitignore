@@ -1,11 +1,103 @@
-data/kolkata_full.osm.pbf
-data/kolkata_raw.osm.pbf
-data/kolkata_edges.csv
-data/kolkata_nodes.csv
-*.csv
+# ============================================================================
+# Environment & Secrets (NEVER commit these — always use env vars or .env.local)
+# ============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets/
+
+# ============================================================================
+# Go Build Artifacts
+# ============================================================================
+bin/
+dist/
+*.o
+*.a
+*.so
+.dylib
+*.test
+*.out
+*.exe
+/coverage.txt
+/coverage.html
+
+# ============================================================================
+# Frontend Build & Dependencies
+# ============================================================================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+
+# ============================================================================
+# IDE & Editor Caches
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-workspace
+*.sublime-project
+.vim/
+.emacs.d/
+
+# ============================================================================
+# Development & Analysis Tools (Local only — regenerated on demand)
+# ============================================================================
 .agent/
 .agents/
 .claude/
 .code-review-graph/
 .codex/
 graphify-out/
+.graphify/
+
+# ============================================================================
+# Large Data Files (Regenerated from OSM PBF source via osm-preprocessor)
+# ============================================================================
+data/kolkata_full.osm.pbf
+data/kolkata_raw.osm.pbf
+data/kolkata_edges.csv
+data/kolkata_nodes.csv
+
+# ============================================================================
+# Logs & Temp Files
+# ============================================================================
+*.log
+*.log.*
+tmp/
+temp/
+*.tmp
+
+# ============================================================================
+# Go-specific (vendor dir only if not committed; go.mod/go.sum ARE tracked)
+# ============================================================================
+vendor/
+go.work.sum
+
+# ============================================================================
+# Docker & Database (local runtime state — never track DB volumes)
+# ============================================================================
+.docker/
+postgres_data/
+redis_data/
+
+# ============================================================================
+# OS-specific
+# ============================================================================
+.AppleDouble
+.LSOverride
+._*
+
+# ============================================================================
+# Misc development files
+# ============================================================================
+.DS_Store
+.env.test
+debug.log
