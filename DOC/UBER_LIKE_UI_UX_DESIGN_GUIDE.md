@@ -1,4 +1,5 @@
 # Uber-Like UI/UX Design Guide
+
 ## Enterprise Frontend Architecture for Drivers-for-U
 
 **Version:** 1.0  
@@ -11,7 +12,9 @@
 ## Part 1: Global Architecture & Ground Rules
 
 ### System Context
+
 This document defines the complete UI/UX specification for a unified Progressive Web App (PWA) built on:
+
 - **Next.js 15** with App Router (server + client components)
 - **TailwindCSS v4** for responsive, atomic styling
 - **Shadcn UI** for accessible component primitives
@@ -23,12 +26,14 @@ The **same codebase** deploys to web browsers, iOS App Store (wrapped in Capacit
 ### Core Design Principles
 
 #### 1. State-Driven Transitions (WebSocket-First)
+
 - **Every screen layout transition is event-driven via WebSocket**, NOT page reloads.
 - Backend publishes order state changes (`CREATED` → `ASSIGNED` → `ARRIVED_AT_PICKUP` → `IN_TRIP` → `COMPLETED`).
 - Frontend subscribes to these events and re-renders in real time.
 - **No polling.** No "refresh" buttons. Pure event-driven state.
 
 #### 2. The 4-Second Map Interpolation
+
 - Backend ingests driver GPS coordinates **every 4 seconds** (driver telemetry service).
 - Client receives batch coordinate updates via WebSocket.
 - **Driver vehicle pins must glide smoothly** between old and new positions using linear interpolation animations (4-second duration).
@@ -36,6 +41,7 @@ The **same codebase** deploys to web browsers, iOS App Store (wrapped in Capacit
 - Use Framer Motion or Mapbox native animation for smooth transitions.
 
 #### 3. Connection Resilience & Pod Failover
+
 - Backend pods scale horizontally. When a pod is terminating, it sends a WebSocket `CloseGoingAway` (1001) signal.
 - **UI must detect this silently** and show a subtle "Reconnecting..." spinner overlay.
 - Client automatically re-homes to a healthy pod **without freezing the interface** or closing the map.
@@ -43,6 +49,7 @@ The **same codebase** deploys to web browsers, iOS App Store (wrapped in Capacit
 - After reconnect, state syncs automatically via the outbox notification pattern.
 
 #### 4. Gesture-First UX (No Accidental Taps)
+
 - **Critical actions** (trip start, trip complete) use **swipe gestures**, not standard button taps.
 - Implement reusable `SlideToConfirm` component for high-impact decisions.
 - Example: `>>> SLIDE TO START TRIP >>>` (user must swipe right to confirm).
@@ -53,6 +60,7 @@ The **same codebase** deploys to web browsers, iOS App Store (wrapped in Capacit
 ## Part 2: Design Tokens & Reusable Components
 
 ### Color Palette
+
 ```
 Primary:     #1F2937 (Dark Slate) — Main actions, active states
 Success:     #10B981 (Emerald)     — Accept, complete trip
@@ -66,6 +74,7 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ```
 
 ### Spacing Scale (Tailwind)
+
 - `xs`: 4px
 - `sm`: 8px
 - `md`: 16px
@@ -74,6 +83,7 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 - `2xl`: 48px
 
 ### Typography
+
 - **Headings:** Inter Bold, 24px–32px line height 1.3
 - **Body:** Inter Regular, 16px line height 1.5
 - **Labels:** Inter Medium, 12px–14px, uppercase tracking 0.05em
@@ -81,12 +91,14 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ### Reusable Component Library (Shadcn UI + Custom)
 
 #### 1. `Badge` (Dynamic Pricing)
+
 ```tsx
 // Used for surge multiplier display
 <Badge variant="warning">High Demand Surge: x1.4</Badge>
 ```
 
 #### 2. `SlideToConfirm` (Swipe Gesture)
+
 ```tsx
 <SlideToConfirm 
   onConfirm={() => startTrip()} 
@@ -94,22 +106,26 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
   color="emerald"
 />
 ```
+
 - Renders as a horizontal slider track.
 - User must swipe right to threshold (70%) to trigger callback.
 - Haptic feedback on confirm (Capacitor/native vibration API).
 
 #### 3. `RadialCountdown` (15-Second Offer Timer)
+
 ```tsx
 <RadialCountdown 
   duration={15} 
   onExpire={() => declineOffer()}
 />
 ```
+
 - SVG-based circular progress bar.
 - Depletes over 15 seconds.
 - Color gradient: Green (15s) → Amber (10s) → Red (5s).
 
 #### 4. `DriverProfileCard` (Active Trip)
+
 ```tsx
 <DriverProfileCard 
   photo={url}
@@ -121,6 +137,7 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ```
 
 #### 5. `SurgeHeatmapGrid` (Driver Home Dashboard)
+
 ```tsx
 <SurgeHeatmapGrid 
   hexagons={h3Cells} 
@@ -128,6 +145,7 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
   onCellTap={(cell) => navigateTo(cell)}
 />
 ```
+
 - Renders H3 hexagon grid overlay on map.
 - Color intensity scales: light yellow (1.0x surge) → dark red (2.0x+).
 
@@ -136,15 +154,18 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ## Part 3: The Rider App Screens
 
 ### Screen 1: Fare Preview & Marketplace Discovery
+
 **Route:** `/rider/home` or `/rider/search`  
 **State Trigger:** User opens app OR taps "Order Now"
 
 #### Visual Layout
+
 - **Background:** Full-bleed Mapbox GL map showing user's current location centered.
 - **Vehicle Pins:** Small circular pins (24px) representing nearby available drivers. Color: `#1F2937`.
 - **Map Interactions:** User can pan/zoom but no manual vehicle selection.
 
 #### UI Components (Bottom Sheet Overlay)
+
 ```
 ┌──────────────────────────────┐
 │  📍 Pickup Location          │ ← Current location input (read-only, auto-filled)
@@ -158,12 +179,14 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ```
 
 #### Dynamic Surge Badge
+
 - **Condition:** If `surge_multiplier > 1.0`, show badge.
 - **Color:** Amber background, dark text.
 - **Message Format:** `"High Demand Surge Active: x{multiplier}"`
 - **Explanation Tooltip:** *"Prices increase during peak demand. Extra earnings support your drivers."*
 
 #### Implementation Notes
+
 - Use Shadcn's `Input` component for location fields.
 - Autocomplete via Google Places API (or local PostGIS reverse-geocoding).
 - Bottom sheet uses Radix Dialog + custom positioning.
@@ -172,15 +195,18 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ---
 
 ### Screen 2: Booking Acceptance & Dispatch Radar
+
 **Route:** `/rider/matching`  
 **State Trigger:** Fare estimate confirmed; backend starts Kuhn-Munkres matching
 
 #### Visual Layout
+
 - **Background:** Full-bleed map (same view as Screen 1).
 - **Locked Input State:** All input fields become disabled (visual: grayscale, `pointer-events: none`).
 - **Scanning Animation:** Animated radar circle overlaid in the center of the map, pulsing outward every 1.5s.
 
 #### UI Components (Overlay + Map Interaction)
+
 ```
 ┌──────────────────────────────┐
 │  ⏳ Searching for drivers... │ ← Status badge (top-center)
@@ -193,6 +219,7 @@ Map Layer:   #E5E7EB (Subtle Gray)  — Map overlay tint
 ```
 
 #### Radar Animation (Framer Motion)
+
 ```tsx
 // SVG circle that scales + opacity pulse
 animate={{
@@ -203,6 +230,7 @@ transition={{ duration: 1.5, repeat: Infinity }}
 ```
 
 #### Implementation Notes
+
 - Lock all form inputs at the START of matching phase.
 - Show subtle "Matching..." text near the radar.
 - "Cancel Search" button calls `/api/v1/orders/{orderId}/cancel` endpoint.
@@ -212,15 +240,18 @@ transition={{ duration: 1.5, repeat: Infinity }}
 ---
 
 ### Screen 3: Match Confirmation & Driver En Route
+
 **Route:** `/rider/tracking/{orderId}`  
 **State Trigger:** Backend publishes `order.assigned` event with `driver_id` and initial ETA
 
 #### Visual Layout
+
 - **Map Focus:** Zoom to a bounding box containing both pickup point and driver's current vehicle pin.
 - **Driver Vehicle Pin:** Animated glide movement using 4-second interpolation.
 - **Pickup Marker:** Static blue pin at rider's origin.
 
 #### UI Components (Lower Profile Card)
+
 ```
 ┌──────────────────────────────────────────┐
 │  🖼️ [Driver Photo]  Alex                 │
@@ -231,6 +262,7 @@ transition={{ duration: 1.5, repeat: Infinity }}
 ```
 
 #### Profile Card Fields
+
 - **Driver Photo:** 48px circular image.
 - **Name + Rating:** "Alex ⭐ 4.8"
 - **Vehicle Details:** License plate + model.
@@ -238,6 +270,7 @@ transition={{ duration: 1.5, repeat: Infinity }}
 - **Share Button:** Copy trip code to clipboard (for safety verification).
 
 #### Map Animation (4-Second Interpolation)
+
 ```tsx
 // Every WebSocket batch updates driver coordinates
 // Linear interpolation over 4 seconds
@@ -249,6 +282,7 @@ transition={{ duration: 4, ease: "linear" }}
 ```
 
 #### Implementation Notes
+
 - Driver profile card renders using `<DriverProfileCard>` component.
 - ETA updates via WebSocket event `driver.location.updated`.
 - Map uses Mapbox GL's `easeTo()` or Framer Motion for smooth transitions.
@@ -257,14 +291,17 @@ transition={{ duration: 4, ease: "linear" }}
 ---
 
 ### Screen 4a: Driver Arrived & Pickup Notification
+
 **Route:** `/rider/tracking/{orderId}` (same, state change)  
 **State Trigger:** Backend publishes `order.arrived_at_pickup`
 
 #### Visual Layout
+
 - **Map View:** Unchanged; driver vehicle pin should be at or near pickup marker.
 - **Pickup Marker Animation:** Subtle pulsing ring (2px white stroke, repeating scale 1.0 → 1.2).
 
 #### UI Components (Modal Alert)
+
 ```
 ╔══════════════════════════════╗
 ║  🚗 Driver Arrived!          ║
@@ -276,6 +313,7 @@ transition={{ duration: 4, ease: "linear" }}
 ```
 
 #### Pulsing Ring Animation
+
 ```tsx
 animate={{
   r: [20, 30], // SVG circle radius
@@ -284,6 +322,7 @@ transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
 ```
 
 #### Implementation Notes
+
 - Modal is non-dismissible until user taps "OK" button.
 - Tap triggers local state update: `orderState = "ONBOARD_BOARDING"`.
 - Send notification to driver via WebSocket: `rider.acknowledged_arrival`.
@@ -291,10 +330,12 @@ transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
 ---
 
 ### Screen 4b: Active Journey & Drop-off Navigation
+
 **Route:** `/rider/tracking/{orderId}` (in-trip phase)  
 **State Trigger:** Backend publishes `order.in_trip`
 
 #### Visual Layout
+
 - **Map View:** Route line drawn from current driver location to drop-off marker.
   - Line color: Emerald (`#10B981`), 3px width.
   - Drop-off marker: Red pin (destination icon).
@@ -302,6 +343,7 @@ transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
 - **Turn-by-turn Directions:** Subtle text overlay near top: *"Continue for 1.2 miles, then turn right on Main St."*
 
 #### UI Components (Minimized State)
+
 ```
 ────────────────────────────────
 │  ETA: 5 min  |  Route active  │
@@ -309,6 +351,7 @@ transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
 ```
 
 #### Map Route Drawing
+
 ```tsx
 // Fetch route from backend `/api/v1/routing/directions?origin=X&destination=Y`
 // Draw GeoJSON LineString on map
@@ -318,6 +361,7 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ```
 
 #### Implementation Notes
+
 - ETA updates via `driver.location.updated` WebSocket events.
 - Route recalculates if driver deviates (re-fetch every 30s or on user request).
 - Profile card stays collapsed until tap; expansion shows full driver card again.
@@ -326,12 +370,15 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ---
 
 ### Screen 5: Trip Completed & Feedback (Optional)
+
 **Route:** `/rider/feedback/{orderId}`  
 **State Trigger:** Backend publishes `order.completed`
 
 #### Visual Layout
+
 - **Success Checkmark:** Large centered checkmark animation (Lottie or SVG).
 - **Trip Summary Card:**
+
   ```
   ✓ Trip Complete
   📍 2.5 miles
@@ -342,6 +389,7 @@ paint: { "line-color": "#10B981", "line-width": 3 }
   ```
 
 #### Implementation Notes
+
 - Optional: Rating modal (1–5 stars + comment field).
 - On completion, trigger celebratory confetti animation (optional, Framer Motion).
 - "Done" button navigates back to Screen 1 (`/rider/home`).
@@ -351,16 +399,19 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ## Part 4: The Driver App Screens
 
 ### Screen 6: Online Duty Availability Pane (Home Dashboard)
+
 **Route:** `/driver/home`  
 **State Trigger:** App launches; driver is authenticated
 
 #### Visual Layout
+
 - **Background:** Full-bleed map showing the driver's current region.
 - **H3 Hexagon Overlay:** Color-coded grid of 15x15 km cells.
   - **Color Scale:** Light yellow (1.0x surge) → Amber (1.3x) → Dark red (2.0x+).
   - **Interaction:** Tap any cell to see local demand heatmap and estimated earnings.
 
 #### Floating UI Components
+
 ```
 ┌─────────────────────────────────┐
 │  ☀️ Good Morning, Alex!         │ ← Greeting badge
@@ -375,18 +426,21 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ```
 
 #### Online/Offline Toggle
+
 - **Component:** Shadcn's `Switch` component, 48px tall for thumb size.
 - **Label:** "GO ONLINE" (Emerald text if online) / "GO OFFLINE" (Gray if offline).
 - **On Toggle:** Send WebSocket event `driver.state.changed` with payload `{ state: "ONLINE_AVAILABLE" | "OFFLINE" }`.
 - **State Persistence:** Store in Redis via driver presence key (`ws:presence:{driver_id}`).
 
 #### Hexagon Grid Heatmap
+
 - **Data Source:** `cmd/surge` service publishes `surge.zone.updated` events.
 - **Rendering:** Use H3 library (`h3-js`) to iterate grid cells and render Mapbox GL polygon features.
 - **Color Interpolation:** Scale `surge_multiplier` to RGB gradient.
 - **Tap Interaction:** Display modal with cell stats: demand, avg ETA to pickup, est. earnings per trip.
 
 #### Implementation Notes
+
 - Map is zoomable + pannable; toggle position is fixed to screen bottom.
 - Greeting text refreshes on app load based on time of day.
 - Earnings card updates via WebSocket from ledger service (if available).
@@ -395,14 +449,17 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ---
 
 ### Screen 7: The High-Priority Offer Flash Card (CRITICAL UX)
+
 **Route:** Overlay modal (not a route)  
 **State Trigger:** Backend publishes `order.created` + Kuhn-Munkres matching decides this driver is the best match
 
 #### Visual Layout
+
 - **Background:** Map behind is slightly blurred (Tailwind `backdrop-blur-sm`).
 - **Card Position:** Center of screen, non-dismissible overlay.
 
 #### UI Components (Full-Screen Modal)
+
 ```
 ╔════════════════════════════════════╗
 ║                                    ║
@@ -419,17 +476,20 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ```
 
 #### Radial Countdown Timer (SVG)
+
 - **Component:** `<RadialCountdown duration={15} />`
 - **Rendering:** SVG circle (150px diameter) with animated stroke-dasharray.
 - **Color Gradient:** Green (15s) → Amber (10s) → Red (5s).
 - **Callback:** On expiration, auto-decline and return to home dashboard.
 
 #### Accept/Decline Buttons
+
 - **Decline:** Red background (`#EF4444`), 24px font, full width.
 - **Accept:** Green background (`#10B981`), 24px font, full width.
 - **Haptic Feedback:** Vibrate on button tap (Capacitor vibration API).
 
 #### Implementation Notes
+
 - **CRITICAL:** This modal is **absolutely full-screen**. User cannot dismiss or interact with map.
 - **Auto-dismiss on timer expiry:** If driver does not tap within 15 seconds, auto-decline with reason `"No response"`.
 - **On Accept:** Immediately send WebSocket event `order.accepted` with `driver_id`.
@@ -441,15 +501,18 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ---
 
 ### Screen 8: Navigation & Passenger Verification (Pickup)
+
 **Route:** `/driver/navigation/{orderId}`  
 **State Trigger:** Order accepted; driver must navigate to pickup location
 
 #### Visual Layout
+
 - **Background:** Full-bleed map focused on route from driver's current position to pickup marker.
 - **Route Line:** Emerald polyline showing turn-by-turn path.
 - **Turn-by-Turn Panel:** Top of screen, slide-up drawer showing next maneuver.
 
 #### UI Components (Top Navigation Panel)
+
 ```
 ┌──────────────────────────────┐
 │  🚗 Navigating to Pickup     │
@@ -464,6 +527,7 @@ paint: { "line-color": "#10B981", "line-width": 3 }
 ```
 
 #### Safety Verification Screen (After "Arrived")
+
 Once driver taps "Arrived at Pickup," display strict swipe gesture:
 
 ```
@@ -480,6 +544,7 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
 ```
 
 #### Swipe Gesture Component
+
 ```tsx
 <SlideToConfirm 
   label="SLIDE TO START TRIP" 
@@ -487,11 +552,13 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
   color="emerald"
 />
 ```
+
 - User must swipe the slider thumb to 70% of track to trigger confirm.
 - Haptic feedback on 50% threshold and on confirm.
 - If user releases before 70%, slider snaps back to 0%.
 
 #### Implementation Notes
+
 - Use Mapbox GL's routing layer to draw turn-by-turn route.
 - Navigation panel updates via WebSocket (backend sends routing recalculations every 10s).
 - "Arrived at Pickup" button is disabled until driver's GPS is within 50m of pickup marker.
@@ -501,15 +568,18 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
 ---
 
 ### Screen 9: Active Trip Navigation & Drop-off Completion
+
 **Route:** `/driver/navigation/{orderId}` (same, state change)  
 **State Trigger:** Trip started; `order.in_trip`
 
 #### Visual Layout
+
 - **Background:** Full-bleed map focused on route from current driver position to drop-off marker.
 - **Route Line:** Emerald polyline with drop-off marker in red.
 - **Turn-by-Turn Panel:** Compact top drawer (same as Screen 8).
 
 #### UI Components (Bottom Swipe Panel)
+
 ```
 ╔════════════════════════════════════╗
 ║  🏁 Approaching Destination        ║
@@ -525,6 +595,7 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
 ```
 
 #### Swipe Gesture for Trip Completion
+
 ```tsx
 <SlideToConfirm 
   label="SLIDE TO COMPLETE TRIP" 
@@ -532,16 +603,19 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
   color="emerald"
 />
 ```
+
 - Same as "Start Trip": must swipe to 70% to trigger.
 - On confirm, send WebSocket event `order.completed`.
 - Backend finalizes transaction (ledger entry, payment processing, etc.).
 
 #### Post-Completion Transition
+
 - **Success State:** Show "✓ Trip Completed" banner for 2 seconds.
 - **Reset to Home:** Automatically navigate back to Screen 6 (home dashboard).
 - **Earnings Update:** Earnings badge updates to reflect new trip total.
 
 #### Implementation Notes
+
 - Turn-by-turn updates via WebSocket (same as Screen 8).
 - ETA countdown reflects real-time routing engine calculations.
 - Swipe gesture is the **only way** to complete a trip (no button fallback).
@@ -552,6 +626,7 @@ Once driver taps "Arrived at Pickup," display strict swipe gesture:
 ## Part 5: Implementation Instructions for Claude Code / Cursor
 
 ### Command 1: Scaffold Next.js Project with Stack
+
 ```bash
 npx create-next-app@latest drivers-for-u-client \
   --typescript \
@@ -563,6 +638,7 @@ npx create-next-app@latest drivers-for-u-client \
 ```
 
 ### Command 2: Install Component & Utility Libraries
+
 ```bash
 cd drivers-for-u-client
 
@@ -586,7 +662,9 @@ npm install clsx date-fns zustand swr axios
 ```
 
 ### Command 3: Build Reusable Custom Components
+
 **File:** `src/components/SlideToConfirm.tsx`
+
 ```tsx
 "use client";
 import { motion } from "framer-motion";
@@ -653,6 +731,7 @@ export function SlideToConfirm({
 ```
 
 **File:** `src/components/RadialCountdown.tsx`
+
 ```tsx
 "use client";
 import { useEffect, useState } from "react";
@@ -708,6 +787,7 @@ export function RadialCountdown({ duration, onExpire }: RadialCountdownProps) {
 ```
 
 ### Command 4: Set Up CapacitorJS
+
 ```bash
 npm install @capacitor/core @capacitor/cli
 
@@ -723,7 +803,9 @@ npx cap sync
 ```
 
 ### Command 5: Build the Routing Page Structure
+
 **File:** `src/app/(rider)/layout.tsx`
+
 ```tsx
 export default function RiderLayout({
   children,
@@ -739,17 +821,21 @@ export default function RiderLayout({
 ```
 
 **Files to create:**
+
 - `src/app/(rider)/home/page.tsx` — Screen 1 (Fare Preview)
 - `src/app/(rider)/matching/page.tsx` — Screen 2 (Dispatch Radar)
 - `src/app/(rider)/tracking/[orderId]/page.tsx` — Screens 3–5 (Tracking + Feedback)
 
 **Files for Driver app:**
+
 - `src/app/(driver)/home/page.tsx` — Screen 6 (Online Dashboard)
 - `src/app/(driver)/offer/page.tsx` — Screen 7 (Offer Modal, overlay)
 - `src/app/(driver)/navigation/[orderId]/page.tsx` — Screens 8–9 (Navigation + Completion)
 
 ### Command 6: WebSocket Client Setup
+
 **File:** `src/lib/websocket.ts`
+
 ```ts
 import { ResilientStreamManager } from '@/network/ResilientStreamManager';
 
@@ -765,6 +851,7 @@ export async function subscribeToOrderUpdates(orderId: string, onUpdate: (event:
 ```
 
 ### Command 7: Deploy to Web + Native
+
 ```bash
 # Test on web
 npm run dev
@@ -786,6 +873,7 @@ npx cap open android
 ## Part 6: Design Tokens & Tailwind Configuration
 
 **File:** `tailwind.config.ts`
+
 ```ts
 import type { Config } from 'tailwindcss';
 
@@ -823,6 +911,7 @@ export default config;
 ## Part 7: Testing & Validation Checklist
 
 ### Functional Testing
+
 - [ ] Rider can order and see 4-second smooth vehicle interpolation on map
 - [ ] Driver receives 15-second offer modal (non-dismissible)
 - [ ] Swipe gestures work on iOS/Android (Capacitor)
@@ -831,12 +920,14 @@ export default config;
 - [ ] H3 hexagon grid renders correctly with color gradient
 
 ### Performance Testing
+
 - [ ] Map interaction (pan/zoom) is smooth (60 FPS target)
 - [ ] WebSocket event processing < 100ms latency
 - [ ] App cold start < 3 seconds
 - [ ] Swipe gesture response time < 50ms
 
 ### Mobile Testing (Capacitor)
+
 - [ ] Geolocation works on iOS + Android
 - [ ] Haptic feedback triggers on button/swipe interactions
 - [ ] Background geolocation works (driver telemetry while app is backgrounded)
@@ -847,6 +938,7 @@ export default config;
 ## Part 8: References & Dependencies
 
 ### Core Libraries
+
 - **Next.js 15:** App Router, Server Components, API Routes
 - **React 18+:** Client-side state, hooks, suspense boundaries
 - **TailwindCSS v4:** Atomic CSS, responsive design
@@ -855,14 +947,17 @@ export default config;
 - **Mapbox GL JS:** Map rendering + route visualization
 
 ### State Management
+
 - **Zustand:** Lightweight client state (order state, driver state)
 - **SWR / React Query:** Data fetching + caching
 
 ### APIs & Real-Time
+
 - **WebSocket (via ResilientStreamManager):** Order + driver events
 - **HTTP (Axios):** Fare estimates, ledger queries
 
 ### Native Integration
+
 - **CapacitorJS:** iOS/Android wrapper, geolocation, vibration
 - **@capacitor/geolocation:** GPS access
 - **@capacitor/haptics:** Device vibration feedback
@@ -871,7 +966,7 @@ export default config;
 
 ## Conclusion
 
-This document serves as the **complete UI/UX specification** for an Uber-like frontend. Every screen, component, and interaction is defined. 
+This document serves as the **complete UI/UX specification** for an Uber-like frontend. Every screen, component, and interaction is defined.
 
 **For AI agents:** Feed this document into Claude Code, Cursor, or your AI design system to scaffold the entire project automatically. The tech stack (Next.js 15 + Capacitor + TailwindCSS + Shadcn UI) is production-proven and scalable to millions of concurrent users.
 
