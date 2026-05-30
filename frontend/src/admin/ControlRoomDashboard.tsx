@@ -135,26 +135,23 @@ export const ControlRoomDashboard: React.FC = () => {
 
   if (isAuthError || !adminToken) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl rounded-2xl p-8 border border-slate-800 shadow-2xl relative overflow-hidden">
-          {/* Glowing neon blobs for ultimate look and feel */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl"></div>
-          <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-amber-500/10 blur-3xl"></div>
-
+      <div className="min-h-screen bg-white text-ink flex items-center justify-center p-6 font-sans selection:bg-black selection:text-white">
+        <div className="w-full max-w-md bg-canvas-softer rounded-xl p-8 border border-canvas-soft shadow-sm relative overflow-hidden">
+          
           <div className="text-center mb-8 relative">
-            <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-              DRIVERS-for-U
+            <h1 className="text-3xl font-bold tracking-tight text-ink font-move">
+              drivers-for-u
             </h1>
-            <p className="text-slate-400 text-sm mt-2 font-medium">Operations Dashboard Security Gateway</p>
+            <p className="text-body text-xs mt-2 font-medium">Operations Dashboard Security Gateway</p>
           </div>
 
           <form onSubmit={handleAuthenticate} className="space-y-6 relative">
             <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-3">
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-3">
                 Administrative Access Token
               </label>
               <textarea
-                className="w-full h-24 bg-slate-950/80 border border-slate-800 focus:border-emerald-500/50 rounded-xl p-3 text-xs font-mono text-emerald-400 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition resize-none"
+                className="w-full h-24 bg-white border border-canvas-soft focus:border-ink rounded-xl p-3 text-xs font-mono text-ink placeholder-mute focus:outline-none focus:ring-1 focus:ring-ink transition resize-none"
                 placeholder="Paste your signed ADMIN JWT access token here..."
                 value={authInput}
                 onChange={(e) => setAuthInput(e.target.value)}
@@ -163,14 +160,14 @@ export const ControlRoomDashboard: React.FC = () => {
             </div>
 
             {authError && (
-              <div className="p-3 bg-rose-950/30 border border-rose-800/50 rounded-xl text-rose-400 text-xs font-medium font-mono text-center">
+              <div className="p-3 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-wider text-center">
                 {authError}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-extrabold py-3.5 px-4 rounded-xl transition shadow-lg shadow-emerald-500/15 text-sm uppercase tracking-wider active:scale-[0.98]"
+              className="w-full bg-black hover:bg-black-elevated text-white font-bold py-3.5 px-4 rounded-full transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
             >
               Unlock Control Room
             </button>
@@ -181,25 +178,25 @@ export const ControlRoomDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-8 font-sans">
-      <header className="mb-8 border-b border-slate-800 pb-4 flex justify-between items-center">
+    <div className="min-h-screen bg-white text-ink p-6 md:p-12 font-sans selection:bg-black selection:text-white">
+      <header className="mb-8 border-b border-canvas-soft pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-emerald-400">DRIVERS-for-U</h1>
-          <p className="text-slate-400 text-sm">Centralized Operations Control Room Panel (Region: KOL)</p>
+          <h1 className="text-2xl font-bold tracking-tight text-ink font-move">drivers-for-u</h1>
+          <p className="text-body text-xs mt-0.5">Centralized operations control room panel (region: kol)</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div
-            className={`px-4 py-2 rounded-full font-mono text-xs font-bold ${
+            className={`px-4 py-2 rounded-full font-mono text-[10px] font-bold tracking-wider uppercase ${
               isBalanced
-                ? 'bg-emerald-950 text-emerald-400 border border-emerald-500'
-                : 'bg-rose-950 text-rose-400 border border-rose-500'
+                ? 'bg-canvas-soft border border-surface-pressed text-ink'
+                : 'bg-black border border-black text-white'
             }`}
           >
-            {isBalanced ? '● ALL LEDGER BALANCE SHEET AUDITS STABLE' : '▲ ATTENTION: LEDGER IMBALANCE DETECTED'}
+            {isBalanced ? '● ledger balance sheet stable' : '▲ ledger imbalance detected'}
           </div>
           <button
             onClick={handleLogout}
-            className="bg-slate-800 hover:bg-slate-700 text-xs font-bold py-2 px-4 rounded-lg tracking-wider border border-slate-700 text-slate-300 uppercase transition active:scale-95"
+            className="bg-white hover:bg-canvas-softer text-[10px] font-bold py-2.5 px-5 rounded-full border border-canvas-soft text-ink uppercase tracking-wider transition active:scale-95 cursor-pointer"
           >
             Lock Terminal
           </button>
@@ -207,83 +204,94 @@ export const ControlRoomDashboard: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
         {/* Col 1: Real-Time Spatial Density Stream Map View */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="animate-ping w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-            Live Regional H3 Cell Supply Heatmap
-          </h2>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-            {Object.keys(spatialHeatmap).length === 0 ? (
-              <p className="text-slate-500 italic text-sm">Awaiting live coordinate streams from fleet grid...</p>
-            ) : (
-              Object.entries(spatialHeatmap).map(([cellIndex, densityCount]) => (
-                <div
-                  key={cellIndex}
-                  className="flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono text-sm"
-                >
-                  <span className="text-slate-400">
-                    Hex Cell: <span className="text-emerald-400 font-bold">{cellIndex}</span>
-                  </span>
-                  <span className="bg-emerald-950 text-emerald-400 px-3 py-1 rounded font-bold">
-                    {densityCount} Drivers Active
-                  </span>
-                </div>
-              ))
-            )}
+        <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft shadow-sm flex flex-col justify-between min-h-[450px]">
+          <div>
+            <h2 className="text-lg font-bold mb-4 text-ink font-move flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-black"></span>
+              </span>
+              Live H3 cell supply density
+            </h2>
+            <div className="space-y-3 max-h-[340px] overflow-y-auto pr-2">
+              {Object.keys(spatialHeatmap).length === 0 ? (
+                <p className="text-body italic text-xs leading-relaxed">Awaiting live coordinate streams from fleet grid...</p>
+              ) : (
+                Object.entries(spatialHeatmap).map(([cellIndex, densityCount]) => (
+                  <div
+                    key={cellIndex}
+                    className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-canvas-soft font-mono text-xs text-ink"
+                  >
+                    <span>
+                      Hex: <span className="font-bold">{cellIndex}</span>
+                    </span>
+                    <span className="bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold select-none">
+                      {densityCount} drivers
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="text-[10px] text-mute font-bold uppercase tracking-wider pt-4 border-t border-canvas-soft/40">
+            stream feed active (kol)
           </div>
         </div>
 
         {/* Col 2: High-Priority Manual Override Management Control Engine */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
-          <h2 className="text-xl font-bold mb-4 text-amber-400">Driver State Super-Override Portal</h2>
-          <form onSubmit={executeManualDriverOverride} className="space-y-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">Target Driver UUID</label>
-              <input
-                type="text"
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-amber-500"
-                placeholder="e.g. a0eebc99-9c0b-4ef8-..."
-                value={targetDriverID}
-                onChange={(e) => setTargetDriverID(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">Target System State Promotion</label>
-              <select
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-sm font-bold text-slate-100 focus:outline-none focus:border-amber-500"
-                value={overrideState}
-                onChange={(e) => setOverrideState(e.target.value)}
+        <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft shadow-sm flex flex-col justify-between min-h-[450px]">
+          <div>
+            <h2 className="text-lg font-bold mb-4 text-ink font-move">Driver state override</h2>
+            <form onSubmit={executeManualDriverOverride} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Target Driver UUID</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-canvas-soft rounded-xl p-3 text-xs font-mono text-ink placeholder-mute focus:outline-none focus:border-ink"
+                  placeholder="e.g. a0eebc99-9c0b-4ef8-..."
+                  value={targetDriverID}
+                  onChange={(e) => setTargetDriverID(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">State promotion</label>
+                <select
+                  className="w-full bg-white border border-canvas-soft rounded-xl p-3 text-xs font-bold text-ink focus:outline-none focus:border-ink cursor-pointer"
+                  value={overrideState}
+                  onChange={(e) => setOverrideState(e.target.value)}
+                >
+                  <option value="ONLINE_AVAILABLE">ONLINE_AVAILABLE (Release to pool)</option>
+                  <option value="OFFLINE">OFFLINE (Disconnect device)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Justification reason</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-canvas-soft rounded-xl p-3 text-xs text-ink placeholder-mute focus:outline-none focus:border-ink"
+                  placeholder="Driver app state reset"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-black hover:bg-black-elevated text-white font-bold py-3 px-4 rounded-full transition text-xs uppercase tracking-wider cursor-pointer"
               >
-                <option value="ONLINE_AVAILABLE">ONLINE_AVAILABLE (Force Release to Pool)</option>
-                <option value="OFFLINE">OFFLINE (Force Disconnect Device)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">Administrative Justification Reason</label>
-              <input
-                type="text"
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
-                placeholder="Driver app lockup reset request"
-                value={overrideReason}
-                onChange={(e) => setOverrideReason(e.target.value)}
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 px-4 rounded transition text-sm uppercase tracking-wider"
-            >
-              Execute State Override
-            </button>
-          </form>
+                Execute state override
+              </button>
+            </form>
+          </div>
           {actionMessage && (
             <div
-              className={`mt-4 p-3 rounded text-xs font-mono font-bold ${
+              className={`mt-4 p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider ${
                 actionMessage.startsWith('SUCCESS')
-                  ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800'
-                  : 'bg-rose-950/50 text-rose-400 border border-rose-800'
+                  ? 'bg-canvas-soft border border-surface-pressed text-ink'
+                  : 'bg-black border border-black text-white'
               }`}
             >
               {actionMessage}
@@ -292,56 +300,59 @@ export const ControlRoomDashboard: React.FC = () => {
         </div>
 
         {/* Col 3: Double-Entry Financial Splits Audit Panel */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl lg:col-span-3">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Immutable Financial Ledger Splits Auditor</h2>
+        <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft shadow-sm lg:col-span-3 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink font-move">Financial ledger splits auditor</h2>
+              <p className="text-xs text-body">Immutable verification matrices for regional transactions</p>
+            </div>
             <button
               onClick={fetchLedgerLogs}
-              className="bg-slate-700 hover:bg-slate-600 text-xs font-bold py-1 px-3 rounded tracking-wider uppercase transition"
+              className="bg-white hover:bg-canvas-softer text-[10px] font-bold py-2 px-5 rounded-full border border-canvas-soft text-ink uppercase tracking-wider transition duration-200 cursor-pointer"
             >
-              Refresh Audit Table
+              Refresh Table
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm font-mono border-collapse">
+          <div className="overflow-x-auto rounded-xl border border-canvas-soft bg-white">
+            <table className="w-full text-left text-xs font-mono border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-slate-400 uppercase text-xs border-b border-slate-700">
-                  <th className="p-3">Order Transaction ID</th>
-                  <th className="p-3">Metropolitan Prefix</th>
-                  <th className="p-3">Split Category Account Type</th>
-                  <th className="p-3">Entry Option</th>
-                  <th className="p-3 text-right">Value (INR Paise)</th>
-                  <th className="p-3">Audit Log Trace Description</th>
+                <tr className="bg-canvas-softer text-mute uppercase text-[9px] font-bold border-b border-canvas-soft">
+                  <th className="p-4">Transaction ID</th>
+                  <th className="p-4">Region</th>
+                  <th className="p-4">Split account category</th>
+                  <th className="p-4">Entry type</th>
+                  <th className="p-4 text-right">Value (INR Paise)</th>
+                  <th className="p-4">Trace audit log</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-canvas-soft text-ink">
                 {ledgerEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center text-slate-500 italic">
-                      Zero completed transaction logs found on system storage maps.
+                    <td colSpan={6} className="p-6 text-center text-body italic leading-relaxed">
+                      Zero completed transaction logs found on regional systems.
                     </td>
                   </tr>
                 ) : (
                   ledgerEntries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-900/50 transition">
-                      <td className="p-3 text-slate-300">{entry.order_id.slice(0, 18)}...</td>
-                      <td className="p-3">
-                        <span className="bg-slate-700 text-slate-200 px-2 py-0.5 rounded text-xs">{entry.city_prefix}</span>
+                    <tr key={entry.id} className="hover:bg-canvas-softer/50 transition">
+                      <td className="p-4 text-body">{entry.order_id.slice(0, 18)}...</td>
+                      <td className="p-4">
+                        <span className="bg-canvas-soft border border-surface-pressed text-ink px-2 py-0.5 rounded text-[10px] font-bold select-none">{entry.city_prefix}</span>
                       </td>
-                      <td className="p-3 font-bold text-slate-400">{entry.account_type}</td>
-                      <td className="p-3">
+                      <td className="p-4 font-bold text-body">{entry.account_type}</td>
+                      <td className="p-4">
                         <span
-                          className={`px-2 py-0.5 rounded text-xs font-bold ${
-                            entry.entry_type === 'DEBIT' ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            entry.entry_type === 'DEBIT' ? 'bg-black text-white' : 'bg-canvas-soft border border-surface-pressed text-ink'
                           }`}
                         >
                           {entry.entry_type}
                         </span>
                       </td>
-                      <td className={`p-3 text-right font-bold ${entry.entry_type === 'DEBIT' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      <td className="p-4 text-right font-bold">
                         ₹{(entry.amount_paise / 100).toFixed(2)}
                       </td>
-                      <td className="p-3 text-slate-400 text-xs italic">{entry.description}</td>
+                      <td className="p-4 text-body text-xs italic">{entry.description}</td>
                     </tr>
                   ))
                 )}
@@ -349,6 +360,7 @@ export const ControlRoomDashboard: React.FC = () => {
             </table>
           </div>
         </div>
+
       </div>
     </div>
   );
