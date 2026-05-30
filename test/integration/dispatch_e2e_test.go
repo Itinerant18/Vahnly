@@ -161,6 +161,21 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	
 	// Injecting Redis cluster client reference to support high-velocity telemetry forking checks
 	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil, redisClient)
+
+	// Create and inject RegionRouter for Milestone 29 Active-Active handoffs
+	handoffWriter := &kafka.Writer{
+		Addr:         kafka.TCP(strings.Split(kafkaBrokers, ",")...),
+		Topic:        "global.region.handoffs",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+	}
+	defer handoffWriter.Close()
+
+	regionRouter := telemetryUsecase.NewRegionRouter(redisClient, handoffWriter, "kolkata")
+	if setter, ok := telemetryUC.(interface{ SetRegionRouter(router *telemetryUsecase.RegionRouter) }); ok {
+		setter.SetRegionRouter(regionRouter)
+	}
+
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUC)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:50051")
@@ -469,6 +484,73 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 
 	t.Logf("[STAGE 7 OK] Closed-Loop Surge Engine responsive under pressure. Computed Multiplier: %.2f", activeMultiplier)
+
+	// STAGE 8 LIFECYCLE ASSERTION: Global Active-Active Cross-Region Handoff & Hydration Verification Pass
+	t.Log("Validating Global Active-Active Cross-Region Synchronizations & Boundary Handoff pipelines...")
+
+	// 1. Spin up target region ("howrah") hydration consumer in a background thread
+	handoffConsumer := consumer.NewHandoffConsumer(
+		brokersList,
+		"global.region.handoffs",
+		"dispatch-handoff-howrah-test-group",
+		"howrah",
+		redisClient,
+	)
+	go handoffConsumer.Start(consumerCtx)
+	defer handoffConsumer.Close()
+
+	// 2. Initial state: verify driver is currently indexed in the kolkata region locations Geo ZSET
+	kolkataGeoKey := "driver:locations:kolkata"
+	howrahGeoKey := "driver:locations:howrah"
+
+	// Seed target driver inside kolkata Geo index to start boundary testing
+	_ = redisClient.GeoAdd(ctx, kolkataGeoKey, &redis.GeoLocation{
+		Name:      targetDriverID,
+		Longitude: 88.3639,
+		Latitude:  22.5726,
+	}).Err()
+
+	// 3. Emit location update representing a boundary crossing out of Kolkata region into Howrah region
+	crossingConn, err := grpc.NewClient("127.0.0.1:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("Failed connecting to gRPC telemetry node: %v", err)
+	}
+	defer crossingConn.Close()
+
+	crossingGrpcClient := pb.NewLocationIngestionServiceClient(crossingConn)
+	crossingStream, err := crossingGrpcClient.ClientStreamPositions(ctx)
+	if err != nil {
+		t.Fatalf("Failed opening telemetry gRPC channel: %v", err)
+	}
+
+	reqCrossing := &pb.IngestionRequest{
+		DriverId:     targetDriverID,
+		CityPrefix:   "KOL",
+		Latitude:     22.6,  // Lies inside Howrah bounding box
+		Longitude:    88.1,  // Lies inside Howrah bounding box
+		Bearing:      270.0,
+		SpeedKms:     45.0,
+		TimestampUtc: time.Now().Unix(),
+	}
+	_ = crossingStream.Send(reqCrossing)
+	_ = crossingStream.CloseSend()
+
+	// 4. Wait for Kafka replication, handoff processing, and hydration loops to settle
+	time.Sleep(3 * time.Second)
+
+	// 5. Assert: Local origin ("kolkata") Geo ZSET eviction
+	kolkataScore, err := redisClient.ZScore(ctx, kolkataGeoKey, targetDriverID).Result()
+	if err == nil {
+		t.Errorf("Boundary Cross Validator failed to evict driver from origin Kolkata Geo ZSET. Score: %v", kolkataScore)
+	}
+
+	// 6. Assert: Target region ("howrah") hydration & geohash scoring validation
+	howrahScore, err := redisClient.ZScore(ctx, howrahGeoKey, targetDriverID).Result()
+	if err != nil || howrahScore == 0 {
+		t.Errorf("Active-Active handoff failed: driver %s not successfully hydrated in Howrah Geo ZSET. Error: %v", targetDriverID, err)
+	} else {
+		t.Logf("[STAGE 8 OK] Active-Active synchronization verified. Hydrated Howrah geohash ZSET score: %v", howrahScore)
+	}
 
 	t.Log("═══════════════════════════════════════════════════════════════")
 	t.Log(" SUCCESS: Full-Lifecycle Journey Matrix completely validated. ")

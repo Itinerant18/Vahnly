@@ -172,7 +172,22 @@ func main() {
 		}
 	}()
 
-	// 7. Start Match Execution Loop in Background Thread
+	// 7. Start Match Execution and Active-Active Hydration Loops in Background Threads
+	currentRegion := getEnv("CURRENT_REGION", "kolkata")
+	handoffConsumer := consumer.NewHandoffConsumer(
+		brokersList,
+		"global.region.handoffs",
+		"dispatch-handoff-"+currentRegion,
+		currentRegion,
+		redisClusterClient,
+	)
+	defer func() {
+		if err := handoffConsumer.Close(); err != nil {
+			log.Printf("Failed to close handoff consumer: %v", err)
+		}
+	}()
+	go handoffConsumer.Start(ctx)
+
 	go orderConsumer.StartExecutionPipeline(ctx)
 
 	// 8. Start HTTP Observability Server (Prometheus + Health + Stats)

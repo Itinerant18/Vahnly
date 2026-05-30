@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -112,6 +113,21 @@ func main() {
 
 	driverMetrics := repository.NewPostgresDriverMetrics(dbPool)
 	telemetryUseCase := usecase.NewTelemetryUseCase(redisRepo, kafkaProducer, driverMetrics, redisClusterClient)
+
+	// Set up and inject active-active RegionRouter for boundary checks in Kolkata cluster context
+	handoffWriter := &kafka.Writer{
+		Addr:         kafka.TCP(brokersList...),
+		Topic:        "global.region.handoffs",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+	}
+	defer handoffWriter.Close()
+
+	regionRouter := usecase.NewRegionRouter(redisClusterClient, handoffWriter, "kolkata")
+	if setter, ok := telemetryUseCase.(interface{ SetRegionRouter(router *usecase.RegionRouter) }); ok {
+		setter.SetRegionRouter(regionRouter)
+	}
+
 	ingestionHandler := grpcDelivery.NewLocationIngestionHandler(telemetryUseCase)
 
 	// 5. Initialize and Bind the gRPC TCP Server Loop
