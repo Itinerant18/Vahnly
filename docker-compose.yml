@@ -440,3 +440,19 @@ services:
         condition: service_completed_successfully
     networks:
       - dispatch-tier
+
+  fleet-rebalancer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: rebalancer
+    container_name: dispatch_rebalancer_prod
+    environment:
+      - REDIS_CLUSTER_NODES=redis-node-1:6379
+      - CITY_PREFIX=KOL
+    depends_on:
+      redis-cluster-orchestrator:
+        condition: service_completed_successfully
+    networks:
+      - dispatch-tier
