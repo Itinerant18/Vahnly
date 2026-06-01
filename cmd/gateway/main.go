@@ -15,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 
+	adminHttp "github.com/platform/driver-delivery/internal/admin/delivery/http"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
@@ -68,6 +69,15 @@ func main() {
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
 	handler.SetJWTSecret(jwtSecret)
 
+	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
+	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
+	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
+	pricingAdminHandler := adminHttp.NewPricingAdminHandler(redisClusterClient, pricingLogger)
+	incidentLogger := log.New(os.Stdout, "[INCIDENT_ADMIN] ", log.LstdFlags)
+	incidentAdminHandler := adminHttp.NewIncidentAdminHandler(dbPool, redisClusterClient, brokersList, incidentLogger)
+	ledgerLogger := log.New(os.Stdout, "[LEDGER_ADMIN] ", log.LstdFlags)
+	ledgerAdminHandler := adminHttp.NewLedgerAdminHandler(dbPool, ledgerLogger)
+
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
 
@@ -86,6 +96,8 @@ func main() {
 	// Authentication / Access routes
 	mux.HandleFunc("POST /api/v1/auth/rider/login", handler.HandleRiderLogin)
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
+	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
+	mux.HandleFunc("POST /api/v1/admin/auth/register", adminAuthHandler.HandleAdminRegister)
 
 	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
 	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
@@ -97,9 +109,16 @@ func main() {
 	mux.HandleFunc("POST /api/v1/trip/complete", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCompleteTrip))))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
 
-	// Register administrative control routes, protected by the Admin role gate
-	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireRole("ADMIN", handler.HandleAdminGetLedger))
-	mux.HandleFunc("POST /api/v1/admin/drivers/override", authGuard.RequireRole("ADMIN", handler.HandleAdminDriverOverride))
+	// Register administrative control routes, protected by granular RBAC role gates
+	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, handler.HandleAdminGetLedger))
+	mux.HandleFunc("POST /api/v1/admin/drivers/override", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, handler.HandleAdminDriverOverride))
+	mux.HandleFunc("GET /api/v1/admin/orders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, adminTripHandler.HandleAdminGetOrders))
+	mux.HandleFunc("POST /api/v1/admin/orders/cancel", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, adminTripHandler.HandleAdminCancelOrder))
+	mux.HandleFunc("POST /api/v1/admin/pricing/freeze", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKET_CONTROLLER"}, pricingAdminHandler.HandleEnforcePriceCap))
+	mux.HandleFunc("GET /api/v1/admin/trips/stalled", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleGetStalledTrips))
+	mux.HandleFunc("POST /api/v1/admin/trips/recover", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleExecuteTripRecovery))
+	mux.HandleFunc("GET /api/v1/admin/ledger/discrepancies", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, ledgerAdminHandler.HandleGetLedgerDiscrepancies))
+	mux.HandleFunc("POST /api/v1/admin/ledger/reconcile", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, ledgerAdminHandler.HandlePostLedgerCorrection))
 
 	corsMiddleware := middleware.NewCORSMiddleware()
 

@@ -7,6 +7,7 @@ import { AdminAuthGateway } from './components/AdminAuthGateway';
 import { ActiveTripRadar } from './ActiveTripRadar';
 import { SurgeControlValve } from './components/SurgeControlValve';
 import { IncidentRecoveryTerminal } from './components/IncidentRecoveryTerminal';
+import { LedgerReconciliation } from './components/LedgerReconciliation';
 
 interface LedgerEntry {
   id: number;
@@ -376,7 +377,8 @@ export const ControlRoomDashboard: React.FC = () => {
             <div className="p-4"><IncidentRecoveryTerminal /></div>
           )}
           {activeTab === 'ledger' && canAudit && (
-            <div className="p-4 overflow-x-auto">
+            <div className="p-4 space-y-4 overflow-x-auto">
+              <LedgerReconciliation />
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="text-mute uppercase text-[10px] font-medium border-b border-canvas-soft tracking-wider">
