@@ -17,6 +17,10 @@ export default {
         link: '#0000ee',
         'on-dark': '#ffffff',
         'black-elevated': '#282828',
+        // Operational semantic accents — used only for status dots/badges, never as brand accent
+        'status-online': '#138000',
+        'status-warn': '#a06000',
+        'status-alert': '#b00020',
       },
       borderRadius: {
         'pill': '999px',
@@ -25,6 +29,7 @@ export default {
       },
       fontFamily: {
         sans: ['Geist Sans', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono', 'Fira Code', 'monospace'],
       }
     },
   },

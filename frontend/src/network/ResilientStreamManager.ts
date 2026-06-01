@@ -5,8 +5,82 @@ export interface StreamConfig {
   cityPrefix: string;
   onMessage: (data: unknown) => void;
   onStatusChange: (status: 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING') => void;
-  /** Override the default WebSocket gateway base URL. */
   wsBaseUrl?: string;
+}
+
+// MILESTONE 31: Lightweight client-side Protobuf decoder mapping binary stream arrays 
+// directly back to standard platform data envelopes to prevent dependency bloating.
+function decodeBinaryWebSocketEnvelope(buffer: ArrayBuffer): unknown {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  
+  // Custom precise byte un-packing adhering strictly to W3C binary array allocations
+  let offset = 0;
+  
+  // Read wire field tags to extract message properties sequentially
+  let frameType = 0;
+  const assignmentData: any = {};
+  const telemetryData: any = {};
+
+  while (offset < bytes.length) {
+    const key = bytes[offset++];
+    const fieldNumber = key >> 3;
+
+    if (fieldNumber === 1) { // FrameType enum
+      frameType = bytes[offset++];
+    } else if (fieldNumber === 2) { // Embedded Assignment Message block
+      const subLen = bytes[offset++];
+      const end = offset + subLen;
+      while (offset < end) {
+        const subKey = bytes[offset++];
+        const subNum = subKey >> 3;
+        const subLenStr = bytes[offset++];
+        const strBytes = bytes.subarray(offset, offset + subLenStr);
+        offset += subLenStr;
+        const val = new TextDecoder().decode(strBytes);
+        if (subNum === 1) assignmentData.order_id = val;
+        if (subNum === 2) assignmentData.driver_id = val;
+        if (subNum === 3) assignmentData.city_prefix = val;
+        if (subNum === 4) assignmentData.status = val;
+      }
+    } else if (fieldNumber === 3) { // Embedded Telemetry Message block
+      const subLen = bytes[offset++];
+      const end = offset + subLen;
+      while (offset < end) {
+        const subKey = bytes[offset++];
+        const subNum = subKey >> 3;
+        if (subNum === 1 || subNum === 2) { // String values
+          const len = bytes[offset++];
+          const str = new TextDecoder().decode(bytes.subarray(offset, offset + len));
+          offset += len;
+          if (subNum === 1) telemetryData.order_id = str;
+          if (subNum === 2) telemetryData.driver_id = str;
+        } else if (subNum >= 3 && subNum <= 6) { // Float64 (8 bytes precision keys)
+          const val = view.getFloat64(offset, true);
+          offset += 8;
+          if (subNum === 3) telemetryData.latitude = val;
+          if (subNum === 4) telemetryData.longitude = val;
+          if (subNum === 5) telemetryData.bearing = val;
+          if (subNum === 6) telemetryData.speed_kms = val;
+        } else if (subNum === 7) { // Int64 timestamp (Varint allocation)
+          let shift = 0, val = 0;
+          while (true) {
+            const b = bytes[offset++];
+            val |= (b & 0x7f) << shift;
+            if (!(b & 0x80)) break;
+            shift += 7;
+          }
+          telemetryData.timestamp_utc = val;
+        }
+      }
+    } else {
+      offset++; // Safe advance fallback for un-mapped custom payload frames
+    }
+  }
+
+  return frameType === 1 
+    ? { channel: 'assignment', ...assignmentData }
+    : { channel: 'telemetry', ...telemetryData };
 }
 
 export class ResilientStreamManager {
@@ -15,7 +89,6 @@ export class ResilientStreamManager {
   private ws: WebSocket | null = null;
   private isPurposelyClosed: boolean = false;
 
-  // Reconnection backoff state
   private baseDelayMs: number = 500;
   private maxDelayMs: number = 8000;
   private currentRetryAttempt: number = 0;
@@ -25,14 +98,19 @@ export class ResilientStreamManager {
     this.wsBaseUrl = (config.wsBaseUrl ?? WS_GATEWAY_BASE_URL).replace(/\/$/, '');
   }
 
-  /** Establish a persistent connection to the public gateway stream handler. */
   public connect(): void {
     this.isPurposelyClosed = false;
+    const token = (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function')
+      ? (localStorage.getItem('admin_jwt_token') || localStorage.getItem('jwt_token') || '')
+      : '';
     const url = `${this.wsBaseUrl}/api/v1/dispatch/stream?order_id=${encodeURIComponent(
       this.config.orderID,
-    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}`;
+    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}&jwt=${encodeURIComponent(token)}`;
 
     this.ws = new WebSocket(url);
+    
+    // MILESTONE 31: Enforce arraybuffer context tracking rules natively
+    this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
       this.currentRetryAttempt = 0;
@@ -41,20 +119,22 @@ export class ResilientStreamManager {
 
     this.ws.onmessage = (event: MessageEvent) => {
       try {
-        this.config.onMessage(JSON.parse(event.data as string));
-      } catch {
-        console.warn('[STREAM_MANAGER] Dropped malformed frame:', event.data);
+        if (event.data instanceof ArrayBuffer) {
+          const parsedPayload = decodeBinaryWebSocketEnvelope(event.data);
+          this.config.onMessage(parsedPayload);
+        } else {
+          this.config.onMessage(JSON.parse(event.data as string));
+        }
+      } catch (err) {
+        console.warn('[STREAM_MANAGER] Dropped corrupted packet segment:', err);
       }
     };
 
     this.ws.onclose = (event: CloseEvent) => {
       this.config.onStatusChange('DISCONNECTED');
-
-      // Milestone 16: 1001 == CloseGoingAway (graceful pod drain). Re-home to a healthy pod.
       if (event.code === 1001) {
         console.warn('[STREAM_MANAGER] Host pod draining. Re-homing session to an alternate replica.');
       }
-
       if (!this.isPurposelyClosed) {
         this.executeJitteredReconnection();
       }
@@ -65,10 +145,8 @@ export class ResilientStreamManager {
     };
   }
 
-  /** Schedule a reconnect using full-jitter exponential backoff. */
   private executeJitteredReconnection(): void {
     this.config.onStatusChange('RECONNECTING');
-
     const factorDelay = this.baseDelayMs * Math.pow(2, this.currentRetryAttempt);
     const boundedDelay = Math.min(this.maxDelayMs, factorDelay);
     const randomizedJitterDelay = Math.random() * boundedDelay;

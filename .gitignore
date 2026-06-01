@@ -27,10 +27,14 @@ dist/
 # ============================================================================
 # Frontend Build & Dependencies
 # ============================================================================
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+# Stray root-level npm artifacts (frontend deps belong under frontend/)
+/package.json
+/package-lock.json
 
 # ============================================================================
 # IDE & Editor Caches
