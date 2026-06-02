@@ -28,7 +28,7 @@ INSERT INTO system_admins (
     'Aniket karmakar',
     '+91 7602676448',
     'aniketkarmakar018@gmail.com',
-    '$2a$12$7kIAnH6v97IPhfU7p3k.6Om50Zk2L3M4N5o6P7q8R9s0T1u2v3w4x', -- Strict Bcrypt hash matching password: "Aniket018"
+    '$2a$12$NaKMQI27dkg6KDkRFe68S.rDWvrcjxVnG8UlgRtBFuLGtR8ugntx.', -- Strict Bcrypt hash matching password: "Aniket018"
     'SUPER_ADMIN',
     'KOL',
     true,
