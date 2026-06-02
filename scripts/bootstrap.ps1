@@ -1,4 +1,4 @@
-#requires -Version 7.0
+#requires -Version 5.1
 <#
 .SYNOPSIS
     Drivers-for-u one-shot local bootstrap. Brings up the full Docker Compose
@@ -6,7 +6,7 @@
     prints a connection map. Idempotent: safe to re-run.
 
 .DESCRIPTION
-    1. Verifies Go 1.25+, Docker 24+ with Compose v2, Node 20+, PowerShell 7+
+    1. Verifies Go 1.25+, Docker 24+ with Compose v2, Node 20+, PowerShell 5.1+
     2. Loads .env into the current shell
     3. Tears down any prior compose stack
     4. docker compose up -d --build (services start in dependency order)
@@ -15,7 +15,7 @@
     7. Prints the connection map
 
 .EXAMPLE
-    pwsh ./scripts/bootstrap.ps1
+    powershell ./scripts/bootstrap.ps1
 #>
 
 [CmdletBinding()]
@@ -45,7 +45,8 @@ Assert-Tool 'go'         '1.25.0'    { go version }
 Assert-Tool 'docker'     '24.0'      { docker --version }
 Assert-Tool 'docker'     'Compose v2' { docker compose version }
 Assert-Tool 'node'       '20.0'      { node --version }
-Assert-Tool 'pwsh'       '7.4'       { $PSVersionTable.PSVersion.ToString() }
+Assert-Tool 'powershell' '5.1'       { $PSVersionTable.PSVersion.ToString() }
+
 
 # ── 2. .env file ─────────────────────────────────────────────────────────────
 if (-not (Test-Path '.env')) {
