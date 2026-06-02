@@ -1,431 +1,366 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
-import { useResilientWebSocket } from '../../hooks/useResilientWebSocket';
+import React, { useState, useEffect, useRef } from 'react';
 import { ClientCoreEngine } from '../../network/ClientCoreEngine';
+import { SlideToConfirm } from '../../components/SlideToConfirm';
 
-export default function RiderPage() {
-  const [cityPrefix] = useState('KOL');
+interface PriceQuoteResponse {
+  estimated_fare_paise: number;
+  surge_multiplier: number;
+  distance_meters: number;
+  duration_seconds: number;
+  currency: string;
+}
+
+interface PlacePrediction {
+  description: string;
+  place_id: string;
+}
+
+export default function RiderBookingPage() {
+  const engineRef = useRef(new ClientCoreEngine('KOL', 'http://localhost:8080'));
   
-  // Rider state machine: 'idle' | 'pricing' | 'requesting' | 'assigned' | 'completed'
-  const [rideState, setRideState] = useState<'idle' | 'pricing' | 'requesting' | 'assigned' | 'completed'>('idle');
-  
-  // Trip details
-  const [pickup, setPickup] = useState<{ name: string; lat: number; lng: number } | null>(null);
-  const [destination, setDestination] = useState<{ name: string; lat: number; lng: number } | null>(null);
-  const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
-  const [fareEstimate, setFareEstimate] = useState(0);
-  const [orderID, setOrderID] = useState('');
-  
-  // Driver states
-  const [activeDrivers, setActiveDrivers] = useState<MapDriver[]>([]);
-  const [assignedDriver, setAssignedDriver] = useState<MapDriver | null>(null);
+  // Geographic State Machine Boundaries
+  const [pickupText, setPickupText] = useState<string>('');
+  const [dropoffText, setDropoffText] = useState<string>('');
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [dropoffCoords, setDropoffCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Mock active drivers for discovery phase
+  // Address Autocomplete UI Lists
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const [activeSearchTarget, setActiveSearchTarget] = useState<'PICKUP' | 'DROPOFF' | null>(null);
+
+  // Car Asset Constraints Mapped Directly to Backend Kuhn-Munkres Match Match Loops
+  const [transmission, setTransmission] = useState<'MANUAL' | 'AUTOMATIC'>('AUTOMATIC');
+  const [vehicleTier, setVehicleTier] = useState<'HATCHBACK' | 'PREMIUM_SUV' | 'ULTRA_LUXURY'>('PREMIUM_SUV');
+
+  // Transaction States
+  const [priceQuote, setPriceQuote] = useState<PriceQuoteResponse | null>(null);
+  const [isEstimating, setIsEstimating] = useState<boolean>(false);
+  const [isBooking, setIsBooking] = useState<boolean>(false);
+  const [bookingLog, setBookingLog] = useState<{ status: 'SUCCESS' | 'ERROR'; message: string } | null>(null);
+
+  // Trigger pricing quote evaluation whenever coordinates or vehicle parameters mutate
   useEffect(() => {
-    if (rideState === 'idle' || rideState === 'pricing') {
-      const interval = setInterval(() => {
-        // Simulating 5 available drivers circling nearby
-        const mockDrivers: MapDriver[] = Array.from({ length: 5 }).map((_, i) => {
-          const angle = (Date.now() / 6000) + (i * Math.PI * 2) / 5;
-          const radius = 0.005 + (i * 0.001);
-          return {
-            id: `drv-online-00${i + 1}`,
-            latitude: 22.5726 + radius * Math.cos(angle),
-            longitude: 88.3639 + radius * Math.sin(angle),
-            bearing: (angle * 180) / Math.PI,
-            speed: 15 + i * 5,
-          };
-        });
-        setActiveDrivers(mockDrivers);
-      }, 1000);
-      return () => clearInterval(interval);
+    if (pickupCoords && dropoffCoords) {
+      executeFetchUpfrontQuote();
     }
-  }, [rideState]);
+  }, [pickupCoords, dropoffCoords, transmission, vehicleTier]);
 
-  // WebSocket Subscription Loop
-  const { status: wsStatus, lastMessage } = useResilientWebSocket(
-    orderID,
-    cityPrefix,
-    rideState === 'requesting' || rideState === 'assigned'
-  );
+  // Simulate Google Places Autocomplete Engine Lookup Hooks
+  const handleLocationInputChange = (text: string, target: 'PICKUP' | 'DROPOFF') => {
+    if (target === 'PICKUP') setPickupText(text);
+    else setDropoffText(text);
+    
+    setActiveSearchTarget(target);
 
-  // Monitor incoming matching messages
-  useEffect(() => {
-    if (lastMessage) {
-      const msg = lastMessage as { event: string; payload?: { driver_id?: string; latitude?: number; longitude?: number; bearing?: number; speed?: number } };
-      
-      if (msg.event === 'order.assigned' && msg.payload) {
-        setRideState('assigned');
-        const drvId = msg.payload.driver_id ?? 'drv-reconciled-99';
-        setAssignedDriver({
-          id: drvId,
-          latitude: msg.payload.latitude ?? 22.574,
-          longitude: msg.payload.longitude ?? 88.365,
-          bearing: msg.payload.bearing ?? 45,
-          speed: msg.payload.speed ?? 30,
-        });
-      } else if (msg.event === 'driver.location.updated' && msg.payload && rideState === 'assigned') {
-        // Continuous updates glide vehicle across client map
-        setAssignedDriver((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            latitude: msg.payload?.latitude ?? prev.latitude,
-            longitude: msg.payload?.longitude ?? prev.longitude,
-            bearing: msg.payload?.bearing ?? prev.bearing,
-            speed: msg.payload?.speed ?? prev.speed,
-          };
-        });
-      }
-    }
-  }, [lastMessage, rideState]);
-
-  // Animate assigned driver moving towards the pickup point
-  useEffect(() => {
-    if (rideState === 'assigned' && assignedDriver && pickup) {
-      // Feed assigned driver details to the rendering map component
-      setActiveDrivers([assignedDriver]);
-
-      // Mock progress to pickup (simulating driver movement if stream is quiet)
-      const interval = setInterval(() => {
-        setAssignedDriver((prev) => {
-          if (!prev) return null;
-          const latDiff = pickup.lat - prev.latitude;
-          const lngDiff = pickup.lng - prev.longitude;
-          const dist = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-          
-          if (dist < 0.0005) {
-            clearInterval(interval);
-            setTimeout(() => setRideState('completed'), 2000);
-            return prev;
-          }
-
-          // Advance towards pickup by 10% on each iteration
-          const bearing = (Math.atan2(latDiff, lngDiff) * 180) / Math.PI;
-          return {
-            ...prev,
-            latitude: prev.latitude + latDiff * 0.1,
-            longitude: prev.longitude + lngDiff * 0.1,
-            bearing,
-            speed: 40,
-          };
-        });
-      }, 4000); // Trigger every 4 seconds to match backend ingestion bounds
-
-      return () => clearInterval(interval);
-    }
-  }, [rideState, pickup]);
-
-  // Request Quote API Hook
-  const handleSelectRoute = async (routeId: number) => {
-    let pName = 'Salt Lake City, Sector V';
-    let pLat = 22.5726;
-    let pLng = 88.3639;
-    let dName = 'Park Street Operations Hub';
-    let dLat = 22.5535;
-    let dLng = 88.3512;
-
-    if (routeId === 2) {
-      pName = 'Howrah Junction Terminal';
-      pLat = 22.5855;
-      pLng = 88.3415;
+    if (text.trim().length < 3) {
+      setPredictions([]);
+      return;
     }
 
-    setPickup({ name: pName, lat: pLat, lng: pLng });
-    setDestination({ name: dName, lat: dLat, lng: dLng });
-    setRideState('pricing');
+    // High-fidelity predictive completions anchor paths mapping locally within Kolkata metro grids
+    const mockPlacesLibrary: Record<string, PlacePrediction[]> = {
+      'how': [
+        { description: 'Howrah Junction Railway Station, Kolkata', place_id: 'pl-hw-01' },
+        { description: 'Howrah Bridge Overpass Core, West Bengal', place_id: 'pl-hw-02' }
+      ],
+      'par': [
+        { description: 'Park Street Dining & Corporate Sector, Kolkata', place_id: 'pl-pk-01' },
+        { description: 'Park Circus Seven-Point Crossing, Kolkata', place_id: 'pl-pk-02' }
+      ],
+      'sal': [
+        { description: 'Salt Lake Sector V Tech Hub, Bidhannagar', place_id: 'pl-sl-01' },
+        { description: 'Salt Lake Central Park Metro Boundary, Kolkata', place_id: 'pl-sl-02' }
+      ]
+    };
 
-    // Simulate backend pricing client lookup
-    const client = new ClientCoreEngine(cityPrefix);
+    const tokenSearchKey = text.toLowerCase().slice(0, 3);
+    setPredictions(mockPlacesLibrary[tokenSearchKey] || [
+      { description: `${text} Main Road Intersection, Kolkata`, place_id: `pl-gen-${Date.now()}` }
+    ]);
+  };
+
+  const handleSelectPrediction = (place: PlacePrediction) => {
+    // Deterministic mock lat/lng resolution boundaries to supply our Directions API wrappers safely
+    let assignedLat = 22.5726;
+    let assignedLng = 88.3639;
+
+    if (place.place_id.includes('hw')) { assignedLat = 22.5855; assignedLng = 88.3411; }
+    else if (place.place_id.includes('pk')) { assignedLat = 22.5487; assignedLng = 88.3561; }
+    else if (place.place_id.includes('sl')) { assignedLat = 22.5731; assignedLng = 88.4332; }
+
+    if (activeSearchTarget === 'PICKUP') {
+      setPickupText(place.description);
+      setPickupCoords({ lat: assignedLat, lng: assignedLng });
+    } else {
+      setDropoffText(place.description);
+      setDropoffCoords({ lat: assignedLat + 0.015, lng: assignedLng + 0.015 }); // Guarantee spatial offset displacement
+    }
+
+    setPredictions([]);
+    setActiveSearchTarget(null);
+  };
+
+  const executeFetchUpfrontQuote = async () => {
+    if (!pickupCoords || !dropoffCoords) return;
+    setIsEstimating(true);
+    setBookingLog(null);
+
     try {
-      // Mocked endpoint execution query
-      const response = await client.executeRequest<{ active_surge_multiplier: number; base_fare_paise: number }>({
-        method: 'GET',
-        path: `/api/v1/pricing/quote?pickup_lat=${pLat}&pickup_lng=${pLng}&drop_lat=${dLat}&drop_lng=${dLng}`,
-      }).catch(() => {
-        // Fallback pricing if backend compose stack is not fully warm
-        return { active_surge_multiplier: 1.4, base_fare_paise: 25000 };
+      // Access backend gateway via our client core network manager wrapper engine
+      const data = await engineRef.current.executeRequest<PriceQuoteResponse>({
+        method: 'POST',
+        path: '/api/v1/orders/quote',
+        body: {
+          pickup_latitude: pickupCoords.lat,
+          pickup_longitude: pickupCoords.lng,
+          dropoff_latitude: dropoffCoords.lat,
+          dropoff_longitude: dropoffCoords.lng,
+          transmission_requirement: transmission,
+          asset_tier: vehicleTier,
+        },
       });
-
-      setSurgeMultiplier(response.active_surge_multiplier);
-      setFareEstimate((response.base_fare_paise / 100) * response.active_surge_multiplier);
-    } catch {
-      setSurgeMultiplier(1.4);
-      setFareEstimate(350);
+      setPriceQuote(data);
+    } catch (err) {
+      console.error('Upfront calculation handshake failure, using failover parameters:', err);
+      // Failover static baseline estimation tracking for network sandbox environments
+      setPriceQuote({
+        estimated_fare_paise: vehicleTier === 'ULTRA_LUXURY' ? 98000 : vehicleTier === 'PREMIUM_SUV' ? 62000 : 35000,
+        surge_multiplier: 1.2,
+        distance_meters: 8400,
+        duration_seconds: 1440,
+        currency: 'INR',
+      });
+    } finally {
+      setIsEstimating(false);
     }
   };
 
-  // Submit Order Creation to gRPC Ingestion & Kafka
-  const handleRequestRide = async () => {
-    if (!pickup || !destination) return;
-    setRideState('requesting');
-    
-    // Generate order ID
-    const newOrderID = `ord-${Math.floor(Math.random() * 900000 + 100000)}`;
-    setOrderID(newOrderID);
+  const handleBookingExecutionCommit = async () => {
+    if (!pickupCoords || !dropoffCoords || !priceQuote) return;
+    setIsBooking(true);
+    setBookingLog(null);
 
-    const client = new ClientCoreEngine(cityPrefix);
     try {
-      await client.executeRequest<{ status: string }>({
+      // Execute demand commit using the X-Idempotency-Key guard rule configuration pattern
+      const data = await engineRef.current.executeRequest<{ order_id: string; status: string }>({
         method: 'POST',
         path: '/api/v1/orders',
-        useIdempotency: true,
         body: {
-          order_id: newOrderID,
-          pickup_latitude: pickup.lat,
-          pickup_longitude: pickup.lng,
-          drop_latitude: destination.lat,
-          drop_longitude: destination.lng,
-          city_prefix: cityPrefix,
+          pickup_address: pickupText,
+          pickup_latitude: pickupCoords.lat,
+          pickup_longitude: pickupCoords.lng,
+          dropoff_address: dropoffText,
+          dropoff_latitude: dropoffCoords.lat,
+          dropoff_longitude: dropoffCoords.lng,
+          transmission_requirement: transmission,
+          asset_tier: vehicleTier,
+          quoted_fare_paise: priceQuote.estimated_fare_paise,
         },
-      }).catch(() => {
-        // Fallback simulate matching
-        console.warn('Backend stack disconnected; triggering loopback simulation matches.');
+        useIdempotency: true, // Core Security Check: Reuses same fingerprint token across retry sweeps
+        maxAttempts: 3,
       });
-    } catch {
-      // Silent catch to handle offline local development gracefully
+
+      setBookingLog({
+        status: 'SUCCESS',
+        message: `Trip request registered cleanly! Dispatch Matrix Order UUID: ${data.order_id.slice(0, 13)}... Seeking professional operator match.`,
+      });
+    } catch (err) {
+      setBookingLog({
+        status: 'ERROR',
+        message: 'Order submission rejected by gateway network sanity checks.',
+      });
+    } finally {
+      setIsBooking(false);
     }
-
-    // Loopback simulated matching trigger for un-orchestrated sandboxes
-    setTimeout(() => {
-      // If still in requesting state, force match completion
-      setRideState((curr) => {
-        if (curr === 'requesting') {
-          setAssignedDriver({
-            id: 'drv-offline-99',
-            latitude: pickup.lat + 0.01,
-            longitude: pickup.lng - 0.01,
-            bearing: 120,
-            speed: 45,
-          });
-          return 'assigned';
-        }
-        return curr;
-      });
-    }, 9000);
-  };
-
-  const handleReset = () => {
-    setRideState('idle');
-    setPickup(null);
-    setDestination(null);
-    setOrderID('');
-    setAssignedDriver(null);
   };
 
   return (
-    <main className="min-h-screen bg-white text-ink flex flex-col md:flex-row antialiased font-sans selection:bg-black selection:text-white">
-      
-      {/* 1. Left Control Panel: Core Rides Panel UI */}
-      <section className="w-full md:w-[380px] p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-canvas-soft bg-white z-10">
-        
-        {/* Top Header */}
+    <div className="min-h-screen bg-white text-black p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-black selection:text-white">
+      {/* Platform Sub-Header Context Navigation Menu */}
+      <header className="border-b border-zinc-100 pb-4 mb-6 flex justify-between items-center">
         <div>
-          <div className="flex items-center justify-between mb-8">
-            <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-xs font-bold text-mute group-hover:text-ink transition">←</span>
-              <h1 className="text-xl font-bold tracking-tight text-ink font-move">
-                drivers-for-u
-              </h1>
-            </Link>
-            <span className="px-2.5 py-0.5 rounded-full border border-surface-pressed bg-canvas-soft text-[10px] font-bold text-ink tracking-wider uppercase">
-              Rider portal
-            </span>
+          <h1 className="text-xl font-bold tracking-tight font-move">Hire Professional Pilot</h1>
+          <p className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider font-bold mt-0.5"> Demand Terminal (Hub: Kol)</p>
+        </div>
+        <a href="/" className="text-xs font-bold uppercase tracking-wider border border-zinc-200 px-4 py-2 rounded-full hover:bg-zinc-50 transition">
+          ← Cancel
+        </a>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-8 flex-grow">
+        {/* Left Input Fields Section (3/5 Columns) */}
+        <div className="md:col-span-3 space-y-5 text-left">
+          
+          {/* Spatial Address Autocomplete Inputs Container Box */}
+          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 space-y-4 relative">
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Route Specifications</h3>
+            
+            {/* Pickup Node Field */}
+            <div className="relative">
+              <label className="block text-[9px] uppercase tracking-wide font-bold text-zinc-500 mb-1">Pick-Up Address (Your Car's Location)</label>
+              <input
+                type="text"
+                className="w-full bg-white border border-zinc-200 rounded-xl p-3 text-xs text-black focus:outline-none focus:border-black font-medium"
+                placeholder="Type 'Howrah', 'Park Street', or 'Salt Lake'..."
+                value={pickupText}
+                onChange={(e) => handleLocationInputChange(e.target.value, 'PICKUP')}
+                disabled={isBooking}
+              />
+            </div>
+
+            {/* Dropoff Node Field */}
+            <div className="relative">
+              <label className="block text-[9px] uppercase tracking-wide font-bold text-zinc-500 mb-1">Destination Address</label>
+              <input
+                type="text"
+                className="w-full bg-white border border-zinc-200 rounded-xl p-3 text-xs text-black focus:outline-none focus:border-black font-medium"
+                placeholder="Where should the pilot guide your vehicle?"
+                value={dropoffText}
+                onChange={(e) => handleLocationInputChange(e.target.value, 'DROPOFF')}
+                disabled={isBooking}
+              />
+            </div>
+
+            {/* Autocomplete Predictions Dropdown Panel */}
+            {predictions.length > 0 && (
+              <div className="absolute left-5 right-5 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 overflow-hidden divide-y divide-zinc-100">
+                {predictions.map((place) => (
+                  <button
+                    key={place.place_id}
+                    type="button"
+                    onClick={() => handleSelectPrediction(place)}
+                    className="w-full text-left px-4 py-3 text-xs text-black hover:bg-zinc-50 font-medium transition cursor-pointer"
+                  >
+                    📍 {place.description}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Idle State: Destination Selector */}
-          {rideState === 'idle' && (
-            <div className="space-y-4 animate-in">
-              <h2 className="text-lg font-bold text-ink font-move">Where are you heading?</h2>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => handleSelectRoute(1)}
-                  className="w-full p-5 rounded-xl text-left border border-canvas-soft bg-canvas-softer hover:border-ink hover:bg-white transition duration-200 group cursor-pointer"
-                >
-                  <div className="font-bold text-ink group-hover:text-black font-move">Sector V Office Hub</div>
-                  <div className="text-xs text-body mt-1">From Sector V → Park Street Hub</div>
-                </button>
-
-                <button
-                  onClick={() => handleSelectRoute(2)}
-                  className="w-full p-5 rounded-xl text-left border border-canvas-soft bg-canvas-softer hover:border-ink hover:bg-white transition duration-200 group cursor-pointer"
-                >
-                  <div className="font-bold text-ink group-hover:text-black font-move">Howrah Junction Terminal</div>
-                  <div className="text-xs text-body mt-1">From Howrah Station → Park Street Hub</div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pricing State: Quote Breakdown */}
-          {rideState === 'pricing' && pickup && destination && (
-            <div className="space-y-6 animate-in">
-              <h2 className="text-lg font-bold text-ink font-move">Select a ride option</h2>
-              
-              <div className="p-5 rounded-xl border border-canvas-soft bg-canvas-softer space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-bold text-ink text-base font-move">Classic journey</h3>
-                    <p className="text-xs text-body mt-0.5">Reliable door-to-door dispatch comfort</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-ink font-move">₹{fareEstimate.toFixed(2)}</div>
-                    <div className="text-[10px] text-mute uppercase font-semibold">Fare estimate</div>
-                  </div>
-                </div>
-
-                {/* Dynamic Surge Warning Badge */}
-                {surgeMultiplier > 1.0 && (
-                  <div className="flex items-center gap-2.5 p-3 rounded-lg border border-black/10 bg-black text-white shadow-sm">
-                    <svg className="w-4 h-4 fill-none stroke-current" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      Surge active: x{surgeMultiplier.toFixed(2)} multiplier
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleReset}
-                  className="flex-1 py-3.5 rounded-full border border-canvas-soft bg-white font-semibold text-ink hover:bg-canvas-softer transition duration-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRequestRide}
-                  className="flex-1 py-3.5 rounded-full bg-black text-white font-semibold hover:bg-black-elevated transition duration-200 cursor-pointer"
-                >
-                  Request ride
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Requesting State: Radar Matching Console */}
-          {rideState === 'requesting' && (
-            <div className="space-y-6 animate-in">
-              <div className="p-6 rounded-xl border border-canvas-soft bg-canvas-softer text-center space-y-4">
-                <div className="relative w-12 h-12 mx-auto flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border border-black/20 animate-ping" />
-                  <div className="w-10 h-10 rounded-full border border-black flex items-center justify-center bg-black/5">
-                    <svg className="w-4 h-4 text-black animate-spin" fill="none" strokeWidth="3.5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-ink text-base font-move">Booking radar active</h3>
-                  <p className="text-xs text-body mt-1">Hungarian dispatch solver searching available drivers...</p>
+          {/* Customer Owned Vehicle Mechanical Asset Specification Matrix */}
+          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 space-y-4">
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Vehicle Profile Matching Criteria</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Transmission Choice Switches */}
+              <div>
+                <span className="block text-[9px] uppercase tracking-wide font-bold text-zinc-500 mb-2">Transmission Mechanism</span>
+                <div className="flex gap-2">
+                  {(['AUTOMATIC', 'MANUAL'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setTransmission(type)}
+                      disabled={isBooking}
+                      className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition cursor-pointer ${
+                        transmission === type ? 'bg-black border-black text-white' : 'bg-white border-zinc-200 hover:bg-zinc-100 text-black'
+                      }`}
+                    >
+                      {type === 'AUTOMATIC' ? '🕹️ Auto / EV' : '⚙️ Stick Shift'}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl border border-canvas-soft bg-black font-mono text-[9px] text-canvas-soft space-y-1.5 max-h-[160px] overflow-y-auto leading-relaxed shadow-inner">
-                <div>[SYSTEM] Inbound order created: {orderID}</div>
-                <div>[KAFKA] Order committed to order.created</div>
-                <div>[SOLVER] EWMA batch window set to 300ms</div>
-                <div className="animate-pulse text-white font-semibold">[HUNGARIAN] Scanning bipartite driver matching vectors...</div>
-              </div>
-            </div>
-          )}
-
-          {/* Assigned State: Ride Active */}
-          {rideState === 'assigned' && assignedDriver && (
-            <div className="space-y-6 animate-in">
-              <h2 className="text-lg font-bold text-ink font-move">Meet your driver</h2>
-              
-              <div className="p-5 rounded-xl border border-canvas-soft bg-canvas-softer space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white font-bold text-xs select-none">
-                    DR
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-ink font-move">Driver partner assigned</h3>
-                    <p className="text-xs text-body mt-0.5">Vehicle reference: {assignedDriver.id}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 rounded-lg border border-canvas-soft bg-white text-xs">
-                  <span className="text-body font-semibold">Estimated arrival</span>
-                  <span className="font-bold text-black uppercase tracking-wide">3 Mins Away</span>
+              {/* Asset Class Tier Grid Selectors */}
+              <div>
+                <span className="block text-[9px] uppercase tracking-wide font-bold text-zinc-500 mb-2">Vehicle Class Classification</span>
+                <div className="flex flex-col gap-1.5">
+                  {(['HATCHBACK', 'PREMIUM_SUV', 'ULTRA_LUXURY'] as const).map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => setVehicleTier(tier)}
+                      disabled={isBooking}
+                      className={`w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition cursor-pointer flex justify-between items-center ${
+                        vehicleTier === tier ? 'bg-black border-black text-white' : 'bg-white border-zinc-200 hover:bg-zinc-100 text-black'
+                      }`}
+                    >
+                      <span>{tier.replace('_', ' ')}</span>
+                      <span className="text-[9px] opacity-60 font-mono">
+                        {tier === 'ULTRA_LUXURY' ? 'Premium Imports' : tier === 'PREMIUM_SUV' ? 'Sedans/SUVs' : 'Compact Core'}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Completed State: Arrival */}
-          {rideState === 'completed' && (
-            <div className="space-y-6 animate-in text-center">
-              <div className="p-6 rounded-xl border border-canvas-soft bg-canvas-softer space-y-5">
-                <div className="w-12 h-12 rounded-full bg-black mx-auto flex items-center justify-center text-white font-bold text-xl select-none">
-                  ✓
-                </div>
-                <div>
-                  <h3 className="font-bold text-ink text-lg font-move">Arrival successful!</h3>
-                  <p className="text-xs text-body mt-1">Thank you for riding with drivers-for-u.</p>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="w-full py-3 rounded-full bg-black hover:bg-black-elevated font-semibold text-white transition duration-200 cursor-pointer"
-                >
-                  Book another ride
-                </button>
-              </div>
-            </div>
-          )}
+          </div>
 
         </div>
 
-        {/* WebSocket Graceful Reconnection Mask */}
-        {(rideState === 'requesting' || rideState === 'assigned') && (
-          <div className="mt-6 border-t border-canvas-soft pt-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${
-                wsStatus === 'CONNECTED' ? 'bg-black' :
-                wsStatus === 'RECONNECTING' ? 'bg-mute animate-pulse' : 'bg-mute'
-              }`} />
-              <span className="text-[10px] text-body font-bold uppercase tracking-wider">
-                Stream: {wsStatus}
-              </span>
-            </div>
-            {wsStatus === 'RECONNECTING' && (
-              <span className="text-[10px] text-ink font-bold animate-pulse uppercase tracking-wider">
-                Reconnecting...
-              </span>
+        {/* Right Pricing Summary Section (2/5 Columns) */}
+        <div className="md:col-span-2 bg-zinc-50 border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between min-h-[350px]">
+          <div className="text-left space-y-4 w-full">
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Upfront Price Summary</h3>
+
+            {isEstimating ? (
+              <div className="py-12 text-center text-xs font-mono text-zinc-400 animate-pulse italic">
+                Evaluating physical track road conditions & surge indices...
+              </div>
+            ) : priceQuote ? (
+              <div className="space-y-4 animate-fadeIn w-full">
+                {/* Large Currency Price Display Metric */}
+                <div className="border-b border-zinc-200/60 pb-3">
+                  <span className="text-3xl font-mono font-bold tracking-tighter text-black">
+                    ₹{(priceQuote.estimated_fare_paise / 100).toFixed(2)}
+                  </span>
+                  {priceQuote.surge_multiplier > 1.0 && (
+                    <span className="ml-2 inline-block bg-black text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
+                      Surge {priceQuote.surge_multiplier}x
+                    </span>
+                  )}
+                </div>
+
+                {/* Subtitle Journey Length Analytics Meta Values */}
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono border-b border-zinc-200/60 pb-3">
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-bold tracking-tight">Driving Distance</span>
+                    <span className="font-bold text-black text-xs mt-0.5 block">{(priceQuote.distance_meters / 1000).toFixed(2)} km</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-bold tracking-tight">Est. Transit Time</span>
+                    <span className="font-bold text-black text-xs mt-0.5 block">{Math.round(priceQuote.duration_seconds / 60)} mins</span>
+                  </div>
+                </div>
+
+                {/* Compliance Matching Parameter Recaps */}
+                <div className="text-[10px] space-y-1 text-zinc-600 font-medium">
+                  <div>• Bipartite match constraint: <span className="font-bold text-black font-mono">{transmission} pilot only</span></div>
+                  <div>• Escrow routing ledger: <span className="font-bold text-black uppercase font-mono">{vehicleTier} category</span></div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 rounded-xl italic px-4">
+                Provide pickup and destination coordinates to evaluate live upfront pricing splits.
+              </div>
             )}
           </div>
-        )}
 
-      </section>
-      
-      {/* 2. Right Canvas Map View Panel */}
-      <section className="flex-1 h-[450px] md:h-screen relative p-4 bg-canvas-softer">
-        <MapInterpolated
-          drivers={activeDrivers}
-          pickup={pickup}
-          destination={destination}
-        />
+          {/* Interactive Booking Execution Commit Container Layer */}
+          <div className="w-full mt-6 space-y-3">
+            {priceQuote && !isEstimating && (
+              <SlideToConfirm 
+                label={isBooking ? "Broadcasting Request..." : "Slide to Hire Pilot"}
+                onConfirm={handleBookingExecutionCommit}
+                disabled={isBooking}
+              />
+            )}
 
-        {/* Global Connection Draining Banner */}
-        {wsStatus === 'RECONNECTING' && (
-          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className="p-8 rounded-xl border border-canvas-soft bg-white shadow-xl text-center space-y-4 max-w-sm">
-              <div className="w-8 h-8 rounded-full border-2 border-canvas-soft border-t-black animate-spin mx-auto" />
-              <h3 className="font-bold text-ink text-base font-move">Reconnecting stream</h3>
-              <p className="text-xs text-body leading-relaxed">
-                Pod scale-down completed. Re-homing WebSocket to an alternate healthy replica gateway cleanly...
-              </p>
-            </div>
+            {bookingLog && (
+              <div className={`p-4 rounded-xl text-[10px] text-left font-mono font-bold uppercase tracking-wider leading-relaxed ${
+                bookingLog.status === 'SUCCESS' ? 'bg-zinc-200 text-black border border-zinc-300' : 'bg-black text-white'
+              }`}>
+                {bookingLog.message}
+              </div>
+            )}
           </div>
-        )}
-      </section>
 
-    </main>
+        </div>
+      </div>
+    </div>
   );
 }
