@@ -22,7 +22,7 @@ at the bottom.
 - **Go:** 1.25.0 (see `go.mod`)
 - **Stack:** Go (backend), Next.js 16 + Capacitor 8 (mobile client), Vite + React 18 (admin dashboard), Postgres 15 + PostGIS 3.3, Redis 7.2 cluster, Apache Kafka (KRaft mode), NVIDIA Triton 24.01
 - **Services:** 15 Go services (ingestion, dispatch, surge, pricing, reconciler, pruner, expiry, rebalancer, gateway, notification, analytics, simulator, osm-preprocessor, server, migrate)
-- **Milestones delivered:** 33+ (see [Milestones](#milestones))
+- **Milestones delivered:** 34+ (see [Milestones](#milestones))
 - **Regions supported:** KOL (Kolkata) and BLR (Bengaluru) via region router middleware
 
 ## High-Level Runtime Path
@@ -462,7 +462,7 @@ Supported regions: `KOL` (Kolkata) and `BLR` (Bengaluru). Configure
 
 ## Milestones
 
-All 33 currently-completed milestones:
+All 34 currently-completed milestones:
 
 | # | Milestone |
 | --- | --- |
@@ -499,6 +499,7 @@ All 33 currently-completed milestones:
 | 31 | Lightweight Client-Side Protobuf Stream Decoder & Binary WS Framing |
 | 32 | Full-Stack Network Integration & Mocking Suite |
 | 33 | System Administrator Authorization Tier & Relational Database Seeding |
+| 34 | Dynamic Geofencing & Operational Zone Management, Algorithmic Force-Match, & Telemetry Fraud Risk Isolation Radar (Marketplace Orchestrator) |
 
 ## Wiring Risks (current)
 

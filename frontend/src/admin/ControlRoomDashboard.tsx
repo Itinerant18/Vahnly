@@ -8,6 +8,7 @@ import { ActiveTripRadar } from './ActiveTripRadar';
 import { SurgeControlValve } from './components/SurgeControlValve';
 import { IncidentRecoveryTerminal } from './components/IncidentRecoveryTerminal';
 import { LedgerReconciliation } from './components/LedgerReconciliation';
+import { MarketplaceOrchestrator } from './components/MarketplaceOrchestrator';
 
 interface LedgerEntry {
   id: number;
@@ -68,7 +69,7 @@ export const ControlRoomDashboard: React.FC = () => {
   const activePolygonsRef = useRef<google.maps.Polygon[]>([]);
   const [isMapSdkLoaded, setIsMapSdkLoaded] = useState<boolean>(false);
 
-  const [bottomTab, setBottomTab] = useState<'orders' | 'drivers' | 'vehicles' | 'incidents' | 'ledger'>('orders');
+  const [bottomTab, setBottomTab] = useState<'orders' | 'drivers' | 'vehicles' | 'incidents' | 'ledger' | 'orchestrator'>('orders');
 
   useEffect(() => {
     if (window.google?.maps) {
@@ -232,6 +233,7 @@ export const ControlRoomDashboard: React.FC = () => {
     { key: 'drivers', label: 'Driver queue', allowed: canFleet },
     { key: 'vehicles', label: 'Vehicles', allowed: canFleet },
     { key: 'incidents', label: 'Incidents', allowed: canIncident },
+    { key: 'orchestrator', label: 'Marketplace controls', allowed: canFleet },
     { key: 'ledger', label: 'Ledger', allowed: canAudit },
   ];
   const visibleTabs = tabs.filter((t) => t.allowed);
@@ -375,6 +377,9 @@ export const ControlRoomDashboard: React.FC = () => {
           )}
           {activeTab === 'incidents' && canIncident && (
             <div className="p-4"><IncidentRecoveryTerminal /></div>
+          )}
+          {activeTab === 'orchestrator' && canFleet && (
+            <div className="p-4"><MarketplaceOrchestrator /></div>
           )}
           {activeTab === 'ledger' && canAudit && (
             <div className="p-4 space-y-4 overflow-x-auto">

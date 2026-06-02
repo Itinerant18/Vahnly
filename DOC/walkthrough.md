@@ -1241,3 +1241,35 @@ Initial deployments require a default admin user and structured role-based datab
 |-------|--------|---------|
 | `go run ./cmd/migrate` | ✅ Pass | Database schema migrations up to 000033 apply cleanly with seeds |
 | `go test ./internal/admin/...` | ✅ Pass | Admin API endpoints return 401/403 for unauthorized users and 200 for Aniket |
+
+---
+
+## Milestone 34: Dynamic Geofencing & Operational Zone Management, Algorithmic Force-Match, & Telemetry Fraud Risk Isolation Radar (Marketplace Orchestrator) ✅
+
+### Problem
+
+Active operational management of a large-scale driver delivery fleet requires real-time interventions that bypass automated batch-matching loops (Kuhn-Munkres/Hungarian calculations). Specifically, operators must be able to:
+1. Instantly declare/blacklist geographic regions due to extreme weather or safety issues.
+2. Manually force-assign order allocations to resolve specific on-the-ground blockages.
+3. Detect, audit, and suspend telemetry-spoofing drivers in real time to prevent dispatch corruption.
+
+### Solution
+
+1. **Database Spatial Schema (`database/migrations/000034_create_operational_geofences.up.sql`)**:
+   - Added PostGIS geometry polygons in the `operational_geofences` table, utilizing a GiST spatial index.
+2. **Go Orchestrator HTTP Delivery Layer (`internal/admin/delivery/http/orchestrator_handler.go`)**:
+   - Developed `HandleUpsertGeofenceZone` to parse polygons, construct WKT geometries, and commit them directly to PostGIS.
+   - Built `HandleManualForceMatch` executing serializable PostgreSQL database overrides to force-update driver and order states, updating local Redis cluster keys concurrently.
+   - Programmed `HandleExecuteFraudLockout` and `HandleGetFraudAnomalies` to flag and instantly lock out drivers with suspicious GPS telemetry patterns.
+3. **Gateway Registration (`cmd/gateway/main.go`)**:
+   - Exposed endpoints gated with role-based auth (e.g. `FLEET_MANAGER` and `MARKET_CONTROLLER`).
+4. **Marketplace UI Integration (`frontend/src/admin/components/MarketplaceOrchestrator.tsx`)**:
+   - Developed a tabbed operations console in React allowing operators to govern PostGIS geofences, trigger force-match assignments, and view high-variance velocity telemetry exceptions.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go run ./cmd/migrate` | ✅ Pass | Applied `000034_create_operational_geofences` migration successfully |
+| `go test ./internal/admin/...` | ✅ Pass | Go backend orchestration handlers compile and verify clean |
+| `npm run build` | ✅ Pass | Admin dashboard compiled successfully with the new Tab interface (42 modules) |
