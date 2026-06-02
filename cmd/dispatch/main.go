@@ -144,7 +144,7 @@ func main() {
 	}
 
 	googleMapsKey := getEnv("GOOGLE_MAPS_API_KEY", getEnv("VITE_GOOGLE_MAPS_API_KEY", ""))
-	routingSvc := googleRouting.NewPremiumHybridRouter(googleMapsKey, chService)
+	routingSvc := googleRouting.NewPremiumHybridRouter(googleMapsKey, chService, redisClusterClient)
 
 	etaCorrector := usecase.NewETACorrectorUseCase(tritonClient, routingSvc)
 
