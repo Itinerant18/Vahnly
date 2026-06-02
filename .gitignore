@@ -1,44 +1,119 @@
 # ============================================================================
-# Environment & Secrets (NEVER commit these — always use env vars or .env.local)
+# Drivers-for-u — Repository .gitignore
 # ============================================================================
+# Goal: anything that is generated, environment-specific, secret-bearing, or
+# produced by a build is OUT. Source, configs, migrations, and proto Go stubs
+# are IN. New devs should be able to clone, run the bootstrap, and reproduce
+# a working stack with no local state leaking from the previous developer.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 1. Secrets & environment (NEVER commit — use .env.local for dev)
+# ----------------------------------------------------------------------------
 .env
 .env.local
 .env.*.local
+.envrc
 *.pem
 *.key
+*.crt
+*.p12
 credentials.json
 secrets/
+gcp-service-account*.json
+aws-credentials
 
-# ============================================================================
-# Go Build Artifacts
-# ============================================================================
-bin/
-dist/
-*.o
-*.a
+# ----------------------------------------------------------------------------
+# 2. Go build artifacts
+# ----------------------------------------------------------------------------
+# Catch all compiled Go binaries (works on Windows; harmless on Linux/macOS)
+*.exe
+*.exe~
+*.dll
 *.so
-.dylib
+*.dylib
 *.test
 *.out
-*.exe
+
+# Coverage & profile outputs
 /coverage.txt
 /coverage.html
+*.cover
+*.prof
 
-# ============================================================================
-# Frontend Build & Dependencies
-# ============================================================================
+# Single-file Go build outputs at the repo root (e.g. `go build -o gateway.exe`)
+# (already covered by *.exe above, but explicit for clarity)
+/gateway.exe
+/reconciler.exe
+/integration.test.exe
+/simulator.exe
+/dispatch.exe
+/ingestion.exe
+/analytics.exe
+/pricing.exe
+/expiry.exe
+/rebalancer.exe
+/pruner.exe
+/surge.exe
+/notification.exe
+/migrate.exe
+/osm-preprocessor.exe
+/admin.exe
+
+# Build cache & test cache
+.cache/
+.gocache/
+
+# ----------------------------------------------------------------------------
+# 3. bin/ — runtime artifacts (binaries, logs, generated wrappers)
+# ----------------------------------------------------------------------------
+# We DO want a few canonical helper scripts tracked under bin/. The whitelist
+# below is enforced by Git's "last matching pattern wins" rule.
+bin/*
+!bin/seed.sql
+!bin/run-local-env.ps1
+!bin/start-port-forwards.ps1
+!bin/.gitkeep
+
+# ----------------------------------------------------------------------------
+# 4. Frontend (Vite + React 18) build & dependency state
+# ----------------------------------------------------------------------------
 node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
-# Stray root-level npm artifacts (frontend deps belong under frontend/)
+# Yarn / pnpm alternative lockfiles (project uses npm)
+frontend/yarn.lock
+frontend/pnpm-lock.yaml
+
+# Stray root-level npm artifacts (root package.json is only a frontend
+# test forwarder — should never have its own lockfile)
 /package.json
 /package-lock.json
+/yarn.lock
+/pnpm-lock.yaml
 
-# ============================================================================
-# IDE & Editor Caches
-# ============================================================================
+# ----------------------------------------------------------------------------
+# 5. client-app (Next.js 16 + Capacitor 8) build & dependency state
+# ----------------------------------------------------------------------------
+client-app/node_modules/
+client-app/.next/
+client-app/out/
+client-app/build/
+client-app/.turbo/
+client-app/coverage/
+# Capacitor native platform folders (regenerated via `npx cap add`)
+client-app/android/app/build/
+client-app/android/build/
+client-app/android/.gradle/
+client-app/android/local.properties
+client-app/ios/Pods/
+client-app/ios/build/
+
+# ----------------------------------------------------------------------------
+# 6. AI / IDE / tool caches (regenerable, personal to each developer)
+# ----------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
@@ -46,62 +121,94 @@ frontend/coverage/
 *~
 .DS_Store
 Thumbs.db
+.AppleDouble
+.LSOverride
+._*
 *.sublime-workspace
 *.sublime-project
 .vim/
 .emacs.d/
+.history/
 
-# ============================================================================
-# Development & Analysis Tools (Local only — regenerated on demand)
-# ============================================================================
+# Agent / assistant workspaces
 .agent/
 .agents/
 .claude/
-.code-review-graph/
 .codex/
+.code-review-graph/
+.cursor/
+.aider*
+.continue/
+
+# Knowledge-graph outputs (regenerate with `graphify update .`)
 graphify-out/
 .graphify/
+graphify.cache/
 
-# ============================================================================
-# Large Data Files (Regenerated from OSM PBF source via osm-preprocessor)
-# ============================================================================
-data/kolkata_full.osm.pbf
-data/kolkata_raw.osm.pbf
-data/kolkata_edges.csv
-data/kolkata_nodes.csv
+# ----------------------------------------------------------------------------
+# 7. Large data files (regenerated by cmd/osm-preprocessor from a fresh
+#    .osm.pbf download — never commit the binaries)
+# ----------------------------------------------------------------------------
+data/*.pbf
+data/*.osm
+data/*.csv
+data/raw/
+data/processed/
+!data/.gitkeep
 
-# ============================================================================
-# Logs & Temp Files
-# ============================================================================
+# ----------------------------------------------------------------------------
+# 8. Logs, temps, OS junk
+# ----------------------------------------------------------------------------
 *.log
 *.log.*
+logs/
 tmp/
 temp/
 *.tmp
+*.bak
+*.swp
+*.orig
+*.rej
 
-# ============================================================================
-# Go-specific (vendor dir only if not committed; go.mod/go.sum ARE tracked)
-# ============================================================================
+# ----------------------------------------------------------------------------
+# 9. Local database / Redis state
+# ----------------------------------------------------------------------------
+postgres_data/
+redis_data/
+*.sqlite
+*.sqlite3
+*.db
+dump.rdb
+appendonly.aof
+
+# Docker Compose local state
+.docker/
+
+# ----------------------------------------------------------------------------
+# 10. Kubernetes / Helm local state
+# ----------------------------------------------------------------------------
+# Never commit cluster secrets
+kustomize-secrets/
+*.kubeconfig
+.kube/
+
+# ----------------------------------------------------------------------------
+# 11. Go vendor dir (project does not use vendor/)
+# ----------------------------------------------------------------------------
 vendor/
 go.work.sum
 
-# ============================================================================
-# Docker & Database (local runtime state — never track DB volumes)
-# ============================================================================
-.docker/
-postgres_data/
-redis_data/
-
-# ============================================================================
-# OS-specific
-# ============================================================================
-.AppleDouble
-.LSOverride
-._*
-
-# ============================================================================
-# Misc development files
-# ============================================================================
-.DS_Store
-.env.test
+# ----------------------------------------------------------------------------
+# 12. Misc safety nets
+# ----------------------------------------------------------------------------
 debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local override / scratch / personal notes
+TODO.local.md
+NOTES.local.md
+scratch/
+playground/

@@ -1,337 +1,532 @@
 # Drivers-for-u
 
-Real-time driver delivery dispatch platform written in Go. The system ingests driver telemetry, maintains spatial availability in Redis, matches orders to drivers, updates Postgres state, emits Kafka events, computes surge multipliers, and exposes pricing read models.
+A real-time, multi-region driver delivery dispatch platform. The system ingests
+driver telemetry over gRPC, maintains spatial availability in Redis H3 cells,
+matches orders to drivers with a configurable optimizer (greedy / Hungarian
+/ circuit-breaker fallback), persists state in Postgres+PostGIS, streams
+events through Kafka, runs an XGBoost ETA corrector on Triton, computes
+surge pricing, and exposes a JWT-authenticated public API gateway with
+WebSocket fan-out for live trip updates.
 
-This README is a current developer orientation snapshot. For deeper architecture notes, see the `DOC/` files listed near the end.
+This README is a current developer orientation. For deeper dives see `DOC/`
+at the bottom.
+
+> **New here? Start with [`SETUP.md`](./SETUP.md).** It walks you from
+> `git clone` to a running stack in under 15 minutes, with one command:
+> `pwsh ./scripts/bootstrap.ps1` (or `./scripts/bootstrap.sh` on macOS/Linux).
+> The README is the project map; `SETUP.md` is the runbook.
 
 ## Current Snapshot
 
-Observed with the code review graph on 2026-05-28:
+- **Module:** `github.com/platform/driver-delivery`
+- **Go:** 1.25.0 (see `go.mod`)
+- **Stack:** Go (backend), Next.js 16 + Capacitor 8 (mobile client), Vite + React 18 (admin dashboard), Postgres 15 + PostGIS 3.3, Redis 7.2 cluster, Apache Kafka (KRaft mode), NVIDIA Triton 24.01
+- **Services:** 15 Go services (ingestion, dispatch, surge, pricing, reconciler, pruner, expiry, rebalancer, gateway, notification, analytics, simulator, osm-preprocessor, server, migrate)
+- **Milestones delivered:** 28+ (see [Milestones](#milestones))
+- **Regions supported:** KOL (Kolkata) and BLR (Bengaluru) via region router middleware
 
-| Area             | Current value             |
-| ---------------- | ------------------------- |
-| Files in graph   | 52                        |
-| Graph nodes      | 323                       |
-| Graph edges      | 2,873                     |
-| Main languages   | Go, SQL, Bash, PowerShell |
-| Main service     | `cmd/ingestion`, `cmd/dispatch`, `cmd/surge`, `cmd/pricing`, `cmd/reconciler`, `cmd/pruner`, `cmd/simulator`, `cmd/osm-preprocessor` |
-
-High-level runtime path:
+## High-Level Runtime Path
 
 ```text
-driver telemetry
-  -> cmd/ingestion gRPC
-  -> internal/telemetry
-  -> Postgres + Redis H3 driver indexes + Kafka driver.location.updated
+driver mobile app (gRPC stream)
+  -> cmd/ingestion → Postgres + Redis H3 driver indexes + Kafka driver.location.updated
   -> cmd/dispatch consumes order.created
-  -> internal/dispatch matcher + routing ETA + optional Triton correction
-  -> Postgres order/driver updates + Redis driver eviction + Kafka order.assigned
-  -> Kafka driver.state.changed / order.created
-  -> cmd/surge supply, demand, and calculator workers
-  -> Kafka surge.zone.updated
+     → internal/dispatch matcher (greedy | Hungarian | circuit-breaker)
+     → internal/routing ETA (CH-style local road graph)
+     → optional internal/intelligence Triton XGBoost correction
+  -> Postgres order/driver updates + Redis eviction + Kafka order.assigned
+  -> cmd/surge supply/demand/calculator workers → Kafka surge.zone.updated
   -> cmd/pricing in-memory multiplier read model
+  -> cmd/notification outbox → FCM/APNs push
+  -> cmd/analytics SSE heatmap stream
+  -> cmd/gateway WebSocket fan-out → rider app live state
+  -> cmd/reconciler self-heals stuck assignments
+  -> cmd/pruner evicts stale telemetry
+  -> cmd/expiry times out unaccepted offers
+  -> cmd/rebalancer redistributes idle drivers
 ```
+
+## Quickstart (Docker Compose)
+
+The fastest path to a running system. From the repo root in an
+**Administrator PowerShell**:
+
+```powershell
+docker-compose down -v
+Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue
+docker-compose up -d --build
+```
+
+This brings up the entire backend mesh (Postgres, Kafka, 6-node Redis
+cluster, Triton, db-migrator, plus all 11 deployable Go services). The
+frontend apps are decoupled and run separately.
+
+After infrastructure is healthy (~30s):
+
+```powershell
+# Apply migrations explicitly
+go run .\cmd\migrate
+
+# Stream simulated fleet + orders
+go run .\cmd\simulator
+```
+
+For the local Kubernetes path, see [Deployment](#deployment).
 
 ## Repository Map
 
 | Path | Role |
 | --- | --- |
-| `api/proto/v1` | Protobuf API contract for telemetry ingestion. |
-| `pkg/api/v1` | Generated Go protobuf and gRPC bindings. |
-| `cmd/ingestion` | Driver telemetry gRPC service bootstrap. |
-| `cmd/dispatch` | Order matching engine bootstrap with metrics and health endpoints. |
+| `api/proto` | Protobuf contracts (telemetry, triton, stream_framing). |
+| `pkg/api/v1` | Generated Go bindings for the proto contracts. |
+| `cmd/ingestion` | Driver telemetry gRPC streaming gateway. |
+| `cmd/dispatch` | Order matching engine (greedy + Hungarian + circuit-breaker). |
 | `cmd/surge` | Supply, demand, and surge calculator stream workers. |
-| `cmd/pricing` | Pricing service bootstrap that maintains a surge multiplier read model. |
-| `cmd/reconciler` | Dispatch reconciliation daemon for stuck or incomplete assignments. |
-| `cmd/pruner` | Stale telemetry cleanup worker for Redis/Postgres driver availability state. |
-| `cmd/simulator` | Local telemetry simulator for development and tests. |
-| `cmd/osm-preprocessor` | OSM PBF to local routing CSV preprocessor. |
-| `internal/telemetry` | Telemetry ingestion domain, repositories, gRPC handler, and use case. |
-| `internal/dispatch` | Matching consumer, matching algorithms, spatial scanner, and reconciliation logic. |
-| `internal/routing` | Local road graph loader and contraction-hierarchy-style ETA service. |
-| `internal/intelligence` | Triton ETA correction client and ETA adapter. |
-| `internal/surge` | Supply aggregation, demand aggregation, and surge multiplier calculation. |
+| `cmd/pricing` | Pricing service with thread-safe in-memory surge multiplier cache. |
+| `cmd/reconciler` | Self-healing state reconciliation sync worker. |
+| `cmd/pruner` | Stale telemetry garbage collector for Redis/Postgres. |
+| `cmd/expiry` | Offer timeout janitor for unaccepted offers. |
+| `cmd/rebalancer` | Idle-driver redistribution prompts. |
+| `cmd/gateway` | JWT-authenticated public API + WebSocket fan-out (BFF). |
+| `cmd/notification` | Outbox pattern → FCM/APNs push notification engine. |
+| `cmd/analytics` | Live spatial heatmap SSE stream. |
+| `cmd/simulator` | Local telemetry + order simulator for dev/test. |
+| `cmd/osm-preprocessor` | OSM PBF → local routing CSV preprocessor. |
+| `cmd/migrate` | Standalone database migration runner. |
+| `cmd/server` | Reserved for future consolidated service entrypoint. |
+| `internal/telemetry` | Telemetry domain, gRPC handler, use case, repos. |
+| `internal/dispatch` | Order consumer, matchers, spatial scanner, CH graph. |
+| `internal/routing` | Local road graph loader, contraction hierarchies, ETA. |
+| `internal/intelligence` | Triton gRPC client, ETA corrector, circuit breaker. |
+| `internal/surge` | Supply aggregator, demand aggregator, surge calculator. |
 | `internal/pricing` | Order pricing service and surge multiplier cache. |
-| `internal/events` | Shared event payload contracts used across services. |
-| `internal/observability` | Prometheus metrics, health/readiness server, and circuit breaker helpers. |
-| `internal/test` | Integration-oriented test helpers and end-to-end test coverage. |
-| `data` | Local routing datasets for Kolkata road graph experiments. |
-| `model_repository` | Triton model repository for ETA correction. |
-| `deploy` | Kubernetes-oriented manifests and alerts. |
-| `docker-compose.yml` | Local infrastructure stack for Postgres, Kafka, Redis Cluster, Triton, and reconciler. |
-| `database/migrations` | golang-migrate up/down scripts — the single source of truth for the DB schema and seed data. Applied by the `db-migrator` service (and at dispatch startup). |
+| `internal/notification` | Outbox writer, FCM/APNs adapters. |
+| `internal/analytics` | Heatmap engine and SSE writer. |
+| `internal/admin` | Admin portal HTTP handlers (auth, trip, pricing, incident). |
+| `internal/gateway` | Gateway HTTP/WebSocket handlers, JWT middleware, region router. |
+| `internal/events` | Shared Kafka event payload contracts. |
+| `internal/observability` | Prometheus, OpenTelemetry, health/readiness, gobreaker. |
+| `internal/storage` | Storage layer abstractions (Postgres/Redis/Kafka/Triton). |
+| `internal/test` | Integration-oriented test helpers and e2e coverage. |
+| `frontend/` | Vite + React 18 admin control-room dashboard. |
+| `client-app/` | Next.js 16 + Capacitor 8 driver mobile app. |
+| `data/` | Local routing datasets (Kolkata OSM extract). |
+| `model_repository/` | Triton model repository (ETA + cancellation risk). |
+| `database/migrations/` | golang-migrate up/down scripts (single source of truth). |
+| `deploy/charts/drivers-for-u/` | Production Helm chart. |
+| `deploy/local/` | Local K8s topology + start/teardown scripts. |
+| `deploy/keda-scaler.yaml` | KEDA ScaledObject for Kafka-consumer autoscaling. |
+| `deploy/prometheus-alerts.yaml` | Production alert rules. |
+| `bin/` | PowerShell helpers + pre-built dev binaries. |
 
-## Main Services
+## Services
 
-### Ingestion
+### Ingestion — `cmd/ingestion`
 
-`cmd/ingestion` starts the driver telemetry gRPC gateway. It writes the latest driver telemetry to Postgres, indexes available drivers into Redis H3 sorted sets, and emits `driver.location.updated`.
+Driver telemetry gRPC streaming gateway. Writes the latest driver
+telemetry to Postgres, indexes available drivers into Redis H3 sorted
+sets, emits `driver.location.updated`.
 
-Important env vars:
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `GRPC_PORT` | `50051` | gRPC listener. |
+| `DATABASE_URL` | local Postgres | |
+| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` | Comma-separated. |
+| `KAFKA_BROKERS` | `localhost:19092` | |
+| `REDIS_IP_MAP` | empty | Cluster-node-IP → local-IP overrides. |
 
-| Variable | Default |
-| --- | --- |
-| `GRPC_PORT` | `50051` |
-| `DATABASE_URL` | local Postgres connection string |
-| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` |
-| `KAFKA_BROKERS` | `localhost:19092` |
-| `REDIS_IP_MAP` | empty |
+### Dispatch — `cmd/dispatch`
 
-### Dispatch
+Order matching engine. Consumes `order.created`, performs spatial ring
+scan in Redis, evaluates matches (greedy default, Hungarian on
+`ALGORITHM_STRATEGY=HUNGARIAN`, or circuit-breaker fallback when Triton
+is unhealthy), persists assignments, evicts drivers, emits
+`order.assigned` and `driver.state.changed`.
 
-`cmd/dispatch` consumes `order.created`, finds nearby available drivers, evaluates matches, persists assignments, evicts assigned drivers from Redis, emits `order.assigned`, and emits `driver.state.changed`.
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` | |
+| `KAFKA_BROKERS` | `localhost:19092` | |
+| `ALGORITHM_STRATEGY` | `HUNGARIAN` | `HUNGARIAN` or `GREEDY`. |
+| `TRITON_SERVER_URL` | `127.0.0.1:8001` | gRPC. Set empty to force fallback. |
+| `METRICS_PORT` | `8080` | Prometheus + health/ready/stats. |
+| `OSM_NODES_DATA_PATH` | `./data/kolkata_nodes.csv` | |
+| `OSM_EDGES_DATA_PATH` | `./data/kolkata_edges.csv` | |
+| `BATCH_WINDOW` | `300ms` | Adjustable 200–4000ms for velocity balancer. |
 
-Important env vars:
+### Surge — `cmd/surge`
 
-| Variable | Default |
-| --- | --- |
-| `DATABASE_URL` | local Postgres connection string |
-| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` |
-| `KAFKA_BROKERS` | `localhost:19092` |
-| `ALGORITHM_STRATEGY` | `HUNGARIAN` |
-| `TRITON_SERVER_URL` | `127.0.0.1:8001` |
-| `METRICS_PORT` | `8080` |
-| `OSM_NODES_DATA_PATH` | `./data/kolkata_nodes.csv` |
-| `OSM_EDGES_DATA_PATH` | `./data/kolkata_edges.csv` |
+Streaming supply aggregator, demand aggregator, and optional surge
+calculator. Supply fed by `driver.state.changed`, demand fed by
+`order.created`, calculated surge updates emitted as `surge.zone.updated`.
 
-### Surge
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `KAFKA_BROKERS` | `localhost:19092` | |
+| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` | |
+| `SURGE_CITY_PREFIX` | `KOL` | |
+| `SURGE_TRACKED_CELLS` | empty | Comma-separated H3 cells. Required for the calculator to publish. |
 
-`cmd/surge` runs the streaming supply aggregator, demand aggregator, and optional surge calculator. Supply is fed by `driver.state.changed`; demand is fed by `order.created`; calculated surge updates are emitted as `surge.zone.updated`.
+### Pricing — `cmd/pricing`
 
-Important env vars:
+Consumes `surge.zone.updated` and maintains a thread-safe in-memory
+surge multiplier read model.
 
-| Variable | Default |
-| --- | --- |
-| `KAFKA_BROKERS` | `localhost:19092` |
-| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` |
-| `SURGE_CITY_PREFIX` | `KOL` |
-| `SURGE_TRACKED_CELLS` | empty |
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `KAFKA_BROKERS` | `localhost:19092` | |
+| `PRICING_GROUP_ID` | `pricing-service-consumer-group` | |
+| `REDIS_CLUSTER_ADDRS` | `localhost:6379` | Note: legacy name; others use `REDIS_CLUSTER_NODES`. |
 
-Set `SURGE_TRACKED_CELLS` to a comma-separated H3 cell list when you want the calculator loop to publish zone updates.
+### Reconciler — `cmd/reconciler`
 
-### Pricing
+Self-healing background repair loop. Detects dispatch state that
+drifted after partial failures and reconciles it.
 
-`cmd/pricing` consumes `surge.zone.updated` and keeps a thread-safe in-memory surge multiplier cache. It is currently a pricing service runtime/read model, not a public HTTP fare quote gateway.
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `KAFKA_BROKERS` | `localhost:19092` | |
+| `CITY_PREFIX` | `KOL` | |
 
-Important env vars:
+### Pruner — `cmd/expiry`
 
-| Variable | Default |
-| --- | --- |
-| `KAFKA_BROKERS` | `localhost:19092` |
-| `PRICING_GROUP_ID` | `pricing-service-consumer-group` |
-| `REDIS_CLUSTER_ADDRS` | `localhost:6379` |
+> Note: pruner is the stale-telemetry worker; expiry is a separate
+> offer-timeout janitor — see below.
 
-Note: most services use `REDIS_CLUSTER_NODES`; pricing currently uses `REDIS_CLUSTER_ADDRS`.
+`cmd/pruner` removes stale telemetry and availability state. Hardcoded
+Kolkata zone list by default.
 
-### Reconciler
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` | |
+| `REDIS_IP_MAP` | empty | |
 
-`cmd/reconciler` runs a background repair loop for dispatch state that can drift after partial failures.
+### Expiry — `cmd/expiry`
 
-Important env vars:
+`cmd/expiry` runs `OfferTimeoutJanitor` to time out unaccepted offers
+and transition them back to `EXPIRED` so the order can be re-matched.
 
-| Variable | Default |
-| --- | --- |
-| `DATABASE_URL` | local Postgres connection string |
-| `KAFKA_BROKERS` | `localhost:19092` |
-| `CITY_PREFIX` | `KOL` |
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `REDIS_CLUSTER_NODES` | `redis-node-1:6379` | |
+| `KAFKA_BROKERS` | `kafka-broker:9092` | |
+| `CITY_PREFIX` | `KOL` | |
 
-### Pruner
+### Rebalancer — `cmd/rebalancer`
 
-`cmd/pruner` removes stale telemetry and availability state. The current bootstrap tracks a small hardcoded Kolkata zone list.
+`cmd/rebalancer` periodically scans idle drivers and emits
+`RebalancePrompt` events so the dispatcher can redistribute them to
+underserved cells.
 
-Important env vars:
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `REDIS_CLUSTER_NODES` | `redis-node-1:6379` | |
+| `CITY_PREFIX` | `KOL` | |
 
-| Variable | Default |
-| --- | --- |
-| `DATABASE_URL` | local Postgres connection string |
-| `REDIS_CLUSTER_NODES` | `127.0.0.1:6379` |
-| `REDIS_IP_MAP` | empty |
+### Gateway — `cmd/gateway` (BFF / public API)
 
-## Local Development
+JWT-authenticated HTTP/WebSocket BFF. Sits between clients (rider app,
+admin portal, driver app) and the internal services. Routes:
 
-Prerequisites:
+- `/api/v1/auth/*` — login, refresh, role check
+- `/api/v1/orders/*` — order CRUD and state
+- `/api/v1/dispatch/*` — operational stats and rebalancer controls
+- `/api/v1/trips/*` — active trip waypoint stream
+- `/api/v1/analytics/*` — heatmap SSE
+- `/ws` — WebSocket fan-out (driver.location, order.assigned, trip state)
+- `/api/v1/admin/*` — admin portal (auth, trip, pricing, incident)
 
-| Tool | Purpose |
-| --- | --- |
-| Docker Desktop | Local Postgres, Kafka, Redis Cluster, Triton. |
-| Go | Build and run services. Match the repo toolchain in `go.mod`. |
-| PowerShell | Existing local helper scripts are PowerShell-first. |
+Region routing via `SUPPORTED_REGIONS_MATRIX` (e.g. `KOL,BLR`); client
+can pass `X-Region` header or `?region=` query. Unrecognized regions
+are rejected.
 
-Common local ports:
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `REDIS_CLUSTER_NODES` | `redis-node-1:6379` | |
+| `KAFKA_BROKERS` | `kafka-broker:9092` | |
+| `HTTP_PORT` | `8080` | |
+| `JWT_SECRET_SIGNING_KEY` | dev value | **Override in production.** |
+| `SUPPORTED_REGIONS_MATRIX` | `KOL,BLR` | Comma-separated region list. |
 
-| Port | Service |
-| --- | --- |
-| `5432` | Postgres/PostGIS |
-| `19092` | Kafka external listener |
-| `6379`-`6384` | Redis Cluster |
-| `50051` | Telemetry gRPC |
-| `8000`-`8002` | Triton HTTP/gRPC/metrics |
-| `8080` | Dispatch health, readiness, metrics, and stats |
+### Notification — `cmd/notification`
 
-## 🚀 Complete Backend Unified Startup Command
+Outbox-pattern push notification engine. Reads the `outbox_events`
+table, fans out to FCM (Android) and APNs (iOS) providers, marks rows
+as delivered.
 
-To spin up the entire multi-service backend environment concurrently—including data nodes, stream workers, model engines, and public gateways (excluding frontend layouts)—paste this single execution chain command into your terminal:
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | |
+| `FCM_PROJECT_ID` | empty | Required to enable FCM. |
+| `APNS_KEY_ID` | empty | Required to enable APNs. |
+| `APNS_TEAM_ID` | empty | |
+
+### Analytics — `cmd/analytics`
+
+Live spatial heatmap SSE stream. Subscribes to driver state changes,
+maintains a per-cell density grid, exposes `/api/v1/analytics/heatmap`
+as a Server-Sent Events stream.
+
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `KAFKA_BROKERS` | `kafka-broker:9092` | |
+| `CITY_PREFIX` | `KOL` | |
+| `ANALYTICS_PORT` | `8089` | |
+
+### Simulator — `cmd/simulator`
+
+Local telemetry + order simulator. Streams synthetic driver positions
+and orders to exercise the full pipeline.
+
+### OSM Preprocessor — `cmd/osm-preprocessor`
+
+Converts an OSM PBF extract into the local routing CSV format consumed
+by `internal/routing`. See `DOC/README-LOCAL-ROUTING.md`.
+
+### Migrate — `cmd/migrate`
+
+Standalone migration runner using `golang-migrate`. Migrations also
+auto-run on `cmd/dispatch` boot.
+
+## Frontend Apps
+
+### `frontend/` — Admin Control Room
+
+Vite + React 18 + Tailwind dashboard for fleet ops, pricing control,
+incident response, and live heatmap.
 
 ```powershell
-docker-compose down -v; Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue; Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue; docker-compose up -d --build
+cd frontend
+npm install
+npm run dev
 ```
 
-### What this single command handles
+Vite dev server proxies `/api` and `/ws` to the gateway (see
+`vite.config.ts`).
 
-1. **`docker-compose down -v`** - Clears stale local test resource traces and containers.
-2. **`Get-Process ... Stop-Process`** - Shuts down legacy Kubernetes port-forwarding processes to free up system memory and prevent connection issues.
-3. **`Stop-Service ...`** - Stops any native Windows PostgreSQL databases running directly on your host machine to prevent port collisions on `5432`.
-4. **`docker-compose up -d --build`** - Compiles the latest source code transformations across all 27 milestones and boots the entire backend mesh seamlessly in detached background mode.
+### `client-app/` — Driver Mobile App
 
-Start infrastructure:
-
-If using **Docker Compose**:
+Next.js 16 + Capacitor 8 + Zustand driver-side app. WebSocket-first
+with 4-second GPS interpolation, resilient reconnection, and a
+SlideToConfirm gesture flow.
 
 ```powershell
-cd C:\workspace\Driver
-docker-compose up -d
+cd client-app
+npm install
+npm run dev          # web
+npx cap sync android # build + sync for Android
 ```
 
-If using **Kubernetes (Local Dev)**:
-To deploy the PostgreSQL, Kafka, and Redis Cluster stack inside a local Kubernetes cluster:
+> **Note:** This project uses Next.js 16, which has breaking changes
+> from earlier majors. Always check `node_modules/next/dist/docs/`
+> before writing client-app code.
+
+## Data Layer
+
+### Postgres schema
+
+The single source of truth is `database/migrations/`. Key tables:
+
+- `drivers` — driver profile, status, current H3 cell
+- `orders` — order lifecycle (`CREATED → ASSIGNED → EN_ROUTE_TO_PICKUP → DELIVERING → COMPLETED` / `CANCELLED` / `EXPIRED`)
+- `dispatch_match_logs` — append-only audit ledger of every match decision
+- `outbox_events` — outbox pattern rows for the notification engine
+- `ledger_entries` — double-entry bookkeeping for financial settlement
+
+State transitions are enforced by `verify_order_state_transition()`.
+
+### Redis H3 spatial index
+
+H3 resolution 8 cells. Sorted-set keys:
+
+- `driver:location:{city_prefix}:{h3_cell}` — ZSET of driver IDs by last-seen timestamp
+- `driver:{city_prefix}:{driver_id}:status` — current state
+- `surge:matrix:{city_prefix}` — current surge multipliers per cell
+- `pricing:cache:{city_prefix}` — shared distributed pricing cache
+
+The `cmd/pruner` worker evicts entries older than 30s.
+
+### Kafka topics
+
+KRaft mode, no ZooKeeper. Topics:
+
+| Topic | Producer | Consumer | Partition key |
+| --- | --- | --- | --- |
+| `driver.location.updated` | ingestion | analytics, surge | `city_prefix` |
+| `driver.state.changed` | dispatch, ingestion | surge, gateway | `city_prefix` |
+| `order.created` | gateway (or external) | dispatch, surge, analytics | `city_prefix` |
+| `order.assigned` | dispatch | gateway, notification | `city_prefix` |
+| `order.cancelled` | gateway, admin | dispatch, reconciler | `city_prefix` |
+| `surge.zone.updated` | surge (calculator) | pricing, gateway | `city_prefix` |
+| `rebalance.prompt` | rebalancer | dispatch | `city_prefix` |
+| `trip.waypoint` | dispatch | gateway, analytics | `trip_id` |
+
+### ML models (Triton)
+
+XGBoost models in `model_repository/`:
+
+- `xgboost_spatial_corrector` — corrects raw ETA from the local road graph using live spatial features
+- `cancellation_risk_classifier` — predicts per-driver cancellation risk, feeds the matcher cost function
+
+Both are exposed via the `GRPCInferenceService` proto. The
+`internal/intelligence` package wraps Triton with a multi-tier
+circuit breaker so the matcher falls back gracefully when Triton is
+unhealthy.
+
+## Deployment
+
+### Docker Compose (local dev)
+
+The `docker-compose.yml` brings up the full mesh: Postgres+PostGIS,
+Kafka (KRaft), 6-node Redis cluster, Triton, db-migrator, and 11
+deployable Go services (dispatch, ingestion, surge, pricing, reconciler,
+pruner, expiry, rebalancer, gateway, notification, analytics).
+
+### Helm chart (production)
+
+`deploy/charts/drivers-for-u/` ships templates for dispatch, ingestion,
+pricing, pruner, reconciler, surge deployments and services.
 
 ```powershell
-# 1. Deploy K8s resources into the 'dispatch' namespace
+helm lint deploy/charts/drivers-for-u
+helm install drivers-for-u deploy/charts/drivers-for-u -n dispatch --create-namespace
+```
+
+### KEDA autoscaling
+
+`deploy/keda-scaler.yaml` scales the dispatch and surge consumers on
+Kafka consumer-group lag.
+
+### Prometheus alerts
+
+`deploy/prometheus-alerts.yaml` defines the production SLO alert rules
+(see Milestone 10 for context).
+
+### Local Kubernetes topology
+
+`deploy/local/local-dev-topology.yaml` is a self-contained manifest
+for spinning up Postgres, Kafka, and the Redis cluster inside a
+local k8s cluster (e.g. Docker Desktop, kind, minikube):
+
+```powershell
 kubectl apply -f deploy/local/local-dev-topology.yaml
-
-# 2. Run the port-forward helper to bind service ports locally
 powershell -ExecutionPolicy Bypass -File .\bin\start-port-forwards.ps1
 ```
 
-Load the standard local environment:
+## Testing
 
-If using **Docker Compose**:
+| Layer | Command | Notes |
+| --- | --- | --- |
+| Matcher unit | `go test .\internal\dispatch\matcher` | Pure-Go, no infra. |
+| Surge formula | `go test .\internal\surge\calculator -run TestSurgeCalculatorEngine_FormulaMath` | |
+| Pricing | `go test .\internal\pricing\service` | |
+| Spatial scanner | `go test .\internal\dispatch\repository` | Needs Redis. |
+| Broad integration | `go test .\internal\test\...` | Needs full stack. |
+| E2E | `powershell -ExecutionPolicy Bypass -File .\run_e2e_test.ps1` | Drives gateway + matrix + chaos. |
+| Frontend (admin) | `cd frontend && npm test` | Jest. |
+| Mobile (client) | `cd client-app && npm run lint` | ESLint + Next typecheck. |
 
-```powershell
-. .\bin\run-local-env.ps1
-$env:REDIS_CLUSTER_ADDRS = $env:REDIS_CLUSTER_NODES
-```
-
-If using **Kubernetes (Local Dev)**:
-Set the environment variables printed by the `start-port-forwards.ps1` script:
-
-```powershell
-$env:REDIS_IP_MAP = "<IP_MAP_FROM_SCRIPT>"
-$env:DATABASE_URL = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
-$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
-$env:KAFKA_BROKERS = "localhost:19092"
-```
-
-Database Migrations:
-
-On boot, the `dispatch` service automatically executes programmatic schema migrations. To run migrations manually at any time:
-
-```powershell
-go run .\cmd\migrate
-```
-
-Run services in separate terminals as needed (ensure env vars are set in each terminal):
-
-```powershell
-go run .\cmd\ingestion
-go run .\cmd\dispatch
-$env:SURGE_TRACKED_CELLS = "88754cb247fffff,88283473fffffff"; go run .\cmd\surge
-go run .\cmd\pricing
-go run .\cmd\reconciler
-go run .\cmd\pruner
-go run .\cmd\simulator
-```
+The chaos test harness (Milestone 12) injects faults into Kafka,
+Redis, and Postgres to verify reconciler, pruner, and circuit-breaker
+fallback behavior. The integration test binary is built as
+`integration.test.exe` (55 MB).
 
 ## Observability
 
-`cmd/dispatch` exposes the local operations endpoints:
+| Surface | Where | Notes |
+| --- | --- | --- |
+| Prometheus metrics | `http://localhost:8080/metrics` (dispatch), `:8089/metrics` (analytics) | |
+| Liveness | `http://localhost:8080/health` | |
+| Readiness | `http://localhost:8080/ready` | DB, Redis, Kafka checks. |
+| Dispatch stats | `http://localhost:8080/api/v1/dispatch/stats` | |
+| OpenTelemetry traces | `internal/observability/tracing` | Distributed context propagation across Kafka (header carrier). |
+| Health server | `internal/observability/server` | Shared `HealthServer` used by every service. |
+| Circuit breaker | `sony/gobreaker v2` | Per-dependency. |
 
-| Endpoint | Purpose |
+## Multi-Region
+
+The gateway uses `internal/gateway/middleware/region.go` to attach a
+region to every request. The `RegionRouter` detects and routes
+cross-region handoffs; cross-region handoffs flow through the
+`HandoffConsumer` and emit `order.handoff.requested` /
+`order.handoff.completed` events.
+
+Supported regions: `KOL` (Kolkata) and `BLR` (Bengaluru). Configure
+`SUPPORTED_REGIONS_MATRIX` to add more.
+
+## Milestones
+
+All 28 currently-completed milestones:
+
+| # | Milestone |
 | --- | --- |
-| `http://localhost:8080/health` | Basic liveness. |
-| `http://localhost:8080/ready` | Dependency readiness for database, Redis, and Kafka. |
-| `http://localhost:8080/metrics` | Prometheus scrape endpoint. |
-| `http://localhost:8080/api/v1/dispatch/stats` | Dispatch operational stats. |
+| 2 | Live Feature Hydration |
+| 3 | Request Re-Queuing & Recovery Paths |
+| 4 | Shared Distributed Pricing Cache |
+| 5 | Standalone E2E Simulation Runner |
+| 6 | City-Scale OpenStreetMap Routing Ingestion |
+| 7 | Stale Telemetry Pruner Daemon |
+| 8 | Dynamic Batching Window Adaptation (Marketplace Velocity Balancer) |
+| 9 | Post-Crash Order State Reconciliation Sync Worker |
+| 10 | Prometheus Alert Topographies & SLA Metrics |
+| 11 | Schema-Migration Instrumentation & Database Seeding |
+| 12 | Chaos Engineering and Fault-Injection Testing Harness |
+| 13 | End-to-End Local Kubernetes Deployment via Helm Charts |
+| 14 | The Public API Gateway & BFF Architecture Layer |
+| 15 | Edge Security Tier (JWT + Distributed Redis Sliding-Window Rate Limiting) |
+| 16 | Graceful WebSocket Connection Draining & Reconnect Handshaking |
+| 17 | Driver Acceptance, Expiry, and Rejection Lifecycle |
+| 18 | Distributed Context Propagation & Async Observability (OpenTelemetry) |
+| 19 | Live Spatial Fleet Analytics & Dynamic Heatmap Streaming |
+| 20 | The Active Trip Execution Lifecycle & Live Waypoint Streaming |
+| 21 | Immutable Financial Settlement & Double-Entry Bookkeeping Ledger |
+| 22 | Multi-Region Federation & Shared-Nothing Edge Partitioning |
+| 23 | Full-Lifecycle E2E Automated Integration & Telemetry Load Testing |
+| 24 | Asynchronous Outbox Push Notification Layer (FCM / APNs) |
+| 25 | Third-Party Fiat Payment Gateway & Webhook Reconciliation Engine |
+| 26 | Frontend Mobile Client Networking Core & Resilient Reconnection |
+| 27 | Centralized Operations Control Room Dashboard Panel (Admin Portal) |
+| 28 | Local Environment Streamlining & Unified Orchestration Startup |
+| 28b | Closed-Loop Dynamic Surge Pricing & Triton ML Backpressure Circuit Breaking |
 
-Kubernetes-oriented scaler and alert examples live in `deploy/`.
-
-## Routing Data
-
-Dispatch loads local road graph data from:
-
-```text
-data/kolkata_nodes.csv
-data/kolkata_edges.csv
-```
-
-If those files are present, dispatch loads them into the routing graph. If they are missing, dispatch falls back to a tiny in-memory seed graph so the service can still boot.
-
-To regenerate routing CSVs, place the expected OSM PBF input under `data/` and run:
-
-```powershell
-go run .\cmd\osm-preprocessor
-```
-
-See `DOC/README-LOCAL-ROUTING.md` for the routing pipeline details.
-
-## Verification
-
-Run targeted unit tests:
-
-```powershell
-go test .\internal\dispatch\matcher
-go test .\internal\surge\aggregator .\internal\pricing\service
-go test .\internal\surge\calculator -run TestSurgeCalculatorEngine_FormulaMath
-```
-
-Run broader integration checks after Docker infrastructure is healthy:
-
-```powershell
-go test .\internal\test\...
-powershell -ExecutionPolicy Bypass -File .\run_e2e_test.ps1
-```
-
-Some tests require Kafka, Redis Cluster, Postgres, or Triton. If H3-backed dispatch packages fail on Windows, verify that Go, `GOARCH`, Cgo, and the MinGW toolchain are aligned with the team setup.
-
-## Current Wiring Risks
-
-The largest gaps to keep in mind when developing against this repo:
+## Wiring Risks (current)
 
 | Risk | Why it matters |
 | --- | --- |
-| Pricing has no public quote API yet | `cmd/pricing` maintains the multiplier read model, but clients still need an exposed fare quote surface. |
-| `SURGE_TRACKED_CELLS` controls surge publication | Supply and demand workers can run while the calculator publishes nothing if no tracked cells are configured. |
-| Telemetry and dispatch both affect driver availability | Assigned-driver Redis eviction exists, but driver state transitions must stay aligned so later telemetry does not re-index unavailable drivers incorrectly. |
-| `driver.location.updated` is currently mostly an integration output | It is emitted by ingestion, but the core local pricing path does not depend on it yet. |
-| Hungarian matching can create high fan-out work | Batch matching evaluates many order-driver combinations and can stress CPU/latency under large windows. |
-| Environment names are not fully standardized | Most services use `REDIS_CLUSTER_NODES`; pricing uses `REDIS_CLUSTER_ADDRS`. |
-| Local routing input path can drift | `cmd/osm-preprocessor` expects its configured PBF input, while checked-in CSVs are what dispatch consumes by default. |
-| End-to-end correctness still depends on external infrastructure | Kafka topics, Redis Cluster, Postgres schema, and Triton availability are required for full-system behavior. |
+| `REDIS_CLUSTER_NODES` vs `REDIS_CLUSTER_ADDRS` | Pricing uses the legacy name; standardizing is open. |
+| `SURGE_TRACKED_CELLS` gates surge publication | Calculator publishes nothing when empty; supply/demand workers still run. |
+| Driver availability is dual-written | Telemetry (ingestion) and assignment (dispatch) both touch Redis. Stale telemetry can re-index an already-assigned driver if eviction lags. |
+| `driver.location.updated` is integration-only | Not on the pricing critical path. |
+| Hungarian matching is CPU-heavy at high concurrency | The 300ms `BATCH_WINDOW` cap mitigates but doesn't eliminate fan-out cost. |
+| OSM PBF input vs checked-in CSVs | `cmd/osm-preprocessor` reads PBF; dispatch loads CSVs. Drift is possible. |
+| External infrastructure for full E2E | Kafka, Redis Cluster, Postgres, and Triton must all be healthy for end-to-end behavior. |
+| Region matrix is hardcoded | New regions need a code change in the gateway. |
+| Pricing still lacks a public quote endpoint | The gateway reads cached surge; final fare quote endpoint is still on the roadmap. |
 
 ## Deeper Documentation
 
 | Document | Purpose |
 | --- | --- |
-| `DOC/ARCHITECTURE_BREAKDOWN_FOR_TEAM.md` | Package/community breakdown and runtime data-flow notes. |
+| `DOC/ARCHITECTURE_BREAKDOWN_FOR_TEAM.md` | Package/community breakdown and runtime data flow. |
 | `DOC/Driver_Delivery_Platform_Architecture.md` | Earlier high-level architecture narrative. |
+| `DOC/ENTERPRISE_SYSTEMS_BLUEPRINT.md` | Full enterprise blueprint with diagrams. |
 | `DOC/PRODUCTION_BLUEPRINT.md` | Production hardening and operational blueprint. |
 | `DOC/README-LOCAL-ROUTING.md` | OSM routing data preparation and dispatch routing integration. |
-| `DOC\ASSIGNMENT_FLOW.md` | Assignment workflow details. |
-| `DOC\OPS_ACCEPTANCE_CHECKLIST.md` | Operational readiness checklist. |
+| `DOC/STATE_ARCHITECTURE_AND_WEBSOCKET_INTEGRATION.md` | WebSocket-first state model and live waypoint streaming. |
+| `DOC/UBER_LIKE_UI_UX_DESIGN_GUIDE.md` | Frontend design system reference. |
+| `DOC/walkthrough.md` | End-to-end walkthrough of the assignment flow. |
 
-## 🚀 Local Standalone Sandbox Quickstart
+For deep codebase queries, the project ships a knowledge graph at
+`graphify-out/`. Run `graphify query "<question>"` (or
+`graphify explain "<concept>"` / `graphify path A B`) before
+grepping raw source. Run `graphify update .` after modifying code.
 
-To clear lingering system port conflicts, initialize the background microservices cluster, and run the simulator to stress-test your pipelines (leaving the frontend decoupled), execute this unified command pipeline inside an **Administrator PowerShell terminal**:
+## License
 
-```powershell
-docker-compose down -v; Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue; Stop-Service -Name "postgresql*" -ErrorAction SilentlyContinue; docker-compose up -d --build; Write-Host "Waiting 12s for data tier initialization..." -ForegroundColor Cyan; Start-Sleep -Seconds 12; go run cmd/simulator/main.go
-```
-
-### What this unified pipeline handles
-
-1. **`docker-compose down -v`** - Purges active local test container networks and drops database volumes to reset the local stack.
-2. **`Stop-Process -Name "kubectl"`** - Clears any hidden cluster port forwards to prevent connection blocks.
-3. **`Stop-Service -Name "postgresql*"`** - Stops any native Windows PostgreSQL installations to prevent port conflicts on `5432`.
-4. **`docker-compose up -d --build`** - Compiles the updated codebase across all 27 milestones and launches the backend microservices concurrently.
-5. **`Start-Sleep -Seconds 12`** - Pauses execution for 12 seconds to let data schemas sync, internal components spin up, and Kafka partitions align.
-6. **`go run cmd/simulator/main.go`** - Launches the virtual fleet runner to stream simulated ride requests, active vehicle telemetry updates, and transactional data loops........
+Internal platform — see your platform's standard terms.

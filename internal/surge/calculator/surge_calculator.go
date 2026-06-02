@@ -81,8 +81,8 @@ func (e *SurgeCalculatorEngine) evaluateCitySurgeGrid(ctx context.Context, cityP
 
 			// 1. Evict stale window points and read current metric cardinality in parallel via multi-command pipeline
 			pipe := e.clusterClient.Pipeline()
-			pipe.ZRemRangeByScore(epochCtx, supplyKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
-			pipe.ZRemRangeByScore(epochCtx, demandKey, "-inf", fmt.Sprintf("(%d)", nowEpoch))
+			pipe.ZRemRangeByScore(epochCtx, supplyKey, "-inf", fmt.Sprintf("(%d", nowEpoch))
+			pipe.ZRemRangeByScore(epochCtx, demandKey, "-inf", fmt.Sprintf("(%d", nowEpoch))
 			supplyCountCmd := pipe.ZCard(epochCtx, supplyKey)
 			demandCountCmd := pipe.ZCard(epochCtx, demandKey)
 

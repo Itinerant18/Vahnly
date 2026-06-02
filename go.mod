@@ -15,6 +15,7 @@ require (
 	github.com/uber/h3-go/v3 v3.7.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/sdk v1.44.0
+	golang.org/x/crypto v0.49.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 )

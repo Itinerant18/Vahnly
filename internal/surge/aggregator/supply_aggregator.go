@@ -91,7 +91,7 @@ func (s *SupplyAggregatorStream) mutateRollingSupplyWindow(ctx context.Context, 
 	}
 
 	// Clean out any stale entries across the historical window boundary
-	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d)", now))
+	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now))
 
 	// Keep the cache key alive for twice the window size to prevent data gaps
 	pipe.Expire(ctx, redisKey, s.windowSize*2)
@@ -110,7 +110,7 @@ func (s *SupplyAggregatorStream) GetAvailableDriverCount(ctx context.Context, ci
 	now := time.Now().Unix()
 
 	// Clear out trailing stale records before counting
-	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d)", now)).Result()
+	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now)).Result()
 
 	// Count the remaining valid members inside the ZSET matrix
 	count, err := s.clusterClient.ZCard(ctx, redisKey).Result()

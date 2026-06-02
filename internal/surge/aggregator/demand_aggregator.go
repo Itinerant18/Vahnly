@@ -96,7 +96,7 @@ func (s *DemandAggregatorStream) mutateRollingDemandWindow(ctx context.Context, 
 	})
 
 	// 2. Perform eviction of all stale indices sitting behind the present UNIX timeline
-	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d)", now))
+	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now))
 
 	// 3. Keep cache footprint alive for double the window lifecycle to preserve audit availability
 	pipe.Expire(ctx, redisKey, s.windowSize*2)
@@ -115,7 +115,7 @@ func (s *DemandAggregatorStream) GetRecentDemandRate(ctx context.Context, cityPr
 	now := time.Now().Unix()
 
 	// Proactively drop trailing stale entries prior to cardinal evaluation
-	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d)", now)).Result()
+	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now)).Result()
 
 	// Retrieve total distinct requests currently registered inside the Sorted Set
 	count, err := s.clusterClient.ZCard(ctx, redisKey).Result()

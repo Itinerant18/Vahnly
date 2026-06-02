@@ -1,0 +1,3 @@
+# Keep this file so the bin/ and scripts/ directories stay tracked even when
+# they contain only generated/runtime artifacts. See .gitignore for the
+# patterns that keep the rest of the noise out.

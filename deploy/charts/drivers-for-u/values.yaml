@@ -1,51 +1,92 @@
+# =============================================================================
+# GLOBAL PRODUCTION MATRIX PROFILE CONFIGURATIONS
+# =============================================================================
 global:
+  environment: production
+  regionMatrix: ["KOL", "BLR"]
+  logLevel: warn
+  metricsEnabled: true
+
+# =============================================================================
+# PUBLIC API GATEWAY & BFF LAYER (SERVICE NODE INTERFACES)
+# =============================================================================
+public-gateway:
+  replicaCount: 4
+  terminationGracePeriodSeconds: 15 # Protects Milestone 16 & 31 binary connection draining loops
+
   image:
-    repository: "drivers-for-u-service"
-    tag: "latest"
+    repository: drivers-for-u/public-gateway
+    tag: v1.2.0
     pullPolicy: IfNotPresent
 
-# Federated Shared-Nothing Region Shards Matrix Definitions
-regions:
-  kolkata:
-    enabled: true
-    cityPrefix: "KOL"
-    replicaCount:
-      ingestion: 3
-      dispatch: 2
-    env:
-      kafkaBrokers: "kafka-kol-svc.dispatch-kol.svc.cluster.local:9092"
-      redisClusterNodes: "redis-kol-svc.dispatch-kol.svc.cluster.local:6379"
-      databaseUrl: "postgres://postgres:password@db-kol-svc.dispatch-kol.svc.cluster.local:5432/delivery_kol?sslmode=disable"
-      tritonServerUrl: "triton-kol-svc.dispatch-kol.svc.cluster.local:8001"
-    resources:
-      dispatch:
-        limits: { cpu: "2000m", memory: "1Gi" }
-        requests: { cpu: "500m", memory: "512Mi" }
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+    requests:
+      cpu: "500m"
+      memory: "256Mi"
 
-  bengaluru:
-    enabled: true
-    cityPrefix: "BLR"
-    replicaCount:
-      ingestion: 4
-      dispatch: 3
-    env:
-      kafkaBrokers: "kafka-blr-svc.dispatch-blr.svc.cluster.local:9092"
-      redisClusterNodes: "redis-blr-svc.dispatch-blr.svc.cluster.local:6379"
-      databaseUrl: "postgres://postgres:password@db-blr-svc.dispatch-blr.svc.cluster.local:5432/delivery_blr?sslmode=disable"
-      tritonServerUrl: "triton-blr-svc.dispatch-blr.svc.cluster.local:8001"
-    resources:
-      dispatch:
-        limits: { cpu: "4000m", memory: "2Gi" }
-        requests: { cpu: "1000m", memory: "1Gi" }
+  env:
+    PORT: "8080"
+    KAFKA_BROKERS: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
+    REDIS_CLUSTER_ADDRS: "redis-cluster.dispatch.svc.cluster.local:6379"
+    DATABASE_URL: "postgresql://app_gateway:HardenedProdPassword@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=verify-full"
 
-  mumbai:
-    enabled: false # Dormant initialization flag until real-world market entry
-    cityPrefix: "BOM"
-    replicaCount:
-      ingestion: 2
-      dispatch: 1
-    env:
-      kafkaBrokers: "kafka-bom-svc.dispatch-bom.svc.cluster.local:9092"
-      redisClusterNodes: "redis-bom-svc.dispatch-bom.svc.cluster.local:6379"
-      databaseUrl: "postgres://postgres:password@db-bom-svc.dispatch-bom.svc.cluster.local:5432/delivery_bom?sslmode=disable"
-      tritonServerUrl: "triton-bom-svc.dispatch-bom.svc.cluster.local:8001"
+  # Real-time infrastructure health checking configurations
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+
+  # Prevent scheduling multiples of this service on the same node to avoid shared failures
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - public-gateway
+          topologyKey: "kubernetes.io/hostname"
+
+# =============================================================================
+# KUHN-MUNKRES MATCHING ENGINE (COMPUTATIONAL MATCH CORES)
+# =============================================================================
+matching-engine:
+  replicaCount: 2
+  
+  resources:
+    limits:
+      cpu: "4000m" # High compute allocation to handle intense combinatorial optimization load spikes
+      memory: "2Gi"
+    requests:
+      cpu: "2000m"
+      memory: "1Gi"
+
+  env:
+    ALGORITHM_STRATEGY: "HUNGARIAN"
+    TRITON_SERVER_URL: "triton-inference-service.intelligence.svc.cluster.local:8001"
+    METRICS_PORT: "8080"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    # Powered by KEDA: scale up based directly on pending Kafka broker lag sizes
+    kafkaTrigger:
+      topic: "order.created"
+      consumerGroup: "matching-engine-group"
+      lagThreshold: "20"

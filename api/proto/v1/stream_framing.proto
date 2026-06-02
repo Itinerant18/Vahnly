@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package api.proto.v1;
+option go_package = "github.com/platform/driver-delivery/pkg/api/v1;apiv1";
+
+enum FrameType {
+    FRAME_TYPE_UNSPECIFIED = 0;
+    FRAME_TYPE_ASSIGNMENT = 1;
+    FRAME_TYPE_TELEMETRY = 2;
+}
+
+message AssignmentFrame {
+    string order_id = 1;
+    string driver_id = 2;
+    string city_prefix = 3;
+    string status = 4;
+}
+
+message TelemetryFrame {
+    string order_id = 1;
+    string driver_id = 2;
+    double latitude = 3;
+    double longitude = 4;
+    double bearing = 5;
+    double speed_kms = 6;
+    int64 timestamp_utc = 7;
+}
+
+message WebSocketBinaryEnvelope {
+    FrameType type = 1;
+    AssignmentFrame assignment = 2;
+    TelemetryFrame telemetry = 3;
+}

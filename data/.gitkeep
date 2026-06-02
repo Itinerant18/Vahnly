@@ -1,0 +1,2 @@
+# keep this directory tracked even when data/ is empty after .gitignore
+# filters out the .pbf and .csv artifacts.

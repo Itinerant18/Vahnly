@@ -95,6 +95,28 @@ func TestAuthMiddleware_AuthenticateJWT(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Query Parameter Fallback", func(t *testing.T) {
+		tokenStr := generateToken("user-query", "rider", time.Minute, []byte(secret))
+		req := httptest.NewRequest("POST", "/api/v1/dispatch/stream?jwt="+tokenStr, nil)
+		w := httptest.NewRecorder()
+
+		var capturedUserID string
+		dummyHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			capturedUserID, _ = middleware.GetUserIDFromContext(r.Context())
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		handlerToTest := authGuard.AuthenticateJWT(dummyHandler)
+		handlerToTest.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", w.Code)
+		}
+		if capturedUserID != "user-query" {
+			t.Errorf("expected user ID user-query, got %s", capturedUserID)
+		}
+	})
 }
 
 func TestGetUserIDFromContext_Empty(t *testing.T) {
@@ -103,3 +125,68 @@ func TestGetUserIDFromContext_Empty(t *testing.T) {
 		t.Error("expected ok to be false for empty context")
 	}
 }
+
+func TestAuthMiddleware_RequireAnyRole(t *testing.T) {
+	secret := "super_secret_signing_key_for_testing_purposes_only"
+	authGuard := middleware.NewAuthMiddleware(secret)
+
+	generateToken := func(userID, role string, d time.Duration) string {
+		claims := &middleware.CustomClaims{
+			UserID: userID,
+			Role:   role,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(d)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		str, _ := token.SignedString([]byte(secret))
+		return str
+	}
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		allowedRoles   []string
+		expectedStatus int
+	}{
+		{
+			name:           "Valid Permitted Role (FLEET_MANAGER)",
+			authHeader:     "Bearer " + generateToken("user-1", "FLEET_MANAGER", time.Minute),
+			allowedRoles:   []string{"FLEET_MANAGER", "SUPER_ADMIN"},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Valid SUPER_ADMIN Bypass",
+			authHeader:     "Bearer " + generateToken("user-2", "SUPER_ADMIN", time.Minute),
+			allowedRoles:   []string{"FINANCIAL_AUDITOR"},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Insufficient Privileges",
+			authHeader:     "Bearer " + generateToken("user-3", "FINANCIAL_AUDITOR", time.Minute),
+			allowedRoles:   []string{"FLEET_MANAGER"},
+			expectedStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/v1/admin/ledger", nil)
+			req.Header.Set("Authorization", tt.authHeader)
+
+			w := httptest.NewRecorder()
+
+			dummyHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				rw.WriteHeader(http.StatusOK)
+			})
+
+			handlerToTest := authGuard.RequireAnyRole(tt.allowedRoles, dummyHandler)
+			handlerToTest.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, w.Code)
+			}
+		})
+	}
+}
+

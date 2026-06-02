@@ -24,7 +24,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"google.golang.org/protobuf/proto"
 
+	. "github.com/platform/driver-delivery/pkg/api/v1"
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/events"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
@@ -199,7 +201,7 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(fmt.Sprintf(`{"order_id":"%s","status":"PROCESSING"}`, orderID)))
 }
 
-// HandleMatchRealtimeStream upgrades requests to WebSockets and registers the active connection session
+// HandleMatchRealtimeStream upgrades requests to WebSockets and registers the active binary connection session
 func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *http.Request) {
 	targetOrderID := r.URL.Query().Get("order_id")
 	if targetOrderID == "" {
@@ -214,9 +216,8 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	}
 	defer wsConn.Close()
 
-	messageChan := make(chan []byte, 2)
+	messageChan := make(chan []byte, 5) // Expanded channel buffer to process high-frequency streams safely
 	
-	// MILESTONE 16 REGISTER: Store both the message channel and connection handle to manage graceful shutdowns
 	sessionMetadata := &ActiveWebSocketSession{
 		MessageChan: messageChan,
 		Connection:  wsConn,
@@ -224,8 +225,6 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	h.localSessions.Store(targetOrderID, sessionMetadata)
 	defer h.localSessions.Delete(targetOrderID)
 
-	// MILESTONE 24: advertise cluster-wide WS presence so OTHER pods skip the push-outbox
-	// fallback while this driver is connected here. Covers the brief assignment-offer window.
 	presenceKey := fmt.Sprintf("ws:presence:%s", targetOrderID)
 	_ = h.clusterClient.Set(r.Context(), presenceKey, "1", 30*time.Minute).Err()
 	defer func() {
@@ -240,29 +239,27 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 		select {
 		case <-r.Context().Done():
 			return
-		case rawPayload, active := <-messageChan:
+		case rawBinaryPayload, active := <-messageChan:
 			if !active {
 				return
 			}
 			
 			_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
-			err = wsConn.WriteMessage(websocket.TextMessage, rawPayload)
+			// MILESTONE 31: Write payloads natively using BinaryMessage framing bounds
+			err = wsConn.WriteMessage(websocket.BinaryMessage, rawBinaryPayload)
 			if err != nil {
 				return
 			}
-			// Keep the connection open: after the initial assignment frame the same
-			// socket streams live telemetry coordinates (Milestone 20) until the client
-			// disconnects, the channel closes, or the request context is cancelled.
 		}
 	}
 }
 
-// InternalBackplaneMultiplexer handles multi-pod routing of both assignments and live telemetry coordinates
+// InternalBackplaneMultiplexer handles multi-pod routing and packs raw JSON events into Protocol Buffers
 func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 	pubsub := h.clusterClient.Subscribe(ctx, RedisPubSubChannel, RedisTelemetryChannel)
 	defer pubsub.Close()
 
-	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel connection active for assignments and metrics.")
+	log.Println("[BACKPLANE_DAEMON] Redis Cluster Pub/Sub channel connection active. Streaming via Proto binary framing.")
 
 	ch := pubsub.Channel()
 	for {
@@ -274,64 +271,92 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				return
 			}
 
-			// Parse incoming data payload packet frames generically to isolate target order IDs
-			var routingEnvelope struct {
-				OrderID  string `json:"order_id"`
-				DriverID string `json:"driver_id"`
+			// Core Envelope structured representation mapping both telemetry and assignment tokens
+			var ev struct {
+				OrderID      string  `json:"order_id"`
+				DriverID     string  `json:"driver_id"`
+				CityPrefix   string  `json:"city_prefix"`
+				Status       string  `json:"status"`
+				Latitude     float64 `json:"latitude"`
+				Longitude    float64 `json:"longitude"`
+				Bearing      float64 `json:"bearing"`
+				SpeedKms     float64 `json:"speed_kms"`
+				TimestampUtc int64   `json:"timestamp_utc"`
 			}
-			if err := json.Unmarshal([]byte(msg.Payload), &routingEnvelope); err != nil || routingEnvelope.OrderID == "" {
+			if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil || ev.OrderID == "" {
 				continue
 			}
 
-			// If the active socket session lives on *this* pod, forward coordinates up to the client device
-			rawSession, found := h.localSessions.Load(routingEnvelope.OrderID)
+			rawSession, found := h.localSessions.Load(ev.OrderID)
 			if found {
 				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
-					select {
-					case session.MessageChan <- []byte(msg.Payload):
-					default:
+					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
+					var binaryBuffer []byte
+					var marshalErr error
+
+					if msg.Channel == RedisPubSubChannel {
+						envelope := &WebSocketBinaryEnvelope{
+							Type: FrameType_FRAME_TYPE_ASSIGNMENT,
+							Assignment: &AssignmentFrame{
+								OrderId:    ev.OrderID,
+								DriverId:   ev.DriverID,
+								CityPrefix: ev.CityPrefix,
+								Status:     ev.Status,
+							},
+						}
+						binaryBuffer, marshalErr = proto.Marshal(envelope)
+					} else {
+						envelope := &WebSocketBinaryEnvelope{
+							Type: FrameType_FRAME_TYPE_TELEMETRY,
+							Telemetry: &TelemetryFrame{
+								OrderId:      ev.OrderID,
+								DriverId:     ev.DriverID,
+								Latitude:     ev.Latitude,
+								Longitude:    ev.Longitude,
+								Bearing:      ev.Bearing,
+								SpeedKms:     ev.SpeedKms,
+								TimestampUtc: ev.TimestampUtc,
+							},
+						}
+						binaryBuffer, marshalErr = proto.Marshal(envelope)
+					}
+
+					if marshalErr == nil {
+						select {
+						case session.MessageChan <- binaryBuffer:
+						default:
+							// Handle channel pressure fallback gracefully
+						}
 					}
 				}
-			} else if msg.Channel == RedisPubSubChannel && routingEnvelope.DriverID != "" {
-				// MILESTONE 24 OUTBOX ACCUMULATION FALLBACK:
-				// If this is an assignment broadcast and the target session is missing locally, 
-				// verify if any alternate pod handles it. If not found cluster-wide, write an outbox push record.
+			} else if msg.Channel == RedisPubSubChannel && ev.DriverID != "" {
+				// MILESTONE 24 OUTBOX FALLBACK PRESERVED: Database text constraints expect JSON formats
 				go func(orderID, driverID string, rawJSON string) {
 					dbCtx, dbCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 					defer dbCancel()
 
-					// Cluster-wide presence guard: if ANY pod holds a live WebSocket for this
-					// order, the client is online — skip the push so connected drivers aren't
-					// double-notified by pods that simply don't host the session locally.
 					if present, _ := h.clusterClient.Exists(dbCtx, fmt.Sprintf("ws:presence:%s", orderID)).Result(); present > 0 {
 						return
 					}
 
-					// Check if a cluster-wide token mapping exists for this backgrounded driver
 					var hasToken bool
 					_ = h.dbPool.QueryRow(dbCtx, "SELECT EXISTS(SELECT 1 FROM user_device_tokens WHERE user_id = $1::uuid)", driverID).Scan(&hasToken)
 					if !hasToken {
-						return // Skip if no push registration exists for this user ID
+						return
 					}
 
-					// Verify if another pod recently claimed this order ID before logging an outbox record
 					fenceKey := fmt.Sprintf("notification:lock:fence:%s", orderID)
 					lockClaimed, _ := h.clusterClient.SetNX(dbCtx, fenceKey, "CLAIMED", 4*time.Second).Result()
 					if !lockClaimed {
-						return // Prevent duplicate notifications across multiple horizontal gateway pods
+						return
 					}
 
 					outboxInsertQuery := `
 						INSERT INTO notification_outbox (user_id, title, body, payload, status)
 						VALUES ($1::uuid, 'New Matching Trip Offer', 'You have received an optimized ride request allocation. 15 seconds to accept.', $2::jsonb, 'PENDING');
 					`
-					_, err := h.dbPool.Exec(dbCtx, outboxInsertQuery, driverID, rawJSON)
-					if err != nil {
-						log.Printf("[OUTBOX_FALLBACK_ERROR] Failed committing append-only push record to datastore: %v", err)
-					} else {
-						log.Printf("[OUTBOX_FALLBACK_COMMITTED] Driver connection offline. Match payload saved to outbox for Order: %s", orderID)
-					}
-				}(routingEnvelope.OrderID, routingEnvelope.DriverID, msg.Payload)
+					_, _ = h.dbPool.Exec(dbCtx, outboxInsertQuery, driverID, rawJSON)
+				}(ev.OrderID, ev.DriverID, msg.Payload)
 			}
 		}
 	}

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
+	"os"
 	"strconv"
 	"time"
 
@@ -23,34 +25,50 @@ type SurgeZoneUpdatedEvent struct {
 	SupplyCount     int64   `json:"supply_count"`
 }
 
-type OrderPricingService struct {
-	kafkaReader    *kafka.Reader
-	clusterClient  *redis.ClusterClient // MILESTONE 4: Shared distributed cache replaces process-local map
-	surgeRegulator *surge.SurgeRegulator
+// SurgeZoneUpdateEvent represents the event payload emitted by the Surge Calculator (Job 3)
+type SurgeZoneUpdateEvent struct {
+	CityPrefix      string    `json:"city_prefix"`
+	H3Cell          string    `json:"h3_cell"`
+	SurgeMultiplier float64   `json:"surge_multiplier"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// OrderPricingService handles stateless passenger fare estimations using a shared Redis Cluster cache
+type OrderPricingService struct {
+	kafkaReader    *kafka.Reader
+	clusterClient  *redis.ClusterClient
+	surgeRegulator *surge.SurgeRegulator
+	baseFarePaise  int64
+	perMeterPaise  int64
+	logger         *log.Logger
+}
+
+// NewOrderPricingService instantiates a horizontally scalable pricing gateway engine
 func NewOrderPricingService(brokers []string, groupID string, client *redis.ClusterClient) *OrderPricingService {
 	return &OrderPricingService{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:  brokers,
-			Topic:    "surge.zone.updated", // Consumes output from our Job 3 pricing engine
-			GroupID:  groupID,              // Horizontal group scaling configuration
-			MinBytes: 10,
-			MaxBytes: 10e6,
+			Brokers:        brokers,
+			Topic:          "surge.zone.updated", // Consumes output from our Job 3 pricing engine
+			GroupID:        groupID,              // Horizontal group scaling configuration
+			MinBytes:       10,
+			MaxBytes:       10e6,
 		}),
 		clusterClient:  client,
 		surgeRegulator: surge.NewSurgeRegulator(0.20, 15*time.Second, 3.5),
+		baseFarePaise:  4000, // 40.00 Rs baseline
+		perMeterPaise:  15,   // 0.15 Rs per meter baseline
+		logger:         log.New(os.Stdout, "[PricingSvc] ", log.LstdFlags),
 	}
 }
 
 // StartSurgeMatrixSync pumps event loops from Kafka to continuously update the shared cluster state
 func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
-	log.Println("Order Pricing Service: Safely synchronized distributed surge cache paths.")
+	s.logger.Println("Order Pricing Service: Safely synchronized distributed surge cache paths.")
 	
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Closing pricing matrix synchronization pipelines cleanly.")
+			s.logger.Println("Closing pricing matrix synchronization pipelines cleanly.")
 			return
 		default:
 			msg, err := s.kafkaReader.ReadMessage(ctx)
@@ -58,13 +76,13 @@ func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				log.Printf("Pricing data pipeline exception: %v", err)
+				s.logger.Printf("Pricing data pipeline exception: %v", err)
 				continue
 			}
 
 			var event SurgeZoneUpdatedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				log.Printf("Dropped malformed surge pricing log event: %v", err)
+				s.logger.Printf("Dropped malformed surge pricing log event: %v", err)
 				continue
 			}
 
@@ -75,7 +93,57 @@ func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 			// with a defensive 12-hour expiration safety TTL boundary
 			err = s.clusterClient.Set(ctx, matrixKey, event.SurgeMultiplier, 12*time.Hour).Err()
 			if err != nil {
-				log.Printf("[PRICING_CACHE_WRITE_ERROR] Failed saving distributed key %s: %v", matrixKey, err)
+				s.logger.Printf("[PRICING_CACHE_WRITE_ERROR] Failed saving distributed key %s: %v", matrixKey, err)
+			}
+		}
+	}
+}
+
+// StartSurgeMatrixSyncLoop boots the background stream consumer that hydrates the shared Redis cache (FetchMessage/Commit pattern)
+func (s *OrderPricingService) StartSurgeMatrixSyncLoop(ctx context.Context) {
+	s.logger.Println("Successfully initialized shared Redis pricing cache sync consumer loop...")
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Println("Draining in-flight pricing cache sync tasks and shutting down...")
+			if err := s.kafkaReader.Close(); err != nil {
+				s.logger.Printf("Failed to close Kafka surge update reader channel cleanly: %v", err)
+			}
+			return
+		default:
+			msg, err := s.kafkaReader.FetchMessage(ctx)
+			if err != nil {
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return
+				}
+				s.logger.Printf("Error pulling surge zone update message event frame: %v", err)
+				continue
+			}
+
+			var event SurgeZoneUpdateEvent
+			if err := json.Unmarshal(msg.Value, &event); err != nil {
+				s.logger.Printf("Poison pill encounter: failed to unmarshal surge matrix token payload: %v", err)
+				_ = s.kafkaReader.CommitMessages(ctx, msg)
+				continue
+			}
+
+			// Core Architecture Rule: Avoid city-bracket hashtagging to ensure keys are scattered
+			// uniformly across all cluster shards based on H3 spatial cell tokens.
+			matrixKey := fmt.Sprintf("surge:matrix:%s:%s", event.CityPrefix, event.H3Cell)
+
+			// Enforce a strict 60-second expiration TTL. If a neighborhood's compute pipeline fails,
+			// pricing automatically degrades back to baseline multipliers to protect consumers.
+			err = s.clusterClient.Set(ctx, matrixKey, fmt.Sprintf("%.4f", event.SurgeMultiplier), 60*time.Second).Err()
+			if err != nil {
+				s.logger.Printf("Cluster Slot Exception: failed to sync surge zone metric to Redis shard: %v", err)
+				// Do not commit offset to force a retry on adjacent scaled pods if infrastructure is down
+				continue
+			}
+
+			// Synchronously commit message offsets to ensure zero data-loss during scaling loops
+			if err := s.kafkaReader.CommitMessages(ctx, msg); err != nil {
+				s.logger.Printf("Failed to commit offset back to Kafka coordinator group: %v", err)
 			}
 		}
 	}
@@ -98,7 +166,7 @@ func (s *OrderPricingService) CalculateFare(ctx context.Context, cityPrefix stri
 		}
 	} else if !errors.Is(err, redis.Nil) {
 		// Log the error but maintain fallback baseline calculation execution
-		log.Printf("[PRICING_CACHE_READ_ERROR] Fallback triggered for key %s: %v", matrixKey, err)
+		s.logger.Printf("[PRICING_CACHE_READ_ERROR] Fallback triggered for key %s: %v", matrixKey, err)
 	}
 
 	// Calculate final pricing allocation mapping using integer paise bounds to prevent data loss
@@ -134,6 +202,34 @@ func (s *OrderPricingService) CalculateDynamicFarePaise(ctx context.Context, h3C
 	finalFarePaise := int64(float64(baseFarePaise) * surgeMultiplier)
 
 	return finalFarePaise, surgeMultiplier
+}
+
+// GetFareQuote evaluates spatial coefficients across the shared cache and returns transactional costs in Paise
+func (s *OrderPricingService) GetFareQuote(ctx context.Context, city string, h3Cell string, distanceMeters float64) (int64, float64, error) {
+	if city == "" || h3Cell == "" || distanceMeters < 0 {
+		return 0, 1.0, errors.New("invalid estimation arguments: fields cannot be empty or negative values")
+	}
+
+	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", city, h3Cell)
+	multiplierStr, err := s.clusterClient.Get(ctx, matrixKey).Result()
+	
+	multiplier := 1.0
+	if err == nil {
+		parsed, parseErr := strconv.ParseFloat(multiplierStr, 64)
+		if parseErr == nil {
+			multiplier = parsed
+		}
+	} else if !errors.Is(err, redis.Nil) {
+		s.logger.Printf("Degraded Operations Warning: Redis cluster read error, falling back to 1.0 multiplier: %v", err)
+	}
+
+	// Calculate base operational costs before applying multiplier modifiers
+	distanceCost := float64(s.perMeterPaise) * distanceMeters
+	rawTotalFare := float64(s.baseFarePaise) + distanceCost
+	finalSurgeFare := rawTotalFare * multiplier
+
+	// Enforce 64-bit integer tracking boundaries (Paise) to eliminate floating point accuracy drift
+	return int64(math.Round(finalSurgeFare)), multiplier, nil
 }
 
 // Close cleanly releases network stream context resources
