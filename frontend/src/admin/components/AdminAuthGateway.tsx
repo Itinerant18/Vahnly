@@ -15,10 +15,11 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   const [loginPassword, setLoginPassword] = useState<string>('Aniket018');
 
   // Registration form inputs
-  const [signupName, setSignupName] = useState<string>('Aniket karmakar');
-  const [signupPhone, setSignupPhone] = useState<string>('+91 7602676448');
-  const [signupEmail, setSignupEmail] = useState<string>('aniketkarmakar018@gmail.com');
-  const [signupPassword, setSignupPassword] = useState<string>('Aniket018');
+  const [signupName, setSignupName] = useState<string>('');
+  const [signupPhone, setSignupPhone] = useState<string>('');
+  const [signupEmail, setSignupEmail] = useState<string>('');
+  const [signupPassword, setSignupPassword] = useState<string>('');
+
   const [signupRegion, setSignupRegion] = useState<string>('KOL'); // Defaulting to Kolkata operational grid
   const [signupRole, setSignupRole] = useState<string>('FLEET_MANAGER'); // Defaulting to Fleet Manager role
 
