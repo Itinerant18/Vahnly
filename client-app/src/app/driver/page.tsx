@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import MapInterpolated, { MapH3Hex, MapDriver } from '../../components/MapInterpolated';
+import { VehicleTracker } from '../../lib/VehicleTracker';
 
 // We map a local version of MapH3Hex to prevent SSR conflicts.
 // Wait! Let's make sure the import is correct. In our components folder, the map component is named `MapInterpolated` but it supports `h3Hexagons` prop!
@@ -30,8 +31,42 @@ export default function DriverPage() {
   // Simulation drivers list (empty for driver app as the driver is the center, or shows mock passenger points)
   const [discoveryPassengers, setDiscoveryPassengers] = useState<MapDriver[]>([]);
 
-  // Telemetry offline coordinates logging buffer
+  // Telemetry offline coordinates logging buffer and tracking coordinator ref
   const [offlinePacketsCount, setOfflinePacketsCount] = useState(0);
+  const trackerRef = useRef<VehicleTracker | null>(null);
+
+  // Mock telemetry upload handler
+  const mockUploadHandler = async (packets: any[]) => {
+    console.log('[DRIVER_PORTAL] Uploading telemetry packet batch:', packets);
+    // Simulate API ingestion roundtrip delay
+    return new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 800));
+  };
+
+  useEffect(() => {
+    if (isOnline) {
+      console.log('[DRIVER_PORTAL] Instantiating geolocation tracker for KOL region.');
+      const tracker = new VehicleTracker('driver-partner-kol-1', cityPrefix, mockUploadHandler);
+      trackerRef.current = tracker;
+      tracker.startTrackingCore();
+
+      // Poll pending packets count for UI status updates
+      const interval = setInterval(() => {
+        if (trackerRef.current) {
+          setOfflinePacketsCount(trackerRef.current.getRingBuffer().getPendingCount());
+        }
+      }, 1000);
+
+      return () => {
+        clearInterval(interval);
+        if (trackerRef.current) {
+          trackerRef.current.stopTrackingCore();
+          trackerRef.current = null;
+        }
+        setOfflinePacketsCount(0);
+      };
+    }
+  }, [isOnline, cityPrefix]);
+
 
   // Setup demand hexagon overlays when going online
   useEffect(() => {
