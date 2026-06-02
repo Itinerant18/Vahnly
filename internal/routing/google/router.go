@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/platform/driver-delivery/internal/routing/graph"
 	"github.com/redis/go-redis/v9"
@@ -43,12 +44,20 @@ func (r *PremiumHybridRouter) ComputeShortestPathETA(ctx context.Context, source
 		return r.chService.ComputeShortestPathETA(ctx, sourceID, targetID)
 	}
 
+	// Only attempt Google Maps (Redis cache check + API) when the caller's context has
+	// enough remaining budget: the cache check alone needs ~35ms, and the API path needs
+	// ~400ms. Batch edge-cost calls arrive with a ~15ms budget — they must go straight to
+	// CH (sub-millisecond in-memory), otherwise both sub-contexts collapse to the parent
+	// deadline and GetTransitMetrics always deadlines out, swallows the error as a local
+	// fallback, and the Redis cache never warms.
 	if r.mapsClient != nil {
-		metrics, err := r.mapsClient.GetTransitMetrics(ctx, sourceNode.Latitude, sourceNode.Longitude, targetNode.Latitude, targetNode.Longitude)
-		if err == nil {
-			return float64(metrics.DurationSecs), nil
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) >= 50*time.Millisecond {
+			metrics, err := r.mapsClient.GetTransitMetrics(ctx, sourceNode.Latitude, sourceNode.Longitude, targetNode.Latitude, targetNode.Longitude)
+			if err == nil {
+				return float64(metrics.DurationSecs), nil
+			}
+			log.Printf("[ROUTING_FALLBACK] Google Maps API failed (%v). Falling back to local OSM Contraction Hierarchies.", err)
 		}
-		log.Printf("[ROUTING_FALLBACK] Google Maps API failed (%v). Falling back to local OSM Contraction Hierarchies.", err)
 	}
 
 	// Fallback to pure local calculation

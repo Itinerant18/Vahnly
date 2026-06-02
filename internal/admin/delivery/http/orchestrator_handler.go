@@ -75,26 +75,37 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 	}
 	defer tx.Rollback(ctx)
 
-	// Validate order and driver availability state atoms securely under serialization gates
-	var currentStatus string
-	err = tx.QueryRow(ctx, "SELECT status FROM orders WHERE id = $1::uuid FOR UPDATE", req.OrderID).Scan(&currentStatus)
+	var currentStatus, cityPrefix string
+	err = tx.QueryRow(ctx,
+		"SELECT status::text, city_prefix FROM orders WHERE id = $1::uuid FOR UPDATE",
+		req.OrderID).Scan(&currentStatus, &cityPrefix)
 	if err != nil {
 		http.Error(w, "order_pre_allocated_or_missing", http.StatusConflict)
 		return
 	}
-	if currentStatus != "PENDING" && currentStatus != "CREATED" {
+	if currentStatus != "CREATED" {
 		http.Error(w, "order_pre_allocated_or_missing", http.StatusConflict)
 		return
 	}
 
-	// Commit explicit override assignment mapping
-	_, err = tx.Exec(ctx, "UPDATE orders SET status = 'ASSIGNED', driver_id = $1::uuid, updated_at = NOW() WHERE id = $2::uuid", req.DriverID, req.OrderID)
-	if err != nil {
+	res, err := tx.Exec(ctx, `
+		UPDATE orders
+		SET status = 'ASSIGNED'::order_status_enum,
+		    assigned_driver_id = $1::uuid,
+		    assigned_at = CURRENT_TIMESTAMP
+		WHERE id = $2::uuid AND status = 'CREATED'::order_status_enum`,
+		req.DriverID, req.OrderID)
+	if err != nil || res.RowsAffected() == 0 {
 		http.Error(w, "manual_allocation_db_failed", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = tx.Exec(ctx, "UPDATE drivers SET current_state = 'EN_ROUTE', updated_at = NOW() WHERE id = $1::uuid", req.DriverID)
+	_, err = tx.Exec(ctx, `
+		UPDATE drivers
+		SET current_state = 'ONLINE_EN_ROUTE'::driver_state_enum,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1::uuid`,
+		req.DriverID)
 	if err != nil {
 		http.Error(w, "driver_state_promotion_failed", http.StatusInternalServerError)
 		return
@@ -105,9 +116,18 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 		return
 	}
 
-	// Update Redis topology to notify active socket streaming channels instantly
-	_ = h.clusterClient.Set(ctx, fmt.Sprintf("driver:state:%s", req.DriverID), "EN_ROUTE", 24*time.Hour).Err()
+	// Update Redis driver state and lock
+	_ = h.clusterClient.Set(ctx, fmt.Sprintf("driver:state:%s", req.DriverID), "ONLINE_EN_ROUTE", 24*time.Hour).Err()
 	_ = h.clusterClient.Set(ctx, fmt.Sprintf("driver:lock:%s", req.DriverID), "OCCUPIED", 30*time.Minute).Err()
+
+	// Evict the driver from the spatial ZSET so the matcher cannot double-dispatch them.
+	// The cell comes from the telemetry tracker key written by the ingestion service.
+	cellKey := fmt.Sprintf("driver:{%s:%s}:current_cell", cityPrefix, req.DriverID)
+	if h3Cell, err := h.clusterClient.Get(ctx, cellKey).Result(); err == nil && h3Cell != "" {
+		spatialKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, h3Cell)
+		_ = h.clusterClient.ZRem(ctx, spatialKey, req.DriverID).Err()
+	}
+	_ = h.clusterClient.Set(ctx, fmt.Sprintf("cooldown:driver:%s", req.DriverID), "1", 30*time.Minute).Err()
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))
