@@ -1110,3 +1110,134 @@ To shield the high-velocity dispatch matching loop SLA against Triton Inference 
 | `go test ./internal/pricing/...` | ✅ Pass | All unit tests for `SurgeRegulator` and pricing service pass cleanly |
 | `test/integration/dispatch_e2e_test.go` | ✅ Pass | Integration test suite compiles and executes flawlessly |
 | **AST Graph Sync** | ✅ Updated | Code graph successfully synchronized with 1349 nodes and 1537 edges |
+
+---
+
+## Milestone 29: Global Active-Active Cross-Region Handoff & Boundary Hydration ✅
+
+### Problem
+
+In a multi-region deployment, when a driver travels between cities (such as Kolkata and Howrah), telemetry updates continue hitting the old region's cluster. This causes "ghost dispatching" and spatial mismatching in the matching loop, as the driver is no longer physically present or under the authority of the old cluster's regional boundary.
+
+### Solution
+
+1. **Active-Active Region Router (`internal/telemetry/usecase/region_router.go`)**:
+   * Implemented a `RegionRouter` that maps active regional geo-fences (e.g. Kolkata and Howrah coordinates).
+2. **Boundary Crossing Detection**:
+   * Programmed `DetectAndHandoff` to verify if incoming driver GPS coordinates cross out of the current region's geofence bounds.
+3. **Global Kafka Handoff Events**:
+   * Upon boundary violation, serializes a `RegionHandoffEvent` and publishes it to the globally replicated Kafka topic `global.region.handoffs` using the driver ID as partition key.
+4. **Instant Redis Eviction**:
+   * Evicts the driver ID immediately from local Redis spatial indexes (both standard locations ZSET and H3 cell ZSET) to prevent stale/ghost matchmaking decisions.
+5. **E2E Integration & Testing (`test/integration/dispatch_e2e_test.go`)**:
+   * Configured and injected `RegionRouter` in the telemetry ingest pipeline and verified boundary crossing handling.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go test ./internal/telemetry/usecase/...` | ✅ Pass | Unit tests for boundary detection and handoff execution pass |
+| `test/integration/dispatch_e2e_test.go` | ✅ Pass | Integration tests for active-active regional routing and Redis eviction pass cleanly |
+
+---
+
+## Milestone 30: Premium Operations Portal Authentication Overlay ✅
+
+### Problem
+
+The Operations Control Room (OCR) and administration backend requires secure, role-gated access routes to prevent unauthorized personnel from viewing driver routes, updating surge pricing, or manually overriding ledger discrepancies.
+
+### Solution
+
+1. **JWT Verification Middleware (`internal/gateway/middleware/auth.go`)**:
+   * Programmed `AuthenticateJWT` to parse and validate HMAC-SHA256 signed access tokens with custom claims containing the client user's ID and role prefix.
+2. **Role-Gating Guard Decoders (`internal/gateway/middleware/auth.go`)**:
+   * Implemented `RequireRole` and `RequireAnyRole` interceptors to block requests that lack specific administrative roles (such as `SUPER_ADMIN` or `FINANCIAL_AUDITOR`).
+3. **Vite Dashboard Overlay Interface (`frontend/src/admin/components/AdminAuthGateway.tsx`, `AdminLogin.tsx`)**:
+   * Created authentication login screens and router guards using Geist typography, hairline borders, and sentence-case headlines conforming to the brand design system.
+4. **Endpoint Guarding (`cmd/gateway/main.go`)**:
+   * Mounted authentication guards to secure dashboard paths (e.g. `/api/v1/admin/ledger/discrepancies`, `/api/v1/admin/ledger/reconcile`).
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go test ./internal/gateway/middleware/...` | ✅ Pass | Auth middleware token parsing and role-check unit tests pass cleanly |
+| `npm run build` inside `frontend` | ✅ Pass | Vite control room compilation completes successfully with 41 modules |
+
+---
+
+## Milestone 31: Lightweight Client-Side Protobuf Stream Decoder & Binary WS Framing ✅
+
+### Problem
+
+High-velocity JSON WebSocket streaming consumes substantial CPU/network bandwidth and increases bundle sizes significantly if full-blown runtime protobuf JS libraries are imported.
+
+### Solution
+
+1. **Binary WebSocket Envelope (`api/proto/v1/stream_framing.proto`)**:
+   * Created a protocol buffer schema `WebSocketBinaryEnvelope` with `FrameType` enum wrapper supporting `AssignmentFrame` and `TelemetryFrame` formats.
+2. **Server-Side Serialization (`internal/gateway/delivery/http/handler.go`)**:
+   * Upgraded the gateway WebSocket handler to serialize active dispatch state objects and location telemetry updates into high-density binary buffers using `google.golang.org/protobuf/proto`.
+3. **Custom Client-Side Decoder (`frontend/src/network/ResilientStreamManager.ts`)**:
+   * Built `decodeBinaryWebSocketEnvelope`, a hand-rolled, zero-dependency, lightweight binary parser that unpacks Protobuf Varint tags and floats from `ArrayBuffer` directly to JavaScript objects.
+4. **WebSocket Binary Type Integration**:
+   * Configured WebSocket connections to use `arraybuffer` binary type natively, allowing seamless frame dispatch.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go test ./internal/gateway/...` | ✅ Pass | Server-side binary serialization logic checks pass successfully |
+| `npm test` inside `frontend` | ✅ Pass | Client-side custom decoder unpacks binary envelopes without error |
+
+---
+
+## Milestone 32: Full-Stack Network Integration & Mocking Suite ✅
+
+### Problem
+
+Validating frontend client connection resiliency, automatic backoffs, sliding-window telemetry ring buffers, and network error-handling behaviors under realistic network outages without deploying external infrastructure.
+
+### Solution
+
+1. **Client Resiliency Mocks (`frontend/src/network/__tests__/NetworkEngineE2EMocks.test.ts`)**:
+   * Developed Jest test suites asserting client-side fetching behavior under transient network drop simulations.
+2. **Idempotency Verification**:
+   * Verified that the exact same client-side idempotency token is preserved across retried network request headers.
+3. **WS Connection Re-homing Checks**:
+   * Mocked WS CloseGoingAway (1001) connection closures to assert that the stream manager executes jittered backoff reconnect routines.
+4. **Telemetry Integrity Buffering**:
+   * Confirmed that `TelemetryRingBuffer` enforces hard queue sizes via FIFO evictions under offline scenarios, and uses reference-matched pointer comparisons during flush routines to avoid async race conditions.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `npm test` inside `frontend` | ✅ Pass | Jest network integration test suite compiles and runs 100% green |
+
+---
+
+## Milestone 33: System Administrator Authorization Tier & Relational Database Seeding ✅
+
+### Problem
+
+Initial deployments require a default admin user and structured role-based databases to enable logins and validate ledger correction flows.
+
+### Solution
+
+1. **System Admins Schema Migration (`database/migrations/000033_add_system_admins.up.sql`)**:
+   * Created a relational schema `system_admins` capturing identifiers, roles, geo-fenced regions, email addresses, and Bcrypt-hashed password strings.
+2. **Aniket Super Admin Seeding**:
+   * Seeded the database migration with a default `SUPER_ADMIN` account for Aniket Karmakar (`aniketkarmakar018@gmail.com`) with password hash for `Aniket018`.
+3. **Admin Actions Wiring (`internal/admin/delivery/http/ledger_handler.go`)**:
+   * Wired endpoint handlers `/api/v1/admin/ledger/discrepancies` and `/api/v1/admin/ledger/reconcile` ensuring role gates are restricted to `SUPER_ADMIN` or `FINANCIAL_AUDITOR` roles.
+4. **Database Migration Pipeline (`cmd/migrate/main.go`)**:
+   * Standardized automated schema runs so that the seed values populate Postgres cleanly during local development setups.
+
+### Verification Results
+
+| Check | Result | Details |
+|-------|--------|---------|
+| `go run ./cmd/migrate` | ✅ Pass | Database schema migrations up to 000033 apply cleanly with seeds |
+| `go test ./internal/admin/...` | ✅ Pass | Admin API endpoints return 401/403 for unauthorized users and 200 for Aniket |

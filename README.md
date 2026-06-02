@@ -22,7 +22,7 @@ at the bottom.
 - **Go:** 1.25.0 (see `go.mod`)
 - **Stack:** Go (backend), Next.js 16 + Capacitor 8 (mobile client), Vite + React 18 (admin dashboard), Postgres 15 + PostGIS 3.3, Redis 7.2 cluster, Apache Kafka (KRaft mode), NVIDIA Triton 24.01
 - **Services:** 15 Go services (ingestion, dispatch, surge, pricing, reconciler, pruner, expiry, rebalancer, gateway, notification, analytics, simulator, osm-preprocessor, server, migrate)
-- **Milestones delivered:** 28+ (see [Milestones](#milestones))
+- **Milestones delivered:** 33+ (see [Milestones](#milestones))
 - **Regions supported:** KOL (Kolkata) and BLR (Bengaluru) via region router middleware
 
 ## High-Level Runtime Path
@@ -462,7 +462,7 @@ Supported regions: `KOL` (Kolkata) and `BLR` (Bengaluru). Configure
 
 ## Milestones
 
-All 28 currently-completed milestones:
+All 33 currently-completed milestones:
 
 | # | Milestone |
 | --- | --- |
@@ -494,6 +494,11 @@ All 28 currently-completed milestones:
 | 27 | Centralized Operations Control Room Dashboard Panel (Admin Portal) |
 | 28 | Local Environment Streamlining & Unified Orchestration Startup |
 | 28b | Closed-Loop Dynamic Surge Pricing & Triton ML Backpressure Circuit Breaking |
+| 29 | Global Active-Active Cross-Region Handoff & Boundary Hydration |
+| 30 | Premium Operations Portal Authentication Overlay |
+| 31 | Lightweight Client-Side Protobuf Stream Decoder & Binary WS Framing |
+| 32 | Full-Stack Network Integration & Mocking Suite |
+| 33 | System Administrator Authorization Tier & Relational Database Seeding |
 
 ## Wiring Risks (current)
 
