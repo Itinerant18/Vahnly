@@ -19,16 +19,10 @@ import (
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
 	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/routing/graph"
+	googleRouting "github.com/platform/driver-delivery/internal/routing/google"
 	"github.com/platform/driver-delivery/internal/storage/migration"
 )
 
-type simpleRoutingService struct {
-	chService *graph.ContractionHierarchiesService
-}
-
-func (s *simpleRoutingService) ComputeShortestPathETA(ctx context.Context, sourceID, targetID int64) (float64, error) {
-	return s.chService.ComputeShortestPathETA(ctx, sourceID, targetID)
-}
 
 func main() {
 	// 1. Core System Context & Configuration Setup
@@ -149,7 +143,8 @@ func main() {
 		chService.AddEdge(9999, 1001, 10.0, false)
 	}
 
-	routingSvc := &simpleRoutingService{chService: chService}
+	googleMapsKey := getEnv("GOOGLE_MAPS_API_KEY", getEnv("VITE_GOOGLE_MAPS_API_KEY", ""))
+	routingSvc := googleRouting.NewPremiumHybridRouter(googleMapsKey, chService)
 
 	etaCorrector := usecase.NewETACorrectorUseCase(tritonClient, routingSvc)
 

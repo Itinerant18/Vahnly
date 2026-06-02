@@ -42,6 +42,12 @@ func (s *ContractionHierarchiesService) AddNode(node *CHNode) {
 	s.nodes[node.ID] = node
 }
 
+// GetNode retrieves a preprocessed node by its ID
+func (s *ContractionHierarchiesService) GetNode(id int64) (*CHNode, bool) {
+	node, exists := s.nodes[id]
+	return node, exists
+}
+
 // AddEdge registers a directed edge between two nodes in the CH graph.
 // It populates the forward or backward graphs depending on Node hierarchy order.
 func (s *ContractionHierarchiesService) AddEdge(fromID, toID int64, weight float64, isShortcut bool) {
