@@ -9,6 +9,7 @@ import { SurgeControlValve } from './components/SurgeControlValve';
 import { IncidentRecoveryTerminal } from './components/IncidentRecoveryTerminal';
 import { LedgerReconciliation } from './components/LedgerReconciliation';
 import { MarketplaceOrchestrator } from './components/MarketplaceOrchestrator';
+import { VirtualizedLedgerTable } from './components/VirtualizedLedgerTable';
 
 interface LedgerEntry {
   id: number;
@@ -67,6 +68,8 @@ export const ControlRoomDashboard: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const activePolygonsRef = useRef<google.maps.Polygon[]>([]);
+  // Buffers the latest heatmap frame between throttled flushes — see SSE effect.
+  const pendingHeatmapRef = useRef<Record<string, number> | null>(null);
   const [isMapSdkLoaded, setIsMapSdkLoaded] = useState<boolean>(false);
 
   const [bottomTab, setBottomTab] = useState<'orders' | 'drivers' | 'vehicles' | 'incidents' | 'ledger' | 'orchestrator'>('orders');
@@ -98,19 +101,29 @@ export const ControlRoomDashboard: React.FC = () => {
     if (!adminToken) return;
 
     let eventSource: EventSource | null = null;
+    let flushTimer: ReturnType<typeof setInterval> | null = null;
     if (adminRole === 'SUPER_ADMIN' || adminRole === 'FLEET_MANAGER') {
       eventSource = new EventSource(`${ANALYTICS_SSE_BASE_URL}/api/v1/analytics/heatmap`);
 
+      // Stream packets only update a ref; the map repaints on a fixed cadence so
+      // a high-frequency feed cannot thrash polygon re-rendering or the DOM.
       eventSource.onmessage = (event: MessageEvent) => {
         try {
           const payload = JSON.parse(event.data as string);
           if (payload.cell_data) {
-            setSpatialHeatmap(payload.cell_data);
+            pendingHeatmapRef.current = payload.cell_data;
           }
         } catch (err) {
           console.error('Failed processing heatmap stream packet:', err);
         }
       };
+
+      flushTimer = setInterval(() => {
+        if (pendingHeatmapRef.current) {
+          setSpatialHeatmap(pendingHeatmapRef.current);
+          pendingHeatmapRef.current = null;
+        }
+      }, 2500);
     }
 
     if (adminRole === 'SUPER_ADMIN' || adminRole === 'FINANCIAL_AUDITOR') {
@@ -120,6 +133,9 @@ export const ControlRoomDashboard: React.FC = () => {
     return () => {
       if (eventSource) {
         eventSource.close();
+      }
+      if (flushTimer) {
+        clearInterval(flushTimer);
       }
     };
   }, [adminToken, adminRole]);
@@ -382,48 +398,9 @@ export const ControlRoomDashboard: React.FC = () => {
             <div className="p-4"><MarketplaceOrchestrator /></div>
           )}
           {activeTab === 'ledger' && canAudit && (
-            <div className="p-4 space-y-4 overflow-x-auto">
+            <div className="p-4 space-y-4">
               <LedgerReconciliation />
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="text-mute uppercase text-[10px] font-medium border-b border-canvas-soft tracking-wider">
-                    <th className="p-3">Order ID</th>
-                    <th className="p-3">Region</th>
-                    <th className="p-3">Account</th>
-                    <th className="p-3">Type</th>
-                    <th className="p-3 text-right">Amount</th>
-                    <th className="p-3">Description</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-canvas-soft">
-                  {ledgerEntries.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-6 text-center text-body">
-                        No completed transactions on record.
-                      </td>
-                    </tr>
-                  ) : (
-                    ledgerEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-canvas-softer transition">
-                        <td className="p-3 font-mono text-xs text-body">{entry.order_id.slice(0, 16)}...</td>
-                        <td className="p-3">
-                          <span className="bg-canvas-soft px-2 py-0.5 rounded-pill text-xs font-medium">{entry.city_prefix}</span>
-                        </td>
-                        <td className="p-3 text-body">{entry.account_type}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded-pill text-[10px] font-medium ${
-                            entry.entry_type === 'DEBIT' ? 'bg-ink text-on-dark' : 'bg-canvas-soft text-ink'
-                          }`}>
-                            {entry.entry_type}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right font-mono font-medium">₹{(entry.amount_paise / 100).toFixed(2)}</td>
-                        <td className="p-3 text-body text-xs">{entry.description}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <VirtualizedLedgerTable rows={ledgerEntries} height={220} />
             </div>
           )}
         </div>

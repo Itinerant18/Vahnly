@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { SlideToConfirm } from './SlideToConfirm';
 
 interface StalledTripIncident {
   order_id: string;
@@ -180,24 +181,24 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Trigger Buttons Core Section */}
-              <div className="border-t border-canvas-soft pt-4 mt-4 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => dispatchRecoveryAction('FORCE_ABORT')}
+              {/* Destructive action gates — slide-to-confirm prevents accidental eviction */}
+              <div className="border-t border-canvas-soft pt-4 mt-4 flex flex-col gap-3">
+                <SlideToConfirm
+                  key={`abort-${selectedIncident.order_id}`}
+                  label="Slide to force-cancel trip"
+                  confirmedLabel="Trip cancelled — committing"
+                  tone="destructive"
                   disabled={isMutating}
-                  className="flex-1 bg-canvas-soft text-status-alert border border-surface-pressed font-bold py-3 px-4 rounded-md transition text-xs uppercase tracking-wider cursor-pointer disabled:opacity-40 active:scale-95"
-                >
-                  Force Cancel Trip
-                </button>
-                <button
-                  type="button"
-                  onClick={() => dispatchRecoveryAction('FORCE_REMATCH')}
+                  onConfirm={() => dispatchRecoveryAction('FORCE_ABORT')}
+                />
+                <SlideToConfirm
+                  key={`rematch-${selectedIncident.order_id}`}
+                  label="Slide to evict driver & re-match"
+                  confirmedLabel="Driver evicted — re-matching"
+                  tone="neutral"
                   disabled={isMutating}
-                  className="flex-1 bg-canvas-soft text-ink border border-surface-pressed font-bold py-3 px-4 rounded-md transition text-xs uppercase tracking-wider cursor-pointer disabled:opacity-40 active:scale-95"
-                >
-                  Evict Driver & Re-Match Order
-                </button>
+                  onConfirm={() => dispatchRecoveryAction('FORCE_REMATCH')}
+                />
               </div>
             </div>
           ) : (

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../config';
+import { assessTelemetryIntegrity } from './telemetryIntegrity';
+import { SlideToConfirm } from './components/SlideToConfirm';
 
 interface ActiveDriverTelemetry {
   driver_id: string;
@@ -20,6 +22,28 @@ interface FleetDrillDownDrawerProps {
 export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cellToken, onClose }) => {
   const [drivers, setDrivers] = useState<ActiveDriverTelemetry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [suspendingId, setSuspendingId] = useState<string | null>(null);
+
+  const suspendDriver = async (driverId: string) => {
+    setSuspendingId(driverId);
+    try {
+      const jwtToken = localStorage.getItem('admin_jwt_token') ?? '';
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${driverId}/suspend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwtToken}`,
+        },
+        body: JSON.stringify({ reason: 'Telemetry integrity hold — flagged by operations dashboard.' }),
+      });
+    } catch (err) {
+      console.error('Failed dispatching driver suspension override:', err);
+    } finally {
+      // Drop the operator from the live pool regardless — the hold breaks their lock.
+      setDrivers((prev) => prev.filter((d) => d.driver_id !== driverId));
+      setSuspendingId(null);
+    }
+  };
 
   useEffect(() => {
     if (cellToken) {
@@ -113,15 +137,22 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
           </div>
         ) : (
           <div className="space-y-3">
-            {drivers.map((driver) => (
+            {drivers.map((driver) => {
+              const verdict = assessTelemetryIntegrity(driver);
+              const flagged = verdict.risk === 'AMBER';
+              return (
               <div
                 key={driver.driver_id}
-                className="bg-canvas-softer border border-canvas-soft rounded-xl p-4 space-y-3 hover:border-surface-pressed transition"
+                className={`rounded-xl p-4 space-y-3 transition ${
+                  flagged
+                    ? 'bg-canvas-soft border border-status-warn'
+                    : 'bg-canvas-softer border border-canvas-soft hover:border-surface-pressed'
+                }`}
               >
                 {/* Driver Profile Title Metrics */}
                 <div className="flex justify-between items-start border-b border-canvas-soft/60 pb-2">
                   <div>
-                    <h4 className="text-xs font-bold text-ink font-move">{driver.name}</h4>
+                    <h4 className="text-xs font-bold text-ink">{driver.name}</h4>
                     <p className="text-[10px] text-body font-mono mt-0.5">{driver.phone}</p>
                   </div>
                   <span
@@ -149,6 +180,31 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
                   </div>
                 </div>
 
+                {/* Telemetry Integrity Alarm — surfaces snapshot-level spoof signals */}
+                {flagged && (
+                  <div className="border border-status-warn rounded-lg p-3 space-y-2 bg-white">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full bg-status-warn" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-status-warn">
+                        Telemetry integrity hold
+                      </span>
+                    </div>
+                    <ul className="text-[10px] text-body space-y-0.5 list-disc list-inside">
+                      {verdict.reasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                    <SlideToConfirm
+                      key={`suspend-${driver.driver_id}`}
+                      label="Slide to suspend operator"
+                      confirmedLabel="Suspending — breaking lock"
+                      tone="destructive"
+                      disabled={suspendingId === driver.driver_id}
+                      onConfirm={() => suspendDriver(driver.driver_id)}
+                    />
+                  </div>
+                )}
+
                 {/* State Dependencies & Trip ID Contexts */}
                 <div className="text-[10px] space-y-1 pt-1">
                   <div>
@@ -166,7 +222,8 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

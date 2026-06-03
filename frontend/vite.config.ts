@@ -1,17 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// The dashboard talks to the gateway (:8080) and the analytics SSE service (:8089).
+// The dashboard talks to the gateway and the analytics SSE service (:8089).
 // Calling those absolute origins from the browser would trip CORS, so in dev we serve
 // everything same-origin from :3000 and proxy the API paths to the right backend.
+// The gateway container publishes host :8085 (see docker-compose public-gateway,
+// "8085:8080"); :8080 is left free for other local tooling.
 // Override targets with API_GATEWAY_URL / ANALYTICS_SSE_URL if your hosts differ.
-const GATEWAY = process.env.API_GATEWAY_URL ?? 'http://localhost:8080';
+const GATEWAY = process.env.API_GATEWAY_URL ?? 'http://localhost:8085';
 const ANALYTICS = process.env.ANALYTICS_SSE_URL ?? 'http://localhost:8089';
 
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    port: 5000,
     proxy: {
       // Most specific first: analytics SSE goes to the analytics service.
       '/api/v1/analytics': { target: ANALYTICS, changeOrigin: true },
