@@ -177,7 +177,7 @@ spec:
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
-              value: "password"
+              value: "HardenedProdPassword"
             - name: POSTGRES_DB
               value: "delivery_platform"
           ports:

@@ -39,7 +39,7 @@ foreach ($item in $pods.items) {
 }
 $env:REDIS_IP_MAP = $ipMapList -join ","
 Write-Host "  Generated REDIS_IP_MAP: $env:REDIS_IP_MAP"
-$env:DATABASE_URL = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
+$env:DATABASE_URL = "postgres://postgres:HardenedProdPassword@localhost:5432/delivery_platform?sslmode=disable"
 $env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
 $env:KAFKA_BROKERS = "localhost:19092"
 $env:GOARCH = "amd64"
@@ -143,7 +143,7 @@ Write-Host "  Database seeded successfully"
 Write-Host "Booting services..."
 
 $ingestionWrapper = @"
-`$env:DATABASE_URL        = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
+`$env:DATABASE_URL        = "postgres://postgres:HardenedProdPassword@localhost:5432/delivery_platform?sslmode=disable"
 `$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
 `$env:KAFKA_BROKERS       = "localhost:19092"
 `$env:GRPC_PORT           = "50051"
@@ -153,7 +153,7 @@ $ingestionWrapper = @"
 $ingestionWrapper | Out-File -FilePath "C:\workspace\Driver\bin\run-ingestion.ps1" -Encoding UTF8 -Force
 
 $dispatchWrapper = @"
-`$env:DATABASE_URL        = "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable"
+`$env:DATABASE_URL        = "postgres://postgres:HardenedProdPassword@localhost:5432/delivery_platform?sslmode=disable"
 `$env:REDIS_CLUSTER_NODES = "127.0.0.1:6379"
 `$env:KAFKA_BROKERS       = "localhost:19092"
 `$env:ALGORITHM_STRATEGY  = "GREEDY"

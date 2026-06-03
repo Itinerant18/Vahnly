@@ -60,7 +60,7 @@ func (m *mockTritonServer) ModelInfer(ctx context.Context, req *triton.ModelInfe
 	}, nil
 }
 
-func TestEndToEnd_DispatchMatchingPipeline(t *testing.T) {
+func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	// 1. Gather Configuration Metrics from Environment Variables
 	postgresURL := os.Getenv("DATABASE_URL")
 	redisNodes := os.Getenv("REDIS_CLUSTER_NODES")

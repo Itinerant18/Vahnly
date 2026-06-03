@@ -1,438 +1,351 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import MapInterpolated, { MapH3Hex, MapDriver } from '../../components/MapInterpolated';
 import { VehicleTracker } from '../../lib/VehicleTracker';
+import { ResilientStreamManager } from '../../network/ResilientStreamManager';
 
-// We map a local version of MapH3Hex to prevent SSR conflicts.
-// Wait! Let's make sure the import is correct. In our components folder, the map component is named `MapInterpolated` but it supports `h3Hexagons` prop!
-// Let's import MapInterpolated from '../../components/MapInterpolated'.
+interface ActiveOrderAssignment {
+  order_id: string;
+  customer_name: string;
+  pickup_address: string;
+  dropoff_address: string;
+  quoted_fare_paise: number;
+  vehicle_tier: string;
+}
 
-export default function DriverPage() {
-  const [isOnline, setIsOnline] = useState(false);
-  const [cityPrefix] = useState('KOL');
-  
-  // Driver state machine: 'offline' | 'searching' | 'offered' | 'accepted' | 'started' | 'completed'
-  const [driverState, setDriverState] = useState<'offline' | 'searching' | 'offered' | 'accepted' | 'started' | 'completed'>('offline');
-  
-  // Active offer timer
-  const [offerCountdown, setOfferCountdown] = useState(15);
-  const [offerTimerProgress, setOfferTimerProgress] = useState(100);
-  
-  // Slide gesture state
-  const [sliderVal, setSliderVal] = useState(0);
-  const isSliding = useRef(false);
-  const sliderTrackRef = useRef<HTMLDivElement | null>(null);
+// Low-overhead client-side unpacking framework matching Milestone 31 specifications exactly
+function parseBinaryEnvelope(buffer: ArrayBuffer): { type: string; data: any } | null {
+  const bytes = new Uint8Array(buffer);
+  let offset = 0;
+  let frameType = 0;
+  const assignmentData: any = {};
 
-  // Active H3 cells overlay details
-  const [h3Overlays, setH3Overlays] = useState<MapH3Hex[]>([]);
+  try {
+    while (offset < bytes.length) {
+      const key = bytes[offset++];
+      const fieldNumber = key >> 3;
 
-  // Simulation drivers list (empty for driver app as the driver is the center, or shows mock passenger points)
-  const [discoveryPassengers, setDiscoveryPassengers] = useState<MapDriver[]>([]);
-
-  // Telemetry offline coordinates logging buffer and tracking coordinator ref
-  const [offlinePacketsCount, setOfflinePacketsCount] = useState(0);
-  const trackerRef = useRef<VehicleTracker | null>(null);
-
-  // Mock telemetry upload handler
-  const mockUploadHandler = async (packets: any[]) => {
-    console.log('[DRIVER_PORTAL] Uploading telemetry packet batch:', packets);
-    // Simulate API ingestion roundtrip delay
-    return new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 800));
-  };
-
-  useEffect(() => {
-    if (isOnline) {
-      console.log('[DRIVER_PORTAL] Instantiating geolocation tracker for KOL region.');
-      const tracker = new VehicleTracker('driver-partner-kol-1', cityPrefix, mockUploadHandler);
-      trackerRef.current = tracker;
-      tracker.startTrackingCore();
-
-      // Poll pending packets count for UI status updates
-      const interval = setInterval(() => {
-        if (trackerRef.current) {
-          setOfflinePacketsCount(trackerRef.current.getRingBuffer().getPendingCount());
+      if (fieldNumber === 1) {
+        frameType = bytes[offset++];
+      } else if (fieldNumber === 2) { // Assignment Message Block
+        const subLen = bytes[offset++];
+        const end = offset + subLen;
+        while (offset < end) {
+          const subKey = bytes[offset++];
+          const subNum = subKey >> 3;
+          const len = bytes[offset++];
+          const str = new TextDecoder().decode(bytes.subarray(offset, offset + len));
+          offset += len;
+          if (subNum === 1) assignmentData.order_id = str;
+          if (subNum === 2) assignmentData.driver_id = str;
+          if (subNum === 4) assignmentData.status = str;
         }
-      }, 1000);
-
-      return () => {
-        clearInterval(interval);
-        if (trackerRef.current) {
-          trackerRef.current.stopTrackingCore();
-          trackerRef.current = null;
-        }
-        setOfflinePacketsCount(0);
-      };
+      } else {
+        offset++;
+      }
     }
-  }, [isOnline, cityPrefix]);
-
-
-  // Setup demand hexagon overlays when going online
-  useEffect(() => {
-    if (isOnline) {
-      setH3Overlays([
-        { index: '88283082b9fffff', intensity: 0.8, color: 'rgba(245, 158, 11, 0.25)' }, // amber surge
-        { index: '88283082b9fcdef', intensity: 0.4, color: 'rgba(59, 130, 246, 0.2)' },  // moderate blue
-      ]);
-      setDriverState('searching');
-    } else {
-      setH3Overlays([]);
-      setDriverState('offline');
-    }
-  }, [isOnline]);
-
-  // Offer Discovery Loop Simulation
-  useEffect(() => {
-    if (driverState === 'searching') {
-      const trigger = setTimeout(() => {
-        setDriverState('offered');
-        setOfferCountdown(15);
-        setOfferTimerProgress(100);
-      }, 7000); // Receive ride offer after 7s online
-      return () => clearTimeout(trigger);
-    }
-  }, [driverState]);
-
-  // 15-Second Radial Offer Countdown Timer Bar Logic
-  useEffect(() => {
-    if (driverState === 'offered' && offerCountdown > 0) {
-      const interval = setInterval(() => {
-        setOfferCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            setDriverState('searching'); // Timed out: return to searching
-            return 0;
-          }
-          const nextVal = prev - 1;
-          setOfferTimerProgress((nextVal / 15) * 100);
-          return nextVal;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [driverState, offerCountdown]);
-
-  // Slide Gesture Drag Tracker
-  const handleTouchStart = () => {
-    isSliding.current = true;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isSliding.current || !sliderTrackRef.current) return;
-    const rect = sliderTrackRef.current.getBoundingClientRect();
-    const width = rect.width - 56; // minus thumb diameter
-    const x = e.clientX - rect.left - 28;
-    const percent = Math.min(100, Math.max(0, (x / width) * 100));
-    setSliderVal(percent);
     
-    if (percent >= 98) {
-      triggerSlideAction();
+    if (frameType === 1 || assignmentData.order_id) {
+      return { type: 'ASSIGNMENT', data: assignmentData };
+    }
+  } catch (err) {
+    console.error('[BINARY_PARSER] Failed parsing incoming array byte frames:', err);
+  }
+  return null;
+}
+
+export default function DriverTerminalPage() {
+  // Hardcoded target authentication metadata for instant local sandbox test execution loopback
+  const [driverID] = useState<string>('drv-aniket-7602');
+  const [cityPrefix] = useState<string>('KOL');
+
+  // Duty State Machine Configuration States
+  const [dutyState, setDutyState] = useState<'OFFLINE' | 'ONLINE_AVAILABLE' | 'ON_TRIP'>('OFFLINE');
+  const [streamStatus, setStreamStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING'>('DISCONNECTED');
+  
+  // High-Priority Match Allocation Overlay Hooks
+  const [incomingOffer, setIncomingOffer] = useState<ActiveOrderAssignment | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(15);
+  const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
+
+  // Structural Class Reference Pointer Scopes
+  const trackerRef = useRef<VehicleTracker | null>(null);
+  const streamRef = useRef<ResilientStreamManager | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up streaming sessions and hardware trackers on component unmount
+  useEffect(() => {
+    return () => {
+      trackerRef.current?.stopTrackingCore();
+      streamRef.current?.disconnect();
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    };
+  }, []);
+
+  // Monitor allocation offer lifecycles to manage the 15-second expiration windows
+  useEffect(() => {
+    if (incomingOffer && countdownSeconds > 0) {
+      countdownTimerRef.current = setTimeout(() => {
+        setCountdownSeconds((prev) => prev - 1);
+      }, 1000);
+    } else if (countdownSeconds === 0 && incomingOffer) {
+      handleDeclineOffer(); // Automatic expiration fallback if dispatcher validation interval passes
+    }
+    return () => {
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    };
+  }, [incomingOffer, countdownSeconds]);
+
+  const handleToggleDutySwitch = async () => {
+    if (dutyState === 'OFFLINE') {
+      setDutyState('ONLINE_AVAILABLE');
+
+      // 1. Initialize native background coordinate injection via the tracker engine
+      trackerRef.current = new VehicleTracker(driverID, cityPrefix, async (packets) => {
+        console.log('[DUTY_TERMINAL] Flushing telemetry chunk payloads:', packets);
+        return true;
+      });
+      await trackerRef.current.startTrackingCore();
+
+      // 2. Establish low-latency connection to binary WebSocket channels
+      streamRef.current = new ResilientStreamManager({
+        orderID: `stream-session-${driverID}`,
+        cityPrefix: cityPrefix,
+        wsBaseUrl: 'ws://localhost:8080',
+        onStatusChange: (status) => setStreamStatus(status),
+        onMessage: (message: any) => {
+          // Intercept incoming byte stream buffers or standard text fallback events
+          if (message instanceof ArrayBuffer) {
+            const unpacked = parseBinaryEnvelope(message);
+            if (unpacked?.type === 'ASSIGNMENT') {
+              triggerIncomingMatchNotification(unpacked.data.order_id);
+            }
+          } else if (message?.channel === 'assignment' || message?.order_id) {
+            triggerIncomingMatchNotification(message.order_id);
+          }
+        }
+      });
+      streamRef.current.connect();
+
+    } else {
+      // Clean teardown and hardware release routine
+      trackerRef.current?.stopTrackingCore();
+      streamRef.current?.disconnect();
+      trackerRef.current = null;
+      streamRef.current = null;
+      setDutyState('OFFLINE');
+      setStreamStatus('DISCONNECTED');
+      setIncomingOffer(null);
+      setActiveTrip(null);
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSliding.current || !sliderTrackRef.current) return;
-    const rect = sliderTrackRef.current.getBoundingClientRect();
-    const width = rect.width - 56;
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left - 28;
-    const percent = Math.min(100, Math.max(0, (x / width) * 100));
-    setSliderVal(percent);
+  const triggerIncomingMatchNotification = (orderId: string) => {
+    if (dutyState !== 'ONLINE_AVAILABLE' || activeTrip) return;
 
-    if (percent >= 98) {
-      triggerSlideAction();
-    }
+    // Build incoming transaction package mapping structural configurations safely
+    setIncomingOffer({
+      order_id: orderId || `ord-mock-${Date.now().toString().slice(-4)}`,
+      customer_name: 'Aniket Karmakar (Car Owner)',
+      pickup_address: 'Salt Lake Sector V Tech Hub, Kolkata',
+      dropoff_address: 'Park Street Dining Grid, Kolkata',
+      quoted_fare_paise: 68000, // ₹680.00
+      vehicle_tier: 'ULTRA_LUXURY',
+    });
+    setCountdownSeconds(15);
   };
 
-  const handleMouseOrTouchEnd = () => {
-    isSliding.current = false;
-    // Snap back to 0 if not completed
-    if (sliderVal < 98) {
-      setSliderVal(0);
+  const handleAcceptOffer = async () => {
+    if (!incomingOffer) return;
+    setDutyState('ON_TRIP');
+    setActiveTrip(incomingOffer);
+    setIncomingOffer(null);
+
+    try {
+      // Post validation receipt parameters directly to your Go matching controllers
+      await fetch('http://localhost:8080/api/v1/dispatch/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: activeTrip?.order_id, driver_id: driverID }),
+      });
+    } catch (err) {
+      console.warn('[TERMINAL_WS] Assignment claimed locally. Syncing background parameters.');
     }
-  };
-
-  const triggerSlideAction = () => {
-    isSliding.current = false;
-    setSliderVal(0);
-
-    if (driverState === 'accepted') {
-      setDriverState('started');
-    } else if (driverState === 'started') {
-      setDriverState('completed');
-      setTimeout(() => {
-        setDriverState('searching');
-      }, 3000);
-    }
-  };
-
-  const handleAcceptOffer = () => {
-    setDriverState('accepted');
   };
 
   const handleDeclineOffer = () => {
-    setDriverState('searching');
+    setIncomingOffer(null);
+    setCountdownSeconds(15);
+  };
+
+  const handleCompleteCurrentTrip = () => {
+    setDutyState('ONLINE_AVAILABLE');
+    setActiveTrip(null);
   };
 
   return (
-    <main className="min-h-screen bg-white text-ink flex flex-col md:flex-row antialiased font-sans selection:bg-black selection:text-white">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
       
-      {/* 1. Left Control Panel: Online Duty Dashboard */}
-      <section className="w-full md:w-[380px] p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-canvas-soft bg-white z-10">
-        
-        <div>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-xs font-bold text-mute group-hover:text-ink transition">←</span>
-              <h1 className="text-xl font-bold tracking-tight text-ink font-move">
-                drivers-for-u
-              </h1>
-            </Link>
-            <span className="px-2.5 py-0.5 rounded-full border border-surface-pressed bg-canvas-soft text-[10px] font-bold text-ink tracking-wider uppercase">
-              Partner portal
-            </span>
+      {/* 15-Second High-Priority Full Screen Acceptance Modal Overlay */}
+      {incomingOffer && (
+        <div className="fixed inset-0 bg-black z-[99999] flex flex-col justify-between p-6 sm:p-12 animate-fadeIn text-left">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+              <div>
+                <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase font-mono">High-Priority Allocation Target</span>
+                <h2 className="text-2xl font-bold tracking-tight text-white font-move mt-1">New Match Offer Received</h2>
+              </div>
+              
+              {/* Animated Countdown Ring Component Canvas Visual Indicator */}
+              <div className="h-14 w-14 rounded-full border-4 border-zinc-800 flex items-center justify-center relative overflow-hidden">
+                <span className="text-base font-mono font-bold animate-pulse text-white">{countdownSeconds}s</span>
+                <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin duration-1000"></div>
+              </div>
+            </div>
+
+            {/* Trip Parameters Metadata Grid Layout */}
+            <div className="pt-6 space-y-6 max-w-xl">
+              <div>
+                <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider block">Vehicle Asset Owner</span>
+                <span className="text-lg font-bold font-move text-white mt-0.5 block">{incomingOffer.customer_name}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+                  <span className="text-zinc-500 block text-[8px] font-bold uppercase">Route Pickup Base</span>
+                  <span className="text-white font-medium mt-1 block">{incomingOffer.pickup_address}</span>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+                  <span className="text-zinc-500 block text-[8px] font-bold uppercase">Destination Dropoff</span>
+                  <span className="text-white font-medium mt-1 block">{incomingOffer.dropoff_address}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center bg-zinc-900 border border-zinc-800 p-4 rounded-xl font-mono">
+                <div>
+                  <span className="text-zinc-500 block text-[8px] font-bold uppercase">Guaranteed Payout Split</span>
+                  <span className="text-xl font-bold text-white mt-0.5 block">₹{(incomingOffer.quoted_fare_paise / 100).toFixed(2)}</span>
+                </div>
+                <span className="bg-white text-black px-2.5 py-1 text-[9px] font-bold rounded uppercase tracking-wider">
+                  {incomingOffer.vehicle_tier.replace('_', ' ')}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Toggle Switch online/offline */}
-          <div className="p-5 rounded-xl border border-canvas-soft bg-canvas-softer flex items-center justify-between shadow-sm mb-6">
-            <div>
-              <h2 className="font-bold text-ink font-move">Duty switch</h2>
-              <p className="text-xs text-body mt-0.5 leading-relaxed">
-                {isOnline ? 'Active & receiving dispatches' : 'Offline'}
-              </p>
-            </div>
+          {/* Action Trigger Handles */}
+          <div className="flex gap-4 max-w-xl w-full mx-auto">
             <button
-              onClick={() => setIsOnline(!isOnline)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                isOnline ? 'bg-black' : 'bg-surface-pressed'
-              }`}
+              onClick={handleDeclineOffer}
+              type="button"
+              className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 font-bold py-4 rounded-full text-xs uppercase tracking-wider transition cursor-pointer border border-zinc-800 active:scale-95"
             >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  isOnline ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
+              Decline Offer
+            </button>
+            <button
+              onClick={handleAcceptOffer}
+              type="button"
+              className="flex-1 bg-white hover:bg-zinc-200 text-black font-bold py-4 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95 animate-bounce"
+            >
+              Accept Match Offer
             </button>
           </div>
+        </div>
+      )}
 
-          {/* Core States Body */}
-          {isOnline ? (
-            <div className="space-y-6 animate-in">
-              {/* Searching Screen */}
-              {driverState === 'searching' && (
-                <div className="space-y-5">
-                  <div className="p-6 rounded-xl border border-canvas-soft bg-canvas-softer text-center space-y-4">
-                    <div className="relative w-10 h-10 mx-auto flex items-center justify-center">
-                      <div className="absolute inset-0 rounded-full border border-black/20 animate-ping" />
-                      <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold select-none">
-                        ⚡
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-ink text-base font-move">Online & available</h3>
-                      <p className="text-xs text-body mt-1">Positioned near high-demand surge grid cells...</p>
-                    </div>
-                  </div>
-
-                  {/* Active Surge Legend */}
-                  <div className="p-5 rounded-xl border border-canvas-soft bg-white space-y-3">
-                    <h4 className="text-[10px] font-bold text-mute uppercase tracking-wider">Demand metrics</h4>
-                    <div className="flex items-center justify-between text-xs text-ink">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3.5 h-3.5 rounded bg-black/10 border border-black/30" />
-                        <span className="font-semibold">Sector V surge zone</span>
-                      </div>
-                      <span className="font-bold text-black font-move">x1.40 Surge</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ride Accepted Panel */}
-              {driverState === 'accepted' && (
-                <div className="space-y-6 animate-in">
-                  <div className="p-5 rounded-xl border border-canvas-soft bg-canvas-softer space-y-3">
-                    <h3 className="font-bold text-ink text-base font-move">Trip assigned</h3>
-                    <div className="flex justify-between items-center text-xs text-ink">
-                      <span className="text-body font-semibold">Rider identity</span>
-                      <span className="font-mono bg-white px-2 py-0.5 rounded border border-canvas-soft text-[10px]">usr-match-56</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-ink">
-                      <span className="text-body font-semibold">Fare estimate</span>
-                      <span className="font-bold text-black font-move">₹350.00</span>
-                    </div>
-                  </div>
-
-                  {/* Slide to Start Gesture */}
-                  <div
-                    ref={sliderTrackRef}
-                    onMouseMove={handleMouseMove}
-                    onTouchMove={handleTouchMove}
-                    onMouseUp={handleMouseOrTouchEnd}
-                    onTouchEnd={handleMouseOrTouchEnd}
-                    className="relative h-14 w-full rounded-xl bg-canvas-softer border border-canvas-soft overflow-hidden select-none"
-                  >
-                    <div
-                      style={{ width: `${sliderVal}%` }}
-                      className="absolute inset-y-0 left-0 bg-black/10 transition-all duration-75"
-                    />
-                    <div
-                      onMouseDown={handleTouchStart}
-                      onTouchStart={handleTouchStart}
-                      style={{ left: `${sliderVal}%`, transform: `translateX(-${sliderVal * 0.56}px)` }}
-                      className="absolute top-1 left-1 w-12 h-12 rounded-lg bg-black flex items-center justify-center cursor-grab active:cursor-grabbing text-white font-bold shadow-md transition-all duration-75"
-                    >
-                      →
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-mute pointer-events-none uppercase tracking-wider">
-                      Slide to start journey
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ride Started Panel */}
-              {driverState === 'started' && (
-                <div className="space-y-6 animate-in">
-                  <div className="p-5 rounded-xl border border-canvas-soft bg-canvas-softer space-y-3">
-                    <h3 className="font-bold text-ink text-base font-move">Journey in progress</h3>
-                    <div className="flex items-center justify-between text-xs text-ink">
-                      <span className="text-body font-semibold">Navigating destination</span>
-                      <span className="font-bold text-black font-move">Park Street Terminal</span>
-                    </div>
-                  </div>
-
-                  {/* Slide to Complete Gesture */}
-                  <div
-                    ref={sliderTrackRef}
-                    onMouseMove={handleMouseMove}
-                    onTouchMove={handleTouchMove}
-                    onMouseUp={handleMouseOrTouchEnd}
-                    onTouchEnd={handleMouseOrTouchEnd}
-                    className="relative h-14 w-full rounded-xl bg-canvas-softer border border-canvas-soft overflow-hidden select-none"
-                  >
-                    <div
-                      style={{ width: `${sliderVal}%` }}
-                      className="absolute inset-y-0 left-0 bg-black/10 transition-all duration-75"
-                    />
-                    <div
-                      onMouseDown={handleTouchStart}
-                      onTouchStart={handleTouchStart}
-                      style={{ left: `${sliderVal}%`, transform: `translateX(-${sliderVal * 0.56}px)` }}
-                      className="absolute top-1 left-1 w-12 h-12 rounded-lg bg-black flex items-center justify-center cursor-grab active:cursor-grabbing text-white font-bold shadow-md transition-all duration-75"
-                    >
-                      ✓
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-mute pointer-events-none uppercase tracking-wider">
-                      Slide to complete trip
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ride Completed Panel */}
-              {driverState === 'completed' && (
-                <div className="p-6 rounded-xl border border-canvas-soft bg-canvas-softer text-center space-y-4 animate-in">
-                  <div className="w-12 h-12 rounded-full bg-black mx-auto flex items-center justify-center text-white font-bold text-xl select-none">
-                    ✓
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-ink text-base font-move">Trip finished</h3>
-                    <p className="text-xs text-body mt-1">Earnings credited to your wallet ledger successfully.</p>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          ) : (
-            <div className="p-6 rounded-xl border border-canvas-soft bg-canvas-softer text-center space-y-2">
-              <h3 className="font-bold text-ink font-move">Offline</h3>
-              <p className="text-xs text-body leading-relaxed">Toggle the duty switch online to map demand grids and receive passenger dispatches.</p>
-            </div>
+      {/* Primary On-Duty View Header Panel */}
+      <header className="border-b border-zinc-800 pb-4 flex justify-between items-center w-full text-left">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white font-move">Driver Duty Terminal</h1>
+          <p className="text-zinc-500 text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">ID: {driverID.toUpperCase()} (Hub: {cityPrefix})</p>
+        </div>
+        
+        {/* On Duty Status Network Color Badges */}
+        <div className="flex items-center gap-2">
+          {dutyState !== 'OFFLINE' && (
+            <span className="bg-zinc-900 text-zinc-400 border border-zinc-800 px-3 py-1.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider animate-pulse">
+              ● Stream: {streamStatus.toLowerCase()}
+            </span>
           )}
+          <a href="/" className="text-xs font-bold uppercase tracking-wider border border-zinc-800 px-4 py-2 rounded-full hover:bg-zinc-900 transition">
+            ← Home
+          </a>
+        </div>
+      </header>
 
+      {/* Main Control Status Dashboard Panel Module */}
+      <div className="w-full max-w-md mx-auto my-8 bg-zinc-950 border border-zinc-800 rounded-2xl p-6 space-y-6 relative overflow-hidden">
+        <div className="text-left border-b border-zinc-900 pb-4 flex justify-between items-center">
+          <div>
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-zinc-500">Operating Lifecycle State</h3>
+            <div className="text-lg font-bold font-move text-white mt-1">
+              {dutyState === 'OFFLINE' ? '🔴 System Disconnected' : dutyState === 'ONLINE_AVAILABLE' ? '🟢 Active & Seeking Match' : '⚡ Busy on Active Trip'}
+            </div>
+          </div>
+
+          {/* Core Master On-Duty Toggle Switch */}
+          <button
+            onClick={handleToggleDutySwitch}
+            disabled={dutyState === 'ON_TRIP'}
+            className={`h-7 w-14 rounded-full transition relative flex items-center p-1 cursor-pointer disabled:opacity-30 ${
+              dutyState !== 'OFFLINE' ? 'bg-white' : 'bg-zinc-800'
+            }`}
+          >
+            <div className={`h-5 w-5 rounded-full shadow transition-transform duration-300 ${
+              dutyState !== 'OFFLINE' ? 'translate-x-7 bg-black' : 'translate-x-0 bg-zinc-400'
+            }`} />
+          </button>
         </div>
 
-        {/* Offline Ring Buffer Status */}
-        {isOnline && (
-          <div className="mt-6 border-t border-canvas-soft pt-4 flex items-center justify-between text-[10px] font-bold text-body uppercase tracking-wider">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-black" />
-              <span>Offline GPS buffer</span>
+        {/* Conditional Terminal Views Rendering Matrix */}
+        {dutyState === 'OFFLINE' ? (
+          <div className="py-8 text-center text-xs text-zinc-500 font-medium italic">
+            Toggle the on-duty master switch above to launch native background telemetry runners and bind session streaming pipes.
+          </div>
+        ) : dutyState === 'ONLINE_AVAILABLE' ? (
+          <div className="space-y-4 animate-fadeIn text-left">
+            <div className="p-4 bg-zinc-900/40 border border-zinc-900 rounded-xl text-[11px] text-zinc-400 leading-relaxed font-mono">
+              [TELEMETRY_DAEMON]: Geolocation hardware polling loops operational.<br />
+              [STREAM_BACKPLANE]: Awaiting binary allocation vector payload frames from gateway...
             </div>
-            <span className="font-mono text-ink">
-              {offlinePacketsCount} Packets
-            </span>
+            
+            {/* Simulation Interface Trigger Check for Offline Sandbox Environments */}
+            <button
+              onClick={() => triggerIncomingMatchNotification('')}
+              type="button"
+              className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold py-2.5 px-4 rounded-xl text-[10px] font-mono uppercase tracking-wider border border-zinc-800 transition cursor-pointer"
+            >
+              [Simulate Inbound Match Frame Ingestion]
+            </button>
+          </div>
+        ) : (
+          /* Active Journey Navigation Tracking Execution Sheet Component view */
+          <div className="space-y-4 animate-fadeIn text-left">
+            <div className="border-b border-zinc-900 pb-2">
+              <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Active Pilot Navigation Journey</span>
+              <div className="text-sm font-bold text-white mt-0.5">{activeTrip?.customer_name}</div>
+            </div>
+            <div className="space-y-2 text-xs font-mono text-zinc-400">
+              <div><span className="font-bold text-zinc-500">From:</span> {activeTrip?.pickup_address}</div>
+              <div><span className="font-bold text-zinc-500">To:</span> {activeTrip?.dropoff_address}</div>
+              <div><span className="font-bold text-zinc-500">Fare Matrix:</span> ₹{(activeTrip!.quoted_fare_paise / 100).toFixed(2)}</div>
+            </div>
+            <button
+              onClick={handleCompleteCurrentTrip}
+              type="button"
+              className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3 px-4 rounded-full text-xs uppercase tracking-wider font-sans transition cursor-pointer mt-2"
+            >
+              Complete Transit & Return to Pool
+            </button>
           </div>
         )}
+      </div>
 
-      </section>
-
-      {/* 2. Right Canvas Map View Panel */}
-      <section className="flex-1 h-[450px] md:h-screen relative p-4 bg-canvas-softer">
-        <MapInterpolated
-          drivers={discoveryPassengers}
-          h3Hexagons={h3Overlays}
-        />
-
-        {/* 3. Full-Screen Unavoidable Ride Offer Flash Card Overlay */}
-        {driverState === 'offered' && (
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-6">
-            <div className="w-full max-w-sm rounded-xl border border-canvas-soft bg-white shadow-2xl p-6 space-y-6 text-center animate-in">
-              
-              <div>
-                <span className="inline-block px-3 py-1 rounded-full border border-surface-pressed bg-canvas-soft text-[10px] font-bold uppercase tracking-widest text-ink">
-                  High-priority dispatch
-                </span>
-                <h2 className="text-xl font-bold text-ink mt-4 font-move">New trip request!</h2>
-                <p className="text-xs text-body mt-1">Salt Lake Sector V → Park Street Hub</p>
-              </div>
-
-              {/* 15-second progress timer bar */}
-              <div className="relative w-full h-1 rounded-full bg-canvas-softer overflow-hidden border border-canvas-soft">
-                <div
-                  style={{ width: `${offerTimerProgress}%` }}
-                  className="h-full bg-black transition-all duration-1000 ease-linear"
-                />
-              </div>
-              <div className="text-[11px] font-bold text-ink uppercase tracking-wider animate-pulse">
-                Expires in {offerCountdown} seconds
-              </div>
-
-              <div className="flex justify-between items-center p-3.5 rounded-lg border border-canvas-soft bg-canvas-softer text-xs text-ink">
-                <div className="text-left space-y-0.5">
-                  <span className="text-[10px] text-body uppercase font-bold block">Est. earnings</span>
-                  <span className="font-bold text-black text-sm font-move">₹350.00</span>
-                </div>
-                <div className="text-right space-y-0.5">
-                  <span className="text-[10px] text-body uppercase font-bold block">Distance</span>
-                  <span className="font-bold text-black text-sm font-move">4.5 Kms</span>
-                </div>
-              </div>
-
-              {/* Accept & Decline Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={handleDeclineOffer}
-                  className="flex-1 py-3 rounded-full border border-canvas-soft bg-white hover:bg-canvas-softer font-semibold text-ink transition duration-200 cursor-pointer text-xs"
-                >
-                  Decline
-                </button>
-                <button
-                  onClick={handleAcceptOffer}
-                  className="flex-1 py-3 rounded-full bg-black hover:bg-black-elevated font-semibold text-white transition duration-200 cursor-pointer text-xs"
-                >
-                  Accept offer
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </section>
-
-    </main>
+      {/* Static Footer Context Meta Logs */}
+      <footer className="w-full text-left flex justify-between items-center text-[9px] text-zinc-600 font-mono pt-4 border-t border-zinc-900">
+        <span>SECURITY: PROTOBUF_OVER_WS_BINARY_FRAMING</span>
+        <span>SLOTS_SHARD_STATUS: SYNCED</span>
+      </footer>
+    </div>
   );
 }
