@@ -189,4 +189,3 @@ func TestAuthMiddleware_RequireAnyRole(t *testing.T) {
 		})
 	}
 }
-

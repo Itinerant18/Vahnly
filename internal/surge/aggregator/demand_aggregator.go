@@ -82,7 +82,7 @@ func (s *DemandAggregatorStream) mutateRollingDemandWindow(ctx context.Context, 
 	// Enforce strict Redis Hashtagging to ensure slot alignment on regional cluster nodes
 	// Target format matches supply structures: surge:demand:{city}:cellID
 	redisKey := fmt.Sprintf("surge:demand:{%s}:%s", event.CityPrefix, event.PickupH3Cell)
-	
+
 	now := time.Now().Unix()
 	expirationBoundary := now + int64(s.windowSize.Seconds())
 
@@ -109,7 +109,7 @@ func (s *DemandAggregatorStream) mutateRollingDemandWindow(ctx context.Context, 
 	return nil
 }
 
-// GetRecentDemandRate returns the non-stale ride request speed within the active window 
+// GetRecentDemandRate returns the non-stale ride request speed within the active window
 func (s *DemandAggregatorStream) GetRecentDemandRate(ctx context.Context, cityPrefix, h3Cell string) (int64, error) {
 	redisKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, h3Cell)
 	now := time.Now().Unix()

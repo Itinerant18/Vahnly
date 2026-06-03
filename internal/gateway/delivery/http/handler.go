@@ -26,12 +26,12 @@ import (
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
 
-	. "github.com/platform/driver-delivery/pkg/api/v1"
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	"github.com/platform/driver-delivery/internal/events"
-	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
+	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	. "github.com/platform/driver-delivery/pkg/api/v1"
 	"go.opentelemetry.io/otel"
 )
 
@@ -217,7 +217,7 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	defer wsConn.Close()
 
 	messageChan := make(chan []byte, 5) // Expanded channel buffer to process high-frequency streams safely
-	
+
 	sessionMetadata := &ActiveWebSocketSession{
 		MessageChan: messageChan,
 		Connection:  wsConn,
@@ -234,7 +234,7 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	}()
 
 	const writeWait = 10 * time.Second
-	
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -243,7 +243,7 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 			if !active {
 				return
 			}
-			
+
 			_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
 			// MILESTONE 31: Write payloads natively using BinaryMessage framing bounds
 			err = wsConn.WriteMessage(websocket.BinaryMessage, rawBinaryPayload)
@@ -365,9 +365,9 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 // DrainAndSignalWebSockets executes the CloseGoingAway handshake protocol across all active connections
 func (h *GatewayHandler) DrainAndSignalWebSockets(ctx context.Context) {
 	log.Println("[DRAIN_ENGINE] Intercepted container shutdown signal. Initiating WebSocket connection draining...")
-	
+
 	var wg sync.WaitGroup
-	
+
 	h.localSessions.Range(func(key, value interface{}) bool {
 		session, ok := value.(*ActiveWebSocketSession)
 		if !ok {
@@ -380,7 +380,7 @@ func (h *GatewayHandler) DrainAndSignalWebSockets(ctx context.Context) {
 
 			// Set a tight write deadline so a slow client connection can't stall the container shutdown
 			_ = s.Connection.SetWriteDeadline(time.Now().Add(1500 * time.Millisecond))
-			
+
 			// Format and send a CloseGoingAway control frame to signal the client app to reconnect elsewhere
 			closeFrame := websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server node undergoes rolling maintenance. Reconnecting.")
 			err := s.Connection.WriteMessage(websocket.CloseMessage, closeFrame)
@@ -554,7 +554,7 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 	// 3. Clear lease and drop a 30s match cooldown key in Redis to prevent immediate re-matching
 	leaseKey := fmt.Sprintf("offer:lease:%s", orderID)
 	cooldownKey := fmt.Sprintf("cooldown:driver:%s", driverID)
-	
+
 	_ = h.clusterClient.Del(ctx, leaseKey)
 	_ = h.clusterClient.Set(ctx, cooldownKey, "1", 30*time.Second).Err()
 
@@ -680,7 +680,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "cache_verification_failure", http.StatusInternalServerError)
 		return
 	}
-	
+
 	if !setSuccess {
 		// If the key exists, evaluate if it is processing or already finalized safely
 		status, _ := h.clusterClient.Get(ctx, idempotencyKey).Result()
@@ -717,7 +717,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'DELIVERING'::order_status_enum 
 		FOR UPDATE;
 	`
-	
+
 	err = tx.QueryRow(ctx, fetchQuery, req.OrderID, req.DriverID).Scan(&baseFarePaise, &cityPrefix)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -947,8 +947,12 @@ func (h *GatewayHandler) HandleAdminGetLedger(w http.ResponseWriter, r *http.Req
 
 	limit := 50
 	offset := 0
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 { limit = l }
-	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 { offset = o }
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		offset = o
+	}
 
 	var query string
 	var args []interface{}
@@ -1017,9 +1021,9 @@ func (h *GatewayHandler) HandleAdminGetLedger(w http.ResponseWriter, r *http.Req
 // HandleAdminDriverOverride forces a driver's state to reset, eviction-clearing active Redis tracking leases instantly
 func (h *GatewayHandler) HandleAdminDriverOverride(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DriverID     string `json:"driver_id"`
-		TargetState  string `json:"target_state"` // e.g., 'ONLINE_AVAILABLE'
-		Reason       string `json:"reason"`
+		DriverID    string `json:"driver_id"`
+		TargetState string `json:"target_state"` // e.g., 'ONLINE_AVAILABLE'
+		Reason      string `json:"reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
@@ -1054,7 +1058,7 @@ func (h *GatewayHandler) HandleAdminDriverOverride(w http.ResponseWriter, r *htt
 	_ = h.clusterClient.Del(ctx, activeTripKey)
 
 	log.Printf("[ADMIN_OVERRIDE] Operator forced Driver %s state to %s. Reason: %s", req.DriverID, req.TargetState, req.Reason)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"OVERRIDE_SUCCESSFUL","driver_id":"` + req.DriverID + `"}`))
@@ -1152,5 +1156,3 @@ func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Reques
 		},
 	})
 }
-
-

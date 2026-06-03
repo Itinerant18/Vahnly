@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/pruner"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -75,7 +75,7 @@ func main() {
 	trackedZones := []string{"88754cb247fffff", "88283473fffffff"}
 
 	prunerDaemon := pruner.NewStaleTelemetryPruner(redisClusterClient, dbPool)
-	
+
 	// Boot the sweeping loop worker thread
 	go prunerDaemon.StartPrunerLoop(ctx, "KOL", trackedZones)
 

@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/platform/driver-delivery/internal/events"
+	"github.com/segmentio/kafka-go"
 )
 
 type HeatmapAnalyticsService struct {
 	kafkaReader *kafka.Reader
-	
+
 	// Thread-safe map tracking active driver allocations per H3 Hexagon cell index
 	// Key: H3Cell string, Value: Count int64
 	cellDensityMap sync.Map
@@ -43,7 +43,7 @@ func NewHeatmapAnalyticsService(brokers []string, groupID string) *HeatmapAnalyt
 // StartAnalyticsProcessing reads driver transitions and increments cell state counts dynamically
 func (s *HeatmapAnalyticsService) StartAnalyticsProcessing(ctx context.Context, cityPrefix string) {
 	log.Printf("[ANALYTICS_CORE] Operational Fleet Tracking active for region [%s]. Stream sinking launched.", cityPrefix)
-	
+
 	// Launch a sub-worker thread to periodically push consolidated matrix updates to active dashboard connections
 	go s.startBroadcastTicker(ctx)
 

@@ -265,13 +265,18 @@ func SolveKuhnMunkres(matrix [][]float64) map[int]int {
 	p := make([]int, n+1)
 	way := make([]int, n+1)
 
+	// Bolt: Hoist slice allocations outside the loop to reduce GC pressure
+	// For an NxN matrix, this avoids N slice allocations per solver execution.
+	minv := make([]float64, n+1)
+	used := make([]bool, n+1)
+
 	for i := 1; i <= n; i++ {
 		p[0] = i
-		minv := make([]float64, n+1)
+
 		for j := range minv {
 			minv[j] = math.MaxFloat64
 		}
-		used := make([]bool, n+1)
+		clear(used)
 		j0 := 0
 
 		for {

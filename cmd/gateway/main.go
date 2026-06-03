@@ -94,7 +94,7 @@ func main() {
 	regionRouter := middleware.NewRegionRouterMiddleware(supportedRegions)
 
 	mux := http.NewServeMux()
-	
+
 	// Authentication / Access routes
 	mux.HandleFunc("POST /api/v1/auth/rider/login", handler.HandleRiderLogin)
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
@@ -161,7 +161,7 @@ func main() {
 
 	// 4. Cancel the main execution context to cleanly stop internal background workers
 	mainCancel()
-	
+
 	log.Println("Gateway process terminated cleanly. Zero connection truncation errors encountered.")
 }
 

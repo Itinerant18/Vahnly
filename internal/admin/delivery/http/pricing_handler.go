@@ -60,7 +60,7 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	// Maintain key naming consistency without city-bracket hashtagging 
+	// Maintain key naming consistency without city-bracket hashtagging
 	// This ensures uniform load distribution across all cluster nodes
 	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", req.CityPrefix, req.H3Cell)
 	multiplierValue := strconv.FormatFloat(req.MaxMultiplier, 'f', 4, 64)
@@ -74,7 +74,7 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 		return
 	}
 
-	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin overridden key %s set to %s for %d minutes", 
+	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin overridden key %s set to %s for %d minutes",
 		matrixKey, multiplierValue, req.DurationMins)
 
 	w.WriteHeader(http.StatusOK)

@@ -10,7 +10,7 @@ import (
 )
 
 type RateLimiterMiddleware struct {
-	clusterClient *redis.ClusterClient
+	clusterClient  *redis.ClusterClient
 	limitCount     int64
 	windowDuration time.Duration
 }
@@ -51,7 +51,7 @@ func (m *RateLimiterMiddleware) LimitRouteConcurrency(next http.HandlerFunc) htt
 
 		// Execute atomic precision sliding logs within a single multi-command round-trip pipeline
 		pipe := m.clusterClient.Pipeline()
-		
+
 		// Remove logs older than the current rolling temporal boundary window
 		pipe.ZRemRangeByScore(redisCtx, rateLimitKey, "-inf", fmt.Sprintf("%d", clearBeforeMilli))
 		// Log the current inbound hit trace event timestamp

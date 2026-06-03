@@ -10,6 +10,7 @@ import (
 )
 
 type ContextKey string
+
 const UserIDContextKey ContextKey = "userID"
 
 type AuthMiddleware struct {

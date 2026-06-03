@@ -57,7 +57,7 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 		// Only process if THIS cluster is the target region
 		if event.TargetRegion == hc.currentRegion {
-			log.Printf("[HANDOFF RECEIVED] Hydrating driver %s from %s to %s", 
+			log.Printf("[HANDOFF RECEIVED] Hydrating driver %s from %s to %s",
 				event.DriverID, event.OriginRegion, event.TargetRegion)
 
 			// 1. Hydrate into local Redis Spatial Index (Geo ZSET)
@@ -86,21 +86,21 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 				spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, h3CellStr)
 				nowEpoch := float64(time.Now().Unix())
-				
+
 				pipe := hc.redisClient.Pipeline()
 				pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: event.DriverID})
 				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
 
 				// Also write status, current cell, and profile to completely hydrate driver state
-				statusKey  := fmt.Sprintf("driver:{%s:%s}:status",       cityPrefix, event.DriverID)
+				statusKey := fmt.Sprintf("driver:{%s:%s}:status", cityPrefix, event.DriverID)
 				trackerKey := fmt.Sprintf("driver:{%s:%s}:current_cell", cityPrefix, event.DriverID)
-				profileKey := fmt.Sprintf("driver:{%s:%s}:profile",      cityPrefix, event.DriverID)
+				profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, event.DriverID)
 
 				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 30*time.Second)
 				pipe.Set(ctx, trackerKey, h3CellStr, 24*time.Hour)
 				pipe.HSet(ctx, profileKey,
-					"osm_node_id",              "1001",
-					"acceptance_rate",          "0.95",
+					"osm_node_id", "1001",
+					"acceptance_rate", "0.95",
 					"cancellation_probability", "0.05",
 				)
 				pipe.Expire(ctx, profileKey, 24*time.Hour)

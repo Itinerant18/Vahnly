@@ -34,10 +34,10 @@ func TestSurgeCalculatorEngine_FormulaMath(t *testing.T) {
 		expected float64
 	}{
 		{demand: 0, supply: 0, expected: 1.0},
-		{demand: 5, supply: 0, expected: 4.5}, // capped at max safety ceiling (4.5)
+		{demand: 5, supply: 0, expected: 4.5},    // capped at max safety ceiling (4.5)
 		{demand: 10, supply: 10, expected: 1.43}, // 10 / (10 * 0.7) = 1.42857 -> 1.43
-		{demand: 2, supply: 10, expected: 1.0}, // 2 / 7 = 0.2857 < 1.0 -> 1.0
-		{demand: 100, supply: 5, expected: 4.5}, // 100 / 3.5 = 28.57 -> capped at 4.5
+		{demand: 2, supply: 10, expected: 1.0},   // 2 / 7 = 0.2857 < 1.0 -> 1.0
+		{demand: 100, supply: 5, expected: 4.5},  // 100 / 3.5 = 28.57 -> capped at 4.5
 	}
 
 	for _, tt := range tests {

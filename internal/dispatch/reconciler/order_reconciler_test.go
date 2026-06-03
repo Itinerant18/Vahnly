@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/segmentio/kafka-go"
 	"github.com/platform/driver-delivery/internal/dispatch/reconciler"
+	"github.com/segmentio/kafka-go"
 )
 
 func TestOrderReconcilerSyncWorker_ExecuteStateReconciliation(t *testing.T) {

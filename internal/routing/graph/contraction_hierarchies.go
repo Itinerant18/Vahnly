@@ -115,13 +115,13 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 	// Local search state arrays initialized to infinity
 	forwardDist := make(map[int64]float64)
 	backwardDist := make(map[int64]float64)
-	
+
 	forwardDist[sourceID] = 0.0
 	backwardDist[targetID] = 0.0
 
 	pqForward := &PriorityQueue{{nodeID: sourceID, priority: 0.0}}
 	pqBackward := &PriorityQueue{{nodeID: targetID, priority: 0.0}}
-	
+
 	heap.Init(pqForward)
 	heap.Init(pqBackward)
 
@@ -148,13 +148,13 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 				for _, edge := range s.forwardGraph[u] {
 					v := edge.To
 					alt := uDist + edge.Weight
-					
+
 					if d, ok := forwardDist[v]; !ok || alt < d {
 						forwardDist[v] = alt
 						mu.Lock()
 						heap.Push(pqForward, &Item{nodeID: v, priority: alt})
 						mu.Unlock()
-						
+
 						// Check meeting intersection point
 						if backD, evaluated := backwardDist[v]; evaluated {
 							if alt+backD < bestEstimate {
@@ -178,13 +178,13 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 				for _, edge := range s.backwardGraph[u] {
 					v := edge.To // In backward graph, this means edge coming from v to u
 					alt := uDist + edge.Weight
-					
+
 					if d, ok := backwardDist[v]; !ok || alt < d {
 						backwardDist[v] = alt
 						mu.Lock()
 						heap.Push(pqBackward, &Item{nodeID: v, priority: alt})
 						mu.Unlock()
-						
+
 						// Check meeting intersection point
 						if forD, evaluated := forwardDist[v]; evaluated {
 							if alt+forD < bestEstimate {

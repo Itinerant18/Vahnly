@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/pruner"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestStaleTelemetryPruner_ExecuteGarbageCollection(t *testing.T) {

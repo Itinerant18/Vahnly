@@ -84,7 +84,7 @@ func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *h
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
 }
 
 // HandleExecuteTripRecovery processes administrative interventions to resolve stranded orders
@@ -121,7 +121,7 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 		http.Error(w, "transaction_initialization_failure", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if req.RecoveryAction == "FORCE_REMATCH" {
 		// 1. Re-initialize order entry back to CREATED state and break current driver bindings
@@ -163,7 +163,7 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 			"city_prefix": "KOL",
 			"status":      "CREATED",
 		})
-		
+
 		err = h.kafkaWriter.WriteMessages(ctx, kafka.Message{
 			Key:   []byte(req.OrderID),
 			Value: kafkaPayload,
@@ -179,13 +179,13 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 			http.Error(w, "database_order_abort_mutation_failure", http.StatusInternalServerError)
 			return
 		}
-		
+
 		_, err = tx.Exec(ctx, "UPDATE drivers SET current_state = 'OFFLINE'::driver_state_enum, updated_at = NOW() WHERE id = $1::uuid", req.DriverID)
 		if err != nil {
 			http.Error(w, "database_driver_abort_mutation_failure", http.StatusInternalServerError)
 			return
 		}
-		
+
 		if err := tx.Commit(ctx); err != nil {
 			http.Error(w, "transaction_abort_commit_failure", http.StatusInternalServerError)
 			return
@@ -197,5 +197,5 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
+	_, _ = w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
 }

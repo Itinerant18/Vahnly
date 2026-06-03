@@ -106,9 +106,9 @@ func TestEvaluateGreedyMatch_Success(t *testing.T) {
 	surgeVal := 0.0
 	idleVal := 1.0 / (10.0 + 1.0)
 	riskVal := 0.1
-	
+
 	expectedScore := (0.40 * etaVal) + (0.20 * arVal) + (0.15 * cpVal) + (0.10 * surgeVal) + (0.05 * idleVal) + (0.10 * riskVal)
-	
+
 	if math.Abs(res.Score-expectedScore) > 1e-9 {
 		t.Errorf("Expected Score close to %f, got %f (diff: %e)", expectedScore, res.Score, math.Abs(res.Score-expectedScore))
 	}

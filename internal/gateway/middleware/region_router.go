@@ -7,6 +7,7 @@ import (
 )
 
 type RegionContextKey string
+
 const RegionPrefixContextKey RegionContextKey = "regionPrefix"
 
 type RegionRouterMiddleware struct {

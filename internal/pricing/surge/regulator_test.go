@@ -59,7 +59,7 @@ func TestSurgeRegulator_TimeoutFallback(t *testing.T) {
 
 	ctx := context.Background()
 	m := reg.ExecuteOrFallback(ctx, slowMLMock, 10, 2)
-	
+
 	// Should fallback to heuristic pricing
 	expectedFallback := reg.CalculateO1HeuristicFallback(10, 2)
 	if m != expectedFallback {
