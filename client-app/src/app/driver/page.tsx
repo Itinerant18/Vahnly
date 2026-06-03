@@ -166,7 +166,7 @@ export default function DriverTerminalPage() {
       await fetch('http://localhost:8080/api/v1/dispatch/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: activeTrip?.order_id, driver_id: driverID }),
+        body: JSON.stringify({ order_id: incomingOffer.order_id, driver_id: driverID }),
       });
     } catch (err) {
       console.warn('[TERMINAL_WS] Assignment claimed locally. Syncing background parameters.');

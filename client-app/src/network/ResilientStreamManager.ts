@@ -33,6 +33,8 @@ export class ResilientStreamManager {
     )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}`;
 
     this.ws = new WebSocket(url);
+    // Gateway emits compressed Protobuf allocation frames; receive them as raw buffers.
+    this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
       this.currentRetryAttempt = 0;
@@ -40,6 +42,12 @@ export class ResilientStreamManager {
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
+      // Binary frames pass through untouched so consumers can decode the envelope;
+      // text frames are JSON-parsed as a fallback control channel.
+      if (event.data instanceof ArrayBuffer) {
+        this.config.onMessage(event.data);
+        return;
+      }
       try {
         this.config.onMessage(JSON.parse(event.data as string));
       } catch {
