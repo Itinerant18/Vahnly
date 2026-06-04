@@ -2,10 +2,24 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { VehicleTracker } from '../../lib/VehicleTracker';
-import { ResilientStreamManager } from '../../network/ResilientStreamManager';
 import { useAuthStore } from '@/store/useAuthStore';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
+import {
+  acceptOffer,
+  arriveAtPickup,
+  completeTrip,
+  declineOffer,
+  getDriverProfile,
+  getPendingOffer,
+  PendingOfferOrder,
+  setDriverStatus,
+  startTrip,
+} from '@/api/client';
+import { connectDispatchStream } from '@/services/dispatchStream';
+import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
+import { startTelemetryStream } from '@/services/telemetryStream';
+import { OfferPopup, OrderOffer } from '@/components/OfferPopup';
+import { cellToBoundary } from 'h3-js';
 
 interface ActiveOrderAssignment {
   order_id: string;
@@ -23,51 +37,44 @@ interface ActiveOrderAssignment {
   transmission: string;
   trip_type: string; // "In-city" | "Outstation" | "Mini-outstation"
   special_notes?: string;
+  backend_offer?: PendingOfferOrder;
 }
 
-// Low-overhead client-side unpacking framework matching Milestone 31 specifications exactly
-function parseBinaryEnvelope(buffer: ArrayBuffer): { type: string; data: any } | null {
-  const bytes = new Uint8Array(buffer);
-  let offset = 0;
-  let frameType = 0;
-  const assignmentData: any = {};
+function toOrderOffer(assignment: ActiveOrderAssignment): OrderOffer {
+  return assignment.backend_offer ?? {
+    id: assignment.order_id,
+    city_prefix: 'KOL',
+    pickup_h3_cell: '',
+    pickup_lat: assignment.pickup_lat,
+    pickup_lng: assignment.pickup_lng,
+    dropoff_lat: assignment.dropoff_lat,
+    dropoff_lng: assignment.dropoff_lng,
+    base_fare_paise: assignment.quoted_fare_paise,
+    surge_multiplier: 1,
+    customer_id: 'Rider',
+  };
+}
 
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function h3CellToSvgPoints(cell: string): string {
   try {
-    while (offset < bytes.length) {
-      const key = bytes[offset++];
-      const fieldNumber = key >> 3;
-
-      if (fieldNumber === 1) {
-        frameType = bytes[offset++];
-      } else if (fieldNumber === 2) { // Assignment Message Block
-        const subLen = bytes[offset++];
-        const end = offset + subLen;
-        while (offset < end) {
-          const subKey = bytes[offset++];
-          const subNum = subKey >> 3;
-          const len = bytes[offset++];
-          const str = new TextDecoder().decode(bytes.subarray(offset, offset + len));
-          offset += len;
-          if (subNum === 1) assignmentData.order_id = str;
-          if (subNum === 2) assignmentData.driver_id = str;
-          if (subNum === 4) assignmentData.status = str;
-        }
-      } else {
-        offset++;
-      }
-    }
-    
-    if (frameType === 1 || assignmentData.order_id) {
-      return { type: 'ASSIGNMENT', data: assignmentData };
-    }
-  } catch (err) {
-    console.error('[BINARY_PARSER] Failed parsing incoming array byte frames:', err);
+    return cellToBoundary(cell)
+      .map(([lat, lng]) => {
+        const x = clampPercent(((lng - 88.25) / (88.5 - 88.25)) * 100);
+        const y = clampPercent(((22.7 - lat) / (22.7 - 22.45)) * 100);
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  } catch {
+    return '';
   }
-  return null;
 }
 
 export default function DriverTerminalPage() {
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   
   // Account settings matching session or sandbox defaults
   const driverID = user?.id || 'drv-aniket-7602';
@@ -98,8 +105,6 @@ export default function DriverTerminalPage() {
   // Trip management variables
   const [incomingOffer, setIncomingOffer] = useState<ActiveOrderAssignment | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(15);
-  const [declineReason, setDeclineReason] = useState<string>('');
-  const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
   
   // En-Route and Arrived timer trackers
@@ -130,14 +135,14 @@ export default function DriverTerminalPage() {
   // Map visualization state: simulated marker position along route (0 to 100%)
   const [mapGlideProgress, setMapGlideProgress] = useState(0);
   const [mapIntervalActive, setMapIntervalActive] = useState(false);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
 
   // Live Audit Telemetry Log Vault
   const [auditLogs, setAuditLogs] = useState<string[]>([]);
 
   // Core structural pointers
-  const trackerRef = useRef<VehicleTracker | null>(null);
-  const streamRef = useRef<ResilientStreamManager | null>(null);
-  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const telemetryStopRef = useRef<(() => void) | null>(null);
+  const streamRef = useRef<(() => void) | null>(null);
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -160,28 +165,23 @@ export default function DriverTerminalPage() {
   useEffect(() => {
     logAudit('SESSION_STARTED', { driverID, device: navigator.userAgent });
     return () => {
-      trackerRef.current?.stopTrackingCore();
-      streamRef.current?.disconnect();
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      telemetryStopRef.current?.();
+      streamRef.current?.();
       if (waitTimerRef.current) clearInterval(waitTimerRef.current);
       if (sosTimerRef.current) clearInterval(sosTimerRef.current);
     };
   }, []);
 
-  // Monitor offer countdown expiration windows
   useEffect(() => {
-    if (dutyState === 'OFFER_PENDING' && incomingOffer && countdownSeconds > 0) {
-      countdownTimerRef.current = setTimeout(() => {
-        setCountdownSeconds((prev) => prev - 1);
-      }, 1000);
-    } else if (countdownSeconds === 0 && dutyState === 'OFFER_PENDING') {
-      logAudit('OFFER_AUTO_EXPIRED', { orderId: incomingOffer?.order_id });
-      handleDeclineOfferSubmit('TIMEOUT_NO_RESPONSE');
+    if (!showHeatmap) {
+      setHeatmapData(null);
+      return;
     }
-    return () => {
-      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
-    };
-  }, [incomingOffer, countdownSeconds, dutyState]);
+
+    return connectHeatmapStream((data) => {
+      setHeatmapData(data);
+    });
+  }, [showHeatmap]);
 
   // Wait time calculator once arrived
   useEffect(() => {
@@ -256,81 +256,161 @@ export default function DriverTerminalPage() {
     };
   }, [sosActive, sosCountdown]);
 
+  const openOnlineStreams = () => {
+    if (!token) return;
+
+    if (!telemetryStopRef.current) {
+      telemetryStopRef.current = startTelemetryStream({ token, driverId: driverID, cityPrefix });
+      logAudit('TELEMETRY_STREAM_STARTED', { driverID, cityPrefix });
+    }
+
+    if (!streamRef.current) {
+      streamRef.current = connectDispatchStream(
+        `stream-session-${driverID}`,
+        token,
+        {
+          onAssignment: (frame) => {
+            void getPendingOffer(token)
+              .then((pendingOffer) => {
+                if (pendingOffer.order) {
+                  triggerIncomingMatchNotification(
+                    frame.order_id,
+                    pendingOffer.order,
+                    pendingOffer.offer_expires_in_seconds,
+                  );
+                }
+              })
+              .catch((err) => console.warn('[DRIVER_OFFER] Assignment hydration failed:', err));
+          },
+          onTelemetry: (frame) => {
+            logAudit('WS_TELEMETRY_FRAME', {
+              orderId: frame.order_id,
+              lat: frame.latitude,
+              lng: frame.longitude,
+              speed_kms: frame.speed_kms,
+            });
+          },
+          onClose: () => {
+            setStreamStatus('DISCONNECTED');
+            logAudit('WS_CONNECTION_STATE', { status: 'DISCONNECTED' });
+            streamRef.current = null;
+          },
+        },
+        cityPrefix,
+      );
+      setStreamStatus('CONNECTED');
+      logAudit('WS_CONNECTION_STATE', { status: 'CONNECTED' });
+    }
+
+    void getPendingOffer(token)
+      .then((pendingOffer) => {
+        if (pendingOffer.order && (pendingOffer.offer_expires_in_seconds ?? 0) > 0) {
+          triggerIncomingMatchNotification(
+            pendingOffer.order.id,
+            pendingOffer.order,
+            pendingOffer.offer_expires_in_seconds,
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('[DRIVER_OFFER] Pending offer fallback fetch failed:', err);
+      });
+  };
+
+  const closeOnlineStreams = () => {
+    telemetryStopRef.current?.();
+    streamRef.current?.();
+    telemetryStopRef.current = null;
+    streamRef.current = null;
+    setStreamStatus('DISCONNECTED');
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    getDriverProfile(token)
+      .then((profile) => {
+        if (cancelled) return;
+        if (profile.current_state === 'ONLINE_AVAILABLE') {
+          setDutyState('ONLINE_AVAILABLE');
+          openOnlineStreams();
+        } else if (profile.current_state === 'ONLINE_EN_ROUTE') {
+          setDutyState('EN_ROUTE_TO_PICKUP');
+        } else if (profile.current_state === 'ONLINE_DELIVERING') {
+          setDutyState('DELIVERING');
+        } else {
+          setDutyState('OFFLINE');
+        }
+      })
+      .catch((err) => console.warn('[DRIVER_PROFILE] Initial hydration failed:', err));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   // Go Online/Offline state changes
   const handleToggleDutySwitch = async () => {
     if (dutyState === 'OFFLINE') {
+      if (token) {
+        try {
+          await setDriverStatus(token, driverID, 'ONLINE_AVAILABLE');
+        } catch (err) {
+          console.warn('[DRIVER_STATUS] Online status sync failed:', err);
+        }
+      }
+
       setDutyState('ONLINE_AVAILABLE');
       logAudit('DUTY_ONLINE', { vehicle: activeVehicle, filter: preferredTripFilter });
-
-      // 1. Initialize native background coordinate injection via the tracker engine
-      trackerRef.current = new VehicleTracker(driverID, cityPrefix, async (packets) => {
-        // Send logs to visual debugger console
-        packets.forEach(p => {
-          logAudit('TELEMETRY_INGEST', { lat: p.lat, lng: p.lng, ts: p.timestamp });
-        });
-        return true;
-      });
-      await trackerRef.current.startTrackingCore();
-
-      // 2. Establish low-latency connection to binary WebSocket channels
-      streamRef.current = new ResilientStreamManager({
-        orderID: `stream-session-${driverID}`,
-        cityPrefix: cityPrefix,
-        wsBaseUrl: 'ws://localhost:8080',
-        onStatusChange: (status) => {
-          setStreamStatus(status);
-          logAudit('WS_CONNECTION_STATE', { status });
-        },
-        onMessage: (message: any) => {
-          if (message instanceof ArrayBuffer) {
-            const unpacked = parseBinaryEnvelope(message);
-            if (unpacked?.type === 'ASSIGNMENT') {
-              triggerIncomingMatchNotification(unpacked.data.order_id);
-            }
-          } else if (message?.channel === 'assignment' || message?.order_id) {
-            triggerIncomingMatchNotification(message.order_id);
-          }
-        }
-      });
-      streamRef.current.connect();
+      openOnlineStreams();
 
     } else {
+      if (token) {
+        try {
+          await setDriverStatus(token, driverID, 'OFFLINE');
+        } catch (err) {
+          console.warn('[DRIVER_STATUS] Offline status sync failed:', err);
+        }
+      }
+
       // Clean teardown and hardware release routine
-      trackerRef.current?.stopTrackingCore();
-      streamRef.current?.disconnect();
-      trackerRef.current = null;
-      streamRef.current = null;
+      closeOnlineStreams();
       
       setDutyState('OFFLINE');
-      setStreamStatus('DISCONNECTED');
       setIncomingOffer(null);
       setActiveTrip(null);
       logAudit('DUTY_OFFLINE', { driverID });
     }
   };
 
-  const triggerIncomingMatchNotification = (orderId: string) => {
+  const triggerIncomingMatchNotification = (
+    orderId: string,
+    offer: PendingOfferOrder,
+    expiresInSeconds?: number,
+  ) => {
     // Only accept incoming offers if idle/online available
     setIncomingOffer({
-      order_id: orderId || `ord-mock-${Date.now().toString().slice(-4)}`,
-      customer_name: 'Anirban Das (Venture Lead)',
-      customer_phone: '+91 98300 11223',
-      customer_rating: 4.85,
-      pickup_address: 'Salt Lake Sector V Tech Hub, Kolkata',
-      pickup_lat: 22.5731,
-      pickup_lng: 88.4332,
-      dropoff_address: 'Park Street Dining Grid, Kolkata',
-      dropoff_lat: 22.5487,
-      dropoff_lng: 88.3561,
-      quoted_fare_paise: 78000, // ₹780.00
+      order_id: orderId,
+      customer_name: 'Rider',
+      customer_phone: 'Unavailable',
+      customer_rating: 0,
+      pickup_address: `${offer.pickup_lat.toFixed(5)}, ${offer.pickup_lng.toFixed(5)}`,
+      pickup_lat: offer.pickup_lat,
+      pickup_lng: offer.pickup_lng,
+      dropoff_address: `${offer.dropoff_lat.toFixed(5)}, ${offer.dropoff_lng.toFixed(5)}`,
+      dropoff_lat: offer.dropoff_lat,
+      dropoff_lng: offer.dropoff_lng,
+      quoted_fare_paise: Math.round(offer.base_fare_paise * offer.surge_multiplier),
       vehicle_tier: 'PREMIUM_SUV',
       transmission: 'AUTOMATIC',
       trip_type: 'In-city Round',
-      special_notes: 'Rider carrying extra airport luggage. Polite driving requested.'
+      special_notes: undefined,
+      backend_offer: offer,
     });
     setDutyState('OFFER_PENDING');
-    setCountdownSeconds(15);
-    logAudit('INCOMING_OFFER_RECEIVED', { orderId });
+    setCountdownSeconds(expiresInSeconds && expiresInSeconds > 0 ? expiresInSeconds : 15);
+    logAudit('INCOMING_OFFER_RECEIVED', { orderId, source: offer ? 'HTTP_FALLBACK' : 'WEBSOCKET' });
   };
 
   const handleAcceptOffer = async () => {
@@ -343,42 +423,54 @@ export default function DriverTerminalPage() {
     setIncomingOffer(null);
 
     try {
-      await fetch('http://localhost:8080/api/v1/dispatch/accept', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: incomingOffer.order_id, driver_id: driverID }),
-      });
+      if (token) {
+        await acceptOffer(token, incomingOffer.order_id, driverID);
+      }
     } catch (err) {
       console.warn('[TERMINAL_WS] Assignment claimed locally. Syncing background parameters.');
     }
   };
 
-  const handleDeclineOfferClick = () => {
-    setShowDeclineModal(true);
-  };
-
-  const handleDeclineOfferSubmit = (reason: string) => {
+  const handleDeclineOfferSubmit = async (reason: string) => {
     const declinedAt = new Date().toISOString();
     logAudit('OFFER_DECLINED', { orderId: incomingOffer?.order_id, reason, ts: declinedAt });
     
+    const oId = incomingOffer?.order_id;
     setIncomingOffer(null);
     setCountdownSeconds(15);
-    setDeclineReason('');
-    setShowDeclineModal(false);
     setDutyState('ONLINE_AVAILABLE');
 
-    // Trigger a 30s cooldown alert simulation
+    if (oId) {
+      try {
+        if (token) {
+          await declineOffer(token, oId, driverID, cityPrefix);
+        }
+      } catch (err) {
+        console.warn('Decline sync failed:', err);
+      }
+    }
+
     alert('Offer declined. A 30-second priority matching cooldown has been applied to this node.');
   };
 
-  const handleArrivedAtPickup = () => {
+  const handleArrivedAtPickup = async () => {
     logAudit('ARRIVED_AT_PICKUP_NODE', { orderId: activeTrip?.order_id, time: new Date().toISOString() });
     setDutyState('ARRIVED_AT_PICKUP');
     setFreeWaitSeconds(300);
     setWaitingCharges(0);
+
+    if (activeTrip?.order_id) {
+      try {
+        if (token) {
+          await arriveAtPickup(token, activeTrip.order_id, driverID);
+        }
+      } catch (err) {
+        console.warn('Arrive sync failed:', err);
+      }
+    }
   };
 
-  const handleVerifyOtpAndStart = (e: React.FormEvent) => {
+  const handleVerifyOtpAndStart = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpVerificationCode) {
       setOtpError('Please request and input the 4-digit code from the passenger.');
@@ -396,11 +488,20 @@ export default function DriverTerminalPage() {
       otpEntered: otpVerificationCode
     });
 
-    // Mock OTP verification validation: allow any 4-digit number
     if (/^\d{4}$/.test(otpVerificationCode)) {
       logAudit('TRIP_STARTED', { orderId: activeTrip?.order_id });
       setOtpError('');
       setDutyState('DELIVERING');
+
+      if (activeTrip?.order_id) {
+        try {
+          if (token) {
+            await startTrip(token, activeTrip.order_id, driverID);
+          }
+        } catch (err) {
+          console.warn('Start trip sync failed:', err);
+        }
+      }
     } else {
       setOtpError('Authentication failed: Invalid OTP sequence pattern entered.');
       logAudit('OTP_FAILED_ATTEMPT', { code: otpVerificationCode });
@@ -439,6 +540,16 @@ export default function DriverTerminalPage() {
     });
     
     setDutyState('COMPLETED');
+
+    if (activeTrip?.order_id) {
+      try {
+        if (token) {
+          await completeTrip(token, activeTrip.order_id, driverID);
+        }
+      } catch (err) {
+        console.warn('Complete trip sync failed:', err);
+      }
+    }
   };
 
   const handlePaymentConfirmationSubmit = (method: string) => {
@@ -599,123 +710,12 @@ export default function DriverTerminalPage() {
 
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
       {dutyState === 'OFFER_PENDING' && incomingOffer && (
-        <div className="fixed inset-0 bg-black z-[9999] flex flex-col justify-between p-4 sm:p-8 animate-fadeIn text-left">
-          <div className="space-y-4 max-w-xl mx-auto w-full">
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-4">
-              <div>
-                <span className="text-[9px] font-bold tracking-widest text-zinc-500 uppercase font-mono">Incoming Escrow Matching Opportunity</span>
-                <h2 className="text-2xl font-bold tracking-tight text-white font-move mt-1">Allocation Request</h2>
-              </div>
-              
-              {/* Ring Countdown Progress indicator */}
-              <div className="h-12 w-12 rounded-full border-2 border-zinc-800 flex items-center justify-center relative">
-                <span className="text-sm font-mono font-bold text-white">{countdownSeconds}s</span>
-                <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            </div>
-
-            {/* Offer details mapping */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-900 p-3 rounded-xl">
-                <div className="text-xl">👤</div>
-                <div>
-                  <div className="text-xs font-bold text-white">{incomingOffer.customer_name}</div>
-                  <div className="text-[10px] text-zinc-500 font-mono mt-0.5">Rating: ★ {incomingOffer.customer_rating} | Spec: {incomingOffer.special_notes}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div className="bg-zinc-950 border border-zinc-900 p-3 rounded-xl">
-                  <span className="text-zinc-500 block text-[8px] font-bold uppercase tracking-wider">PICKUP HUB</span>
-                  <span className="text-white font-medium mt-1 block truncate">{incomingOffer.pickup_address}</span>
-                </div>
-                <div className="bg-zinc-950 border border-zinc-900 p-3 rounded-xl">
-                  <span className="text-zinc-500 block text-[8px] font-bold uppercase tracking-wider">DESTINATION</span>
-                  <span className="text-white font-medium mt-1 block truncate">{incomingOffer.dropoff_address}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 font-mono text-[9px] uppercase font-bold text-zinc-400 text-center">
-                <div className="bg-zinc-950 border border-zinc-900 p-2.5 rounded-lg">
-                  <span className="text-zinc-600 block text-[7px]">TRIP CATEGORY</span>
-                  <span className="text-white block mt-0.5">{incomingOffer.trip_type}</span>
-                </div>
-                <div className="bg-zinc-950 border border-zinc-900 p-2.5 rounded-lg">
-                  <span className="text-zinc-600 block text-[7px]">TRANSMISSION</span>
-                  <span className="text-white block mt-0.5">{incomingOffer.transmission}</span>
-                </div>
-                <div className="bg-zinc-950 border border-zinc-900 p-2.5 rounded-lg">
-                  <span className="text-zinc-600 block text-[7px]">TIER ASSET</span>
-                  <span className="text-white block mt-0.5">{incomingOffer.vehicle_tier.replace('_', ' ')}</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-4 rounded-xl font-mono">
-                <div>
-                  <span className="text-zinc-500 block text-[8px] font-bold uppercase tracking-wider">ESTIMATED NET PAYOUT</span>
-                  <span className="text-2xl font-bold text-white mt-0.5 block">₹{(incomingOffer.quoted_fare_paise / 100).toFixed(2)}</span>
-                </div>
-                <span className="bg-emerald-500 text-white font-mono font-bold text-[9px] px-2.5 py-1 rounded">
-                  D4M SAFETY INSURED
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 max-w-xl w-full mx-auto">
-            {/* Slide to accept confirm component */}
-            <SlideToConfirm
-              label="Slide to Accept Job"
-              onConfirm={handleAcceptOffer}
-              color="emerald"
-            />
-            
-            <button
-              onClick={handleDeclineOfferClick}
-              type="button"
-              className="bg-zinc-950 hover:bg-zinc-900 text-zinc-500 font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider transition border border-zinc-900 cursor-pointer active:scale-98"
-            >
-              Decline Offer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 4. DECLINE REASON PICKER MODAL SHEET */}
-      {showDeclineModal && (
-        <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl w-full max-w-md text-left space-y-4">
-            <h3 className="text-sm font-bold tracking-wider uppercase font-mono text-white">Decline Allocation Reason</h3>
-            <p className="text-xs text-zinc-500 leading-normal">
-              Selecting a reason maps logs to dispatch controllers to recalculate allocation thresholds correctly.
-            </p>
-            
-            <div className="flex flex-col gap-2 pt-2">
-              {[
-                'Too far from pickup hub location',
-                'Scheduled break/rest cycle',
-                'Vehicle mechanical breakdown check',
-                'Customer rating is low',
-                'Other routing constraints'
-              ].map((reason) => (
-                <button
-                  key={reason}
-                  onClick={() => handleDeclineOfferSubmit(reason)}
-                  className="w-full text-left p-3 text-xs bg-zinc-900 border border-zinc-850 rounded-xl hover:bg-zinc-850 transition-all font-medium text-zinc-300 cursor-pointer"
-                >
-                  🚫 {reason}
-                </button>
-              ))}
-            </div>
-            
-            <button
-              onClick={() => setShowDeclineModal(false)}
-              className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-500 py-2.5 rounded-xl text-[10px] uppercase font-bold tracking-widest transition cursor-pointer mt-2"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <OfferPopup
+          offer={toOrderOffer(incomingOffer)}
+          timeoutSeconds={countdownSeconds}
+          onAccept={handleAcceptOffer}
+          onDecline={(reason) => handleDeclineOfferSubmit(reason ?? 'driver_declined')}
+        />
       )}
 
       {/* TOP HEADER MENU CONTROL */}
@@ -776,10 +776,31 @@ export default function DriverTerminalPage() {
             {/* Heatmap zones (Kolkata representation) */}
             {showHeatmap && dutyState !== 'OFFLINE' && (
               <>
-                <circle cx="65%" cy="35%" r="80" fill="rgba(239, 68, 68, 0.15)" filter="blur(10px)" />
-                <circle cx="65%" cy="35%" r="40" fill="rgba(239, 68, 68, 0.25)" />
-                <circle cx="35%" cy="65%" r="70" fill="rgba(245, 158, 11, 0.15)" filter="blur(10px)" />
-                <circle cx="35%" cy="65%" r="30" fill="rgba(245, 158, 11, 0.25)" />
+                {Object.entries(heatmapData?.cell_data ?? {})
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 24)
+                  .map(([cell, density]) => {
+                    const points = h3CellToSvgPoints(cell);
+                    if (!points) return null;
+                    const alpha = Math.min(0.55, 0.14 + density * 0.035);
+                    return (
+                      <polygon
+                        key={cell}
+                        points={points}
+                        fill={`rgba(239, 68, 68, ${alpha})`}
+                        stroke="rgba(255,255,255,0.22)"
+                        strokeWidth="0.6"
+                      />
+                    );
+                  })}
+                {!heatmapData && (
+                  <>
+                    <circle cx="65%" cy="35%" r="80" fill="rgba(239, 68, 68, 0.15)" filter="blur(10px)" />
+                    <circle cx="65%" cy="35%" r="40" fill="rgba(239, 68, 68, 0.25)" />
+                    <circle cx="35%" cy="65%" r="70" fill="rgba(245, 158, 11, 0.15)" filter="blur(10px)" />
+                    <circle cx="35%" cy="65%" r="30" fill="rgba(245, 158, 11, 0.25)" />
+                  </>
+                )}
               </>
             )}
 
@@ -848,20 +869,14 @@ export default function DriverTerminalPage() {
               >
                 🔥 Heatmap: {showHeatmap ? 'VISIBLE' : 'HIDDEN'}
               </button>
+              {heatmapData && (
+                <div className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono text-zinc-400 py-1.5 px-3 rounded-full">
+                  {heatmapData.region} · {Object.keys(heatmapData.cell_data).length} live cells
+                </div>
+              )}
             </div>
           )}
 
-          {/* Simulation Injectors inside Map panel */}
-          {dutyState === 'ONLINE_AVAILABLE' && (
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={() => triggerIncomingMatchNotification('')}
-                className="bg-white/10 hover:bg-white/20 border border-zinc-800 text-white font-mono font-bold text-[8px] py-1.5 px-3 rounded-full uppercase tracking-wider transition cursor-pointer"
-              >
-                📡 Ingest Match Mock
-              </button>
-            </div>
-          )}
         </div>
 
         {/* BOTTOM ACTIVE CONTROL SHEET CARD DRAWER */}

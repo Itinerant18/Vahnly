@@ -883,6 +883,565 @@ Logout
 /sos
 ```
 
+## Rider App Blueprint
+
+This section captures the full rider-side product surface for car owners who
+need a driver from the platform. Treat implemented items as current behavior
+and unwired items as requirements for future tickets.
+
+### 1. App Entry & Authentication
+
+#### 1.1 Splash / Launch Screen
+
+- Show logo and tagline: `Your car. Our driver.`
+- Auto-check auth token, profile completion, active or ongoing trip, location permission, and app version.
+- Redirect unauthenticated users to `/login`.
+- Redirect active trips to `/rider/trip/$tripId/live`.
+- Redirect all other valid sessions to `/rider`.
+
+#### 1.2 Login / Signup
+
+Route: `/login`
+
+- Fields: phone number with country code, 6-digit OTP.
+- Buttons: `Send OTP`, `Resend OTP`, `Verify & Continue`.
+- Resend OTP cooldown: 30 seconds.
+- Social buttons: `Continue with Google`, `Continue with Apple`.
+- Links: Terms of Service, Privacy Policy.
+- New-user navigation: `/onboarding`.
+- Returning-user navigation: `/rider`.
+
+#### 1.3 Rider Onboarding
+
+Route: `/onboarding`
+
+- Step 1, Personal Info: full name, email, optional gender, optional DOB, profile photo.
+- Step 2, Add First Car: make, model, year, car type, transmission, fuel type, registration plate, color, optional insurance expiry.
+- Step 2 can be skipped.
+- Step 3, Home & Work Addresses: save both as favorites.
+- Step 4, Emergency Contacts: up to 3 contacts with name and phone.
+- Step 5, Notification Permissions: push, SMS, email toggles.
+- Step 6, Location Permission: prefer `Always`, fallback to `While using app`.
+- Buttons: `Skip`, `Back`, `Next`, `Finish`.
+
+### 2. Home / Booking Screen
+
+Route: `/rider`
+
+#### 2.1 Top Bar
+
+- Left action: hamburger or profile avatar opens `/account`.
+- Center action: current city or location chip, tap to change city.
+- Right actions: notification bell with badge links to `/account/notifications`, SOS shortcut.
+
+#### 2.2 Map View
+
+- Live rider location pin.
+- Nearby available drivers as animated car icons.
+- ETA halo, for example `Drivers in 3 min`.
+- Recenter button.
+- Zoom controls.
+
+#### 2.3 Booking Card
+
+Bottom sheet, swipe-up expandable.
+
+- Trip type tabs: In-City Round Trip, In-City One-Way, Mini Outstation, Outstation.
+- Mini Outstation duration baseline: 8 hours.
+- Outstation duration baseline: multi-day.
+- Pickup field: auto-filled to current location, editable.
+- Pickup button: `Use current location`.
+- Drop field: optional for hourly, required for one-way and outstation.
+- Add stop action: `+`, up to 3 stops.
+- Saved place chips: Home, Work, Recents.
+- Schedule controls: `Now` toggle, `Schedule for later` with date and time picker.
+- Duration control: slider from 1 to 24 hours for in-city trips.
+- Outstation duration control: slider from 1 to 7 days.
+- Car selector default: user's default garage car, badged `Your Car`.
+- `Book for another car` opens a car picker.
+- Garage car picker: list of garage cars with radio selection.
+- One-time car form: make, model, car type, transmission.
+- Car confirmations: Hatchback, Sedan, SUV, Premium, Manual, Automatic.
+- Persons stepper: 1 to 8.
+- Promo code input with `Apply` button.
+- Promo result states: green check or red error.
+- D4M Care add-on toggle with info modal.
+- D4M Care display price: INR 49.
+- D4M Care coverage copy: ride insurance, trip monitoring, premium support.
+- Payment method pill row: Cash, UPI, Card, Wallet.
+- Payment method change route: `/account/payments`.
+- Fare estimate strip: base fare, night charge, Care charge, surge multiplier, total.
+- Night charge applies for 22:00 to 06:00.
+- `Fare breakdown` opens a modal.
+- Primary CTA: `Book Driver`.
+- `Book Driver` triggers dispatch.
+
+#### 2.4 Quick Tiles
+
+Shown above the booking card in collapsed view.
+
+- My Garage shortcut.
+- Last trip `Rebook`.
+- Offers banner.
+- Refer & Earn banner.
+
+### 3. Dispatch & Driver Matching
+
+#### 3.1 Searching Driver Screen
+
+Route: `/rider/dispatch`
+
+- Animated radar or pulsing pin.
+- Copy: `Finding a driver near you`.
+- Countdown timer, typically 60 seconds.
+- Trip summary chip.
+- Button: `Cancel search`.
+- Cancellation rule: no fee within 30 seconds.
+
+#### 3.2 Driver Assigned Modal
+
+- Driver photo, name, rating, total trips.
+- Transmission expertise badge: Manual, Automatic, Both.
+- ETA to pickup with minutes and kilometers.
+- Vehicle context copy, for example `Driving your Maruti Swift`.
+- Buttons: `Call driver`, `Chat driver`, `Share trip`, `Cancel ride`.
+- Driver call uses masked phone.
+- Cancel ride shows policy.
+
+#### 3.3 No Driver Found
+
+- Copy: `No drivers available right now`.
+- Buttons: `Retry`, `Schedule for later`, `Increase radius`.
+
+### 4. Live Trip Screen
+
+Route: `/rider/trip/$tripId/live`
+
+#### 4.1 Map & Status Banner
+
+- Statuses: driver moving toward pickup, driver arrived, OTP shared, trip started, en route, trip ending.
+- Live ETA.
+- Distance covered.
+- Optional current speed.
+
+#### 4.2 Trip Header Card
+
+- Status pill: Arriving, Arrived, In Trip.
+- Driver mini-card with photo, name, rating, vehicle plate.
+- Action icons: Call, Chat, Share trip, SOS.
+
+#### 4.3 OTP Display
+
+Before trip start:
+
+- Large 4-digit OTP.
+- Copy: `Share this with your driver to start the trip`.
+- Copy button.
+
+#### 4.4 Trip Details Card
+
+Expandable card:
+
+- Pickup, stops, drop.
+- Trip type.
+- Duration booked.
+- Car selected.
+- Fare estimate with live updates.
+- Promo.
+- Care add-on.
+- Payment method.
+
+#### 4.5 In-Trip Actions
+
+- Add a stop.
+- Change drop location.
+- Extend duration for hourly trips.
+- Report issue for driver behavior, route, or safety.
+- SOS calls emergency contact and support, then shares live location.
+- Share trip through WhatsApp, SMS, or copy link.
+- Share trip link opens the public live tracking page.
+
+#### 4.6 Trip Timeline
+
+Collapsible timeline:
+
+```text
+Booked at
+Driver assigned
+Driver arrived
+Trip started
+Stop 1
+Trip ended
+```
+
+### 5. End-of-Trip & Payment
+
+#### 5.1 Final Bill Screen
+
+Route: `/rider/trip/$tripId/bill`
+
+- Trip summary: distance, duration, stops, waiting time, night hours.
+- Bill breakdown: base fare, distance covered, extra KM, time charges, overtime, night charges, D4M Care charge, surge, promo discount, wallet credits, taxes, GST, total payable.
+- Payment method with change action before paying.
+- CTA: `Pay Now`.
+- Payment outcomes: cash collected, UPI launched, card charged, wallet debited.
+- After payment, generate invoice.
+
+#### 5.2 Rate Driver Screen
+
+Route: `/rider/trip/$tripId/rate`
+
+- 5-star rating.
+- Positive tag chips: Polite, Safe Driving, Knew Routes, Punctual, Clean.
+- Issue tag chips: Rash Driving, Late, Rude.
+- Tip selector: INR 0, INR 20, INR 50, INR 100, Custom.
+- Optional comments, 500 character limit.
+- Buttons: `Submit`, `Skip`.
+
+#### 5.3 Trip Receipt / Invoice
+
+- Downloadable PDF.
+- Email receipt.
+- `Report a problem with this trip` action.
+
+### 6. Account Drawer / Menu
+
+Route group: `/account`
+
+Drawer order:
+
+```text
+Profile
+My Garage
+Bookings / Trip History
+Payments & Methods
+Wallet
+Promos & Offers
+Refer & Earn
+Saved Places
+Emergency Contacts
+Insurance & Care
+Notifications
+Support / Help
+Settings
+Legal
+Logout
+```
+
+### 7. Account Pages
+
+#### 7.1 Profile
+
+Route: `/account/profile`
+
+- Photo upload.
+- Name, email, phone with verified badge, DOB, gender, preferred language.
+- KYC level indicator: Basic, Verified.
+- Buttons: `Edit`, `Save`, `Verify Email`, `Change Phone`.
+
+#### 7.2 My Garage
+
+Route: `/account/garage`
+
+- Car list with make/model, type, transmission, default star.
+- Per-car actions: `Set Default`, `Edit`, `Delete`, `Upload RC`, `Upload Insurance docs`.
+- Add Car form: make, model, year, type, transmission, fuel, plate, color, insurance expiry, set as default.
+- Car types: Hatchback, Sedan, SUV, Premium.
+- Document slots: RC, Insurance, PUC.
+- Document expiry alerts.
+
+#### 7.3 Bookings / Trip History
+
+Route: `/account/bookings`
+
+- Tabs: Upcoming, Ongoing, Completed, Cancelled.
+- Filters: date range, trip type, car.
+- Trip card fields: route, date, fare, driver, status.
+- Trip detail route: `/account/bookings/$tripId`.
+- Trip detail content: map route, timeline, bill, driver, receipt download, rebook, report issue, missed rating action.
+
+#### 7.4 Payments & Methods
+
+Route: `/account/payments`
+
+- Saved cards with last 4 digits, expiry, brand.
+- Card actions: Add, Remove, Set default.
+- UPI IDs with add/remove actions.
+- Linked wallets, for example Paytm.
+- Cash toggle, always available.
+- Auto-pay setting.
+- Billing address for invoices.
+
+#### 7.5 Wallet
+
+Route: `/account/wallet`
+
+- Balance.
+- Add money presets: INR 100, INR 500, INR 1000, Custom.
+- Transactions list for credits, debits, refunds.
+- Cashback history.
+
+#### 7.6 Promos & Offers
+
+Route: `/account/rewards`
+
+- Active offer cards.
+- Apply code field.
+- Expired offers collapsed.
+- Loyalty tier: Silver, Gold, Platinum.
+- Tier perks.
+
+#### 7.7 Refer & Earn
+
+Route: `/account/refer`
+
+- Referral code.
+- Share buttons: WhatsApp, SMS, Copy, More.
+- Referral status list: Pending, Joined, First trip done, Rewarded.
+- Earnings summary.
+
+#### 7.8 Saved Places
+
+Route: `/account/places`
+
+- Home, Work, custom labels.
+- Add, edit, delete.
+- Address search and map pin selection.
+
+#### 7.9 Emergency Contacts
+
+Route: `/account/emergency`
+
+- Contact list, maximum 3.
+- Add, edit, delete.
+- Toggle: auto-share trip with contacts.
+
+#### 7.10 Insurance & Care
+
+Route: `/account/insurance`
+
+- D4M Care subscription modes: one-time per trip, monthly plan.
+- Active coverage details.
+- Past claims.
+- `File a claim` button.
+
+#### 7.11 Notifications
+
+Route: `/account/notifications`
+
+- Inbox list with trip, promo, system categories.
+- Mark read.
+- Delete.
+- Preferences: push, SMS, email per category.
+
+#### 7.12 Support / Help
+
+Route: `/account/support`
+
+- Categories: Trip issue, Payment, Account, Driver behavior, Lost item, Other.
+- Recent trips issue flow: select trip, issue type, message.
+- Live chat.
+- Call support.
+- FAQ articles.
+- Ticket history with open/closed status.
+- Ticket detail route: `/account/support/ticket/$ticketId`.
+
+#### 7.13 Settings
+
+Route: `/account/settings`
+
+- Language.
+- Theme: System, Light, Dark.
+- Distance units.
+- Currency.
+- App permissions: location, notifications, contacts.
+- Connected accounts: Google, Apple.
+- Data and privacy: download data, delete account.
+- App version, build, check for updates.
+
+#### 7.14 Legal
+
+Route: `/account/legal`
+
+- Terms of Service.
+- Privacy Policy.
+- Cancellation Policy.
+- Refund Policy.
+- Licenses.
+
+### 8. Safety Features
+
+- SOS button on home and live trip.
+- SOS calls 112.
+- SOS alerts emergency contacts with live location, trip details, and driver details.
+- SOS notifies support.
+- Trip sharing produces a public live-tracking link that expires after the trip.
+- Driver verification badge visible before the ride.
+- Ride Check detects anomalies such as long stop or off-route movement.
+- Ride Check prompt copy: `Everything ok?`.
+- Women Safety mode: female-preferred drivers and auto-share with contacts after 22:00.
+
+### 9. Notifications
+
+Push, SMS, and email triggers:
+
+- OTP login.
+- Driver assigned, arriving, arrived.
+- Trip started, ended, cancelled.
+- Payment success, failed, refund.
+- Promo offers.
+- Surge alerts.
+- Scheduled trip reminder 1 hour before pickup.
+- Document expiry for RC, insurance, PUC.
+- Rate your driver.
+- Referral milestones.
+- Support ticket updates.
+
+### 10. Suggested Additional Features
+
+1. Favorite Drivers: request same driver again and maintain blocked driver list.
+2. Subscription Plans: monthly driver hours pack at discount.
+3. Corporate / Business Profile: separate billing, GST invoices, admin dashboard.
+4. Multi-car booking: book 2 drivers simultaneously for family events or similar cases.
+5. Driver pre-assignment for scheduled trips, assigned 30 minutes before pickup.
+6. Voice Booking, for example `Book a driver for tomorrow 9 AM`.
+7. Apple/Google Wallet pass for upcoming trips.
+8. In-app tips and training videos for handing over the car safely.
+9. Car Health Logger so the driver can flag mechanical issues after a trip.
+10. Carbon footprint tracker per trip.
+11. Festive themes and seasonal promos.
+12. Accessibility mode with larger text, screen reader support, and color-blind palette.
+13. Offline mode for active trip and past invoice viewing without internet.
+
+### 11. Navigation Map
+
+```text
+/login
+/onboarding
+/rider
+/rider/dispatch
+/rider/trip/$tripId/live
+/rider/trip/$tripId/bill
+/rider/trip/$tripId/rate
+/account
+/account/profile
+/account/garage
+/account/bookings
+/account/bookings/$tripId
+/account/payments
+/account/wallet
+/account/rewards
+/account/refer
+/account/places
+/account/emergency
+/account/insurance
+/account/notifications
+/account/support
+/account/support/ticket/$ticketId
+/account/settings
+/account/legal
+/sos
+/share/$publicTripId
+```
+
+## App Backend Connectivity Contract
+
+Every Rider and Driver app route in the blueprints above must be backed by a
+real service boundary before it is treated as production behavior. Mock-only
+UI state is allowed for demos, but it must be marked as demo code and must not
+be the final integration path.
+
+### Existing Backend Spine
+
+| App capability | Backend connection |
+| --- | --- |
+| Rider login | `POST /api/v1/auth/rider/login` on `cmd/gateway`; returns a JWT with `RIDER` role. |
+| Driver login | `POST /api/v1/auth/driver/login` on `cmd/gateway`; returns a JWT with `DRIVER` role. |
+| Fare estimate | `GET /api/v1/pricing/quote?h3_cell=...&base_fare_paise=...`; reads the surge matrix through `internal/pricing/service`. |
+| Rider booking | `POST /api/v1/orders`; writes `orders`, emits `order.created`, then dispatch consumes the Kafka event. |
+| Driver matching | `cmd/dispatch` consumes `order.created`, scans Redis H3 cells, evaluates matcher strategy, writes assignment state, and emits `order.assigned`. |
+| Live assignment/trip updates | `GET /api/v1/dispatch/stream?order_id=...` WebSocket; gateway fans out `order.assigned` via Redis pub/sub. |
+| Driver accept | `POST /api/v1/dispatch/accept`; moves order from `ASSIGNED` to `EN_ROUTE_TO_PICKUP` and stores active trip lease in Redis. |
+| Driver decline | `POST /api/v1/dispatch/decline`; rolls order back to `CREATED`, frees driver, applies cooldown, and requeues `order.created`. |
+| Arrived at pickup | `POST /api/v1/trip/arrive`; moves order to `ARRIVED_AT_PICKUP`. |
+| Start trip | `POST /api/v1/trip/start`; moves order to `DELIVERING` and driver to `ONLINE_DELIVERING`. |
+| Complete trip | `POST /api/v1/trip/complete`; moves order to `COMPLETED`, returns driver to available state, and writes ledger entries. |
+| Driver telemetry | `cmd/ingestion` gRPC `ClientStreamPositions`; writes Postgres telemetry, Redis H3 availability, and Kafka `driver.location.updated`. |
+| Heatmap analytics | `cmd/analytics` exposes `/api/v1/analytics/heatmap` over SSE. |
+| Push notifications | `cmd/notification` consumes `notification_outbox` and uses `user_device_tokens`. |
+| Payment reconciliation | `POST /api/v1/payments/webhook`; updates `payment_intents`, `orders`, and `financial_ledger_entries`. |
+| Admin recovery and controls | `cmd/gateway` admin routes for ledger, trip recovery, geofence, fraud lockout, force-match, pricing freeze, and order cancellation. |
+
+### Required Rider API Surface
+
+These Rider pages must connect to backend APIs before production release:
+
+| Rider area | Required backend connection |
+| --- | --- |
+| `/onboarding` | `rider_profiles`, first car, addresses, emergency contacts, notification preferences, and location-permission audit endpoints. |
+| `/rider` booking form | Garage read API, saved places API, quote API, promo validation API, D4M Care pricing API, payment-method read API, and order creation API. |
+| `/rider/dispatch` | Order status polling or WebSocket subscription, search cancellation API, retry API, and search-radius adjustment API. |
+| `/rider/trip/$tripId/live` | Authenticated trip detail API, live WebSocket stream, OTP read API, share-link API, add-stop API, change-drop API, extend-duration API, issue-report API. |
+| `/rider/trip/$tripId/bill` | Final fare API, payment intent API, wallet debit API, cash confirmation API, invoice generation API. |
+| `/rider/trip/$tripId/rate` | Driver rating API, tip API, rider comment moderation/audit API. |
+| `/account/profile` | Rider profile read/update, email verification, phone change workflow. |
+| `/account/garage` | Car CRUD, default car mutation, RC/insurance/PUC upload, expiry alerts. |
+| `/account/bookings` | Trip history list/detail, receipt download, rebook, dispute/report issue. |
+| `/account/payments` | Saved cards, UPI IDs, linked wallets, billing address, auto-pay setting. |
+| `/account/wallet` | Balance, top-up intent, transaction history, refunds, cashback. |
+| `/account/rewards` | Promo catalog, promo redemption, expired offers, loyalty tier. |
+| `/account/refer` | Referral code, referral status, reward ledger. |
+| `/account/places` | Saved place CRUD with geocoding and map pin persistence. |
+| `/account/emergency` | Emergency contact CRUD and auto-share preference. |
+| `/account/insurance` | D4M Care plan, coverage status, claim filing, claim history. |
+| `/account/notifications` | Notification inbox, mark-read/delete, channel preferences. |
+| `/account/support` | Ticket create/list/detail, attachment upload, live chat, call-support event logging. |
+| `/account/settings` | Preferences, permissions audit, connected accounts, data export, delete account. |
+| `/account/legal` | Versioned legal document registry and acceptance audit. |
+| `/sos` | Global SOS API that calls emergency workflow, support escalation, and live-location sharing. |
+| `/share/$publicTripId` | Public trip tracking token, expiry policy, read-only live location stream. |
+
+### Required Driver API Surface
+
+These Driver pages must connect to backend APIs before production release:
+
+| Driver area | Required backend connection |
+| --- | --- |
+| `/driver-onboarding` | Driver profile, address, KYC document uploads, vehicle expertise, bank details, emergency contact, agreement signature, quiz score, admin review audit. |
+| `/driver` duty dashboard | Duty-state API, vehicle selector API, trip preference API, heatmap SSE, dispatch WebSocket, driver telemetry stream, online/offline audit. |
+| Incoming offer popup | WebSocket/push offer payload, offer lease countdown, accept API, decline API, decline reason, response-latency audit. |
+| En route to pickup | Trip detail API, masked call/chat API, route/ETA service, arrive API, cancel API with reason. |
+| Arrived at pickup | Arrival API, wait timer API, start odometer/fuel capture API, photo upload, OTP verification/start API, no-show API. |
+| Trip in progress | Live waypoint upload, add-stop API, issue report API, toll/parking/waiting event API, SOS API, complete-trip API. |
+| Final bill | End odometer/fuel capture, final fare API, payment confirmation, invoice/settlement API, rider rating request. |
+| `/driver-account/profile` | Driver profile, KYC status, languages, vehicles, service cities, document upload. |
+| `/driver-account/earnings` | Earnings summary, trip ledger, deductions, tax statement, PDF/CSV export. |
+| `/driver-account/payouts` | Available balance, bank/UPI update, payout request, payout history, auto-payout schedule. |
+| `/driver-account/support` | FAQ, ticket create/list/detail, attachment upload, live chat, emergency hotline audit. |
+| `/driver-account/trip-history` | Driver trip history, map replay, fare breakdown, dispute, rider rating. |
+| `/driver-account/incentives` | Quest catalog, progress, surge zones, referral program. |
+| `/driver-account/vehicles` | Vehicle CRUD, RC/insurance/PUC documents, expiry alerts. |
+| `/driver-account/performance` | Ratings, acceptance, cancellation, completion, compliments, tier/perks. |
+| `/driver-account/settings` | Language, notifications, ride preferences, nav app, theme, biometric login, password, logout, delete account. |
+| `/driver-account/wallet` | Driver wallet balance, top-up, transaction history, toll/fuel-card integrations. |
+| `/driver-account/training` | Training modules, quiz results, certification status. |
+| `/driver-account/notifications` | Driver inbox, mark-read/delete, delivery/open/action logs. |
+| `/driver-account/refer` | Referral code, referral status, rewards. |
+
+### Current Frontend Wiring Gaps To Close
+
+| Gap | Required fix |
+| --- | --- |
+| Rider login client path points to `/api/v1/auth/login` | Change the Rider client to call `/api/v1/auth/rider/login`, or add a gateway alias intentionally. |
+| SOS page calls `/api/v1/driver/sos` | Add a gateway SOS endpoint and support workflow, or change the client to the final global SOS route. |
+| Driver accept uses hardcoded `http://localhost:8080` | Route all client calls through `API_GATEWAY_BASE_URL` / `NEXT_PUBLIC_API_GATEWAY`. |
+| Driver decline is local UI state | Wire decline to `POST /api/v1/dispatch/decline` with reason and audit metadata. |
+| Driver arrive/start/complete screens are partly local state | Wire them to `/api/v1/trip/arrive`, `/api/v1/trip/start`, and `/api/v1/trip/complete`. |
+| Account, wallet, garage, KYC, documents, payouts, support, ratings, and settings pages are mostly static UI | Create backend APIs, database tables, and service ownership for each page before production. |
+| WebSocket usage is inconsistent | Standardize on `GET /api/v1/dispatch/stream?order_id=...` plus bearer/JWT auth and remove incompatible `?jwt=`-only usage. |
+| Trip photos and documents have no storage contract | Add object storage, signed upload URLs, virus/content checks, metadata tables, and retention policy. |
+| Promo, D4M Care, tips, final fare line items, and subscription plans need financial contracts | Extend pricing/payment/ledger models before these are exposed to users. |
+
 ## Wiring Risks (current)
 
 | Risk | Why it matters |
@@ -895,7 +1454,9 @@ Logout
 | OSM PBF input vs checked-in CSVs | `cmd/osm-preprocessor` reads PBF; dispatch loads CSVs. Drift is possible. |
 | External infrastructure for full E2E | Kafka, Redis Cluster, Postgres, and Triton must all be healthy for end-to-end behavior. |
 | Region matrix is hardcoded | New regions need a code change in the gateway. |
-| Pricing still lacks a public quote endpoint | The gateway reads cached surge; final fare quote endpoint is still on the roadmap. |
+| Product blueprints exceed current API coverage | Rider and Driver account pages, documents, payouts, support, ratings, and SOS still need dedicated backend APIs. |
+| Client route mismatch | The Rider login page calls `/api/v1/auth/login`, but the gateway exposes `/api/v1/auth/rider/login`. |
+| SOS route is not registered | The client calls `/api/v1/driver/sos`, but the gateway has no matching route yet. |
 
 ## Deeper Documentation
 

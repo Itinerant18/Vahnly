@@ -19,8 +19,8 @@ function readEnv(key: string, fallback: string): string {
 // constructor's apiBaseUrl argument).
 
 // REST + WebSocket public API gateway (Milestones 14, 15, 20, 25, 27).
-export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', '');
-export const WS_GATEWAY_BASE_URL = readEnv('WS_GATEWAY_URL', '');
+export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', 'http://localhost:8085');
+export const WS_GATEWAY_BASE_URL = readEnv('WS_GATEWAY_URL', 'ws://localhost:8085');
 
 // Standalone spatial analytics SSE service (Milestone 19).
 export const ANALYTICS_SSE_BASE_URL = readEnv('ANALYTICS_SSE_URL', '');

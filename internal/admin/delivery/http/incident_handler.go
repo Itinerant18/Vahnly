@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,16 +21,30 @@ type TripRecoveryRequest struct {
 	IncidentNotes  string `json:"incident_notes"`
 }
 
+type TripClaimRequest struct {
+	OrderID string `json:"order_id"`
+	AgentID string `json:"agent_id"`
+}
+
 type StalledTripIncident struct {
-	OrderID              string `json:"order_id"`
-	DriverID             string `json:"driver_id"`
-	DriverName           string `json:"driver_name"`
-	CustomerName         string `json:"customer_name"`
-	VehicleMakeModel     string `json:"vehicle_make_model"`
-	LicensePlate         string `json:"license_plate"`
-	LastKnownStatus      string `json:"last_known_status"` // "EN_ROUTE" or "ON_TRIP"
-	SecondsSinceLastPing int    `json:"seconds_since_last_ping"`
-	CityPrefix           string `json:"city_prefix"`
+	OrderID              string  `json:"order_id"`
+	DriverID             string  `json:"driver_id"`
+	DriverName           string  `json:"driver_name"`
+	CustomerName         string  `json:"customer_name"`
+	VehicleMakeModel     string  `json:"vehicle_make_model"`
+	LicensePlate         string  `json:"license_plate"`
+	LastKnownStatus      string  `json:"last_known_status"` // "EN_ROUTE" or "ON_TRIP"
+	SecondsSinceLastPing int     `json:"seconds_since_last_ping"`
+	CityPrefix           string  `json:"city_prefix"`
+	IncidentType         string  `json:"incident_type"`          // "SOS" | "FRAUD" | "SILENCE"
+	IncidentStatus       string  `json:"incident_status"`        // "UNASSIGNED" | "INVESTIGATING" | "RESOLVED"
+	AssignedAgentID      string  `json:"assigned_agent_id"`      // string identifier
+	BearingDelta         float64 `json:"bearing_delta"`          // degrees
+	CalculatedSpeed      float64 `json:"calculated_speed"`       // km/h
+	IsMockProvider       bool    `json:"is_mock_provider"`       // Boolean check flag
+	BatteryLevel         float64 `json:"battery_level"`          // percentage
+	Latitude             float64 `json:"latitude"`
+	Longitude            float64 `json:"longitude"`
 }
 
 type IncidentAdminHandler struct {
@@ -37,6 +52,8 @@ type IncidentAdminHandler struct {
 	clusterClient *redis.ClusterClient
 	kafkaWriter   *kafka.Writer
 	logger        *log.Logger
+	mu            sync.RWMutex
+	incidents     []StalledTripIncident
 }
 
 func NewIncidentAdminHandler(
@@ -51,12 +68,77 @@ func NewIncidentAdminHandler(
 		Balancer: &kafka.LeastBytes{},
 	}
 
-	return &IncidentAdminHandler{
+	h := &IncidentAdminHandler{
 		dbPool:        dbPool,
 		clusterClient: clusterClient,
 		kafkaWriter:   writer,
 		logger:        logger,
 	}
+
+	h.incidents = []StalledTripIncident{
+		{
+			OrderID:              "ord-9011-cb72",
+			DriverID:             "drv-4451-aa89",
+			DriverName:           "Manish Malhotra",
+			CustomerName:         "Sourav Ganguly",
+			VehicleMakeModel:     "Audi A6 Premium",
+			LicensePlate:         "WB-02-AL-0011",
+			LastKnownStatus:      "ON_TRIP",
+			SecondsSinceLastPing: 58,
+			CityPrefix:           "KOL",
+			IncidentType:         "SILENCE",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         4.5,
+			CalculatedSpeed:      22.4,
+			IsMockProvider:       false,
+			BatteryLevel:         68.0,
+			Latitude:             22.5726,
+			Longitude:            88.3639,
+		},
+		{
+			OrderID:              "ord-8831-bb01",
+			DriverID:             "drv-9902-aa11",
+			DriverName:           "Amit Mishra",
+			CustomerName:         "Priyanka Sen",
+			VehicleMakeModel:     "Swift Dzire",
+			LicensePlate:         "WB-04-BC-1234",
+			LastKnownStatus:      "ON_TRIP",
+			SecondsSinceLastPing: 2,
+			CityPrefix:           "KOL",
+			IncidentType:         "SOS",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         12.8,
+			CalculatedSpeed:      45.0,
+			IsMockProvider:       false,
+			BatteryLevel:         82.0,
+			Latitude:             22.5832,
+			Longitude:            88.3678,
+		},
+		{
+			OrderID:              "ord-7711-ac90",
+			DriverID:             "drv-7711-22aa",
+			DriverName:           "Debashis Roy",
+			CustomerName:         "Ayan Mukherji",
+			VehicleMakeModel:     "Hyundai i20",
+			LicensePlate:         "WB-06-DF-5678",
+			LastKnownStatus:      "ON_TRIP",
+			SecondsSinceLastPing: 12,
+			CityPrefix:           "KOL",
+			IncidentType:         "FRAUD",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         0.0,
+			CalculatedSpeed:      240.0,
+			IsMockProvider:       true,
+			BatteryLevel:         50.0,
+			Latitude:             22.5901,
+			Longitude:            88.3512,
+		},
+	}
+
+	return h
 }
 
 // HandleGetStalledTrips retrieves trips that have stalled telemetry streams
@@ -68,23 +150,59 @@ func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *h
 		return
 	}
 
-	// High-fidelity fallback data: Simulates a driver whose device went offline inside an infrastructure dead-zone
-	incidents := []StalledTripIncident{
-		{
-			OrderID:              "ord-9011-cb72",
-			DriverID:             "drv-4451-aa89",
-			DriverName:           "Manish Malhotra",
-			CustomerName:         "Sourav Ganguly",
-			VehicleMakeModel:     "Audi A6 Premium",
-			LicensePlate:         "WB-02-AL-0011",
-			LastKnownStatus:      "ON_TRIP",
-			SecondsSinceLastPing: 58, // Exceeds the critical 45-second telemetry heartbeat threshold
-			CityPrefix:           "KOL",
-		},
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": h.incidents})
+}
+
+// HandleClaimIncident handles claiming of an active incident by a support agent
+func (h *IncidentAdminHandler) HandleClaimIncident(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate RBAC Authorization Claims
+	adminRole := r.Header.Get("X-Admin-Role")
+	if adminRole != "SUPER_ADMIN" && adminRole != "SUPPORT_LEAD" {
+		http.Error(w, "insufficient_operational_permissions", http.StatusForbidden)
+		return
+	}
+
+	var req TripClaimRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.OrderID == "" || req.AgentID == "" {
+		http.Error(w, "missing_required_claim_fields", http.StatusUnprocessableEntity)
+		return
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	found := false
+	for i, incident := range h.incidents {
+		if incident.OrderID == req.OrderID {
+			h.incidents[i].IncidentStatus = "INVESTIGATING"
+			h.incidents[i].AssignedAgentID = req.AgentID
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "incident_not_found", http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"INCIDENT_CLAIMED_SUCCESSFULLY"}`))
 }
 
 // HandleExecuteTripRecovery processes administrative interventions to resolve stranded orders
@@ -195,6 +313,15 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 		http.Error(w, "unsupported_recovery_action_token", http.StatusBadRequest)
 		return
 	}
+
+	h.mu.Lock()
+	for i, incident := range h.incidents {
+		if incident.OrderID == req.OrderID {
+			h.incidents[i].IncidentStatus = "RESOLVED"
+			break
+		}
+	}
+	h.mu.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))

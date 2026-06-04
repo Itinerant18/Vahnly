@@ -1,27 +1,103 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { EarningsResponse, getEarnings } from '@/api/client';
+import { useAuthStore } from '@/store/useAuthStore';
+import Papa from 'papaparse';
 
 export default function DriverEarningsPage() {
-  const [range, setRange] = useState<'TODAY' | 'WEEK' | 'MONTH'>('WEEK');
+  const { token } = useAuthStore();
+  const [range, setRange] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM'>('TODAY');
+  const [customFrom, setCustomFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [earnings, setEarnings] = useState<EarningsResponse | null>(null);
+  const [earningsError, setEarningsError] = useState<string | null>(null);
 
-  const stats = {
+  const period = useMemo(() => {
+    if (range === 'CUSTOM') {
+      const from = new Date(`${customFrom}T00:00:00.000Z`);
+      const to = new Date(`${customTo}T23:59:59.999Z`);
+      return { from: from.toISOString(), to: to.toISOString() };
+    }
+
+    const to = new Date();
+    const from = new Date(to);
+    if (range === 'TODAY') {
+      from.setHours(0, 0, 0, 0);
+    } else if (range === 'WEEK') {
+      from.setDate(from.getDate() - 7);
+    } else {
+      from.setMonth(from.getMonth() - 1);
+    }
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [customFrom, customTo, range]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    getEarnings(token, period.from, period.to)
+      .then((data) => {
+        if (!cancelled) {
+          setEarnings(data);
+          setEarningsError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[DriverEarnings] Earnings fetch failed:', err);
+          setEarningsError('Live earnings data is unavailable.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [period.from, period.to, token]);
+
+  const fallbackStats = {
     TODAY: { gross: 1280, trips: 1120, tips: 100, bonus: 150, incentives: 50, commissions: 140, net: 1140 },
     WEEK: { gross: 9680, trips: 8200, tips: 650, bonus: 1200, incentives: 450, commissions: 820, net: 8860 },
     MONTH: { gross: 42800, trips: 36500, tips: 2800, bonus: 5000, incentives: 1800, commissions: 3650, net: 39150 }
   };
 
-  const trips = [
+  const fallbackTrips = [
     { id: 'TRP-9901', date: '2026-06-03 21:30', route: 'Salt Lake ➔ Park Street', amount: 780.00, method: 'UPI' },
     { id: 'TRP-9892', date: '2026-06-03 14:15', route: 'Howrah Junction ➔ Ballygunge', amount: 560.00, method: 'Cash' },
     { id: 'TRP-9844', date: '2026-06-02 18:40', route: 'Kolkata Airport ➔ New Town Hub', amount: 840.00, method: 'UPI' },
     { id: 'TRP-9781', date: '2026-06-01 11:20', route: 'Alipore ➔ Salt Lake Sector V', amount: 660.00, method: 'Wallet' }
   ];
 
-  const currentStats = stats[range];
+  const liveNet = earnings ? earnings.total_paise / 100 : null;
+  const fallbackRange = range === 'CUSTOM' ? 'TODAY' : range;
+  const currentStats = liveNet === null
+    ? fallbackStats[fallbackRange]
+    : { gross: liveNet, trips: liveNet, tips: 0, bonus: 0, incentives: 0, commissions: 0, net: liveNet };
+  const trips = earnings
+    ? earnings.breakdown.map((item) => ({
+        id: item.order_id,
+        date: new Date(item.completed_at).toLocaleString(),
+        route: 'Completed ride ledger credit',
+        amount: item.amount_paise / 100,
+        method: 'Ledger',
+      }))
+    : fallbackTrips;
 
   const handleDownloadReport = () => {
-    alert('CSV statement statement-report-2026-Q2.csv downloaded successfully.');
+    const rows = (earnings?.breakdown ?? []).map((item) => ({
+      order_id: item.order_id,
+      amount_rupees: (item.amount_paise / 100).toFixed(2),
+      amount_paise: item.amount_paise,
+      completed_at: item.completed_at,
+    }));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `driver-earnings-${period.from.slice(0, 10)}-${period.to.slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -31,19 +107,21 @@ export default function DriverEarningsPage() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">Earnings Statement</h2>
           <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Escrow transaction ledger breakdown and tax indices</p>
+          {earningsError && <p className="text-red-400 text-[10px] font-mono mt-2">{earningsError}</p>}
         </div>
 
         <button
           onClick={handleDownloadReport}
+          disabled={!earnings?.breakdown.length}
           className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono"
         >
-          ⬇️ Download PDF/CSV
+          Download CSV
         </button>
       </div>
 
       {/* Date Range Selector */}
       <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 max-w-sm font-mono text-[10px]">
-        {(['TODAY', 'WEEK', 'MONTH'] as const).map((r) => (
+        {(['TODAY', 'WEEK', 'MONTH', 'CUSTOM'] as const).map((r) => (
           <button
             key={r}
             type="button"
@@ -57,11 +135,29 @@ export default function DriverEarningsPage() {
         ))}
       </div>
 
+      {range === 'CUSTOM' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-sm">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(event) => setCustomFrom(event.target.value)}
+            className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono"
+          />
+          <input
+            type="date"
+            value={customTo}
+            onChange={(event) => setCustomTo(event.target.value)}
+            className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono"
+          />
+        </div>
+      )}
+
       {/* Primary Balance Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-2">
           <span className="text-zinc-500 block text-[9px] uppercase font-mono tracking-wider font-bold">Gross Billing</span>
           <span className="text-2xl font-mono font-bold text-white">₹{currentStats.gross.toFixed(2)}</span>
+          <span className="text-[9px] text-zinc-600 font-mono">{earnings?.trip_count ?? trips.length} trips</span>
         </div>
         
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-2">

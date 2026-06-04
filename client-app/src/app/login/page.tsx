@@ -3,6 +3,8 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { apiFetch } from '@/network/ClientCoreEngine';
+import { driverLogin } from '@/api/client';
+import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function UnifiedLoginContent() {
@@ -16,6 +18,7 @@ function UnifiedLoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showOtpNotice, setShowOtpNotice] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -47,6 +50,7 @@ function UnifiedLoginContent() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAuthError(null);
 
     const deviceId = 'dev-hfid-' + Math.random().toString(36).substring(2, 10);
     const mockIp = '192.168.1.105';
@@ -69,30 +73,38 @@ function UnifiedLoginContent() {
     addAuditLog('LOGIN_ATTEMPT', auditMeta);
 
     try {
-      const apiPath = role === 'DRIVER' ? '/api/v1/auth/driver/login' : '/api/v1/auth/login';
-      const res = await apiFetch(apiPath, {
-        method: 'POST',
-        body: JSON.stringify({ phone, password, email })
-      });
-      
-      login(res.token, res.user);
-      addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
-      router.push(role === 'DRIVER' ? '/driver' : '/rider');
-    } catch (err) {
-      console.warn('[UnifiedAuth] API Endpoint not resolved, triggering resilient offline-first authentication fallback.', err);
-      
-      // Fallback local simulate session login on offline local compose clusters
-      const mockUser = {
-        id: role === 'DRIVER' ? 'drv-aniket-7602' : 'usr-anirban-4521',
-        role: role,
-        name: role === 'DRIVER' ? 'Aniket Karmakar' : 'Anirban Das',
-        phone: phone || '+91 98765 43210'
-      };
+      if (role === 'DRIVER') {
+        const res = await driverLogin(phone, password);
+        login(res.token, {
+          id: res.user.id,
+          role: res.user.role,
+          name: res.user.name,
+          phone,
+        });
+        void registerDriverPushNotifications(res.token).catch((pushErr) => {
+          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+        });
+        addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
+        router.push('/driver');
+      } else {
+        const res = await apiFetch('/api/v1/auth/rider/login', {
+          method: 'POST',
+          body: JSON.stringify({ phone, password, email })
+        });
 
-      login(`mock-${role.toLowerCase()}-jwt-token-12345`, mockUser);
-      addAuditLog('LOGIN_SUCCESS_FALLBACK', { userId: mockUser.id, role, note: 'Offline backup node verified credentials locally.' });
-      
-      router.push(role === 'DRIVER' ? '/driver' : '/rider');
+        login(res.token, {
+          id: res.user.id,
+          role: res.user.role,
+          name: res.user.name,
+          phone: res.user.phone ?? phone,
+        });
+        addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
+        router.push('/rider');
+      }
+    } catch (err) {
+      console.warn('[UnifiedAuth] Authentication failed against gateway.', err);
+      setAuthError('Authentication failed. Check the phone and password, then try again.');
+      addAuditLog('LOGIN_FAILED', { role, phone, reason: String(err) });
     } finally {
       setLoading(false);
     }
@@ -158,6 +170,12 @@ function UnifiedLoginContent() {
         {showOtpNotice && (
           <div className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs py-3 px-4 rounded-xl mb-4 font-mono animate-fadeIn">
             🔔 [MOCK_OTP_AGENT]: OTP request registered! Verification skipped in sandbox environment scope. Enter password below to proceed.
+          </div>
+        )}
+
+        {authError && (
+          <div className="bg-red-950/30 border border-red-900 text-red-300 text-xs py-3 px-4 rounded-xl mb-4 font-mono animate-fadeIn">
+            {authError}
           </div>
         )}
 

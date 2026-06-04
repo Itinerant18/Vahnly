@@ -9,8 +9,8 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
   const pathname = usePathname();
 
   useEffect(() => {
-    // Bypass auth gates if the user is already loading the login or onboarding screens
-    if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/driver/login' || pathname === '/rider/login') {
+    // Bypass auth gates if the user is already loading the login, onboarding or public share screens
+    if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/onboarding' || pathname === '/share' || pathname === '/driver/login' || pathname === '/rider/login') {
       return;
     }
 
@@ -28,8 +28,8 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
     }
   }, [isAuthenticated, user, router, allowedRole, pathname]);
 
-  // Bypass visual overlay for login and onboarding screens
-  if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/driver/login' || pathname === '/rider/login') {
+  // Bypass visual overlay for login, onboarding, and share screens
+  if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/onboarding' || pathname === '/share' || pathname === '/driver/login' || pathname === '/rider/login') {
     return <>{children}</>;
   }
 

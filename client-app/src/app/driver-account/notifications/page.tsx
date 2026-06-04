@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { registerDeviceToken, DevicePlatform } from '@/api/client';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function DriverNotificationsPage() {
+  const { token } = useAuthStore();
   const [tab, setTab] = useState<'ALL' | 'TRIPS' | 'EARNINGS' | 'SYSTEM'>('ALL');
   const [logs, setLogs] = useState<string[]>([]);
+  const [deviceStatus, setDeviceStatus] = useState<string | null>(null);
   const [notifications, setNotifications] = useState([
     { id: '1', type: 'TRIPS', title: 'New Match Completed', body: 'Ride trp-2209 completed! Payout ₹832.00 added to your account ledger.', date: '2026-06-03 22:10', read: false },
     { id: '2', type: 'EARNINGS', title: 'Withdrawal Settled', body: 'Payout request PAY-8821 for ₹4,500.00 settled instantly to your linked UPI address.', date: '2026-06-01 10:45', read: true },
@@ -30,6 +34,32 @@ export default function DriverNotificationsPage() {
     alert('All notifications marked as read.');
   };
 
+  const handleRegisterDevice = async () => {
+    if (!token) {
+      setDeviceStatus('Sign in again before registering a device token.');
+      return;
+    }
+
+    const deviceToken = prompt('Paste the FCM/APNS device token for this device:');
+    if (!deviceToken) return;
+
+    const platformInput = prompt('Platform type: ANDROID_FCM or IOS_APNS', 'ANDROID_FCM') || 'ANDROID_FCM';
+    const platform = platformInput.toUpperCase() as DevicePlatform;
+    if (platform !== 'ANDROID_FCM' && platform !== 'IOS_APNS') {
+      setDeviceStatus('Unsupported platform type.');
+      return;
+    }
+
+    try {
+      await registerDeviceToken(token, deviceToken, platform);
+      setDeviceStatus(`Device token registered for ${platform}.`);
+      logNotificationEvent('DEVICE_TOKEN_REGISTERED', 'device-token', platform);
+    } catch (err) {
+      console.warn('[DriverNotifications] Device token registration failed:', err);
+      setDeviceStatus('Device token registration failed.');
+    }
+  };
+
   const dismissNotification = (id: string, title: string) => {
     logNotificationEvent('DISMISSED', id, title);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -48,13 +78,27 @@ export default function DriverNotificationsPage() {
           <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Filter alerts, read system updates, or dismiss promo banners</p>
         </div>
 
-        <button
-          onClick={handleMarkAllRead}
-          className="text-zinc-400 hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider cursor-pointer"
-        >
-          Mark all read
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleRegisterDevice}
+            className="text-zinc-400 hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider cursor-pointer"
+          >
+            Register device
+          </button>
+          <button
+            onClick={handleMarkAllRead}
+            className="text-zinc-400 hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider cursor-pointer"
+          >
+            Mark all read
+          </button>
+        </div>
       </div>
+
+      {deviceStatus && (
+        <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-[10px] font-mono text-zinc-400">
+          {deviceStatus}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 max-w-sm font-mono text-[9px]">

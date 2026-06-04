@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { API_GATEWAY_BASE_URL } from '../../config';
 import Link from 'next/link';
 import AuthGuard from '../../components/AuthGuard';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -40,7 +41,7 @@ function SosConsole() {
     firedRef.current = true;
     setState('DISPATCHED');
     try {
-      await fetch('http://localhost:8080/api/v1/driver/sos', {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/driver/sos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

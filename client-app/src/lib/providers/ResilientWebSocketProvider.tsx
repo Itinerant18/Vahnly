@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAppState } from '@/lib/store/useAppState';
 import { VehicleTracker } from '@/lib/VehicleTracker';
+import { WS_GATEWAY_BASE_URL } from '@/config';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface WebSocketContextType {
   vehicleTracker: VehicleTracker | null;
@@ -31,8 +33,8 @@ export function ResilientWebSocketProvider({
     try {
       setReconnecting(true);
 
-      const wsUrl = process.env.NEXT_PUBLIC_WS_GATEWAY || 'ws://localhost:8080';
-      const jwtToken = localStorage.getItem('jwt_token');
+      const wsUrl = process.env.NEXT_PUBLIC_WS_GATEWAY || WS_GATEWAY_BASE_URL;
+      const jwtToken = useAuthStore.getState().token;
 
       const ws = new WebSocket(`${wsUrl}/api/v1/dispatch/stream?jwt=${jwtToken}`);
 

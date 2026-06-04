@@ -1,4 +1,5 @@
 import { WS_GATEWAY_BASE_URL } from '../config';
+import { useAuthStore } from '../store/useAuthStore';
 
 export interface StreamConfig {
   orderID: string;
@@ -28,9 +29,10 @@ export class ResilientStreamManager {
   /** Establish a persistent connection to the public gateway stream handler. */
   public connect(): void {
     this.isPurposelyClosed = false;
+    const token = useAuthStore.getState().token;
     const url = `${this.wsBaseUrl}/api/v1/dispatch/stream?order_id=${encodeURIComponent(
       this.config.orderID,
-    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}`;
+    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}${token ? `&jwt=${encodeURIComponent(token)}` : ''}`;
 
     this.ws = new WebSocket(url);
     // Gateway emits compressed Protobuf allocation frames; receive them as raw buffers.

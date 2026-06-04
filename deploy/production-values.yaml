@@ -1,0 +1,23 @@
+# production-values.yaml overrides blueprint configuration
+global:
+  environment: production
+  metricsEnabled: true
+
+public-gateway:
+  replicaCount: 4
+  resources:
+    limits: { cpu: "1000m", memory: "512Mi" }
+    requests: { cpu: "500m", memory: "256Mi" }
+  env:
+    REDIS_CLUSTER_ADDRS: "redis-cluster.dispatch.svc.cluster.local:6379"
+    DATABASE_URL: "postgresql://app_gateway:HardenedProdPassword@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=verify-full"
+
+matching-engine:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 12
+    kafkaTrigger:
+      topic: "order.created"
+      consumerGroup: "matching-engine-group"
+      lagThreshold: "15"

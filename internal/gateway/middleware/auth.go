@@ -67,6 +67,7 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 
 		// Inject verified user context fields into the request context pipeline
 		ctx := context.WithValue(r.Context(), UserIDContextKey, claims.UserID)
+		ctx = context.WithValue(ctx, UserRoleContextKey, claims.Role)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
@@ -78,6 +79,11 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 }
 
 const UserRoleContextKey ContextKey = "userRole"
+
+func GetUserRoleFromContext(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(UserRoleContextKey).(string)
+	return role, ok
+}
 
 // RequireRole guards administrative routes against non-authorized client access
 func (m *AuthMiddleware) RequireRole(targetRole string, next http.HandlerFunc) http.HandlerFunc {

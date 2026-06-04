@@ -48,6 +48,9 @@ func (r *redisRepo) SetDriverLocation(ctx context.Context, loc *domain.DriverLoc
 				"osm_node_id",              strconv.FormatInt(loc.OSMNodeID, 10),
 				"acceptance_rate",          strconv.FormatFloat(float64(loc.AcceptanceRate), 'f', 6, 32),
 				"cancellation_probability", strconv.FormatFloat(float64(loc.CancellationProbability), 'f', 6, 32),
+				"speed_kms",                strconv.FormatFloat(float64(loc.SpeedKMS), 'f', 2, 32),
+				"bearing",                  strconv.FormatFloat(float64(loc.Bearing), 'f', 2, 32),
+				"last_ping_utc",            time.Now().Format(time.RFC3339),
 			)
 			// is_inside_surge_zone and idle_seconds are owned by the surge aggregator.
 			// Use HSetNX so we write a safe default only on first creation, never overwriting

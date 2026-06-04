@@ -1,12 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getDriverProfile, DriverProfile } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function DriverProfilePage() {
-  const { user } = useAuthStore();
-  const driverName = user?.name || 'Aniket Karmakar';
-  const driverPhone = user?.phone || '+91 98765 43210';
+  const { user, token } = useAuthStore();
+  const [profile, setProfile] = useState<DriverProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const driverName = profile?.name || user?.name || 'Driver Partner';
+  const driverPhone = profile?.phone || user?.phone || 'Phone unavailable';
+  const cityPrefix = profile?.city_prefix || 'KOL';
   
   const [bio, setBio] = useState('Professional pilot dedicated to safe, smooth, and premium commuter and outstation transits across Kolkata.');
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -17,6 +21,29 @@ export default function DriverProfilePage() {
     { name: 'Police Verification Clearance', status: 'Pending Review', date: '2026-05-24' },
     { name: 'Address Proof (Utility Bill)', status: 'Verified', date: '2026-01-10' }
   ]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    getDriverProfile(token)
+      .then((data) => {
+        if (!cancelled) {
+          setProfile(data);
+          setProfileError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[DriverProfile] Profile fetch failed:', err);
+          setProfileError('Live profile data is unavailable.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const handleUploadDoc = () => {
     const docName = prompt('Enter the name of the new document to upload:');
@@ -35,6 +62,7 @@ export default function DriverProfilePage() {
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">My Partner Profile</h2>
         <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage credentials, bio, and KYC document uploads</p>
+        {profileError && <p className="text-red-400 text-[10px] font-mono mt-2">{profileError}</p>}
       </div>
 
       {/* Profile Overview Card */}
@@ -47,10 +75,10 @@ export default function DriverProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <h3 className="text-base font-bold text-white">{driverName}</h3>
             <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider w-max mx-auto sm:mx-0">
-              KYC Active
+              {profile?.is_verified === false ? 'KYC Pending' : 'KYC Active'}
             </span>
           </div>
-          <p className="text-xs text-zinc-500 font-mono">{driverPhone} • Hub: Kolkata (KOL)</p>
+          <p className="text-xs text-zinc-500 font-mono">{driverPhone} • Hub: {cityPrefix}</p>
           
           <div className="flex justify-center sm:justify-start gap-4 text-xs font-mono pt-1 text-zinc-400">
             <div>
@@ -60,12 +88,14 @@ export default function DriverProfilePage() {
             <div className="border-r border-zinc-900 h-6"></div>
             <div>
               <span className="text-zinc-600 block text-[9px] uppercase">TOTAL TRIPS</span>
-              <span className="font-bold text-white">412 Jobs</span>
+              <span className="font-bold text-white">{profile?.total_trips ?? 0} Jobs</span>
             </div>
             <div className="border-r border-zinc-900 h-6"></div>
             <div>
-              <span className="text-zinc-600 block text-[9px] uppercase">TIER</span>
-              <span className="font-bold text-emerald-400">Gold Class</span>
+              <span className="text-zinc-600 block text-[9px] uppercase">ACCEPTANCE</span>
+              <span className="font-bold text-emerald-400">
+                {profile ? `${Math.round(profile.acceptance_rate * 100)}%` : '--'}
+              </span>
             </div>
           </div>
         </div>

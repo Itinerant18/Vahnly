@@ -3,10 +3,50 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { TripItem, TRIP_HISTORY } from './tripData';
+import { DriverTrip, getTripHistory } from '@/api/client';
+import { useAuthStore } from '@/store/useAuthStore';
+
+function mapDriverTripToTripItem(trip: DriverTrip): TripItem {
+  const baseFare = trip.base_fare_paise / 100;
+  const quotedFare = (trip.base_fare_paise * trip.surge_multiplier) / 100;
+  const payout = trip.driver_payout_paise > 0 ? trip.driver_payout_paise / 100 : quotedFare;
+  const date = trip.completed_at || trip.assigned_at || '';
+
+  return {
+    id: trip.id,
+    date: date ? new Date(date).toLocaleString() : 'Unscheduled',
+    type: 'CITY',
+    route: `Pickup cell ${trip.pickup_h3_cell}`,
+    fare: payout,
+    status: trip.status,
+    car: 'Assigned vehicle',
+    rider: 'Rider',
+    duration: 0,
+    distance: 0,
+    ratingGiven: 0,
+    ratingReceived: 0,
+    commentReceived: 'Live backend trip record',
+    pickup: `H3 ${trip.pickup_h3_cell}`,
+    dropoff: 'Dropoff location',
+    bill: {
+      base: baseFare,
+      tolls: 0,
+      parking: 0,
+      waiting: 0,
+      surge: Math.max(0, quotedFare - baseFare),
+      deductions: 0,
+      net: payout,
+    },
+  };
+}
 
 export default function DriverTripHistoryPage() {
+  const { token } = useAuthStore();
   const [filterType, setFilterType] = useState<'ALL' | 'CITY' | 'OUTSTATION'>('ALL');
   const [selectedTrip, setSelectedTrip] = useState<TripItem | null>(null);
+  const [liveTrips, setLiveTrips] = useState<TripItem[]>([]);
+  const [liveLoaded, setLiveLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   
   // Replay animation state for the detail view
   const [replayProgress, setReplayProgress] = useState(0);
@@ -25,7 +65,32 @@ export default function DriverTripHistoryPage() {
     };
   }, [selectedTrip, isPlaying]);
 
-  const history = TRIP_HISTORY;
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    getTripHistory(token, 20, 0)
+      .then((data) => {
+        if (!cancelled) {
+          setLiveTrips(data.trips.map(mapDriverTripToTripItem));
+          setLiveLoaded(true);
+          setHistoryError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[DriverTripHistory] Trip history fetch failed:', err);
+          setHistoryError('Live trip history is unavailable.');
+          setLiveLoaded(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const history = liveLoaded ? liveTrips : TRIP_HISTORY;
 
   const filteredHistory = filterType === 'ALL'
     ? history 
@@ -53,6 +118,7 @@ export default function DriverTripHistoryPage() {
           <div>
             <h2 className="text-xl font-bold tracking-tight text-white font-move">Ride Trip History</h2>
             <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Filter past completed matches or inspect audit log details</p>
+            {historyError && <p className="text-red-400 text-[10px] font-mono mt-2">{historyError}</p>}
           </div>
 
           {/* Filter Tabs */}
@@ -106,6 +172,11 @@ export default function DriverTripHistoryPage() {
                 </div>
               </button>
             ))}
+            {filteredHistory.length === 0 && (
+              <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl text-xs text-zinc-500 font-mono">
+                No live trips found for this driver.
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -119,12 +190,14 @@ export default function DriverTripHistoryPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Link
-                href={`/driver-account/trip-history/${selectedTrip.id}`}
-                className="text-xs font-bold uppercase tracking-wider border border-zinc-800 px-4 py-2 rounded-full hover:bg-zinc-900 transition font-mono cursor-pointer"
-              >
-                Open as page ↗
-              </Link>
+              {!liveLoaded && (
+                <Link
+                  href={`/driver-account/trip-history/${selectedTrip.id}`}
+                  className="text-xs font-bold uppercase tracking-wider border border-zinc-800 px-4 py-2 rounded-full hover:bg-zinc-900 transition font-mono cursor-pointer"
+                >
+                  Open as page ↗
+                </Link>
+              )}
               <button
                 onClick={() => setSelectedTrip(null)}
                 className="text-xs font-bold uppercase tracking-wider border border-zinc-800 px-4 py-2 rounded-full hover:bg-zinc-900 transition font-mono cursor-pointer"
