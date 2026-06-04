@@ -83,7 +83,7 @@ func (r *FleetRebalancer) broadcastRepositioningPrompts(ctx context.Context, tar
 	idleCellH3 := "88283082b9fcdef"
 	driverSetKey := fmt.Sprintf("drivers:zset:%s:%s", r.cityPrefix, idleCellH3)
 	
-	drivers, err := r.redisClient.ZRevRange(ctx, driverSetKey, 0, 5).Result()
+	drivers, err := r.redisClient.ZRangeArgs(ctx, redis.ZRangeArgs{Key: driverSetKey, Start: 0, Stop: 5, Rev: true}).Result()
 	if err != nil || len(drivers) == 0 {
 		return
 	}
