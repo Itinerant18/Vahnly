@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { adminRoutes, navItems, navGroups } from './adminRoutes';
 import { AdminAuthGateway } from './components/AdminAuthGateway';
+import { SsoCallback } from './components/SsoCallback';
 import {
   IconDashboard, IconMap, IconTrips, IconRiders, IconDrivers,
   IconVehicles, IconDispatch, IconPricing, IconPromotions,
@@ -97,6 +98,11 @@ export const AdminShell: React.FC = () => {
     // In production: dispatch search to backend
     console.log('[AdminShell] global search:', searchQuery);
   };
+
+  // SSO callback must be handled before the auth gate — it is what establishes auth.
+  if (location.pathname === '/sso-callback') {
+    return <SsoCallback />;
+  }
 
   // Auth gate
   if (!adminToken) {

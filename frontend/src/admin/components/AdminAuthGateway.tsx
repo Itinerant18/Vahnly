@@ -76,6 +76,15 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   const handleSSOLogin = async (provider: string) => {
     setIsLoading(true);
     setStatusMessage(null);
+
+    // Google Workspace uses the real OAuth2 authorization-code flow: hand the
+    // browser to the gateway, which redirects to Google's consent screen and
+    // bounces back to /admin/sso-callback with a signed token.
+    if (provider.toUpperCase() === 'GOOGLE') {
+      window.location.href = `${API_GATEWAY_BASE_URL}/api/v1/admin/auth/sso/google/start`;
+      return;
+    }
+
     const mockSSOId = 'sso-' + provider.toLowerCase() + '-' + Math.random().toString(36).substring(2, 9);
     try {
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/login`, {
