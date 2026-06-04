@@ -74,7 +74,7 @@ func (h *AdminTripHandler) HandleAdminGetOrders(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(orders)
+	_ = json.NewEncoder(w).Encode(orders)
 }
 
 type CancelOrderRequest struct {
@@ -102,7 +102,7 @@ func (h *AdminTripHandler) HandleAdminCancelOrder(w http.ResponseWriter, r *http
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var assignedDriverID *string
 	queryFindDriver := `
@@ -150,5 +150,5 @@ func (h *AdminTripHandler) HandleAdminCancelOrder(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }

@@ -242,7 +242,7 @@ func (h *MarketplaceOrchestratorHandler) HandleGetFraudAnomalies(w http.Response
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"alerts": alerts,
 	})
 }

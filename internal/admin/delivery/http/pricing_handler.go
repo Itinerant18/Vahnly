@@ -78,5 +78,5 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 		matrixKey, multiplierValue, req.DurationMins)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"SURGE_DEFLATION_VALVE_ENGAGED"}`))
+	_, _ = w.Write([]byte(`{"status":"SURGE_DEFLATION_VALVE_ENGAGED"}`))
 }
