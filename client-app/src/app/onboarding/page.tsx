@@ -7,15 +7,17 @@ export default function RiderOnboardingWizard() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [logs, setLogs] = useState<string[]>([]);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
   const [riderData, setOnboardingData] = useState({
-    // Step 1: Personal
+    // Step 1: Personal Profile Matrix
     fullName: '',
     email: '',
     gender: 'Male',
     dob: '',
     profilePhoto: null as string | null,
 
-    // Step 2: Car Details
+    // Step 2: Mechanical Garage Ledger
     carMake: '',
     carModel: '',
     carYear: '2022',
@@ -26,22 +28,23 @@ export default function RiderOnboardingWizard() {
     carColor: '',
     carInsuranceExpiry: '',
 
-    // Step 3: Saved Addresses
+    // Step 3: Saved Locations Framework
     homeAddress: '',
     workAddress: '',
 
-    // Step 4: Emergency Contacts
+    // Step 4: Emergency Contacts (Up to 3 Contacts with labels)
     emergencyContacts: [
-      { name: '', phone: '' },
-      { name: '', phone: '' }
+      { label: 'Family', name: '', phone: '' },
+      { label: 'Spouse', name: '', phone: '' },
+      { label: 'Friend', name: '', phone: '' }
     ],
 
-    // Step 5: Notification Toggles
+    // Step 5: System Communication Preferences
     pushEnabled: true,
     smsEnabled: true,
     emailEnabled: false,
 
-    // Step 6: Location Permission
+    // Step 6: Location Access Consent
     locationPermission: 'WHILE_USING_APP'
   });
 
@@ -73,21 +76,79 @@ export default function RiderOnboardingWizard() {
   };
 
   const nextStep = () => {
+    // Validation gates per step
+    if (currentStep === 1) {
+      if (!riderData.fullName.trim() || !riderData.email.trim()) {
+        setValidationError('Legal Full Name and Email Address are required.');
+        return;
+      }
+      // Simple email validation regex
+      if (!/\S+@\S+\.\S+/.test(riderData.email)) {
+        setValidationError('Please enter a valid email address.');
+        return;
+      }
+    }
+
+    if (currentStep === 2) {
+      // If user inputs ANY garage info, check that they filled out Make, Model, and Plate
+      const hasPartialData = riderData.carMake.trim() || riderData.carModel.trim() || riderData.carPlate.trim();
+      if (hasPartialData) {
+        if (!riderData.carMake.trim() || !riderData.carModel.trim() || !riderData.carPlate.trim()) {
+          setValidationError('Please complete all car details (Make, Model, Plate) or click Skip Step.');
+          return;
+        }
+        
+        // Strict dropdown validation checks
+        const validTypes = ['Hatchback', 'Sedan', 'SUV', 'Premium'];
+        const validTransmissions = ['AUTOMATIC', 'MANUAL'];
+        if (!validTypes.includes(riderData.carType) || !validTransmissions.includes(riderData.carTransmission)) {
+          setValidationError('Invalid vehicle Type or Transmission selected.');
+          return;
+        }
+      }
+    }
+
+    if (currentStep === 4) {
+      // Validate emergency contacts: if filled, check phone length
+      for (const contact of riderData.emergencyContacts) {
+        if (contact.name.trim() || contact.phone.trim()) {
+          if (!contact.name.trim() || contact.phone.trim().length < 8) {
+            setValidationError('Please enter a valid Name and Phone for emergency contacts.');
+            return;
+          }
+        }
+      }
+    }
+
+    setValidationError(null);
     logEvent('STEP_TRANSITION', { from: currentStep, to: currentStep + 1 });
     setCurrentStep((prev) => prev + 1);
   };
 
   const prevStep = () => {
+    setValidationError(null);
     logEvent('STEP_TRANSITION', { from: currentStep, to: currentStep - 1 });
     setCurrentStep((prev) => prev - 1);
   };
 
   const skipStep = () => {
+    setValidationError(null);
     logEvent('STEP_SKIPPED', { step: currentStep });
+    
+    // Clear step 2 values when skipped to prevent invalid parameters from saving
+    if (currentStep === 2) {
+      setOnboardingData((prev) => ({
+        ...prev,
+        carMake: '',
+        carModel: '',
+        carPlate: ''
+      }));
+    }
+    
     setCurrentStep((prev) => prev + 1);
   };
 
-  const handleEmergencyContactChange = (idx: number, key: 'name' | 'phone', val: string) => {
+  const handleEmergencyContactChange = (idx: number, key: 'name' | 'phone' | 'label', val: string) => {
     const updated = [...riderData.emergencyContacts];
     updated[idx] = { ...updated[idx], [key]: val };
     setOnboardingData((prev) => ({ ...prev, emergencyContacts: updated }));
@@ -98,8 +159,13 @@ export default function RiderOnboardingWizard() {
       riderName: riderData.fullName,
       carPlate: riderData.carPlate || 'SKIPPED'
     });
+    
+    // Set onboarding flags in secure local storage
+    localStorage.setItem('rider_onboarding_completed', 'true');
+    localStorage.setItem('rider_profile_name', riderData.fullName);
+    
     alert('Onboarding setup finished! Welcome to the Drivers-For-U ride portal.');
-    router.push('/login?role=rider');
+    router.push('/rider');
   };
 
   return (
@@ -131,10 +197,16 @@ export default function RiderOnboardingWizard() {
       <main className="w-full max-w-2xl mx-auto flex-grow flex items-center justify-center my-6">
         <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-6 sm:p-8 space-y-6 text-left relative overflow-hidden">
           
-          {/* STEP 1: PERSONAL */}
+          {validationError && (
+            <div className="bg-rose-950/30 border border-rose-900 text-rose-350 p-3.5 rounded-xl text-xs font-mono animate-fadeIn">
+              ⚠️ {validationError}
+            </div>
+          )}
+
+          {/* STEP 1: PROFILE MATRIX */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 1 — Personal Information</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 1 — Profile Matrix</h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -186,10 +258,10 @@ export default function RiderOnboardingWizard() {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-2 font-mono">Profile Photo</label>
+                <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-2 font-mono">Profile Image Upload</label>
                 <div className="flex items-center gap-4 bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl">
-                  <div className="h-14 w-14 bg-zinc-850 rounded-xl flex items-center justify-center text-xs font-mono text-zinc-600 border border-zinc-800 shrink-0">
-                    {riderData.profilePhoto ? '✔️ Ready' : 'NO SCAN'}
+                  <div className="h-14 w-14 bg-zinc-850 rounded-xl flex items-center justify-center text-xs font-mono text-zinc-650 border border-zinc-800 shrink-0">
+                    {riderData.profilePhoto ? '✔️ READY' : 'NO SCAN'}
                   </div>
                   <button
                     type="button"
@@ -203,11 +275,11 @@ export default function RiderOnboardingWizard() {
             </div>
           )}
 
-          {/* STEP 2: FIRST CAR */}
+          {/* STEP 2: MECHANICAL GARAGE LEDGER */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-                <h2 className="text-lg font-bold font-move text-white">Step 2 — Add Your Garage Car</h2>
+                <h2 className="text-lg font-bold font-move text-white">Step 2 — Mechanical Garage Ledger</h2>
                 <button
                   onClick={skipStep}
                   className="text-zinc-500 hover:text-white font-mono text-[9px] uppercase font-bold tracking-wider"
@@ -251,16 +323,16 @@ export default function RiderOnboardingWizard() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
                 <div>
-                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Type</label>
+                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Car Type</label>
                   <select
                     value={riderData.carType}
                     onChange={(e) => setOnboardingData({ ...riderData, carType: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-white"
                   >
-                    <option>Hatchback</option>
-                    <option>Sedan</option>
-                    <option>SUV</option>
-                    <option>Premium</option>
+                    <option value="Hatchback">Hatchback</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Premium">Premium</option>
                   </select>
                 </div>
                 <div>
@@ -268,32 +340,32 @@ export default function RiderOnboardingWizard() {
                   <select
                     value={riderData.carTransmission}
                     onChange={(e) => setOnboardingData({ ...riderData, carTransmission: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-white"
                   >
-                    <option>AUTOMATIC</option>
-                    <option>MANUAL</option>
+                    <option value="AUTOMATIC">AUTOMATIC</option>
+                    <option value="MANUAL">MANUAL</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Fuel Type</label>
+                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Fuel Class</label>
                   <select
                     value={riderData.carFuel}
                     onChange={(e) => setOnboardingData({ ...riderData, carFuel: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-white"
                   >
-                    <option>Petrol</option>
-                    <option>Diesel</option>
-                    <option>EV</option>
-                    <option>CNG</option>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Diesel">Diesel</option>
+                    <option value="EV">EV</option>
+                    <option value="CNG">CNG</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Color</label>
+                  <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1">Car Color</label>
                   <input
                     type="text"
                     value={riderData.carColor}
                     onChange={(e) => setOnboardingData({ ...riderData, carColor: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-white"
                     placeholder="e.g. Silver"
                   />
                 </div>
@@ -301,64 +373,77 @@ export default function RiderOnboardingWizard() {
             </div>
           )}
 
-          {/* STEP 3: HOME & WORK ADDRESSES */}
+          {/* STEP 3: SAVED LOCATIONS */}
           {currentStep === 3 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 3 — Favorite Addresses</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 3 — Saved Locations</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">🏠 Home Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">🏠 Residential Home Address</label>
                   <input
                     type="text"
                     value={riderData.homeAddress}
                     onChange={(e) => setOnboardingData({ ...riderData, homeAddress: e.target.value })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none"
-                    placeholder="Enter home location address"
+                    placeholder="Enter Residential home address..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">🏢 Work Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">🏢 Professional Work Address</label>
                   <input
                     type="text"
                     value={riderData.workAddress}
                     onChange={(e) => setOnboardingData({ ...riderData, workAddress: e.target.value })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none"
-                    placeholder="Enter office location address"
+                    placeholder="Enter Professional office address..."
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 4: EMERGENCY CONTACTS */}
+          {/* STEP 4: EMERGENCY RING CONFIGURATION */}
           {currentStep === 4 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 4 — Emergency Contacts (Up to 3)</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 4 — Emergency Ring Configurations (Up to 3)</h2>
               <p className="text-[10px] text-zinc-500 font-mono leading-relaxed">
-                Emergency contacts will receive instant SMS alerts containing coordinates when the SOS button is triggered.
+                Provide up to 3 contacts. They will receive automated notifications when the SOS emergency alarm triggers.
               </p>
 
               <div className="space-y-4 pt-2">
-                {[0, 1].map((idx) => (
-                  <div key={idx} className="grid grid-cols-2 gap-4 bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl">
+                {riderData.emergencyContacts.map((contact, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-3 bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl items-center">
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1 font-mono">Contact Name</label>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Contact Label</label>
+                      <select
+                        value={contact.label}
+                        onChange={(e) => handleEmergencyContactChange(idx, 'label', e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-xs focus:outline-none text-white font-mono"
+                      >
+                        <option value="Family">Family</option>
+                        <option value="Spouse">Spouse</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Colleague">Colleague</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Full Name</label>
                       <input
                         type="text"
-                        value={riderData.emergencyContacts[idx].name}
+                        value={contact.name}
                         onChange={(e) => handleEmergencyContactChange(idx, 'name', e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-xs focus:outline-none"
-                        placeholder="Name"
+                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-xs focus:outline-none text-white"
+                        placeholder="Sarah Connor"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-zinc-500 mb-1 font-mono">Phone Number</label>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Phone Number</label>
                       <input
                         type="tel"
-                        value={riderData.emergencyContacts[idx].phone}
+                        value={contact.phone}
                         onChange={(e) => handleEmergencyContactChange(idx, 'phone', e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-xs focus:outline-none font-mono"
+                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-xs focus:outline-none text-white font-mono"
                         placeholder="+91 99999 88888"
                       />
                     </div>
@@ -368,7 +453,7 @@ export default function RiderOnboardingWizard() {
             </div>
           )}
 
-          {/* STEP 5: NOTIFICATIONS */}
+          {/* STEP 5: PREFERENCES */}
           {currentStep === 5 && (
             <div className="space-y-4 animate-fadeIn">
               <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 5 — Communication Preferences</h2>
@@ -410,7 +495,7 @@ export default function RiderOnboardingWizard() {
             </div>
           )}
 
-          {/* STEP 6: LOCATION */}
+          {/* STEP 6: LOCATION ACCESS */}
           {currentStep === 6 && (
             <div className="space-y-4 animate-fadeIn">
               <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 6 — Platform Location Permissions</h2>
@@ -418,7 +503,7 @@ export default function RiderOnboardingWizard() {
               <div className="space-y-4 text-center py-6 font-sans">
                 <span className="text-4xl block">📍</span>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                  To trace pickup hubs, show nearby drivers, and secure active route timelines, we request location credentials.
+                  Location data is required to route active trip coordinates, estimate driver ETAs, and enable public share tracking streams.
                 </p>
 
                 <div className="flex flex-col gap-2 max-w-xs mx-auto pt-4">
@@ -427,7 +512,7 @@ export default function RiderOnboardingWizard() {
                     onClick={() => {
                       setOnboardingData({ ...riderData, locationPermission: 'ALWAYS' });
                       logEvent('LOCATION_PERMISSION_GRANTED', { scope: 'ALWAYS' });
-                      alert('Location Permission (Always) Mock granted successfully.');
+                      alert('Location permission set: ALWAYS ALLOW.');
                     }}
                     className={`py-3 text-xs font-bold uppercase rounded-xl border transition cursor-pointer ${
                       riderData.locationPermission === 'ALWAYS' 
@@ -435,7 +520,7 @@ export default function RiderOnboardingWizard() {
                         : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
                     }`}
                   >
-                    Allow Always (Recommended)
+                    Always Allow (Recommended)
                   </button>
                   
                   <button
@@ -443,7 +528,7 @@ export default function RiderOnboardingWizard() {
                     onClick={() => {
                       setOnboardingData({ ...riderData, locationPermission: 'WHILE_USING_APP' });
                       logEvent('LOCATION_PERMISSION_GRANTED', { scope: 'WHILE_USING_APP' });
-                      alert('Location Permission (While using app) Mock granted.');
+                      alert('Location permission set: WHILE USING APP.');
                     }}
                     className={`py-2.5 text-xs font-bold uppercase rounded-xl border transition cursor-pointer ${
                       riderData.locationPermission === 'WHILE_USING_APP' 
@@ -458,13 +543,13 @@ export default function RiderOnboardingWizard() {
             </div>
           )}
 
-          {/* Stepper Navigation */}
+          {/* Stepper Navigation Buttons */}
           <div className="flex justify-between items-center border-t border-zinc-900 pt-6">
             <button
               onClick={prevStep}
               disabled={currentStep === 1}
               type="button"
-              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
             >
               Back
             </button>
@@ -473,7 +558,7 @@ export default function RiderOnboardingWizard() {
               <button
                 onClick={nextStep}
                 type="button"
-                className="bg-white hover:bg-zinc-200 text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95"
+                className="bg-white hover:bg-zinc-200 text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer"
               >
                 Next
               </button>
@@ -481,7 +566,7 @@ export default function RiderOnboardingWizard() {
               <button
                 onClick={handleOnboardingFinish}
                 type="button"
-                className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono cursor-pointer"
               >
                 Complete Setup
               </button>
@@ -503,7 +588,7 @@ export default function RiderOnboardingWizard() {
         </div>
       )}
 
-      <footer className="w-full max-w-2xl mx-auto text-left flex justify-between items-center text-[9px] text-zinc-600 font-mono pt-4 mt-6 border-t border-zinc-900">
+      <footer className="w-full max-w-2xl mx-auto text-left flex justify-between items-center text-[9px] text-zinc-650 font-mono pt-4 mt-6 border-t border-zinc-900">
         <span>SECURITY: RIDER_ONBOARD_ENCRYPT</span>
         <span>HUB: KOLKATA / BANGALORE</span>
       </footer>
