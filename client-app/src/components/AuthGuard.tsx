@@ -9,27 +9,27 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
   const pathname = usePathname();
 
   useEffect(() => {
-    // Bypass auth gates if the user is already loading the login screen
-    if (pathname === '/driver/login' || pathname === '/rider/login') {
+    // Bypass auth gates if the user is already loading the login or onboarding screens
+    if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/driver/login' || pathname === '/rider/login') {
       return;
     }
 
-    // If not authenticated, kick back to the respective login screen
+    // If not authenticated, kick back to the unified login screen with the role pre-selected
     if (!isAuthenticated) {
-      const loginRoute = allowedRole === 'DRIVER' ? '/driver/login' : '/rider/login';
+      const loginRoute = allowedRole === 'DRIVER' ? '/login?role=driver' : '/login?role=rider';
       router.push(loginRoute);
       return;
     }
 
     // Role-based access control (RBAC) at the edge
     if (user?.role !== allowedRole) {
-      const fallbackRoute = allowedRole === 'DRIVER' ? '/driver/login' : '/rider/login';
+      const fallbackRoute = allowedRole === 'DRIVER' ? '/login?role=driver' : '/login?role=rider';
       router.push(fallbackRoute);
     }
   }, [isAuthenticated, user, router, allowedRole, pathname]);
 
-  // Bypass visual overlay for login screens
-  if (pathname === '/driver/login' || pathname === '/rider/login') {
+  // Bypass visual overlay for login and onboarding screens
+  if (pathname === '/login' || pathname === '/driver-onboarding' || pathname === '/driver/login' || pathname === '/rider/login') {
     return <>{children}</>;
   }
 

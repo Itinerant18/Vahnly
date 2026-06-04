@@ -1,0 +1,154 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import AuthGuard from '../../components/AuthGuard';
+import { useAuthStore } from '@/store/useAuthStore';
+
+export default function DriverAccountLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const driverName = user?.name || 'Aniket Karmakar';
+  const driverID = user?.id || 'drv-aniket-7602';
+
+  const menuItems = [
+    { label: 'Dashboard Home', href: '/driver', icon: '📱' },
+    { label: 'My Profile', href: '/driver-account/profile', icon: '👤' },
+    { label: 'Earnings Summary', href: '/driver-account/earnings', icon: '₹' },
+    { label: 'Instant Payouts', href: '/driver-account/payouts', icon: '💳' },
+    { label: 'Trip History', href: '/driver-account/trip-history', icon: '📁' },
+    { label: 'Incentives & Quests', href: '/driver-account/incentives', icon: '🏆' },
+    { label: 'Vehicle Records', href: '/driver-account/vehicles', icon: '🚗' },
+    { label: 'Performance Analytics', href: '/driver-account/performance', icon: '📊' },
+    { label: 'Platform Wallet', href: '/driver-account/wallet', icon: '💼' },
+    { label: 'Notifications Inbox', href: '/driver-account/notifications', icon: '🔔' },
+    { label: 'Training Academy', href: '/driver-account/training', icon: '🎓' },
+    { label: 'Refer a Friend', href: '/driver-account/refer', icon: '🎁' },
+    { label: 'System Settings', href: '/driver-account/settings', icon: '⚙️' },
+    { label: 'Support & FAQs', href: '/driver-account/support', icon: '💬' }
+  ];
+
+  return (
+    <AuthGuard allowedRole="DRIVER">
+      <div className="min-h-screen bg-black text-white font-sans flex flex-col md:flex-row relative">
+        
+        {/* 1. LEFT SIDEBAR FOR DESKTOP SCREEN RESOLUTIONS */}
+        <aside className="hidden md:flex md:w-72 bg-zinc-950 border-r border-zinc-900 flex-col justify-between p-6 shrink-0 text-left h-screen sticky top-0">
+          <div className="overflow-y-auto space-y-6 scrollbar-thin pr-1">
+            {/* Logo */}
+            <div className="pb-4 border-b border-zinc-900">
+              <h2 className="text-sm font-extrabold tracking-widest font-mono text-white">DRIVERS-FOR-U</h2>
+              <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-widest">Core Account Hub</span>
+            </div>
+
+            {/* Profile recap */}
+            <div className="flex items-center gap-3 bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
+              <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs">
+                👤
+              </div>
+              <div className="truncate">
+                <h4 className="text-xs font-bold text-white truncate">{driverName}</h4>
+                <span className="text-[9px] font-mono text-zinc-500 block truncate">{driverID.toUpperCase()}</span>
+              </div>
+            </div>
+
+            {/* Nav lists */}
+            <nav className="space-y-1">
+              {menuItems.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent hover:border-zinc-850 transition-all font-mono uppercase tracking-wider"
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div className="border-t border-zinc-900 pt-4 mt-4">
+            <button
+              onClick={() => {
+                useAuthStore.getState().logout();
+                window.location.href = '/login';
+              }}
+              className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-zinc-800 cursor-pointer"
+            >
+              🚪 Terminate Session
+            </button>
+          </div>
+        </aside>
+
+        {/* 2. RESPONSIVE MOBILE TOP NAVIGATION HEADER BAR */}
+        <div className="md:hidden bg-zinc-950 border-b border-zinc-900 p-4 flex justify-between items-center w-full sticky top-0 z-50">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="h-8 w-8 bg-zinc-900 rounded-lg border border-zinc-850 flex items-center justify-center text-sm cursor-pointer"
+            >
+              ☰
+            </button>
+            <h2 className="text-xs font-bold font-mono tracking-widest text-white">CORE ACCT HUB</h2>
+          </div>
+
+          <Link href="/driver" className="text-[9px] font-mono font-bold uppercase tracking-wider border border-zinc-800 px-3 py-1.5 rounded-full hover:bg-zinc-900 transition">
+            ← Duty Console
+          </Link>
+        </div>
+
+        {/* 3. MOBILE MENU SIDE DRAWER POPUP */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="w-72 bg-zinc-950 border-r border-zinc-900 h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
+              <div className="overflow-y-auto space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+                  <h2 className="text-xs font-bold font-mono text-white">ACCOUNTS</h2>
+                  <button 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs text-zinc-500 font-bold font-mono"
+                  >
+                    CLOSE
+                  </button>
+                </div>
+
+                <nav className="space-y-1">
+                  {menuItems.map((item) => (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all font-mono uppercase tracking-wider"
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              <div className="border-t border-zinc-900 pt-4">
+                <button
+                  onClick={() => {
+                    useAuthStore.getState().logout();
+                    window.location.href = '/login';
+                  }}
+                  className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-500 hover:text-white border border-zinc-800 rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
+                >
+                  🚪 Logout
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 cursor-pointer" onClick={() => setMobileMenuOpen(false)} />
+          </div>
+        )}
+
+        {/* 4. MAIN CENTRAL CONTENT AREA PANEL */}
+        <main className="flex-1 p-4 sm:p-8 overflow-y-auto h-screen max-w-4xl mx-auto w-full">
+          {children}
+        </main>
+
+      </div>
+    </AuthGuard>
+  );
+}

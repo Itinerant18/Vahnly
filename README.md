@@ -501,6 +501,388 @@ All 34 currently-completed milestones:
 | 33 | System Administrator Authorization Tier & Relational Database Seeding |
 | 34 | Dynamic Geofencing & Operational Zone Management, Algorithmic Force-Match, & Telemetry Fraud Risk Isolation Radar (Marketplace Orchestrator) |
 
+## Driver Partner App Blueprint
+
+This section captures the full driver-side product surface for mobile and
+backend developers. Treat implemented items as current behavior and unwired
+items as requirements for future tickets.
+
+### 1. App Entry & Authentication
+
+#### 1.1 Splash / Launch Screen
+
+- Show logo and tagline: `Drive with [Brand]`.
+- Auto-check auth token, KYC status, online/offline state, app version.
+- Route to `/login` or `/driver` based on auth and driver state.
+
+#### 1.2 Login / Signup
+
+Route: `/login`
+
+- Driver mode toggle.
+- Fields: phone number, OTP, optional email fallback, password.
+- Buttons: `Send OTP`, `Login`, `Sign up as Driver`, `Continue with Google`.
+- Logs captured: login timestamp, device ID, IP, app version, geo-location.
+
+#### 1.3 Driver Registration Flow
+
+Route: `/driver-onboarding`
+
+- Step 1, Personal: full name, DOB, gender, profile photo, languages spoken.
+- Step 2, Address: permanent address, current address, city of operation.
+- Step 3, Documents: driving license front/back, Aadhaar or ID, PAN, police verification certificate, address proof.
+- Step 4, Vehicle Expertise: manual, automatic, both, years of experience.
+- Step 5, Bank Details: account number, IFSC, holder name, UPI ID, cancelled cheque upload.
+- Step 6, Emergency Contact: name, relation, phone.
+- Step 7, Agreement: terms, privacy, partner agreement, digital signature.
+- Step 8, Training Quiz: safety and etiquette quiz, pass required.
+- Buttons per step: `Upload`, `Next`, `Back`, `Save & Exit`, `Submit for Verification`.
+- Logs captured: each document upload timestamp, verification status changes, admin reviewer ID.
+
+### 2. Driver Home / Duty Dashboard
+
+Route: `/driver`
+
+#### 2.1 Top Bar
+
+- Hamburger menu opens the driver drawer.
+- Driver name, photo, and rating.
+- Connection state indicator: `CONNECTED` or `RECONNECTING`.
+- Notification bell with unread count.
+- SOS button always visible in red.
+
+#### 2.2 Center Map View
+
+- Stylized live map with driver's current location pin.
+- High-demand zone heatmap.
+- Nearby drivers as ambient map context.
+- Pickup and drop pins when on trip.
+
+#### 2.3 Bottom Duty Pane
+
+- Large `Go Online` / `Go Offline` toggle.
+- Today's snapshot: trips count, earnings, online hours, acceptance rate.
+- `Simulate incoming booking (demo)` button with bell icon.
+- Quick links: Earnings, Profile, Support, Payouts.
+- Heatmap legend toggle.
+- Vehicle selector for multi-vehicle drivers.
+- Preferred trip type filter: City, Outstation, Both.
+
+#### 2.4 Home Screen States
+
+- `OFFLINE`: greyed map and only `Go Online` call to action.
+- `ONLINE_IDLE`: searching animation and heatmap visible.
+- `OFFER_PENDING`: incoming booking popup.
+- `MATCHED_EN_ROUTE_TO_PICKUP`: navigation pane.
+- `ARRIVED_AT_PICKUP`: OTP capture pane.
+- `DELIVERING`: trip-in-progress pane.
+- `COMPLETED`: final bill pane.
+
+### 3. Incoming Booking Popup
+
+State: `OFFER_PENDING`
+
+- Modal sheet over `/driver`.
+- 15-second countdown ring.
+- Rider name and rating.
+- Pickup distance and pickup ETA.
+- Pickup address and drop address.
+- Trip type: In-city Round, One-way, Mini-outstation, Outstation.
+- Car type requested and transmission required.
+- Estimated fare, estimated distance, estimated duration.
+- D4M Care badge when rider opted in.
+- Special notes from rider, including luggage, pets, and other constraints.
+- Buttons: `Accept` as green slide-to-accept, `Decline` as grey secondary action.
+- Decline behavior: 30-second cooldown and reason picker.
+- Decline reasons: Too far, Break, Vehicle issue, Other.
+- Logs captured: offer received timestamp, accepted/declined timestamp, decline reason, response latency.
+
+### 4. En Route to Pickup
+
+Pane on route: `/driver`
+
+- Turn-by-turn navigation through Google Maps or Mapbox.
+- Rider card: name, photo, rating, masked phone, in-app chat.
+- Buttons: `Call rider`, `Chat`, `Navigate (open Maps)`, `I've arrived`, `Cancel trip`.
+- Cancel reasons: Rider no-show, Wrong address, Vehicle breakdown, Safety, Other.
+- Live ETA shared with rider.
+- Logs captured: route polyline, GPS pings every 5 seconds, time-to-arrive.
+
+### 5. Arrived at Pickup
+
+- Auto-send `Arrived` notification to rider.
+- Start 5-minute free wait timer.
+- After free wait, start waiting charge at INR 2 per minute.
+- Mandatory speedometer capture: start KM odometer reading, fuel level from 0 to 100 percent or E/F gauge.
+- Optional recommended capture: dashboard photo.
+- Ride OTP entry: 4-digit OTP from rider to verify passenger.
+- Buttons: `Verify OTP & Start Trip`, `Report no-show`.
+- Logs captured: arrival timestamp, wait minutes, start KM, fuel percent, OTP attempts.
+
+### 6. Trip In Progress
+
+State: `DELIVERING`
+
+- Live map with route and driver position glide animation.
+- Trip timer in `HH:MM:SS` format.
+- Distance counter.
+- Collapsible rider info card.
+- Buttons: `Navigate`, `Call rider`, `Add stop`, `Report issue`, `SOS`, `Slide to End Trip`.
+- Mid-trip events: toll added, parking added, waiting added.
+- Logs captured: GPS trail, speed samples, idle time, route deviations.
+
+### 7. End Trip & Final Bill
+
+#### 7.1 End Trip Dialog
+
+- Dialog title: `End this trip?`
+- Buttons: `Keep driving`, `Yes, end trip`.
+
+#### 7.2 End Speedometer Capture
+
+- End KM.
+- End fuel percent.
+- Dashboard photo.
+
+#### 7.3 Final Bill Screen
+
+- Package base, for example `INR 800 / 8h / 100km`.
+- Extra KM rate.
+- Overtime hours and rate, for example `INR 50`.
+- Night charge, for example `INR 50` or `INR 100`.
+- Waiting charge.
+- Toll, parking, surge.
+- D4M Care fee.
+- Total amount.
+- Payment method display: Cash, UPI, Card, Wallet.
+- Buttons: `Mark paid (Cash)`, `Confirm UPI received`, `Send payment link`, `Request rider rating`.
+
+#### 7.4 Post-Trip
+
+- Rate the rider from 1 to 5.
+- Rider rating tags: polite, on-time, and related tags.
+- Tip received display.
+- Buttons: `Go back online`, `Take a break`.
+
+### 8. Driver Account
+
+Route group: `/driver-account`
+
+Layout: sidebar or tabs.
+
+#### 8.1 Profile
+
+Route: `/driver-account/profile`
+
+- Photo, name, rating, total trips.
+- Bio editor.
+- Transmission expertise badges.
+- KYC document list with statuses: Verified, Pending, Missing.
+- `Upload new document` button.
+- Languages, vehicle list, service cities.
+
+#### 8.2 Earnings
+
+Route: `/driver-account/earnings`
+
+- Range selector: Today, Week, Month, Custom.
+- Gross earnings card.
+- Breakdown: trips, tips, bonuses, incentives, deductions, commission, GST.
+- Net payout.
+- Recent trips list with time, from/to, amount.
+- Download statement as PDF or CSV.
+- Annual tax summary.
+
+#### 8.3 Payouts
+
+Route: `/driver-account/payouts`
+
+- Available balance.
+- Linked bank account with change action.
+- UPI ID.
+- Withdraw amount input and `MAX` shortcut.
+- `Request payout` button for instant or next-day payout.
+- Payout history list.
+- Auto-payout schedule toggle.
+
+#### 8.4 Support
+
+Route: `/driver-account/support`
+
+- FAQ accordion.
+- Live chat with support.
+- Raise ticket form with category, description, attachment.
+- Emergency hotline one-tap call.
+- Ticket history with status.
+
+#### 8.5 Trip History
+
+Route: `/driver-account/trip-history`
+
+- Filterable list of all trips.
+- Per trip: map replay, fare breakdown, rider rating given/received, dispute button.
+
+#### 8.6 Incentives & Bonuses
+
+Route: `/driver-account/incentives`
+
+- Active quests, for example `Complete 10 trips - INR 500`.
+- Progress bars.
+- Surge zones map.
+- Referral program.
+
+#### 8.7 Vehicle Management
+
+Route: `/driver-account/vehicles`
+
+- Vehicle list with make, model, plate, RC, insurance, PUC.
+- Document expiry alerts.
+- Add/remove vehicle.
+
+#### 8.8 Performance / Ratings
+
+Route: `/driver-account/performance`
+
+- Overall rating, acceptance rate, cancellation rate, completion rate.
+- Compliments breakdown.
+- Recent rider reviews.
+- Tier badge: Bronze, Silver, Gold, Platinum.
+- Tier perks.
+
+#### 8.9 Settings
+
+Route: `/driver-account/settings`
+
+- Language.
+- Notifications.
+- Ride preferences.
+- Default navigation app.
+- Dark mode.
+- Biometric login.
+- Change password.
+- Logout.
+- Delete account.
+
+#### 8.10 Wallet
+
+Route: `/driver-account/wallet`
+
+- In-app wallet balance for tolls, fuel cards, and related expenses.
+- Add money.
+- Transaction history.
+
+#### 8.11 Training & Certifications
+
+Route: `/driver-account/training`
+
+- Modules: safety, etiquette, EV, premium-car.
+- Quiz scores.
+- Certificates earned.
+
+### 9. Notifications Center
+
+Route: `/driver-account/notifications`
+
+- Tabs: All, Trips, Earnings, Promotions, System.
+- Mark all read.
+- Swipe to dismiss.
+- Logs captured: push delivery, open, action taken.
+
+### 10. Hamburger Drawer Navigation
+
+Drawer order:
+
+```text
+Profile
+Go Online toggle
+Trip History
+Earnings
+Payouts
+Incentives
+Vehicle
+Performance
+Wallet
+Notifications
+Support
+Training
+Refer a friend
+Settings
+Logout
+```
+
+### 11. Safety & Emergency
+
+- SOS button always visible.
+- SOS action: call 112, alert support, share live location with emergency contact.
+- Trip share link auto-generated for every ride.
+- Optional dashcam integration.
+- Fatigue monitor: after 10 continuous hours, enforce a mandatory 6-hour break.
+- Women-driver safety mode with night-time geofencing alerts.
+
+### 12. Suggested Additional Features
+
+1. Fuel and maintenance tracker: log refuels and service reminders by KM.
+2. Smart heatmap predictions: AI-driven `go here in 15 min` guidance.
+3. Voice-controlled accept/decline for hands-free safety.
+4. Co-driver mode for long outstation trips.
+5. Offline mode caching so a trip can continue if the network drops.
+6. Earnings goal tracker with daily target and progress ring.
+7. Insurance and claims in-app filing.
+8. Driver community/forum for peer chat.
+9. EV-specific features: charging-station map and battery percentage.
+10. Multi-language voice navigation.
+11. Pet, luggage, and wheelchair acknowledgement before accept.
+12. Daily pre-trip vehicle inspection checklist.
+13. Auto-tax estimator for GST/TDS monthly planning.
+14. Loyalty redemption store for tyres and service discounts.
+15. Geofenced auto-online when entering a city.
+16. Driver-to-driver tip jar and SOS mesh for nearby driver alerts.
+17. In-app fuel-card and toll-tag top-up.
+18. Trip replay video combining dashcam and map.
+19. Auto-cancel protection with compensation if rider cancels late.
+20. Health and insurance perks dashboard.
+
+### 13. Per-Trip Audit Trail
+
+- Offer timestamps: received, accepted/declined, reason.
+- Driver GPS trail: lat, lng, speed, heading every 5 seconds.
+- KM start/end.
+- Fuel start/end.
+- Dashboard photos.
+- OTP attempts.
+- Wait time.
+- Idle time.
+- Route deviations.
+- Fare breakdown components.
+- Payment method and confirmation.
+- Ratings exchanged.
+- Cancellations and reason.
+- Device, app version, network type, battery percent.
+
+### 14. Complete Route Map
+
+```text
+/login
+/driver-onboarding
+/driver
+/driver-account
+/driver-account/profile
+/driver-account/earnings
+/driver-account/payouts
+/driver-account/support
+/driver-account/trip-history
+/driver-account/trip-history/$tripId
+/driver-account/incentives
+/driver-account/vehicles
+/driver-account/performance
+/driver-account/wallet
+/driver-account/notifications
+/driver-account/settings
+/driver-account/training
+/driver-account/refer
+/sos
+```
+
 ## Wiring Risks (current)
 
 | Risk | Why it matters |
