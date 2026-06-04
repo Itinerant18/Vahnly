@@ -10,6 +10,32 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState('Initializing Secure Access...');
 
   useEffect(() => {
+    // 0. Setup Deep Linking and Universal Links routing listeners
+    if (typeof window !== 'undefined') {
+      const handleDeepLink = (url: string) => {
+        if (url.includes('/share') || url.includes('driversforu://')) {
+          const match = url.match(/[?&]tripId=([^&]+)/);
+          if (match && match[1]) {
+            router.push(`/share?tripId=${encodeURIComponent(match[1])}`);
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // Listening via global window Capacitor object to avoid package import issues
+      const Cap = (window as any).Capacitor;
+      if (Cap && Cap.Plugins && Cap.Plugins.App) {
+        Cap.Plugins.App.addListener('appUrlOpen', (event: any) => {
+          handleDeepLink(event.url);
+        });
+      }
+
+      if (handleDeepLink(window.location.href)) {
+        return; // Skip normal onboarding checks if routed by deep link
+      }
+    }
+
     const runBootstrapping = async () => {
       // 1. App Launch Delay (Bootstrapping phase)
       await new Promise(resolve => setTimeout(resolve, 1500));

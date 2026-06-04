@@ -714,9 +714,6 @@ export default function RiderDashboardPage() {
   // Commit dispatch orders with cryptographic X-Idempotency-Key
   const handleDispatchTrigger = async () => {
     const baseFarePaise = estimatedFare * 100;
-    let orderId = '';
-    
-    // Generate unique local UUID token for transaction deduplication fingerprinting
     const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : 'idemp-' + Math.random().toString(36).substring(2, 15);
 
     let h3Cell = '863cf1007ffffff';
@@ -724,47 +721,9 @@ export default function RiderDashboardPage() {
       h3Cell = latLngToCell(pickupCoords.lat, pickupCoords.lng, 8);
     } catch (e) {}
 
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Region-Prefix': 'KOL',
-        'X-Idempotency-Key': idempotencyKey
-      };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/orders`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          city_prefix: 'KOL',
-          customer_id: user?.id || 'usr-mock-11',
-          pickup_h3_cell: h3Cell,
-          pickup_lat: pickupCoords.lat,
-          pickup_lng: pickupCoords.lng,
-          pickup_osm_node_id: 123456,
-          dropoff_lat: dropoffCoords?.lat || pickupCoords.lat,
-          dropoff_lng: dropoffCoords?.lng || pickupCoords.lng,
-          base_fare_paise: baseFarePaise
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        orderId = data.id || data.order_id;
-        console.log('Order verified and submitted with token fingerprinting:', orderId);
-      } else {
-        console.warn('Dispatch order transaction returned gateway rejection code:', res.status);
-      }
-    } catch (err) {
-      console.error('Network failure executing dispatch connection:', err);
-    }
-
-    if (!orderId) {
-      orderId = 'ord-sandbox-' + Math.random().toString(36).substring(2, 10);
-    }
-
+    const optimisticOrderId = 'ord-opt-' + Math.random().toString(36).substring(2, 10);
     const bookingDetails = {
-      orderId,
+      orderId: optimisticOrderId,
       tripType,
       pickup: pickupText,
       dropoff: dropoffText,
@@ -778,8 +737,61 @@ export default function RiderDashboardPage() {
       payment: paymentMethod,
       fare: estimatedFare
     };
+
+    // Save specifications and transition immediately
     sessionStorage.setItem('current_booking_specs', JSON.stringify(bookingDetails));
-    router.push(`/rider/dispatch?orderId=${orderId}`);
+    router.push(`/rider/dispatch?orderId=${optimisticOrderId}`);
+
+    // Asynchronous background retry ingestion loop with exponential backoff
+    const dispatchOrderBackground = async (attempt = 1) => {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'X-Region-Prefix': 'KOL',
+          'X-Idempotency-Key': idempotencyKey
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/orders`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            city_prefix: 'KOL',
+            customer_id: user?.id || 'usr-mock-11',
+            pickup_h3_cell: h3Cell,
+            pickup_lat: pickupCoords.lat,
+            pickup_lng: pickupCoords.lng,
+            pickup_osm_node_id: 123456,
+            dropoff_lat: dropoffCoords?.lat || pickupCoords.lat,
+            dropoff_lng: dropoffCoords?.lng || pickupCoords.lng,
+            base_fare_paise: baseFarePaise
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Gateway returned error status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const realOrderId = data.id || data.order_id;
+        console.log('[OPTIMISTIC_UI] Background order successfully created:', realOrderId);
+        
+        // Update specs with real ID
+        bookingDetails.orderId = realOrderId;
+        sessionStorage.setItem('current_booking_specs', JSON.stringify(bookingDetails));
+      } catch (err) {
+        console.warn(`[OPTIMISTIC_UI] Background dispatch attempt ${attempt} failed:`, err);
+        if (attempt < 4) {
+          const delay = Math.pow(2, attempt) * 1000;
+          setTimeout(() => dispatchOrderBackground(attempt + 1), delay);
+        } else {
+          // Trigger error modal / alert to rider
+          alert('🚨 ORDER CREATION ERROR: Network failure after 4 attempts. Please check cellular connectivity.');
+        }
+      }
+    };
+
+    dispatchOrderBackground();
   };
 
   const handleSliderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {

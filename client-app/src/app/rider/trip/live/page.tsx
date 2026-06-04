@@ -461,6 +461,54 @@ function LiveTripContent() {
     };
   }, [mapCenter, mapZoom, pickupCoords, dropoffCoords, driverCoords, stops, tripStatus]);
 
+  // Listen for network connectivity to flush sync queue
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      console.log('[OfflineSync] Client connection is back online. Flushing queues...');
+      flushSyncQueue();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [token, tripId, dropoffCoords, stops]);
+
+  const flushSyncQueue = async () => {
+    const queueStr = localStorage.getItem('trip_mutation_sync_queue');
+    if (!queueStr) return;
+    try {
+      const queue = JSON.parse(queueStr);
+      if (queue.length === 0) return;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Region-Prefix': 'KOL'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const lastMutation = queue[queue.length - 1];
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/orders/${tripId}/route`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(lastMutation)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.calculated_fare_paise) {
+          setEstimatedFare(data.calculated_fare_paise / 100);
+        }
+        localStorage.removeItem('trip_mutation_sync_queue');
+        console.log('[OfflineSync] Mutation queue successfully synchronized with PostGIS gateway.');
+      }
+    } catch (e) {
+      console.warn('[OfflineSync] Flush sync failed, retaining queue:', e);
+    }
+  };
+
   // Debounced patch route mutators handshake
   useEffect(() => {
     if (tripStatus !== 'IN_TRANSIT') return;
@@ -473,6 +521,22 @@ function LiveTripContent() {
   }, [dropoffText, stops]);
 
   const mutateRouteOnBackend = async () => {
+    const payload = {
+      dropoff_lat: dropoffCoords.lat,
+      dropoff_lng: dropoffCoords.lng,
+      stops: stops
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.warn('[OfflineMode] Client is offline. Queueing route mutation for background sync.');
+      const queue = JSON.parse(localStorage.getItem('trip_mutation_sync_queue') || '[]');
+      queue.push(payload);
+      localStorage.setItem('trip_mutation_sync_queue', JSON.stringify(queue));
+      // Local optimistic pricing update:
+      setEstimatedFare((prev) => prev + (stops.length * 150));
+      return;
+    }
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -483,11 +547,7 @@ function LiveTripContent() {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/orders/${tripId}/route`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({
-          dropoff_lat: dropoffCoords.lat,
-          dropoff_lng: dropoffCoords.lng,
-          stops: stops
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -496,9 +556,14 @@ function LiveTripContent() {
           setEstimatedFare(data.calculated_fare_paise / 100);
         }
         console.log('[MutationEngine] Mid-trip route updated, estimated cost synced:', data);
+      } else {
+        throw new Error('Gateway rejected mutation request');
       }
     } catch (e) {
-      console.warn('Backend PATCH route failed, using offline pricing updates:', e);
+      console.warn('Backend PATCH route failed, queueing for background sync:', e);
+      const queue = JSON.parse(localStorage.getItem('trip_mutation_sync_queue') || '[]');
+      queue.push(payload);
+      localStorage.setItem('trip_mutation_sync_queue', JSON.stringify(queue));
     }
   };
 
@@ -513,14 +578,28 @@ function LiveTripContent() {
   };
 
   const handleSOS = async () => {
-    alert('🚨 SAFETY EMERGENCY SIGNAL BROADCASTED. Distress locations shared with local authorities, support logs and emergency contacts.');
+    alert('🚨 EMERGENCY DISTRESS MODE ACTIVATED. Automatically dialing 112 emergency and broadcasting live coordinates to dispatch support and safety networks.');
+    
+    // 1. Initiate emergency dialer intent
+    window.location.href = 'tel:112';
+
+    // 2. Broadcast telemetry coordinates to Go backend
     try {
-      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/payments/webhook`, { // reuse webhook or dispatch mock distress
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/sos/trigger`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'sos.alarm', order_id: tripId })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          trip_id: tripId, 
+          latitude: driverCoords.lat, 
+          longitude: driverCoords.lng 
+        })
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to broadcast distress coordinates', e);
+    }
   };
 
   const handleReportIssue = (e: React.FormEvent) => {
