@@ -1,0 +1,22 @@
+-- Add 2FA, SSO, Lockout, and City Scope columns to system_admins
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(100) DEFAULT '' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT true NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS sso_provider VARCHAR(50) DEFAULT '' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS sso_id VARCHAR(255) DEFAULT '' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0 NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP WITH TIME ZONE;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255) DEFAULT '' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS ip_allow_list VARCHAR(255) DEFAULT '' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS city_scope VARCHAR(255) DEFAULT 'KOL' NOT NULL;
+ALTER TABLE system_admins ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
+-- Create admin audit logs table
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id UUID NOT NULL,
+    admin_email VARCHAR(255) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    details TEXT,
+    ip_address VARCHAR(45) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);

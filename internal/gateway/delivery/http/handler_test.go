@@ -166,3 +166,48 @@ func TestHandleDriverGetEarnings_MissingFromTo(t *testing.T) {
 	}
 }
 
+func TestHandleTriggerSOS_ValidRequest(t *testing.T) {
+	handler := &GatewayHandler{}
+	
+	callbackCalled := false
+	SOSCallback = func(tripID string, lat, lng float64) {
+		if tripID == "trp-123" && lat == 22.5 && lng == 88.5 {
+			callbackCalled = true
+		}
+	}
+	defer func() { SOSCallback = nil }()
+
+	req := httptest.NewRequest(stdhttp.MethodPost, "/api/v1/sos/trigger", strings.NewReader(`{
+		"trip_id": "trp-123",
+		"latitude": 22.5,
+		"longitude": 88.5
+	}`))
+	rec := httptest.NewRecorder()
+
+	handler.HandleTriggerSOS(rec, req)
+
+	if rec.Code != stdhttp.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
+
+	if !callbackCalled {
+		t.Fatal("expected SOSCallback to be invoked with request coordinates")
+	}
+}
+
+func TestHandleTriggerSOS_MissingTripID(t *testing.T) {
+	handler := &GatewayHandler{}
+	req := httptest.NewRequest(stdhttp.MethodPost, "/api/v1/sos/trigger", strings.NewReader(`{
+		"trip_id": "",
+		"latitude": 22.5,
+		"longitude": 88.5
+	}`))
+	rec := httptest.NewRecorder()
+
+	handler.HandleTriggerSOS(rec, req)
+
+	if rec.Code != stdhttp.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request, got %d", rec.Code)
+	}
+}
+

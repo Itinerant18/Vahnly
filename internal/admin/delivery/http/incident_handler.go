@@ -141,6 +141,13 @@ func NewIncidentAdminHandler(
 	return h
 }
 
+// AddIncident appends a new incident to the active monitoring queue in a thread-safe manner
+func (h *IncidentAdminHandler) AddIncident(incident StalledTripIncident) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.incidents = append(h.incidents, incident)
+}
+
 // HandleGetStalledTrips retrieves trips that have stalled telemetry streams
 func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *http.Request) {
 	// Validate RBAC Authorization Claims
@@ -326,3 +333,13 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
 }
+
+// GetIncidents returns a copy of the active incidents
+func (h *IncidentAdminHandler) GetIncidents() []StalledTripIncident {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	copied := make([]StalledTripIncident, len(h.incidents))
+	copy(copied, h.incidents)
+	return copied
+}
+

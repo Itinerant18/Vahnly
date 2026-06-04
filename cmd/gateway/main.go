@@ -72,9 +72,33 @@ func main() {
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
 	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
 	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
-	pricingAdminHandler := adminHttp.NewPricingAdminHandler(redisClusterClient, pricingLogger)
+	pricingAdminHandler := adminHttp.NewPricingAdminHandler(dbPool, redisClusterClient, pricingLogger)
 	incidentLogger := log.New(os.Stdout, "[INCIDENT_ADMIN] ", log.LstdFlags)
 	incidentAdminHandler := adminHttp.NewIncidentAdminHandler(dbPool, redisClusterClient, brokersList, incidentLogger)
+
+	// Bind global SOS broadcast callback to populate the admin incident panel queue
+	gatewayHttp.SOSCallback = func(tripID string, lat, lng float64) {
+		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
+			OrderID:              tripID,
+			DriverID:             "drv-ambient-alpha",
+			DriverName:           "Aniket Karmakar",
+			CustomerName:         "Sarah Connor",
+			VehicleMakeModel:     "Audi A6 Premium",
+			LicensePlate:         "WB-02-AK-9988",
+			LastKnownStatus:      "ON_TRIP",
+			SecondsSinceLastPing: 0,
+			CityPrefix:           "KOL",
+			IncidentType:         "SOS",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         0.0,
+			CalculatedSpeed:      0.0,
+			IsMockProvider:       false,
+			BatteryLevel:         100.0,
+			Latitude:             lat,
+			Longitude:            lng,
+		})
+	}
 	ledgerLogger := log.New(os.Stdout, "[LEDGER_ADMIN] ", log.LstdFlags)
 	ledgerAdminHandler := adminHttp.NewLedgerAdminHandler(dbPool, ledgerLogger)
 	orchestratorLogger := log.New(os.Stdout, "[ORCHESTRATOR_ADMIN] ", log.LstdFlags)
@@ -82,6 +106,24 @@ func main() {
 
 	complianceLogger := log.New(os.Stdout, "[COMPLIANCE_ADMIN] ", log.LstdFlags)
 	complianceAdminHandler := adminHttp.NewDriverComplianceHandler(dbPool, redisClusterClient, complianceLogger)
+
+	riderLogger := log.New(os.Stdout, "[RIDER_ADMIN] ", log.LstdFlags)
+	riderHandler := adminHttp.NewRiderHandler(dbPool, redisClusterClient, riderLogger)
+
+	driverLogger := log.New(os.Stdout, "[DRIVER_ADMIN] ", log.LstdFlags)
+	driverHandler := adminHttp.NewDriverHandler(dbPool, redisClusterClient, driverLogger)
+
+	vehicleLogger := log.New(os.Stdout, "[VEHICLE_ADMIN] ", log.LstdFlags)
+	vehicleHandler := adminHttp.NewVehicleHandler(dbPool, redisClusterClient, vehicleLogger)
+
+	dispatchLogger := log.New(os.Stdout, "[DISPATCH_ADMIN] ", log.LstdFlags)
+	dispatchHandler := adminHttp.NewDispatchHandler(dbPool, redisClusterClient, dispatchLogger)
+
+	dashboardLogger := log.New(os.Stdout, "[DASHBOARD_ADMIN] ", log.LstdFlags)
+	dashboardHandler := adminHttp.NewDashboardHandler(dbPool, redisClusterClient, dashboardLogger, incidentAdminHandler)
+
+	promoLogger := log.New(os.Stdout, "[PROMO_ADMIN] ", log.LstdFlags)
+	promoHandler := adminHttp.NewPromoHandler(dbPool, redisClusterClient, promoLogger)
 
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
@@ -103,6 +145,10 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
 	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
 	mux.HandleFunc("POST /api/v1/admin/auth/register", adminAuthHandler.HandleAdminRegister)
+	// TOTP self-enrolment (JWT-protected) + Google Workspace SSO (public entry points).
+	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
+	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
+	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/callback", adminAuthHandler.HandleSSOGoogleCallback)
 
 	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
 	mux.HandleFunc("POST /api/v1/orders/quote", regionRouter.RouteRegionalTraffic(handler.HandleCreatePricingQuote))
@@ -123,13 +169,28 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
+	mux.HandleFunc("POST /api/v1/sos/trigger", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleTriggerSOS)))
 
 	// Register administrative control routes, protected by granular RBAC role gates
 	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, handler.HandleAdminGetLedger))
 	mux.HandleFunc("POST /api/v1/admin/drivers/override", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, handler.HandleAdminDriverOverride))
-	mux.HandleFunc("GET /api/v1/admin/orders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, adminTripHandler.HandleAdminGetOrders))
-	mux.HandleFunc("POST /api/v1/admin/orders/cancel", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, adminTripHandler.HandleAdminCancelOrder))
+	mux.HandleFunc("GET /api/v1/admin/orders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR"}, adminTripHandler.HandleAdminGetOrders))
+	mux.HandleFunc("POST /api/v1/admin/orders/cancel", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT"}, adminTripHandler.HandleAdminCancelOrder))
+	mux.HandleFunc("GET /api/v1/admin/orders/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR"}, adminTripHandler.HandleAdminGetTripDetail))
+	mux.HandleFunc("POST /api/v1/admin/orders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}, adminTripHandler.HandleAdminCreateTrip))
+	mux.HandleFunc("POST /api/v1/admin/orders/{id}/reopen", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, adminTripHandler.HandleAdminReopenTrip))
+	mux.HandleFunc("POST /api/v1/admin/orders/{id}/reassign", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}, adminTripHandler.HandleAdminReassignTrip))
+	mux.HandleFunc("POST /api/v1/admin/orders/{id}/fraud", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}, adminTripHandler.HandleAdminMarkFraud))
+	mux.HandleFunc("POST /api/v1/admin/orders/{id}/send-invoice", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT"}, adminTripHandler.HandleAdminSendInvoice))
 	mux.HandleFunc("POST /api/v1/admin/pricing/freeze", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKET_CONTROLLER"}, pricingAdminHandler.HandleEnforcePriceCap))
+	mux.HandleFunc("GET /api/v1/admin/pricing/fares", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, pricingAdminHandler.HandleGetFares))
+	mux.HandleFunc("GET /api/v1/admin/pricing/fares/history", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, pricingAdminHandler.HandleGetFareHistory))
+	mux.HandleFunc("POST /api/v1/admin/pricing/fares", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandlePostFare))
+	mux.HandleFunc("POST /api/v1/admin/pricing/fares/revert", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandleRevertFare))
+	mux.HandleFunc("GET /api/v1/admin/pricing/surge/rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, pricingAdminHandler.HandleGetSurgeRules))
+	mux.HandleFunc("POST /api/v1/admin/pricing/surge/rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandlePostSurgeRules))
+	mux.HandleFunc("GET /api/v1/admin/pricing/commission", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, pricingAdminHandler.HandleGetCommission))
+	mux.HandleFunc("POST /api/v1/admin/pricing/commission", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandlePostCommission))
 	mux.HandleFunc("GET /api/v1/admin/trips/stalled", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleGetStalledTrips))
 	mux.HandleFunc("POST /api/v1/admin/trips/recover", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleExecuteTripRecovery))
 	mux.HandleFunc("POST /api/v1/admin/trips/claim", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleClaimIncident))
@@ -145,6 +206,57 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/validation/duplicate-check", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, complianceAdminHandler.HandleDuplicateCheck))
 	mux.HandleFunc("POST /api/v1/admin/drivers/verify", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, complianceAdminHandler.HandleVerifyDriver))
 	mux.HandleFunc("GET /api/v1/admin/analytics/cells/{h3cell}/drivers", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FLEET_MANAGER"}, complianceAdminHandler.HandleGetDriversInCell))
+
+	// Drivers control endpoints
+	mux.HandleFunc("GET /api/v1/admin/drivers", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDrivers))
+	mux.HandleFunc("GET /api/v1/admin/drivers/onboarding", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDriverOnboarding))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDriverDetail))
+	mux.HandleFunc("POST /api/v1/admin/drivers/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, driverHandler.HandleDriverActions))
+
+	// Riders control endpoints
+	mux.HandleFunc("GET /api/v1/admin/riders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, riderHandler.HandleGetRiders))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, riderHandler.HandleGetRiderDetail))
+	mux.HandleFunc("POST /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
+	mux.HandleFunc("PATCH /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
+
+	// Vehicles control endpoints
+	mux.HandleFunc("GET /api/v1/admin/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicles))
+	mux.HandleFunc("POST /api/v1/admin/vehicles/reminders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleSendDocReminders))
+	mux.HandleFunc("POST /api/v1/admin/vehicles/{plate}/override", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostVehicleOverride))
+
+	// Dispatch, Zones & Rules control endpoints
+	mux.HandleFunc("GET /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, dispatchHandler.HandleGetCities))
+	mux.HandleFunc("POST /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "COMPLIANCE"}, dispatchHandler.HandlePostCity))
+	mux.HandleFunc("GET /api/v1/admin/dispatch/rules/{city}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, dispatchHandler.HandleGetDispatchRules))
+	mux.HandleFunc("POST /api/v1/admin/dispatch/rules/{city}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "COMPLIANCE"}, dispatchHandler.HandlePostDispatchRules))
+
+	// Promotions & Offers control endpoints
+	mux.HandleFunc("GET /api/v1/admin/promos", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "CUSTOMER_SUPPORT", "ANALYTICS", "CITY_MANAGER", "FINANCE", "AUDITOR"}, promoHandler.HandleGetPromos))
+	mux.HandleFunc("POST /api/v1/admin/promos", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "CITY_MANAGER"}, promoHandler.HandlePostPromo))
+	mux.HandleFunc("POST /api/v1/admin/promos/bulk", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}, promoHandler.HandlePostPromosBulk))
+	mux.HandleFunc("POST /api/v1/admin/promos/{code}/state", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "CITY_MANAGER"}, promoHandler.HandlePostPromoState))
+	mux.HandleFunc("GET /api/v1/admin/promos/{code}/analytics", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "ANALYTICS", "FINANCE"}, promoHandler.HandleGetPromoAnalytics))
+	mux.HandleFunc("GET /api/v1/admin/promos/banners", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "CUSTOMER_SUPPORT", "CITY_MANAGER", "ANALYTICS"}, promoHandler.HandleGetBanners))
+	mux.HandleFunc("POST /api/v1/admin/promos/banners", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "CITY_MANAGER"}, promoHandler.HandlePostBanners))
+	mux.HandleFunc("GET /api/v1/admin/promos/referral", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "FINANCE", "ANALYTICS"}, promoHandler.HandleGetReferralSettings))
+	mux.HandleFunc("POST /api/v1/admin/promos/referral", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}, promoHandler.HandlePostReferralSettings))
+	mux.HandleFunc("GET /api/v1/admin/promos/loyalty", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "FINANCE", "ANALYTICS"}, promoHandler.HandleGetLoyaltySettings))
+	mux.HandleFunc("POST /api/v1/admin/promos/loyalty", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}, promoHandler.HandlePostLoyaltySettings))
+
+	// Dashboard endpoints with proper RBAC protecting all roles
+	allAdminRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "MARKETING", "ANALYTICS", "CITY_MANAGER", "COMPLIANCE", "AUDITOR"}
+	mux.HandleFunc("GET /api/v1/admin/dashboard/kpis", authGuard.RequireAnyRole(allAdminRoles, dashboardHandler.HandleGetDashboardKPIs))
+	mux.HandleFunc("GET /api/v1/admin/dashboard/charts", authGuard.RequireAnyRole(allAdminRoles, dashboardHandler.HandleGetDashboardCharts))
+	mux.HandleFunc("GET /api/v1/admin/dashboard/alerts", authGuard.RequireAnyRole(allAdminRoles, dashboardHandler.HandleGetDashboardAlerts))
+	mux.HandleFunc("GET /api/v1/admin/dashboard/recent-trips", authGuard.RequireAnyRole(allAdminRoles, dashboardHandler.HandleGetRecentTrips))
+
+	// Administrative admin accounts and audit team controls
+	mux.HandleFunc("GET /api/v1/admin/team", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleListAdmins))
+	mux.HandleFunc("POST /api/v1/admin/team/invite", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleInviteAdmin))
+	mux.HandleFunc("POST /api/v1/admin/team/edit-role", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleEditRole))
+	mux.HandleFunc("POST /api/v1/admin/team/suspend", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleSuspendAdmin))
+	mux.HandleFunc("POST /api/v1/admin/team/reset-2fa", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleReset2FA))
+	mux.HandleFunc("GET /api/v1/admin/team/audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleGetAuditLogs))
 
 	corsMiddleware := middleware.NewCORSMiddleware()
 

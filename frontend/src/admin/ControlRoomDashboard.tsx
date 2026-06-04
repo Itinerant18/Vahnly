@@ -3,13 +3,14 @@ import { API_GATEWAY_BASE_URL, ANALYTICS_SSE_BASE_URL } from '../config';
 import { DriverVerificationQueue } from './DriverVerificationQueue';
 import { FleetDrillDownDrawer } from './FleetDrillDownDrawer';
 import { VehicleProfilesMatrix } from './VehicleProfilesMatrix';
-import { AdminAuthGateway } from './components/AdminAuthGateway';
+
 import { ActiveTripRadar } from './ActiveTripRadar';
 import { SurgeControlValve } from './components/SurgeControlValve';
 import { IncidentRecoveryTerminal } from './components/IncidentRecoveryTerminal';
 import { LedgerReconciliation } from './components/LedgerReconciliation';
 import { MarketplaceOrchestrator } from './components/MarketplaceOrchestrator';
 import { VirtualizedLedgerTable } from './components/VirtualizedLedgerTable';
+
 
 interface LedgerEntry {
   id: number;
@@ -60,10 +61,10 @@ export const ControlRoomDashboard: React.FC = () => {
   const [spatialHeatmap, setSpatialHeatmap] = useState<Record<string, number>>({});
   const [selectedCellToken, setSelectedCellToken] = useState<string | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
-  const [isBalanced, setIsBalanced] = useState<boolean>(true);
+  const [_isBalanced, setIsBalanced] = useState<boolean>(true);
 
-  const [adminToken, setAdminToken] = useState<string>(localStorage.getItem('admin_jwt_token') ?? '');
-  const [adminRole, setAdminRole] = useState<string>(localStorage.getItem('admin_role') ?? 'ADMIN');
+  const adminRole = localStorage.getItem('admin_role') ?? 'ADMIN';
+  const adminToken = localStorage.getItem('admin_jwt_token') ?? '';
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -198,20 +199,14 @@ export const ControlRoomDashboard: React.FC = () => {
 
   const fetchLedgerLogs = async (): Promise<void> => {
     const token = localStorage.getItem('admin_jwt_token');
-    if (!token) {
-      handleLogout();
-      return;
-    }
+    if (!token) return;
 
     try {
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.status === 401 || response.status === 403) {
-        handleLogout();
-        return;
-      }
+      if (response.status === 401 || response.status === 403) return;
 
       const data = await response.json();
       setLedgerEntries(data.entries || []);
@@ -221,28 +216,21 @@ export const ControlRoomDashboard: React.FC = () => {
     }
   };
 
-  const handleLoginSuccess = (token: string) => {
-    setAdminToken(token);
-    setAdminRole(localStorage.getItem('admin_role') ?? 'ADMIN');
-  };
+  const isSuperAdmin = adminRole === 'SUPER_ADMIN';
+  const canFleet = isSuperAdmin || 
+                   adminRole === 'OPERATIONS_MANAGER' || 
+                   adminRole === 'FLEET_MANAGER' || 
+                   adminRole === 'CITY_MANAGER';
+  const canIncident = isSuperAdmin || 
+                      adminRole === 'OPERATIONS_MANAGER' || 
+                      adminRole === 'COMPLIANCE' || 
+                      adminRole === 'CUSTOMER_SUPPORT' ||
+                      adminRole === 'SUPPORT_LEAD';
+  const canAudit = isSuperAdmin || 
+                   adminRole === 'FINANCE' || 
+                   adminRole === 'AUDITOR' ||
+                   adminRole === 'FINANCIAL_AUDITOR';
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_jwt_token');
-    localStorage.removeItem('admin_role');
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current = null;
-    }
-    setAdminToken('');
-    setAdminRole('');
-  };
-
-  if (!adminToken) {
-    return <AdminAuthGateway onAuthSuccess={handleLoginSuccess} />;
-  }
-
-  const canFleet = adminRole === 'SUPER_ADMIN' || adminRole === 'FLEET_MANAGER';
-  const canIncident = adminRole === 'SUPER_ADMIN' || adminRole === 'SUPPORT_LEAD';
-  const canAudit = adminRole === 'SUPER_ADMIN' || adminRole === 'FINANCIAL_AUDITOR';
 
   const tabs: { key: typeof bottomTab; label: string; allowed: boolean }[] = [
     { key: 'orders', label: 'Active orders', allowed: canFleet },
@@ -251,43 +239,13 @@ export const ControlRoomDashboard: React.FC = () => {
     { key: 'incidents', label: 'Incidents', allowed: canIncident },
     { key: 'orchestrator', label: 'Marketplace controls', allowed: canFleet },
     { key: 'ledger', label: 'Ledger', allowed: canAudit },
+
   ];
   const visibleTabs = tabs.filter((t) => t.allowed);
   const activeTab = visibleTabs.some((t) => t.key === bottomTab) ? bottomTab : visibleTabs[0]?.key;
 
   return (
-    <div className="h-screen bg-canvas text-ink flex flex-col font-sans selection:bg-black selection:text-white overflow-hidden">
-
-      {/* HEADER */}
-      <header className="h-[72px] bg-canvas border-b border-canvas-soft px-8 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold tracking-tight text-ink">drivers-for-u</h1>
-          <span className="text-xs font-medium text-body bg-canvas-soft px-3 py-1 rounded-pill">KOL</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm font-medium text-body">
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-status-online" />
-            {canAudit && !canFleet ? 'Ledger access' : '47 of 60 drivers online'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {canAudit && (
-            <span className={`px-4 py-2 rounded-pill text-xs font-medium ${
-              isBalanced ? 'bg-canvas-soft text-ink' : 'bg-ink text-on-dark'
-            }`}>
-              {isBalanced ? 'Ledger balanced' : 'Ledger imbalance'}
-            </span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="text-sm font-medium py-2 px-5 rounded-pill bg-ink hover:bg-black-elevated text-on-dark transition active:scale-[0.98]"
-          >
-            Lock terminal
-          </button>
-        </div>
-      </header>
+    <div className="h-full flex flex-col overflow-hidden">
 
       {/* MAIN */}
       <div className="flex flex-1 overflow-hidden">
@@ -403,6 +361,7 @@ export const ControlRoomDashboard: React.FC = () => {
               <VirtualizedLedgerTable rows={ledgerEntries} height={220} />
             </div>
           )}
+
         </div>
       </section>
     </div>

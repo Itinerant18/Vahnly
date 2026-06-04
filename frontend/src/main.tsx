@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ControlRoomDashboard } from './admin/ControlRoomDashboard';
+import { BrowserRouter } from 'react-router-dom';
+import { AdminShell } from './admin/AdminShell';
 import './index.css';
 
 const rootElement = document.getElementById('root');
@@ -10,6 +11,8 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <ControlRoomDashboard />
+    <BrowserRouter basename="/admin">
+      <AdminShell />
+    </BrowserRouter>
   </React.StrictMode>,
 );

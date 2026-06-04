@@ -3,6 +3,13 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      spacing: {
+        'sidebar-collapsed': '64px',
+        'sidebar-expanded': '280px',
+      },
+      transitionDuration: {
+        'sidebar': '250ms',
+      },
       colors: {
         primary: '#000000',
         'on-primary': '#ffffff',
