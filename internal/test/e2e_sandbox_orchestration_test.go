@@ -173,7 +173,7 @@ func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed negotiating serializable database transaction fence: %v", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Update order status context to complete the assignment loop
 	_, err = tx.Exec(ctx, "UPDATE orders SET status = 'ASSIGNED', assigned_driver_id = $1::uuid, assigned_at = NOW() WHERE id = $2::uuid", mockDriverID, mockOrderID)

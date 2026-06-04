@@ -37,10 +37,7 @@ interface InterpolatedState {
   bearing: number;
 }
 
-// ⚡ Bolt: Added React.memo() to prevent unnecessary re-renders of this heavy canvas component.
-// 🎯 Why: This component renders an intensive 2D canvas map with moving drivers and a grid.
-// 📊 Impact: It reduces re-renders by preventing it from redrawing when parent state changes but props (like drivers or center) stay the same.
-const MapInterpolated = React.memo(function MapInterpolated({
+export default function MapInterpolated({
   drivers,
   h3Hexagons = [],
   pickup = null,
@@ -381,6 +378,4 @@ const MapInterpolated = React.memo(function MapInterpolated({
       </div>
     </div>
   );
-});
-
-export default MapInterpolated;
+}

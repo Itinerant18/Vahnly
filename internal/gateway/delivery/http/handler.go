@@ -429,7 +429,7 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "transaction_failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	query := `
 		UPDATE orders 
@@ -495,7 +495,7 @@ func (h *GatewayHandler) RollbackAssignmentToCreated(ctx context.Context, orderI
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	// 1. Revert order status back to CREATED
 	orderQuery := `
@@ -707,7 +707,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "transaction_failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	// 2. Fetch base fare and prefix within exclusive row-level transactional lock (FOR UPDATE)
 	var baseFarePaise int64
@@ -849,7 +849,7 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 		http.Error(w, "transaction_failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	// Evaluate if this specific webhook event signature was already processed successfully
 	var isIdempotentEvent bool
@@ -1034,7 +1034,7 @@ func (h *GatewayHandler) HandleAdminDriverOverride(w http.ResponseWriter, r *htt
 		http.Error(w, "transaction_failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	// Update driver status row inside relational tables cleanly
 	query := "UPDATE drivers SET current_state = $1::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $2::uuid;"

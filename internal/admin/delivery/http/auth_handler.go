@@ -105,7 +105,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(AuthResponse{
+	json.NewEncoder(w).Encode(AuthResponse{
 		Token:     tokenString,
 		ExpiresAt: expirationTime,
 		Role:      dbRole,
@@ -159,5 +159,5 @@ func (h *AdminAuthHandler) HandleAdminRegister(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }

@@ -84,7 +84,7 @@ func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *h
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
+	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
 }
 
 // HandleExecuteTripRecovery processes administrative interventions to resolve stranded orders
@@ -121,7 +121,7 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 		http.Error(w, "transaction_initialization_failure", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	if req.RecoveryAction == "FORCE_REMATCH" {
 		// 1. Re-initialize order entry back to CREATED state and break current driver bindings
@@ -197,5 +197,5 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
+	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
 }

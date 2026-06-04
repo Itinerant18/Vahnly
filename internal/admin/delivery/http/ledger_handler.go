@@ -76,7 +76,7 @@ func (h *LedgerAdminHandler) HandleGetLedgerDiscrepancies(w http.ResponseWriter,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	json.NewEncoder(w).Encode(map[string]any{
 		"discrepancies": discrepancies,
 	})
 }
@@ -114,7 +114,7 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 		http.Error(w, "isolation_level_negotiation_failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer tx.Rollback(ctx)
 
 	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix backfill convention.
 	insertQuery := `
@@ -136,5 +136,5 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 
 	h.logger.Printf("[MANUAL_LEDGER_ADJUSTMENT_COMMITTED] Order %s adjusted with %d Paise %s entry.", req.OrderID, req.AmountPaise, req.EntryType)
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(`{"status":"DISCREPANCY_RECONCILED_SUCCESSFULLY"}`))
+	w.Write([]byte(`{"status":"DISCREPANCY_RECONCILED_SUCCESSFULLY"}`))
 }
