@@ -8,6 +8,24 @@ import { useAuthStore } from '@/store/useAuthStore';
 export default function RiderAccountLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    // Sync avatar from local storage
+    const storedAvatar = localStorage.getItem('rider_avatar');
+    if (storedAvatar) {
+      setAvatar(storedAvatar);
+    }
+    
+    // Listen for avatar updates in the same window
+    const handleAvatarUpdate = () => {
+      const updated = localStorage.getItem('rider_avatar');
+      setAvatar(updated);
+    };
+    window.addEventListener('rider_avatar_changed', handleAvatarUpdate);
+    return () => window.removeEventListener('rider_avatar_changed', handleAvatarUpdate);
+  }, []);
+
   const riderName = user?.name || 'Sarah Connor';
   const riderID = user?.id || 'usr-mock-11';
 
@@ -44,11 +62,22 @@ export default function RiderAccountLayout({ children }: { children: React.React
 
             {/* Profile info */}
             <div className="flex items-center gap-3 bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
-              <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs">
-                👤
-              </div>
+              {avatar ? (
+                <img 
+                  src={avatar} 
+                  alt="Profile" 
+                  className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                />
+              ) : (
+                <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs text-zinc-500 border border-zinc-800">
+                  👤
+                </div>
+              )}
               <div className="truncate">
-                <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
+                  <span className="text-[10px] text-emerald-400" title="Verified Driver Partner / Asset Owner">✓</span>
+                </div>
                 <span className="text-[9px] font-mono text-zinc-500 block truncate">{riderID.toUpperCase()}</span>
               </div>
             </div>
@@ -111,6 +140,28 @@ export default function RiderAccountLayout({ children }: { children: React.React
                   >
                     CLOSE
                   </button>
+                </div>
+
+                {/* Mobile Identity Apex Card */}
+                <div className="flex items-center gap-3 bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
+                  {avatar ? (
+                    <img 
+                      src={avatar} 
+                      alt="Profile" 
+                      className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs text-zinc-500 border border-zinc-800">
+                      👤
+                    </div>
+                  )}
+                  <div className="truncate">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
+                      <span className="text-[10px] text-emerald-400">✓</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-zinc-500 block truncate">{riderID.toUpperCase()}</span>
+                  </div>
                 </div>
 
                 <nav className="space-y-1">

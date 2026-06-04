@@ -10,6 +10,11 @@ export default function RiderSettingsPage() {
   const [currency, setCurrency] = useState('INR (₹)');
   const [locationPerm, setLocationPerm] = useState(true);
   const [notifPerm, setNotifPerm] = useState(true);
+
+  // Fine-grained communication consent switches
+  const [emailConsent, setEmailConsent] = useState(true);
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [whatsappConsent, setWhatsappConsent] = useState(true);
   
   const handleDeleteAccount = () => {
     if (confirm('🚨 DANGER: Permanently delete your Rider account? This clears saved cars, wallets, and invoices. Irreversible.')) {
@@ -38,7 +43,7 @@ export default function RiderSettingsPage() {
               <select
                 value={lang}
                 onChange={(e) => setLang(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
+                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold focus:outline-none"
               >
                 <option>English</option>
                 <option>Bengali</option>
@@ -51,7 +56,7 @@ export default function RiderSettingsPage() {
               <select
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
+                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold focus:outline-none"
               >
                 <option>Dark</option>
                 <option>Light</option>
@@ -64,7 +69,7 @@ export default function RiderSettingsPage() {
               <select
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
+                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold focus:outline-none"
               >
                 <option>KM</option>
                 <option>Miles</option>
@@ -76,7 +81,7 @@ export default function RiderSettingsPage() {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
+                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold focus:outline-none"
               >
                 <option>INR (₹)</option>
                 <option>USD ($)</option>
@@ -85,16 +90,16 @@ export default function RiderSettingsPage() {
           </div>
         </div>
 
-        {/* Permissions */}
+        {/* Permissions & Communication Consents */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2">App Permissions</h4>
+          <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2">Permissions & Consents</h4>
 
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
               <span className="text-zinc-400 font-sans">GPS Location Access</span>
               <button
                 onClick={() => setLocationPerm(!locationPerm)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${locationPerm ? 'bg-white' : 'bg-zinc-800'}`}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${locationPerm ? 'bg-white' : 'bg-zinc-880'}`}
               >
                 <div className={`h-4 w-4 rounded-full shadow transition-transform ${locationPerm ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
               </button>
@@ -104,9 +109,39 @@ export default function RiderSettingsPage() {
               <span className="text-zinc-400 font-sans">Push Notifications Alerts</span>
               <button
                 onClick={() => setNotifPerm(!notifPerm)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${notifPerm ? 'bg-white' : 'bg-zinc-800'}`}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${notifPerm ? 'bg-white' : 'bg-zinc-880'}`}
               >
                 <div className={`h-4 w-4 rounded-full shadow transition-transform ${notifPerm ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+              <span className="text-zinc-400 font-sans">Email Invoice Dispatch</span>
+              <button
+                onClick={() => setEmailConsent(!emailConsent)}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${emailConsent ? 'bg-white' : 'bg-zinc-880'}`}
+              >
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${emailConsent ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+              <span className="text-zinc-400 font-sans">SMS SOS Alerts</span>
+              <button
+                onClick={() => setSmsConsent(!smsConsent)}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${smsConsent ? 'bg-white' : 'bg-zinc-880'}`}
+              >
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${smsConsent ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+              <span className="text-zinc-400 font-sans">WhatsApp Booking Updates</span>
+              <button
+                onClick={() => setWhatsappConsent(!whatsappConsent)}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${whatsappConsent ? 'bg-white' : 'bg-zinc-880'}`}
+              >
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${whatsappConsent ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
               </button>
             </div>
           </div>

@@ -1,19 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function RiderSupportPage() {
   const [ticketCategory, setTicketCategory] = useState('Trip dispute issue');
   const [description, setDescription] = useState('');
+  const [selectedTripId, setSelectedTripId] = useState('');
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   
   const [chatMessages, setChatMessages] = useState([
     { sender: 'bot', text: 'Welcome to Rider Support. Select an issue category or message us to speak with a dispatch coordinator.', time: '12:00 PM' }
   ]);
   const [chatInput, setChatInput] = useState('');
+  
   const [tickets, setTickets] = useState([
     { id: 'TCK-9901', category: 'Payment dispute (Surge)', date: '2026-06-03', status: 'Closed', response: 'Surge multiplier adjusted to baseline rate. Wallet cashback ₹150 processed.' }
   ]);
+
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Extract trip ID from URL search parameters on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tripId = params.get('tripId');
+      if (tripId) {
+        setSelectedTripId(tripId);
+        setTicketCategory('Trip dispute issue');
+        setDescription(`Filing billing/route dispute for trip: ${tripId}. Please audit telemetry paths.`);
+      }
+    }
+  }, []);
 
   const faqs = [
     { q: 'How does the 4-digit OTP matching verification work?', a: 'Once your assigned driver partner arrives at your vehicle location, share the 4-digit OTP passcode displayed on your active trip tracker. This OTP verifies the driver\'s session and starts coordinate tracking.' },
@@ -54,14 +72,27 @@ export default function RiderSupportPage() {
 
     setTickets((prev) => [created, ...prev]);
     setDescription('');
-    alert(`Support ticket ${created.id} registered.`);
+    setSelectedTripId('');
+    setUploadedImage(null);
+    alert(`Support ticket ${created.id} registered successfully.`);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUploadedImage(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
     <div className="space-y-6 text-left font-sans">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move font-extrabold">Rider Support Center</h2>
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">Rider Support Center</h2>
         <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Read FAQs, speak with dispatcher representatives, or raise formal trip disputes</p>
       </div>
 
@@ -153,25 +184,39 @@ export default function RiderSupportPage() {
       {/* Ticket Create & History */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
         
+        {/* Ticket Form */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
           <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
             File Support Ticket
           </h4>
 
           <form onSubmit={handleCreateTicket} className="space-y-4 font-sans text-xs">
-            <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Issue Category</label>
-              <select
-                value={ticketCategory}
-                onChange={(e) => setTicketCategory(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none"
-              >
-                <option>Trip dispute issue</option>
-                <option>Payment / Billing mismatch</option>
-                <option>Driver behavior complaint</option>
-                <option>Lost item search query</option>
-                <option>Other account settings issues</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Issue Category</label>
+                <select
+                  value={ticketCategory}
+                  onChange={(e) => setTicketCategory(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-350 focus:outline-none"
+                >
+                  <option>Trip dispute issue</option>
+                  <option>Payment / Billing mismatch</option>
+                  <option>Driver behavior complaint</option>
+                  <option>Lost item search query</option>
+                  <option>Other account settings issues</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Associated Trip ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g. trp-2209 (Optional)"
+                  value={selectedTripId}
+                  onChange={(e) => setSelectedTripId(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white focus:outline-none font-mono"
+                />
+              </div>
             </div>
 
             <div>
@@ -184,6 +229,43 @@ export default function RiderSupportPage() {
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white focus:outline-none"
                 required
               />
+            </div>
+
+            {/* Mock Incident Image Upload */}
+            <div className="space-y-2">
+              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono">Incident Screenshot / Proof</label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 text-white font-mono text-[9px] uppercase px-4 py-2.5 rounded-xl cursor-pointer"
+                >
+                  📸 Attach Photo
+                </button>
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                {uploadedImage && (
+                  <div className="relative">
+                    <img 
+                      src={uploadedImage} 
+                      alt="Proof Thumbnail" 
+                      className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setUploadedImage(null)}
+                      className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full h-4 w-4 text-[8px] font-bold flex items-center justify-center text-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button

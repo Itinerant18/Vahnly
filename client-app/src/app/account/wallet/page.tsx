@@ -11,6 +11,20 @@ export default function RiderWalletPage() {
     { id: 'TXN-003', date: '2026-06-01', label: 'Added cash via UPI', amount: 2000.00, type: 'CREDIT' }
   ]);
 
+  const handleAddPreset = (amt: number) => {
+    const created = {
+      id: `TXN-${Math.floor(Math.random() * 900 + 100)}`,
+      date: new Date().toISOString().split('T')[0],
+      label: 'Added cash via Quick Top-up Preset',
+      amount: amt,
+      type: 'CREDIT' as const
+    };
+
+    setBalance((p) => p + amt);
+    setHistory((prev) => [created, ...prev]);
+    alert(`₹${amt.toFixed(2)} added successfully to your wallet balance.`);
+  };
+
   const handleAddMoney = (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(addVal);
@@ -43,7 +57,7 @@ export default function RiderWalletPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         
-        {/* Balance */}
+        {/* Balance Card */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
           <div className="space-y-1">
             <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">Wallet Balance</span>
@@ -58,14 +72,32 @@ export default function RiderWalletPage() {
           </div>
         </div>
 
-        {/* Top-up */}
-        <form onSubmit={handleAddMoney} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+        {/* Top-up Form & Presets */}
+        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 font-mono text-xs text-white">
+          <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2">
             Top-up Wallet Funds
           </h4>
 
+          {/* Quick Select Presets */}
           <div className="space-y-2">
-            <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono tracking-wider">Top-up amount (INR)</label>
+            <label className="block text-[8px] text-zinc-500 uppercase font-mono">Quick Preset Amounts</label>
+            <div className="flex gap-2">
+              {[100, 500, 1000].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => handleAddPreset(amt)}
+                  className="flex-1 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 py-2.5 rounded-xl font-bold transition active:scale-95 cursor-pointer text-center text-xs"
+                >
+                  +₹{amt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Manual Form */}
+          <form onSubmit={handleAddMoney} className="space-y-2 pt-2 border-t border-zinc-900">
+            <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono tracking-wider">Custom amount (INR)</label>
             <div className="flex gap-2">
               <input
                 type="number"
@@ -83,8 +115,8 @@ export default function RiderWalletPage() {
                 Add Cash
               </button>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
 
       </div>
 
@@ -101,8 +133,8 @@ export default function RiderWalletPage() {
                 <span className="text-white block font-sans font-medium">{txn.label}</span>
                 <span className="text-zinc-500 text-[8px] block mt-0.5">{txn.date} • ID: {txn.id}</span>
               </div>
-              <span className={`font-bold ${txn.type === 'CREDIT' ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                {txn.type === 'CREDIT' ? '+' : ''}₹{txn.amount.toFixed(2)}
+              <span className={`font-bold ${txn.amount > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                {txn.amount > 0 ? '+' : ''}₹{txn.amount.toFixed(2)}
               </span>
             </div>
           ))}

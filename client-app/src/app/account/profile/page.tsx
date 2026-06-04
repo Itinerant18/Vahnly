@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function RiderProfilePage() {
@@ -8,13 +8,55 @@ export default function RiderProfilePage() {
   const riderName = user?.name || 'Sarah Connor';
   const riderPhone = user?.phone || '+91 99999 88888';
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [email, setEmail] = useState('sarah@skynet.com');
   const [dob, setDob] = useState('1985-05-12');
   const [gender, setGender] = useState('Female');
   const [lang, setLang] = useState('English');
   const [emailVerified, setEmailVerified] = useState(true);
-  const [kycLevel, setKycLevel] = useState('Verified');
+  const [phoneVerified, setPhoneVerified] = useState(true);
+  const [kycLevel, setKycLevel] = useState<'Basic' | 'Fully Authenticated'>('Basic');
+
+  useEffect(() => {
+    const savedAvatar = localStorage.getItem('rider_avatar');
+    if (savedAvatar) {
+      setAvatar(savedAvatar);
+    }
+  }, []);
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas for compression and resize to 128x128
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, 128, 128);
+          // Compress to JPEG with 70% quality
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          localStorage.setItem('rider_avatar', compressedDataUrl);
+          setAvatar(compressedDataUrl);
+          // Dispatch event to sync Layout header/sidebar immediately
+          window.dispatchEvent(new Event('rider_avatar_changed'));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,14 +65,13 @@ export default function RiderProfilePage() {
   };
 
   const handleVerifyEmail = () => {
-    alert('Verification OTP link dispatched to email inbox.');
+    setEmailVerified(true);
+    alert('Email verified successfully! Profile focus locked.');
   };
 
-  const handleChangePhone = () => {
-    const newPhone = prompt('Enter new phone number (with country code):');
-    if (newPhone) {
-      alert(`OTP verification SMS dispatched to ${newPhone}.`);
-    }
+  const handleUpgradeKyc = () => {
+    setKycLevel('Fully Authenticated');
+    alert('KYC Validation Succeeded! Premium vehicle options and outstation routes are now unlocked.');
   };
 
   return (
@@ -41,20 +82,78 @@ export default function RiderProfilePage() {
         <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage personal settings and check KYC authorization status</p>
       </div>
 
-      {/* Account Overview */}
+      {/* Account Overview Card */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-center">
-        <div className="h-16 w-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center text-2xl shrink-0">
-          👤
+        {/* Avatar Picker & Compression Trigger */}
+        <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+          {avatar ? (
+            <img 
+              src={avatar} 
+              alt="Avatar" 
+              className="h-20 w-20 rounded-2xl object-cover border border-zinc-800 group-hover:opacity-75 transition"
+            />
+          ) : (
+            <div className="h-20 w-20 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center text-3xl text-zinc-600 group-hover:opacity-75 transition">
+              👤
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-[10px] font-mono uppercase font-bold text-white">
+            Upload
+          </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleAvatarChange} 
+            accept="image/*" 
+            className="hidden" 
+          />
         </div>
         
-        <div className="space-y-1 text-center sm:text-left flex-grow">
+        <div className="space-y-2 text-center sm:text-left flex-grow">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <h3 className="text-base font-bold text-white">{riderName}</h3>
-            <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider w-max mx-auto sm:mx-0">
-              KYC {kycLevel}
+            <h3 className="text-base font-bold text-white flex items-center gap-1.5 justify-center sm:justify-start">
+              <span>{riderName}</span>
+              <span className="text-emerald-400 text-xs" title="Verified Account">✓</span>
+            </h3>
+            <span className={`px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider w-max mx-auto sm:mx-0 border ${
+              kycLevel === 'Fully Authenticated'
+                ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900'
+                : 'bg-amber-950/20 text-amber-500 border-amber-900'
+            }`}>
+              KYC: {kycLevel}
             </span>
           </div>
           <p className="text-xs text-zinc-500 font-mono">{riderPhone} • City: Kolkata</p>
+        </div>
+
+        {kycLevel !== 'Fully Authenticated' && (
+          <button
+            onClick={handleUpgradeKyc}
+            className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase py-2 px-4 rounded-xl cursor-pointer transition active:scale-95 shrink-0 self-center"
+          >
+            Upgrade to Fully Authenticated
+          </button>
+        )}
+      </div>
+
+      {/* KYC Limitations Alert */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+          KYC Tier Capability Mapping
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+          <div className={`p-3 rounded-xl border ${kycLevel === 'Basic' ? 'border-amber-900/50 bg-amber-950/5' : 'border-zinc-900 bg-zinc-950/40 opacity-55'}`}>
+            <span className="text-[10px] font-bold text-amber-400 block mb-1">Tier 1: Basic Identity</span>
+            <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+              For initial registrations. Limits bookings to City Hourly matches, budget/hatchback classes, and distances under 50km.
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl border ${kycLevel === 'Fully Authenticated' ? 'border-emerald-900 bg-emerald-950/5' : 'border-zinc-900 bg-zinc-950/40 opacity-55'}`}>
+            <span className="text-[10px] font-bold text-emerald-400 block mb-1">Tier 2: Fully Authenticated</span>
+            <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+              Unlocks premium/luxury fleets (Sedans, SUVs), outstation long-distance round trips, and priority pilot matching pools.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -79,14 +178,20 @@ export default function RiderProfilePage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={!isEditing}
-                className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+                disabled={!isEditing || emailVerified}
+                className={`flex-grow bg-zinc-900 border rounded-xl p-2.5 focus:outline-none ${
+                  emailVerified ? 'border-emerald-900 text-zinc-400' : 'border-zinc-800 text-white'
+                }`}
               />
-              {!isEditing && !emailVerified && (
+              {emailVerified ? (
+                <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
+                  Verified ✓
+                </span>
+              ) : (
                 <button
                   type="button"
                   onClick={handleVerifyEmail}
-                  className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-amber-500 text-[8px] px-2.5 rounded-xl cursor-pointer"
+                  className="bg-white text-black hover:bg-zinc-200 text-[8px] font-bold px-3 py-2.5 rounded-xl cursor-pointer shrink-0 uppercase transition active:scale-95"
                 >
                   Verify
                 </button>
@@ -101,17 +206,11 @@ export default function RiderProfilePage() {
                 type="tel"
                 value={riderPhone}
                 disabled
-                className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-500 focus:outline-none"
+                className="flex-grow bg-zinc-900 border border-emerald-900 text-zinc-400 rounded-xl p-2.5 focus:outline-none"
               />
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={handleChangePhone}
-                  className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-zinc-300 text-[8px] px-2.5 rounded-xl cursor-pointer"
-                >
-                  Change
-                </button>
-              )}
+              <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
+                Verified ✓
+              </span>
             </div>
           </div>
 
@@ -164,7 +263,6 @@ export default function RiderProfilePage() {
           </button>
         )}
       </form>
-
     </div>
   );
 }
