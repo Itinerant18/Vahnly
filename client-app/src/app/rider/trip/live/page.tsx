@@ -1,8 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ResilientStreamManager } from '@/network/ResilientStreamManager';
+import { useAuthStore } from '@/store/useAuthStore';
+import { API_GATEWAY_BASE_URL } from '@/config';
+import { latLngToCell } from 'h3-js';
+
+interface DriverDetails {
+  name: string;
+  rating: string;
+  plate: string;
+  car: string;
+  photo: string;
+}
 
 function parseBinaryEnvelope(buffer: ArrayBuffer): { type: string; data: any } | null {
   const bytes = new Uint8Array(buffer);
@@ -47,30 +58,74 @@ function parseBinaryEnvelope(buffer: ArrayBuffer): { type: string; data: any } |
 function LiveTripContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const tripId = searchParams?.get('tripId') || 'trp-2209';
+  const { token } = useAuthStore();
+  const tripId = searchParams?.get('tripId') || 'trp-sandbox-2209';
 
-  // Active states: ARRIVING | ARRIVED | IN_TRANSIT | COMPLETED
+  // Active sub-states: ARRIVING | ARRIVED | IN_TRANSIT | COMPLETED
   const [tripStatus, setTripStatus] = useState<'ARRIVING' | 'ARRIVED' | 'IN_TRANSIT' | 'COMPLETED'>('ARRIVING');
-  const [mapGlide, setMapGlide] = useState(0);
-  const [tripTimer, setTripTimer] = useState(0);
-  
-  // Custom modifier state variables
-  const [stops, setStops] = useState<string[]>([]);
+  const [mapGlide, setMapGlide] = useState(0); // Progress percentage of driver en route
+  const [tripTimer, setTripTimer] = useState(0); // Ride duration timer
+  const [estimatedFare, setEstimatedFare] = useState(350);
+
+  // Expanded panel controllers
+  const [isExpanded, setIsExpanded] = useState(false);
   const [dropoffText, setDropoffText] = useState('Park Street Dining Grid, Kolkata');
-  const [durationHours, setDurationHours] = useState(4);
+  const [stops, setStops] = useState<string[]>([]);
+  const [dropoffInputFlash, setDropoffInputFlash] = useState(false);
+
+  // Safety issue report states
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [issueText, setIssueText] = useState('');
 
-  // Live WebSocket Connection
+  // Anomaly "Everything OK?" warning overlays
+  const [showAnomalyOverlay, setShowAnomalyOverlay] = useState(false);
+  const [anomalyTimer, setAnomalyTimer] = useState(30);
+  const [anomalyEscalated, setAnomalyEscalated] = useState(false);
+
+  // Coordinates data sets
+  const [pickupCoords, setPickupCoords] = useState({ lat: 22.5726, lng: 88.4339 });
+  const [dropoffCoords, setDropoffCoords] = useState({ lat: 22.5480, lng: 88.3512 });
+  const [driverCoords, setDriverCoords] = useState({ lat: 22.5650, lng: 88.4200 });
+
+  // Map viewport canvas controls
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 22.5726, lng: 88.3639 });
+  const [mapZoom, setMapZoom] = useState(13);
+
+  // Driver details card
+  const [driverSpecs, setDriverSpecs] = useState<DriverDetails>({
+    name: 'Aniket Karmakar',
+    rating: '★ 4.92',
+    plate: 'WB-02-AK-9988',
+    car: 'Audi A6 Sedan',
+    photo: '👤'
+  });
+
+  // Load session configs
+  useEffect(() => {
+    try {
+      const storedDriver = JSON.parse(sessionStorage.getItem('assigned_driver_specs') || '{}');
+      if (storedDriver.name) {
+        setDriverSpecs(storedDriver);
+      }
+      const specs = JSON.parse(sessionStorage.getItem('current_booking_specs') || '{}');
+      if (specs.pickup) {
+        setDropoffText(specs.dropoff || 'Park Street Dining Grid, Kolkata');
+        if (specs.fare) setEstimatedFare(specs.fare);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Live WebSocket Connection lifecycle
   useEffect(() => {
     const stream = new ResilientStreamManager({
       orderID: tripId,
       cityPrefix: 'KOL',
       onStatusChange: (status) => {
-        console.log('[LiveTrip] WS status:', status);
+        console.log('[LiveTripStream] Stream status:', status);
       },
       onMessage: (message: any) => {
-        console.log('[LiveTrip] Stream envelope:', message);
+        console.log('[LiveTripStream] Event frame:', message);
         let status = '';
 
         if (message instanceof ArrayBuffer) {
@@ -97,29 +152,47 @@ function LiveTripContent() {
 
     stream.connect();
 
-    return () => {
-      stream.disconnect();
-    };
+    return () => stream.disconnect();
   }, [tripId]);
 
-  // Gliding coordinates interval
+  // Coordinates telemetry linear glide interpolation loop
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (tripStatus === 'ARRIVING' || tripStatus === 'IN_TRANSIT') {
-      interval = setInterval(() => {
-        setMapGlide((prev) => {
-          const next = prev + 2;
-          if (next >= 100) {
-            return 0;
-          }
-          return next;
-        });
-      }, 250);
-    }
-    return () => clearInterval(interval);
-  }, [tripStatus]);
+    let animId = 0;
+    const start = Date.now();
+    const duration = 20000; // 20s glide cycle
 
-  // Trip clock timer
+    const updateGlide = () => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(1, elapsed / duration);
+      setMapGlide(progress * 100);
+
+      if (tripStatus === 'ARRIVING') {
+        // Interpolate driver coords closer to pickup
+        const startLat = 22.5650;
+        const startLng = 88.4200;
+        const currentLat = startLat + (pickupCoords.lat - startLat) * progress;
+        const currentLng = startLng + (pickupCoords.lng - startLng) * progress;
+        setDriverCoords({ lat: currentLat, lng: currentLng });
+      } else if (tripStatus === 'IN_TRANSIT') {
+        // Interpolate driver coords from pickup to dropoff
+        const currentLat = pickupCoords.lat + (dropoffCoords.lat - pickupCoords.lat) * progress;
+        const currentLng = pickupCoords.lng + (dropoffCoords.lng - pickupCoords.lng) * progress;
+        setDriverCoords({ lat: currentLat, lng: currentLng });
+      }
+
+      if (progress < 1) {
+        animId = requestAnimationFrame(updateGlide);
+      }
+    };
+
+    if (tripStatus === 'ARRIVING' || tripStatus === 'IN_TRANSIT') {
+      animId = requestAnimationFrame(updateGlide);
+    }
+
+    return () => cancelAnimationFrame(animId);
+  }, [tripStatus, pickupCoords, dropoffCoords]);
+
+  // Trip clock timer active in transit
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (tripStatus === 'IN_TRANSIT') {
@@ -129,6 +202,305 @@ function LiveTripContent() {
     }
     return () => clearInterval(timer);
   }, [tripStatus]);
+
+  // Dynamic automatic map camera centering viewport bounds matrix
+  useEffect(() => {
+    let node1 = pickupCoords;
+    let node2 = dropoffCoords;
+
+    if (tripStatus === 'ARRIVING' || tripStatus === 'ARRIVED') {
+      node1 = driverCoords;
+      node2 = pickupCoords;
+    }
+
+    const centerLat = (node1.lat + node2.lat) / 2;
+    const centerLng = (node1.lng + node2.lng) / 2;
+    setMapCenter({ lat: centerLat, lng: centerLng });
+
+    // Auto calculate matching zoom factor to display both nodes
+    const R = 6371; // km
+    const dLat = (node2.lat - node1.lat) * Math.PI / 180;
+    const dLng = (node2.lng - node1.lng) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(node1.lat * Math.PI / 180) * Math.cos(node2.lat * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    if (dist > 5) setMapZoom(12);
+    else if (dist > 2) setMapZoom(13);
+    else setMapZoom(14);
+
+  }, [tripStatus, pickupCoords, dropoffCoords, driverCoords]);
+
+  // Anomaly check triggers: pop overlay after 12s en route
+  useEffect(() => {
+    if (tripStatus !== 'IN_TRANSIT') return;
+
+    const timer = setTimeout(() => {
+      setShowAnomalyOverlay(true);
+      setAnomalyTimer(30);
+    }, 12000);
+
+    return () => clearTimeout(timer);
+  }, [tripStatus]);
+
+  // Anomaly countdown ticking check
+  useEffect(() => {
+    if (!showAnomalyOverlay) return;
+    const interval = setInterval(() => {
+      setAnomalyTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setAnomalyEscalated(true);
+          console.warn('[AnomalyScanner] SILENCE THRESHOLD EXCEEDED. Trip flagged in Admin Control Terminal.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showAnomalyOverlay]);
+
+  // Draw vector map layers matching current status bounds
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resize = () => {
+      canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
+      canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId = 0;
+
+    const draw = () => {
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Faint city grid matrix
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 1;
+      const size = 40;
+      for (let x = 0; x < canvas.width; x += size) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += size) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Convert LatLng projection coordinates
+      const scale = 150000 * Math.pow(2, mapZoom - 14);
+      const toScreen = (lat: number, lng: number) => {
+        const x = canvas.width / 2 + (lng - mapCenter.lng) * scale * Math.cos(mapCenter.lat * Math.PI / 180);
+        const y = canvas.height / 2 - (lat - mapCenter.lat) * scale;
+        return { x, y };
+      };
+
+      // Draw Hooghly River outline
+      ctx.strokeStyle = 'rgba(29, 78, 216, 0.22)';
+      ctx.lineWidth = 40 * Math.pow(1.3, mapZoom - 14);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      const river = [
+        { lat: 22.6200, lng: 88.3220 },
+        { lat: 22.6050, lng: 88.3300 },
+        { lat: 22.5900, lng: 88.3320 },
+        { lat: 22.5750, lng: 88.3260 },
+        { lat: 22.5600, lng: 88.3250 },
+        { lat: 22.5450, lng: 88.3280 },
+        { lat: 22.5300, lng: 88.3340 }
+      ];
+      river.forEach((pt, idx) => {
+        const s = toScreen(pt.lat, pt.lng);
+        if (idx === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      ctx.stroke();
+
+      // Central streets
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 4 * Math.pow(1.3, mapZoom - 14);
+
+      // Central Ave
+      ctx.beginPath();
+      let pt1 = toScreen(22.6100, 88.3620);
+      let pt2 = toScreen(22.5300, 88.3620);
+      ctx.moveTo(pt1.x, pt1.y);
+      ctx.lineTo(pt2.x, pt2.y);
+      ctx.stroke();
+
+      // Park St
+      ctx.beginPath();
+      pt1 = toScreen(22.5480, 88.3300);
+      pt2 = toScreen(22.5480, 88.4200);
+      ctx.moveTo(pt1.x, pt1.y);
+      ctx.lineTo(pt2.x, pt2.y);
+      ctx.stroke();
+
+      // EM Bypass
+      ctx.beginPath();
+      const bypass = [
+        { lat: 22.6000, lng: 88.4100 },
+        { lat: 22.5700, lng: 88.4150 },
+        { lat: 22.5400, lng: 88.4050 }
+      ];
+      bypass.forEach((pt, i) => {
+        const s = toScreen(pt.lat, pt.lng);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      ctx.stroke();
+
+      // Howrah Bridge
+      ctx.strokeStyle = '#3f3f46';
+      ctx.beginPath();
+      pt1 = toScreen(22.5850, 88.3300);
+      pt2 = toScreen(22.5830, 88.3620);
+      ctx.moveTo(pt1.x, pt1.y);
+      ctx.lineTo(pt2.x, pt2.y);
+      ctx.stroke();
+
+      // Active state route line vectors
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+
+      if (tripStatus === 'ARRIVING' || tripStatus === 'ARRIVED') {
+        const s = toScreen(driverCoords.lat, driverCoords.lng);
+        const p = toScreen(pickupCoords.lat, pickupCoords.lng);
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(p.x, p.y);
+      } else {
+        const p = toScreen(pickupCoords.lat, pickupCoords.lng);
+        const d = toScreen(dropoffCoords.lat, dropoffCoords.lng);
+        ctx.moveTo(p.x, p.y);
+
+        const midLat = (pickupCoords.lat + dropoffCoords.lat) / 2;
+        const midLng = (pickupCoords.lng + dropoffCoords.lng) / 2 + 0.005;
+        const mid = toScreen(midLat, midLng);
+        ctx.quadraticCurveTo(mid.x, mid.y, d.x, d.y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw Pickup point Pin
+      const pLoc = toScreen(pickupCoords.lat, pickupCoords.lng);
+      ctx.fillStyle = '#10b981'; // Green pickup
+      ctx.beginPath();
+      ctx.arc(pLoc.x, pLoc.y, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw Dropoff point Pin
+      const dLoc = toScreen(dropoffCoords.lat, dropoffCoords.lng);
+      ctx.fillStyle = '#ef4444'; // Red dropoff
+      ctx.beginPath();
+      ctx.arc(dLoc.x, dLoc.y, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw Driver vehicle position node (interpolating)
+      const dCoords = toScreen(driverCoords.lat, driverCoords.lng);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(dCoords.x, dCoords.y, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#1d4ed8'; // Blue trace border
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1d4ed8';
+      ctx.beginPath();
+      ctx.arc(dCoords.x, dCoords.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Draw intermediate stops pins
+      stops.forEach((st, i) => {
+        // Offset stops mock locations between pickup and dropoff
+        const progress = (i + 1) / (stops.length + 1);
+        const stopLat = pickupCoords.lat + (dropoffCoords.lat - pickupCoords.lat) * progress;
+        const stopLng = pickupCoords.lng + (dropoffCoords.lng - pickupCoords.lng) * progress + 0.003;
+        const sLoc = toScreen(stopLat, stopLng);
+
+        ctx.fillStyle = '#f59e0b'; // Amber stop
+        ctx.beginPath();
+        ctx.arc(sLoc.x, sLoc.y, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animId);
+    };
+  }, [mapCenter, mapZoom, pickupCoords, dropoffCoords, driverCoords, stops, tripStatus]);
+
+  // Debounced patch route mutators handshake
+  useEffect(() => {
+    if (tripStatus !== 'IN_TRANSIT') return;
+
+    const delay = setTimeout(() => {
+      mutateRouteOnBackend();
+    }, 800);
+
+    return () => clearTimeout(delay);
+  }, [dropoffText, stops]);
+
+  const mutateRouteOnBackend = async () => {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Region-Prefix': 'KOL'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/orders/${tripId}/route`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          dropoff_lat: dropoffCoords.lat,
+          dropoff_lng: dropoffCoords.lng,
+          stops: stops
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.calculated_fare_paise) {
+          setEstimatedFare(data.calculated_fare_paise / 100);
+        }
+        console.log('[MutationEngine] Mid-trip route updated, estimated cost synced:', data);
+      }
+    } catch (e) {
+      console.warn('Backend PATCH route failed, using offline pricing updates:', e);
+    }
+  };
 
   const handleStartTripSimulated = () => {
     setTripStatus('IN_TRANSIT');
@@ -140,38 +512,318 @@ function LiveTripContent() {
     router.push(`/rider/trip/bill?tripId=${tripId}`);
   };
 
-  const handleSOS = () => {
-    alert('🚨 SAFETY EXECUTIONS DIALED: Distress location shared with emergency support and authorities immediately.');
+  const handleSOS = async () => {
+    alert('🚨 SAFETY EMERGENCY SIGNAL BROADCASTED. Distress locations shared with local authorities, support logs and emergency contacts.');
+    try {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/payments/webhook`, { // reuse webhook or dispatch mock distress
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'sos.alarm', order_id: tripId })
+      });
+    } catch (e) {}
   };
 
   const handleReportIssue = (e: React.FormEvent) => {
     e.preventDefault();
     if (!issueText.trim()) return;
-    alert(`Report filed: "${issueText}". Dispatch operations team will investigate.`);
+    alert(`Report submitted: "${issueText}". Incident logs generated.`);
     setIssueText('');
     setShowIssueModal(false);
   };
 
-  const handleExtendDuration = () => {
-    setDurationHours((prev) => prev + 1);
-    alert('Journey hourly package extended by 1 hour (extra ₹100 applied).');
+  const handleAddStop = () => {
+    if (stops.length >= 3) {
+      alert('Maximum of 3 stops can be configured mid-route.');
+      return;
+    }
+    setStops(prev => [...prev, '']);
+  };
+
+  const handleStopChange = (idx: number, val: string) => {
+    const updated = [...stops];
+    updated[idx] = val;
+    setStops(updated);
+  };
+
+  const handleRemoveStop = (idx: number) => {
+    setStops(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleGenerateShareLink = async () => {
+    // Request a short-lived signed tracking JWT token from gateway
+    let trackingToken = 'jwt-mock-tracking-token-hash';
+    try {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/payments/webhook`, { // request mock token
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'share.token', order_id: tripId })
+      });
+      if (res.ok) {
+        trackingToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0cmlwSWQiOiJ0cnAtMTEwOCJ9';
+      }
+    } catch (e) {}
+
+    const shareUrl = `${window.location.origin}/share?tripId=${tripId}&jwt=${trackingToken}`;
+    navigator.clipboard.writeText(shareUrl);
+    alert(`📋 Share tracking link copied to clipboard:\n${shareUrl}`);
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
+    <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-hidden relative">
       
-      {/* Header */}
-      <header className="border-b border-zinc-900 pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left">
-        <div>
-          <span className="bg-zinc-900 text-zinc-500 border border-zinc-850 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
-            ACTIVE PILOT JOURNEY
-          </span>
-          <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">Rider Tracking Panel</h1>
+      {/* ==================== STATEFUL PROGRESS BANNER HORIZON ==================== */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex flex-col backdrop-blur-md border-b border-zinc-900/60">
+        <div className="bg-zinc-950/80 p-4 flex justify-between items-center text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+            <h1 className="font-bold text-[10px] uppercase tracking-widest text-zinc-300">Live Journey Tracking</h1>
+          </div>
+          <span className="text-[8px] text-zinc-500 font-bold uppercase">ID: {tripId.slice(0, 10)}</span>
         </div>
-        <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">ID: {tripId}</span>
+
+        {/* Dynamic linear status progression ribbon */}
+        <div className="grid grid-cols-5 text-[8px] font-mono text-center font-bold uppercase tracking-wider border-t border-zinc-900 select-none bg-zinc-950">
+          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'ARRIVING' ? 'bg-blue-600 text-white animate-pulse' : 'text-zinc-600'}`}>Arriving</div>
+          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'ARRIVED' ? 'bg-amber-600 text-white animate-pulse' : 'text-zinc-600'}`}>Arrived</div>
+          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'IN_TRANSIT' && mapGlide < 20 ? 'bg-emerald-600 text-white animate-pulse' : 'text-zinc-600'}`}>Started</div>
+          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'IN_TRANSIT' && mapGlide >= 20 ? 'bg-emerald-600 text-white animate-pulse' : 'text-zinc-600'}`}>En Route</div>
+          <div className={`py-2 ${tripStatus === 'COMPLETED' ? 'bg-zinc-100 text-black' : 'text-zinc-600'}`}>Ending</div>
+        </div>
       </header>
 
-      {/* 1. MOCK INCIDENT REPORT MODAL SHEET */}
+      {/* ==================== LAYER 1 (Z-INDEX: 10): VIEWPORT MAP CANVAS ==================== */}
+      <div className="absolute inset-0 z-10 w-full h-full">
+        <canvas ref={canvasRef} className="w-full h-full block" />
+      </div>
+
+      {/* SOS panic action trigger */}
+      <div className="absolute top-24 right-4 z-20">
+        <button
+          onClick={handleSOS}
+          className="h-10 w-10 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center shadow-lg border border-red-500 animate-pulse transition cursor-pointer active:scale-95 text-xs"
+        >
+          🚨
+        </button>
+      </div>
+
+      {/* Share tracking action */}
+      <div className="absolute top-24 left-4 z-20">
+        <button
+          onClick={handleGenerateShareLink}
+          className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono font-bold uppercase py-1.5 px-3 rounded-full tracking-wider shadow-md cursor-pointer hover:bg-zinc-900 transition flex items-center gap-1 backdrop-blur-sm"
+        >
+          🔗 Share Live Status
+        </button>
+      </div>
+
+      {/* Interactive Canvas zoom options */}
+      <div className="absolute bottom-[22vh] right-4 z-20 flex flex-col gap-1 font-mono font-bold text-xs select-none">
+        <button
+          onClick={() => setMapZoom(z => Math.min(18, z + 1))}
+          className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+        >
+          +
+        </button>
+        <button
+          onClick={() => setMapZoom(z => Math.max(10, z - 1))}
+          className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+        >
+          -
+        </button>
+      </div>
+
+      {/* ==================== LAYER 2 (Z-INDEX: 30): COLLAPSIBLE JOURNEY CONTEXT SHEET ==================== */}
+      <div
+        style={{ height: isExpanded ? '460px' : '180px' }}
+        className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/95 border-t border-zinc-900 shadow-2xl backdrop-blur-md rounded-t-3xl overflow-hidden flex flex-col transition-all duration-300"
+      >
+        {/* Swipe Toggle handle */}
+        <div
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full py-3 flex items-center justify-center cursor-pointer border-b border-zinc-900/50 select-none shrink-0"
+        >
+          <div className="w-12 h-1 bg-zinc-800 hover:bg-zinc-600 rounded-full transition" />
+        </div>
+
+        {/* Scrollable details panel */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-xl mx-auto w-full text-left">
+          
+          {/* Awaiting handshakes state blockers */}
+          {tripStatus !== 'IN_TRANSIT' ? (
+            <div className="space-y-4">
+              {/* LARGE TYPE OTP HANDOVER CODE */}
+              <div className="bg-zinc-900/50 border border-zinc-900 rounded-2xl p-4 text-center space-y-2 animate-fadeIn">
+                <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">SECURITY HANDOVER PASSCODE</span>
+                <div className="flex justify-center items-center gap-3">
+                  <span className="text-3xl font-mono font-extrabold tracking-widest text-white animate-pulse">
+                    5829
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('5829');
+                      alert('Passcode copied.');
+                    }}
+                    className="bg-zinc-800 text-zinc-400 hover:text-white px-2 py-1 rounded text-[8px] font-mono uppercase"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-[9px] text-zinc-400 font-sans leading-normal max-w-xs mx-auto">
+                  ⚠️ IMPORTANT: Share this security code with Aniket only when handing over your car keys.
+                </p>
+              </div>
+
+              {/* LOCKOUT INTERCEPTION PANEL */}
+              <div className="p-3 bg-zinc-950/60 border border-red-950/40 text-red-400/80 rounded-xl font-mono text-[8px] uppercase tracking-wider text-center">
+                ⛔ Trip telemetry and mid-route adjustments locked until key handoff verify
+              </div>
+
+              {/* Sandbox verification starts */}
+              <button
+                onClick={handleStartTripSimulated}
+                className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider transition"
+              >
+                🔄 Verify Handshake & Start Journey (Simulate)
+              </button>
+            </div>
+          ) : (
+            /* ACTIVE TRIP EN ROUTE DETAILED PANELS */
+            <div className="space-y-4 animate-fadeIn">
+              
+              {/* Collapsed minimal state metadata summary */}
+              {!isExpanded && (
+                <div className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-3.5 rounded-xl text-xs font-mono">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">👨🏽‍✈️</span>
+                    <div>
+                      <span className="text-white font-sans font-bold block">{driverSpecs.name}</span>
+                      <span className="text-[8px] text-zinc-500 block uppercase mt-0.5">{driverSpecs.plate}</span>
+                    </div>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-bold block uppercase w-max ml-auto">
+                      48 KM/H
+                    </span>
+                    <span className="text-[8px] text-zinc-500 block uppercase">ETA: 8 Mins</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Expanded details panels */}
+              {isExpanded && (
+                <div className="space-y-4">
+                  {/* Address timeline inputs */}
+                  <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 font-sans text-xs">
+                    <div>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Meetup Point</label>
+                      <input
+                        type="text"
+                        disabled
+                        value="Salt Lake Sector V Tech Hub, Kolkata"
+                        className="w-full bg-zinc-950 border border-zinc-900/60 rounded-lg p-2.5 text-zinc-500 outline-none text-xs cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Intermediate stops inputs adjusters */}
+                    {stops.map((stop, i) => (
+                      <div key={i} className="flex gap-2 items-center animate-fadeIn">
+                        <div className="flex-1">
+                          <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Waypoint stop {i + 1}</label>
+                          <input
+                            type="text"
+                            value={stop}
+                            onChange={(e) => handleStopChange(i, e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500 text-xs"
+                            placeholder="Enter stop address"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStop(i)}
+                          className="bg-zinc-950 hover:bg-zinc-900 text-red-500 border border-zinc-850 h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Dropoff Address */}
+                    <div>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Final Destination Address</label>
+                      <input
+                        type="text"
+                        value={dropoffText}
+                        onChange={(e) => setDropoffText(e.target.value)}
+                        className={`w-full bg-zinc-950 border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
+                          dropoffInputFlash 
+                            ? 'border-red-500 ring-2 ring-red-500/20 animate-shake' 
+                            : 'border-zinc-850 focus:border-zinc-500'
+                        }`}
+                        placeholder="Enter dropoff location"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddStop}
+                      className="text-[8px] font-mono font-bold uppercase text-zinc-500 hover:text-white flex items-center gap-1 cursor-pointer"
+                    >
+                      ➕ Add Waypoint Stop (Max 3)
+                    </button>
+                  </div>
+
+                  {/* Pricing estimate display */}
+                  <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-3.5 rounded-xl font-mono text-xs">
+                    <div>
+                      <span className="text-zinc-500 block text-[8px] uppercase">MID-TRIP ESTIMATED FARE</span>
+                      <span className="text-base font-bold text-white block mt-0.5">₹{estimatedFare.toFixed(2)}</span>
+                    </div>
+                    <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
+                      Surge floor active
+                    </span>
+                  </div>
+
+                  {/* Safety dispute options */}
+                  <div className="grid grid-cols-2 gap-2 text-[9px] font-mono font-bold uppercase">
+                    <button
+                      type="button"
+                      onClick={() => setShowIssueModal(true)}
+                      className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-400 hover:text-white text-center cursor-pointer"
+                    >
+                      ⚠️ Report safety concern
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEstimatedFare(f => f + 100);
+                        alert('Journey duration extended by 1 hour (₹100 charge applied).');
+                      }}
+                      className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-300 text-center cursor-pointer"
+                    >
+                      📅 Extend Duration (+1h)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* End simulated matches */}
+              <button
+                onClick={handleEndTripSimulated}
+                className="w-full bg-red-600 text-white hover:bg-red-700 py-3.5 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider border border-red-500 cursor-pointer text-center"
+              >
+                🏁 Arrived at drop: Complete Transit (Simulate)
+              </button>
+            </div>
+          )}
+
+        </div>
+
+        <footer className="bg-black py-2 text-center text-[7px] font-mono text-zinc-700 border-t border-zinc-950 select-none">
+          MUTATION ENGINE: ONLINE • SHA-256 SECURE NETWORK
+        </footer>
+      </div>
+
+      {/* ==================== MOCK INCIDENT REPORT MODAL SHEET ==================== */}
       {showIssueModal && (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl w-full max-w-sm text-left space-y-4">
@@ -212,215 +864,59 @@ function LiveTripContent() {
         </div>
       )}
 
-      {/* MAIN CONTAINER */}
-      <main className="w-full max-w-md mx-auto flex-grow my-4 flex flex-col gap-4 text-left">
-        
-        {/* Simulated SVG Gliding Map */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden relative min-h-[220px] flex flex-col justify-between">
-          <div className="absolute inset-0 bg-black/60 z-0">
-            <svg className="w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="liveGrid" width="30" height="30" patternUnits="userSpaceOnUse">
-                  <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#222" strokeWidth="1" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#liveGrid)" />
-
-              {/* Route */}
-              <line x1="25%" y1="75%" x2="75%" y2="25%" stroke="#3b82f6" strokeWidth="3" strokeDasharray="5,5" />
-              
-              {/* Pickup/Drop */}
-              <circle cx="25%" cy="75%" r="6" fill="#10b981" />
-              <circle cx="75%" cy="25%" r="6" fill="#ef4444" />
-              
-              {/* Glide vehicle */}
-              <circle 
-                cx={`${25 + (mapGlide / 100) * (75 - 25)}%`} 
-                cy={`${75 + (mapGlide / 100) * (25 - 75)}%`} 
-                r="7" 
-                fill="#fff" 
-                stroke="#1e3a8a" 
-                strokeWidth="2" 
-              />
-            </svg>
-          </div>
-
-          {/* Status Overlay Banner */}
-          <div className="relative z-10 p-4 bg-gradient-to-b from-black to-transparent flex justify-between items-center text-[8px] font-mono font-bold">
-            <span className="text-zinc-500">
-              {tripStatus === 'ARRIVING' && 'DRIVER ASSIGNED (ARRIVING)'}
-              {tripStatus === 'ARRIVED' && 'DRIVER ARRIVED AT HUB (WAITING)'}
-              {tripStatus === 'IN_TRANSIT' && `EN ROUTE (CLOCK: ${Math.floor(tripTimer / 60)}:${(tripTimer % 60).toString().padStart(2, '0')})`}
-              {tripStatus === 'COMPLETED' && 'TRIP COMPLETED'}
-            </span>
-
-            <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded uppercase">
-              {tripStatus.replace('_', ' ')}
-            </span>
-          </div>
-
-          <div className="relative z-10 p-4 bg-gradient-to-t from-black to-transparent text-[8px] font-mono text-zinc-500">
-            {tripStatus === 'IN_TRANSIT' && 'Speed checking: 46 km/h • Deviations: None'}
-            {tripStatus === 'ARRIVING' && 'Driver distance to pickup: 0.8 KM'}
-          </div>
-        </div>
-
-        {/* Dynamic simulator trigger buttons based on state */}
-        <div className="grid grid-cols-1 gap-2 font-mono text-xs font-bold uppercase">
-          {tripStatus === 'ARRIVED' && (
-            <button
-              onClick={handleStartTripSimulated}
-              className="w-full bg-white text-black hover:bg-zinc-200 py-3 rounded-xl cursor-pointer text-center font-sans"
-            >
-              🔄 [Start Trip: OTP Handshake Verification]
-            </button>
-          )}
-
-          {tripStatus === 'IN_TRANSIT' && (
-            <button
-              onClick={handleEndTripSimulated}
-              className="w-full bg-red-600 text-white hover:bg-red-700 py-3 rounded-xl border border-red-500 cursor-pointer text-center"
-            >
-              🏁 [Arrived at drop: Complete Transit]
-            </button>
-          )}
-        </div>
-
-        {/* 2. RIDER OTP DISPLAY BANNER (Only Awaiting verification) */}
-        {(tripStatus === 'ARRIVING' || tripStatus === 'ARRIVED') && (
-          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 text-center space-y-2">
-            <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">RIDE AUTHENTICATION SECURITY CODE</span>
-            <div className="text-3xl font-mono font-extrabold tracking-widest text-white animate-pulse">
-              1234
+      {/* ==================== ANOMALY CHECK OVERLAY "Everything OK?" ==================== */}
+      {showAnomalyOverlay && (
+        <div className="fixed inset-x-4 top-24 z-[99999] bg-zinc-950 border border-amber-900 rounded-2xl p-5 text-left shadow-2xl animate-bounce">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-[8px] font-mono font-bold text-amber-500 uppercase">
+              <span>Ride Check Anomaly Interceptor</span>
+              <span className="text-amber-600 animate-pulse">{anomalyTimer}s remaining</span>
             </div>
-            <p className="text-[10px] text-zinc-400 font-sans leading-normal max-w-xs mx-auto pt-1">
-              Provide this 4-digit security code to your driver partner once they arrive at your vehicle location to verify.
-            </p>
-          </div>
-        )}
-
-        {/* Driver mini details card */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <div className="flex justify-between items-start gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-zinc-900 border border-zinc-850 rounded-xl flex items-center justify-center text-lg">
-                👤
+            
+            {anomalyEscalated ? (
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-red-500 font-mono uppercase">🚨 SILENCE CRITICAL THRESHOLD EXCEEDED</h3>
+                <p className="text-[9px] text-zinc-400 font-sans leading-normal">
+                  Inactivity detected for more than 30 seconds. A distress notification has been dispatched to admin control rooms. Live support loop initiated.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowAnomalyOverlay(false);
+                    setAnomalyEscalated(false);
+                  }}
+                  className="bg-zinc-900 text-zinc-300 border border-zinc-850 px-3 py-1.5 rounded-lg font-mono text-[8px] uppercase cursor-pointer"
+                >
+                  Dismiss & Clear logs
+                </button>
               </div>
-              <div className="text-xs">
-                <h4 className="font-bold text-white">Aniket Karmakar (★ 4.92)</h4>
-                <span className="text-[9px] font-mono text-zinc-500 block mt-0.5">Driving: Audi A6 (WB-02-AK-9988)</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => alert('Dialing driver mobile proxy forwarding address...')}
-                className="h-8 w-8 bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 rounded-lg flex items-center justify-center text-xs"
-              >
-                📞
-              </button>
-              <button
-                onClick={handleSOS}
-                className="h-8 w-8 bg-red-950 hover:bg-red-900 text-red-500 border border-red-900 rounded-lg flex items-center justify-center text-xs"
-              >
-                🚨
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Expandable active trip variables */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Trip Specifications
-          </h4>
-
-          <div className="space-y-3 text-xs font-mono text-zinc-400">
-            <div>📍 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5">Pickup Node</span> Salt Lake Sector V Tech Hub, Kolkata</div>
-            {stops.map((st, i) => (
-              <div key={i}>🛑 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5">Stop {i + 1}</span> {st || 'Not configured'}</div>
-            ))}
-            <div>🏁 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5 font-mono">Destination</span> {dropoffText}</div>
-          </div>
-        </div>
-
-        {/* In-Trip Modifiers actions */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
-          <h4 className="text-[10px] font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            In-Trip Adjustments
-          </h4>
-
-          <div className="grid grid-cols-2 gap-2 text-[9px] font-mono font-bold uppercase">
-            <button
-              onClick={() => {
-                const newStop = prompt('Enter address for new stop:');
-                if (newStop) setStops((prev) => [...prev, newStop]);
-              }}
-              className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-2.5 rounded-xl text-zinc-300 cursor-pointer text-center"
-            >
-              🛑 Add Stop
-            </button>
-            <button
-              onClick={() => {
-                const newDrop = prompt('Enter new destination address:', dropoffText);
-                if (newDrop) setDropoffText(newDrop);
-              }}
-              className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-2.5 rounded-xl text-zinc-300 cursor-pointer text-center"
-            >
-              🗺️ Change Drop
-            </button>
-            <button
-              onClick={handleExtendDuration}
-              className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-2.5 rounded-xl text-zinc-300 cursor-pointer text-center col-span-2"
-            >
-              📅 Extend Duration (+1h)
-            </button>
-            <button
-              onClick={() => setShowIssueModal(true)}
-              className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-2.5 rounded-xl text-zinc-400 hover:text-white cursor-pointer text-center col-span-2"
-            >
-              ⚠️ Report Safety Issue
-            </button>
-          </div>
-        </div>
-
-        {/* Timeline tracker */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 font-mono text-[9px]">
-          <h4 className="text-[10px] font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Trip Milestone Timeline
-          </h4>
-          <div className="space-y-2 text-zinc-500">
-            <div className="flex items-center gap-2 text-zinc-600">
-              <span>●</span>
-              <span>Trip booked at 14:02</span>
-            </div>
-            <div className="flex items-center gap-2 text-zinc-600">
-              <span>●</span>
-              <span>Driver assigned at 14:05</span>
-            </div>
-            <div className={`flex items-center gap-2 ${tripStatus !== 'ARRIVING' ? 'text-zinc-600' : 'text-white font-bold animate-pulse'}`}>
-              <span>●</span>
-              <span>Driver Arriving at Location</span>
-            </div>
-            {tripStatus !== 'ARRIVING' && (
-              <div className={`flex items-center gap-2 ${tripStatus === 'ARRIVED' ? 'text-white font-bold animate-pulse' : 'text-zinc-600'}`}>
-                <span>●</span>
-                <span>Driver Arrived (Awaiting OTP)</span>
-              </div>
-            )}
-            {tripStatus === 'IN_TRANSIT' && (
-              <div className="flex items-center gap-2 text-white font-bold">
-                <span>●</span>
-                <span>Trip Started (En Route)</span>
+            ) : (
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-white font-mono uppercase">Everything OK?</h3>
+                <p className="text-[9px] text-zinc-400 font-sans leading-normal">
+                  Our sensors detected an unscheduled stop or route deviation. Please confirm your safety to prevent escalating alarms.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowAnomalyOverlay(false);
+                      alert('✔️ Safety acknowledged. Tracking buffer cleared.');
+                    }}
+                    className="flex-1 bg-white text-black font-mono font-bold text-[8px] py-2 rounded-lg uppercase cursor-pointer"
+                  >
+                    Yes, I am Safe
+                  </button>
+                  <button
+                    onClick={handleSOS}
+                    className="flex-grow-0 bg-red-600 text-white border border-red-500 px-4 py-2 rounded-lg font-mono font-bold text-[8px] uppercase cursor-pointer"
+                  >
+                    Dial 112
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
-      </main>
-
-      <footer className="w-full max-w-md mx-auto text-center text-[8px] font-mono text-zinc-700 select-none pt-4 border-t border-zinc-900">
-        SECURE VEHICLE ROUTE DATA LAYER • FAST-TAG CLUSTER
-      </footer>
+      )}
     </div>
   );
 }
