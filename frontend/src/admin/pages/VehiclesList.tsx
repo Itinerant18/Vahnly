@@ -363,14 +363,14 @@ export const VehiclesList: React.FC = () => {
 									<td className="p-4">
 										{v.owner_type === 'DRIVER' ? (
 											<Link
-												to={`/admin/drivers/${v.owner_id}`}
+												to={`/drivers/${v.owner_id}`}
 												className="hover:underline font-semibold text-ink"
 											>
 												{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Driver</span>
 											</Link>
 										) : (
 											<Link
-												to={`/admin/riders/${v.owner_id}`}
+												to={`/riders/${v.owner_id}`}
 												className="hover:underline font-semibold text-ink"
 											>
 												{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Rider</span>

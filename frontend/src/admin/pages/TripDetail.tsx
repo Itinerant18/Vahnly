@@ -217,7 +217,7 @@ export const TripDetail: React.FC = () => {
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
         <div className="text-lg font-bold text-ink mb-1">Trip Record Missing</div>
         <p className="text-xs text-mute max-w-sm">The requested Order UUID does not exist or you do not have permission to view it.</p>
-        <Link to="/admin/trips" className="mt-4 text-xs font-semibold text-ink underline">Back to Trips List</Link>
+        <Link to="/trips" className="mt-4 text-xs font-semibold text-ink underline">Back to Trips List</Link>
       </div>
     );
   }
@@ -230,7 +230,7 @@ export const TripDetail: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-canvas-soft pb-4 gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <Link to="/admin/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
+            <Link to="/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
             <span className="text-xs text-mute font-mono">/</span>
             <span className="text-xs text-ink font-semibold font-mono">TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}</span>
           </div>

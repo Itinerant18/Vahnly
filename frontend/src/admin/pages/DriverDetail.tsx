@@ -130,7 +130,7 @@ export const DriverDetail: React.FC = () => {
 				setTargetCity(payload.city_prefix);
 			} else {
 				alert('Driver profile not found.');
-				navigate('/admin/drivers');
+				navigate('/drivers');
 			}
 		} catch (err) {
 			console.error('Failed to load driver details', err);
@@ -368,7 +368,7 @@ export const DriverDetail: React.FC = () => {
 					<button
 						onClick={() => {
 							if (window.confirm("CRITICAL WARNING: This will permanently wipe driver documents and data (GDPR). Proceed?")) {
-								handleAction('delete').then(() => navigate('/admin/drivers'));
+								handleAction('delete').then(() => navigate('/drivers'));
 							}
 						}}
 						className="w-full text-left text-xs text-mute hover:text-status-alert font-semibold px-4.5 py-2 transition-colors text-center"

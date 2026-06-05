@@ -418,7 +418,12 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ---- Header ---- */}
 			<div className="flex justify-between items-center">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-ink">Payments & Finance</h1>
+					<h1 className="text-2xl font-bold tracking-tight text-ink flex items-center gap-2">
+						Payments & Finance
+						{loading && (
+							<span className="inline-flex w-3.5 h-3.5 rounded-full border-2 border-canvas-soft border-t-ink animate-spin" />
+						)}
+					</h1>
 					<p className="text-xs text-mute mt-1">Audit transactions, manage wallets, verify ledger closes, track invoices & resolve gateway disputes.</p>
 				</div>
 				<div className="flex gap-2">

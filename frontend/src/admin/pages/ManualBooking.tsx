@@ -133,9 +133,9 @@ export const ManualBooking: React.FC = () => {
         const data = await res.json();
         alert('Booking created successfully!');
         if (data.order_id) {
-          navigate(`/admin/trips/${data.order_id}`);
+          navigate(`/trips/${data.order_id}`);
         } else {
-          navigate('/admin/trips');
+          navigate('/trips');
         }
       } else {
         const errText = await res.text();
@@ -152,7 +152,7 @@ export const ManualBooking: React.FC = () => {
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
       <div className="flex items-center space-x-2 border-b border-canvas-soft pb-4">
-        <Link to="/admin/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
+        <Link to="/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
         <span className="text-xs text-mute font-mono">/</span>
         <span className="text-xs text-ink font-semibold">New Booking</span>
       </div>

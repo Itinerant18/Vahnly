@@ -122,37 +122,37 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   // Core
-  { key: 'dashboard', label: 'Dashboard', path: '/admin', icon: 'Dashboard', group: 'core' },
-  { key: 'operations', label: 'Live Operations', path: '/admin/operations', icon: 'Map', group: 'core' },
+  { key: 'dashboard', label: 'Dashboard', path: '/', icon: 'Dashboard', group: 'core' },
+  { key: 'operations', label: 'Live Operations', path: '/operations', icon: 'Map', group: 'core' },
 
   // Fleet
-  { key: 'trips', label: 'Trips', path: '/admin/trips', icon: 'Trips', group: 'fleet' },
-  { key: 'riders', label: 'Riders', path: '/admin/riders', icon: 'Riders', group: 'fleet' },
-  { key: 'drivers', label: 'Drivers', path: '/admin/drivers', icon: 'Drivers', group: 'fleet' },
-  { key: 'vehicles', label: 'Vehicles', path: '/admin/vehicles', icon: 'Vehicles', group: 'fleet' },
-  { key: 'dispatch', label: 'Dispatch & Zones', path: '/admin/dispatch', icon: 'Dispatch', group: 'fleet' },
-  { key: 'pricing', label: 'Pricing & Surge', path: '/admin/pricing', icon: 'Pricing', group: 'fleet' },
+  { key: 'trips', label: 'Trips', path: '/trips', icon: 'Trips', group: 'fleet' },
+  { key: 'riders', label: 'Riders', path: '/riders', icon: 'Riders', group: 'fleet' },
+  { key: 'drivers', label: 'Drivers', path: '/drivers', icon: 'Drivers', group: 'fleet' },
+  { key: 'vehicles', label: 'Vehicles', path: '/vehicles', icon: 'Vehicles', group: 'fleet' },
+  { key: 'dispatch', label: 'Dispatch & Zones', path: '/dispatch', icon: 'Dispatch', group: 'fleet' },
+  { key: 'pricing', label: 'Pricing & Surge', path: '/pricing', icon: 'Pricing', group: 'fleet' },
 
   // Finance
-  { key: 'promotions', label: 'Promotions', path: '/admin/promotions', icon: 'Promotions', group: 'finance' },
-  { key: 'payments', label: 'Payments & Finance', path: '/admin/finance', icon: 'Payments', group: 'finance' },
-  { key: 'payouts', label: 'Payouts', path: '/admin/payouts', icon: 'Payouts', group: 'finance' },
+  { key: 'promotions', label: 'Promotions', path: '/promotions', icon: 'Promotions', group: 'finance' },
+  { key: 'payments', label: 'Payments & Finance', path: '/finance', icon: 'Payments', group: 'finance' },
+  { key: 'payouts', label: 'Payouts', path: '/payouts', icon: 'Payouts', group: 'finance' },
 
   // Engagement
-  { key: 'support', label: 'Support / Tickets', path: '/admin/support', icon: 'Support', group: 'engagement' },
-  { key: 'safety', label: 'Safety & Incidents', path: '/admin/safety', icon: 'Safety', group: 'engagement' },
-  { key: 'marketing', label: 'Marketing & Campaigns', path: '/admin/marketing', icon: 'Marketing', group: 'engagement' },
-  { key: 'communications', label: 'Communications', path: '/admin/communications', icon: 'Comms', group: 'engagement' },
-  { key: 'content', label: 'Content (CMS)', path: '/admin/content', icon: 'Content', group: 'engagement' },
+  { key: 'support', label: 'Support / Tickets', path: '/support', icon: 'Support', group: 'engagement' },
+  { key: 'safety', label: 'Safety & Incidents', path: '/safety', icon: 'Safety', group: 'engagement' },
+  { key: 'marketing', label: 'Marketing & Campaigns', path: '/marketing', icon: 'Marketing', group: 'engagement' },
+  { key: 'communications', label: 'Communications', path: '/communications', icon: 'Comms', group: 'engagement' },
+  { key: 'content', label: 'Content (CMS)', path: '/content', icon: 'Content', group: 'engagement' },
 
   // System
-  { key: 'analytics', label: 'Analytics & Reports', path: '/admin/analytics', icon: 'Analytics', group: 'system' },
-  { key: 'compliance', label: 'Compliance & KYC', path: '/admin/compliance', icon: 'Compliance', group: 'system' },
-  { key: 'documents', label: 'Documents Vault', path: '/admin/documents', icon: 'Documents', group: 'system' },
-  { key: 'settings', label: 'Configuration', path: '/admin/settings', icon: 'Settings', group: 'system' },
-  { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: 'Audit', group: 'system' },
-  { key: 'api', label: 'Developer / API', path: '/admin/api', icon: 'API', group: 'system' },
-  { key: 'team', label: 'Team & Roles', path: '/admin/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
+  { key: 'analytics', label: 'Analytics & Reports', path: '/analytics', icon: 'Analytics', group: 'system' },
+  { key: 'compliance', label: 'Compliance & KYC', path: '/compliance', icon: 'Compliance', group: 'system' },
+  { key: 'documents', label: 'Documents Vault', path: '/documents', icon: 'Documents', group: 'system' },
+  { key: 'settings', label: 'Configuration', path: '/settings', icon: 'Settings', group: 'system' },
+  { key: 'audit', label: 'Audit Logs', path: '/audit', icon: 'Audit', group: 'system' },
+  { key: 'api', label: 'Developer / API', path: '/api', icon: 'API', group: 'system' },
+  { key: 'team', label: 'Team & Roles', path: '/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
 ];
 
 export const navGroups: { key: string; label: string }[] = [

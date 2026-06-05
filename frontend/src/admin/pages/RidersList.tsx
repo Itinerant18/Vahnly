@@ -326,7 +326,7 @@ export const RidersList: React.FC = () => {
 							{riders.map((rider) => (
 								<tr
 									key={rider.customer_id}
-									onClick={() => navigate(`/admin/riders/${rider.customer_id}`)}
+									onClick={() => navigate(`/riders/${rider.customer_id}`)}
 									className="hover:bg-canvas-softer cursor-pointer transition-colors"
 								>
 									<td className="p-4 font-semibold text-ink text-xs">

@@ -181,7 +181,7 @@ export const TripsList: React.FC = () => {
           <p className="text-xs text-mute mt-1">Manage and audit all vehicle bookings, states, and transactions</p>
         </div>
         <Link
-          to="/admin/trips/new"
+          to="/trips/new"
           className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
         >
           + Manual Booking
@@ -393,7 +393,7 @@ export const TripsList: React.FC = () => {
                 return (
                   <tr
                     key={trip.id}
-                    onClick={() => navigate(`/admin/trips/${trip.id}`)}
+                    onClick={() => navigate(`/trips/${trip.id}`)}
                     className={`hover:bg-canvas-softer cursor-pointer transition-colors ${
                       isSelected ? 'bg-canvas-softer/50' : ''
                     }`}

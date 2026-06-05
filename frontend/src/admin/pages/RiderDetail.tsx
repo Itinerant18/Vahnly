@@ -198,7 +198,7 @@ export const RiderDetail: React.FC = () => {
 				});
 			} else {
 				alert('Rider details not found.');
-				navigate('/admin/riders');
+				navigate('/riders');
 			}
 		} catch (err) {
 			console.error('Failed to load rider details', err);
@@ -601,7 +601,7 @@ export const RiderDetail: React.FC = () => {
 										{data.payments.transactions.map((tx) => (
 											<tr key={tx.order_id} className="hover:bg-canvas-softer">
 												<td className="p-4 font-mono text-ink font-semibold">
-													<Link to={`/admin/trips/${tx.order_id}`} className="underline hover:text-black-elevated">
+													<Link to={`/trips/${tx.order_id}`} className="underline hover:text-black-elevated">
 														TRP-{tx.order_id.substring(tx.order_id.length - 8).toUpperCase()}
 													</Link>
 												</td>

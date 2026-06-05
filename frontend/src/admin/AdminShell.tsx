@@ -35,9 +35,9 @@ const mockNotifications = [
 
 // ─── Quick actions ──────────────────────────────────────────────────────
 const quickActions = [
-  { label: 'New promo', path: '/admin/promotions' },
-  { label: 'New broadcast', path: '/admin/communications' },
-  { label: 'Manual booking', path: '/admin/dispatch' },
+  { label: 'New promo', path: '/promotions' },
+  { label: 'New broadcast', path: '/communications' },
+  { label: 'Manual booking', path: '/dispatch' },
 ];
 
 // ─── City options ───────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export const AdminShell: React.FC = () => {
   });
 
   const isActive = (path: string) => {
-    if (path === '/admin') return location.pathname === '/admin' || location.pathname === '/admin/';
+    if (path === '/') return location.pathname === '/' || location.pathname === '';
     return location.pathname.startsWith(path);
   };
 
@@ -130,7 +130,7 @@ export const AdminShell: React.FC = () => {
         <div className="flex items-center gap-4 flex-1 max-w-xl">
           <h1
             className="text-lg font-bold tracking-tight text-ink whitespace-nowrap cursor-pointer"
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/')}
           >
             drivers-for-u
           </h1>
@@ -265,7 +265,7 @@ export const AdminShell: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    navigate('/admin/settings');
+                    navigate('/settings');
                     setShowProfileMenu(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-canvas-softer transition"

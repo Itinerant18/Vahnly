@@ -88,7 +88,7 @@ export const DriversList: React.FC = () => {
 					<p className="text-xs text-mute mt-1">Manage partner registrations, state triggers, performance metrics, and certifications</p>
 				</div>
 				<Link
-					to="/admin/drivers/onboarding"
+					to="/drivers/onboarding"
 					className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
 				>
 					Onboarding Queue →
@@ -251,7 +251,7 @@ export const DriversList: React.FC = () => {
 							{drivers.map((driver) => (
 								<tr
 									key={driver.driver_id}
-									onClick={() => navigate(`/admin/drivers/${driver.driver_id}`)}
+									onClick={() => navigate(`/drivers/${driver.driver_id}`)}
 									className="hover:bg-canvas-softer cursor-pointer transition-colors text-xs"
 								>
 									<td className="p-4 flex items-center space-x-3">
