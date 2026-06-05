@@ -125,6 +125,9 @@ func main() {
 	promoLogger := log.New(os.Stdout, "[PROMO_ADMIN] ", log.LstdFlags)
 	promoHandler := adminHttp.NewPromoHandler(dbPool, redisClusterClient, promoLogger)
 
+	financeLogger := log.New(os.Stdout, "[FINANCE_ADMIN] ", log.LstdFlags)
+	financeHandler := adminHttp.NewFinanceHandler(dbPool, financeLogger)
+
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
 
@@ -242,6 +245,24 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/promos/referral", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}, promoHandler.HandlePostReferralSettings))
 	mux.HandleFunc("GET /api/v1/admin/promos/loyalty", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "FINANCE", "ANALYTICS"}, promoHandler.HandleGetLoyaltySettings))
 	mux.HandleFunc("POST /api/v1/admin/promos/loyalty", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}, promoHandler.HandlePostLoyaltySettings))
+
+	// Finance & Payments control endpoints
+	mux.HandleFunc("GET /api/v1/admin/finance/transactions", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleGetTransactions))
+	mux.HandleFunc("GET /api/v1/admin/finance/transactions/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleGetTransactionDetail))
+	mux.HandleFunc("GET /api/v1/admin/finance/refunds", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, financeHandler.HandleGetRefunds))
+	mux.HandleFunc("POST /api/v1/admin/finance/refunds", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "CUSTOMER_SUPPORT"}, financeHandler.HandlePostRefund))
+	mux.HandleFunc("POST /api/v1/admin/finance/refunds/{id}/approve", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandleApproveRefund))
+	mux.HandleFunc("POST /api/v1/admin/finance/refunds/{id}/reject", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandleRejectRefund))
+	mux.HandleFunc("GET /api/v1/admin/finance/wallets", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleGetWallets))
+	mux.HandleFunc("GET /api/v1/admin/finance/wallets/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleGetWalletDetail))
+	mux.HandleFunc("POST /api/v1/admin/finance/wallets/{id}/adjust", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandlePostWalletAdjustment))
+	mux.HandleFunc("GET /api/v1/admin/finance/invoices", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleGetInvoices))
+	mux.HandleFunc("GET /api/v1/admin/finance/invoices/export", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, financeHandler.HandleExportInvoices))
+	mux.HandleFunc("GET /api/v1/admin/finance/reconciliation", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, financeHandler.HandleGetReconciliation))
+	mux.HandleFunc("GET /api/v1/admin/finance/reconciliation/cash-collect", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, financeHandler.HandleGetCashCollect))
+	mux.HandleFunc("POST /api/v1/admin/finance/reconciliation/daily-close", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandlePostDailyClose))
+	mux.HandleFunc("GET /api/v1/admin/finance/disputes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, financeHandler.HandleGetDisputes))
+	mux.HandleFunc("POST /api/v1/admin/finance/disputes/{id}/evidence", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandlePostDisputeEvidence))
 
 	// Dashboard endpoints with proper RBAC protecting all roles
 	allAdminRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "MARKETING", "ANALYTICS", "CITY_MANAGER", "COMPLIANCE", "AUDITOR"}

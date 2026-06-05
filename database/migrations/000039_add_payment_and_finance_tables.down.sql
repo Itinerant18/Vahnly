@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS disputes;
+DROP TABLE IF EXISTS invoices;
+DROP TABLE IF EXISTS wallet_ledger_entries;
+DROP TABLE IF EXISTS wallets;
+DROP TABLE IF EXISTS refunds;
+DROP TABLE IF EXISTS transactions;

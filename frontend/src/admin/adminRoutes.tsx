@@ -45,6 +45,9 @@ const PricingDashboard = lazy(() =>
 const PromotionsDashboard = lazy(() =>
   import('./pages/PromotionsDashboard').then((m) => ({ default: m.PromotionsDashboard }))
 );
+const FinanceDashboard = lazy(() =>
+  import('./pages/FinanceDashboard').then((m) => ({ default: m.FinanceDashboard }))
+);
 const AdminTeamManagement = lazy(() =>
   import('./components/AdminTeamManagement').then((m) => ({ default: m.AdminTeamManagement }))
 );
@@ -89,7 +92,8 @@ export const adminRoutes: RouteObject[] = [
   { path: 'dispatch', element: <LazyWrap><DispatchDashboard /></LazyWrap> },
   { path: 'pricing', element: <LazyWrap><PricingDashboard /></LazyWrap> },
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
-  { path: 'payments', element: <PlaceholderPage title="Payments & Finance" /> },
+  { path: 'finance', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
+  { path: 'payments', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payouts', element: <PlaceholderPage title="Payouts" /> },
   { path: 'support', element: <PlaceholderPage title="Support / Tickets" /> },
   { path: 'safety', element: <PlaceholderPage title="Safety & Incidents" /> },
@@ -131,7 +135,7 @@ export const navItems: NavItem[] = [
 
   // Finance
   { key: 'promotions', label: 'Promotions', path: '/admin/promotions', icon: 'Promotions', group: 'finance' },
-  { key: 'payments', label: 'Payments & Finance', path: '/admin/payments', icon: 'Payments', group: 'finance' },
+  { key: 'payments', label: 'Payments & Finance', path: '/admin/finance', icon: 'Payments', group: 'finance' },
   { key: 'payouts', label: 'Payouts', path: '/admin/payouts', icon: 'Payouts', group: 'finance' },
 
   // Engagement
