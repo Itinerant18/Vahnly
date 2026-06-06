@@ -313,6 +313,7 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 	if adminEmail == "" {
 		adminEmail = "admin@example.com"
 	}
+	_ = adminEmail // suppress unused
 
 	var req struct {
 		TransactionID string `json:"transaction_id"`
@@ -390,7 +391,9 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Create refund record
 	insertRefund := `
@@ -453,7 +456,9 @@ func (h *FinanceHandler) HandleApproveRefund(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var refundStatus string
 	var amountPaise int64
@@ -566,13 +571,14 @@ func (h *FinanceHandler) executeRefundSettlement(ctx context.Context, tx pgx.Tx,
 	descCredit := fmt.Sprintf("Refund processed via card/UPI gateway (settlement outflow) for refund %s", refundID)
 	descDebit := fmt.Sprintf("Refund amount debited from Rider payment receivable for refund %s", refundID)
 
-	var ordIDVal interface{} = nil
+	var ordIDVal interface{}
 	if orderID.Valid {
 		ordIDVal = orderID.String
 	} else {
 		// Create a mock UUID or use a sentinel if orderID is not present (for wallet topup refunds)
 		ordIDVal = "00000000-0000-0000-0000-000000000000"
 	}
+	_ = ordIDVal
 
 	_, err = tx.Exec(ctx, ledgerQuery, ordIDVal, cityPrefix, amount, descCredit, descDebit)
 	if err != nil {
@@ -820,7 +826,9 @@ func (h *FinanceHandler) HandlePostWalletAdjustment(w http.ResponseWriter, r *ht
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var walletID string
 	var currentBalance int64
@@ -1014,6 +1022,7 @@ func (h *FinanceHandler) HandleExportInvoices(w http.ResponseWriter, r *http.Req
 		args = append(args, strings.ToUpper(status))
 		argIdx++
 	}
+	_ = argIdx
 
 	query += " ORDER BY created_at DESC"
 
