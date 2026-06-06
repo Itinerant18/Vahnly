@@ -316,7 +316,7 @@ func (h *AdminAuthHandler) HandleEnroll2FA(w http.ResponseWriter, r *http.Reques
 	h.recordAuditLog(ctx, adminID, email, "2FA_ENROLLED", "TOTP secret provisioned", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"secret":       secret,
 		"otpauth_uri":  totpEnrolmentURI(secret, email, "Drivers-For-U Admin"),
 		"instructions": "Scan in an authenticator app, then verify a 6-digit code at next login.",
@@ -374,7 +374,7 @@ func (h *AdminAuthHandler) HandleAdminRegister(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // HandleListAdmins retrieves the list of all administrators
@@ -425,7 +425,7 @@ func (h *AdminAuthHandler) HandleListAdmins(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(list)
 }
 
 // HandleInviteAdmin creates a new admin user record with random initial password hash

@@ -93,7 +93,9 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 		http.Error(w, "tx_initialization_failure", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var currentStatus, cityPrefix string
 	err = tx.QueryRow(ctx,
@@ -150,7 +152,7 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 	_ = h.clusterClient.Set(ctx, fmt.Sprintf("cooldown:driver:%s", req.DriverID), "1", 30*time.Minute).Err()
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))
+	_, _ = w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))
 }
 
 // HandleUpsertGeofenceZone injects interactive vector boundaries directly into PostGIS Spatial Databases
@@ -228,7 +230,7 @@ func (h *MarketplaceOrchestratorHandler) HandleUpsertGeofenceZone(w http.Respons
 	_ = h.clusterClient.Del(ctx, fmt.Sprintf("geofence:active:cache:%s", req.CityPrefix)).Err()
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"status":"GEOFENCE_GEOMETRY_UPSERTED_SUCCESSFULLY"}`))
+	_, _ = w.Write([]byte(`{"status":"GEOFENCE_GEOMETRY_UPSERTED_SUCCESSFULLY"}`))
 }
 
 // HandleGetGeofenceZones retrieves all operational geofences from PostGIS
@@ -357,7 +359,7 @@ func (h *MarketplaceOrchestratorHandler) HandleExecuteFraudLockout(w http.Respon
 	_ = h.clusterClient.Del(ctx, fmt.Sprintf("driver:lock:%s", req.DriverID)).Err()
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"COMPLIANCE_FRAUD_LOCKOUT_COMMITTED"}`))
+	_, _ = w.Write([]byte(`{"status":"COMPLIANCE_FRAUD_LOCKOUT_COMMITTED"}`))
 }
 
 // HandleGetFraudAnomalies exposes active/suspicious telemetry spoofing exceptions

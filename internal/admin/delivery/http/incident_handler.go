@@ -246,7 +246,9 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 		http.Error(w, "transaction_initialization_failure", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if req.RecoveryAction == "FORCE_REMATCH" {
 		// 1. Re-initialize order entry back to CREATED state and break current driver bindings
