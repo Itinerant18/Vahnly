@@ -341,7 +341,9 @@ func (h *AdminTripHandler) HandleAdminCancelOrder(w http.ResponseWriter, r *http
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var assignedDriverID *string
 	queryFindDriver := `
@@ -728,7 +730,9 @@ func (h *AdminTripHandler) HandleAdminCreateTrip(w http.ResponseWriter, r *http.
 		http.Error(w, "failed_to_initialize_transaction", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	orderID := ""
 	queryOrder := ""
@@ -841,7 +845,9 @@ func (h *AdminTripHandler) HandleAdminReassignTrip(w http.ResponseWriter, r *htt
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Free current driver if assigned
 	var oldDriverID *string

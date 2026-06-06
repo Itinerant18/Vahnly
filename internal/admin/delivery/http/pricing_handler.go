@@ -135,7 +135,7 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 		fmt.Sprintf("Enforced emergency surge freeze multiplier cap %f on cell %s in city %s", req.MaxMultiplier, req.H3Cell, req.CityPrefix), getClientIP(r))
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"SURGE_DEFLATION_VALVE_ENGAGED"}`))
+	_, _ = w.Write([]byte(`{"status":"SURGE_DEFLATION_VALVE_ENGAGED"}`))
 }
 
 func (h *PricingAdminHandler) HandleGetFares(w http.ResponseWriter, r *http.Request) {

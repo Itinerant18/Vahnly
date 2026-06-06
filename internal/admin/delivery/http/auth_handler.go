@@ -492,7 +492,7 @@ func (h *AdminAuthHandler) HandleInviteAdmin(w http.ResponseWriter, r *http.Requ
 	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", req.Email, "ADMIN_INVITED", fmt.Sprintf("Invited as %s with scope %s", requestedRole, cityScope), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Admin profile invited successfully."})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Admin profile invited successfully."})
 }
 
 // HandleEditRole updates role and city scope parameters
@@ -536,7 +536,7 @@ func (h *AdminAuthHandler) HandleEditRole(w http.ResponseWriter, r *http.Request
 	h.recordAuditLog(ctx, req.AdminID, "", "ROLE_UPDATED", fmt.Sprintf("New Role: %s, Scope: %s", requestedRole, req.CityScope), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
 // HandleSuspendAdmin locks administrative accounts by toggling the active boolean gate
@@ -578,7 +578,7 @@ func (h *AdminAuthHandler) HandleSuspendAdmin(w http.ResponseWriter, r *http.Req
 	h.recordAuditLog(ctx, req.AdminID, "", actionStr, "Admin suspension state altered", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
 // HandleReset2FA clears the 2FA secret
