@@ -20,8 +20,8 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/events"
-	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
+	"go.opentelemetry.io/otel"
 )
 
 const maxHungarianCommitWorkers = 16
@@ -260,13 +260,22 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 
 			// Filter out candidates on active match cooldown
 			var validCandidates []matcher.CandidateDriver
-			for _, d := range candidates {
-				cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
-				exists, err := c.redisClusterClient.Exists(orderCtx, cooldownKey).Result()
-				if err == nil && exists > 0 {
-					continue // Skip this driver; they recently declined or timed out an offer
+			if len(candidates) > 0 {
+				pipe := c.redisClusterClient.Pipeline()
+				cmds := make([]*redis.IntCmd, len(candidates))
+				for i, d := range candidates {
+					cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
+					cmds[i] = pipe.Exists(orderCtx, cooldownKey)
 				}
-				validCandidates = append(validCandidates, d)
+				_, _ = pipe.Exec(orderCtx)
+
+				for i, d := range candidates {
+					exists, err := cmds[i].Result()
+					if err == nil && exists > 0 {
+						continue // Skip this driver; they recently declined or timed out an offer
+					}
+					validCandidates = append(validCandidates, d)
+				}
 			}
 
 			if len(validCandidates) == 0 {
@@ -357,13 +366,22 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 
 			// Filter out candidates on active match cooldown
 			var validCandidates []matcher.CandidateDriver
-			for _, d := range candidates {
-				cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
-				exists, err := c.redisClusterClient.Exists(batchCtx, cooldownKey).Result()
-				if err == nil && exists > 0 {
-					continue // Skip this driver; they recently declined or timed out an offer
+			if len(candidates) > 0 {
+				pipe := c.redisClusterClient.Pipeline()
+				cmds := make([]*redis.IntCmd, len(candidates))
+				for i, d := range candidates {
+					cooldownKey := fmt.Sprintf("cooldown:driver:%s", d.DriverID)
+					cmds[i] = pipe.Exists(batchCtx, cooldownKey)
 				}
-				validCandidates = append(validCandidates, d)
+				_, _ = pipe.Exec(batchCtx)
+
+				for i, d := range candidates {
+					exists, err := cmds[i].Result()
+					if err == nil && exists > 0 {
+						continue // Skip this driver; they recently declined or timed out an offer
+					}
+					validCandidates = append(validCandidates, d)
+				}
 			}
 
 			mapMu.Lock()
