@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -48,8 +49,33 @@ func main() {
 	defer dbPool.Close()
 
 	nodeList := strings.Split(redisNodes, ",")
+
+	// Support local port-forwarded routing mapping (required for host dev connectivity to Docker)
+	ipMapStr := os.Getenv("REDIS_IP_MAP")
+	ipMap := make(map[string]string)
+	if ipMapStr != "" {
+		for _, pair := range strings.Split(ipMapStr, ",") {
+			parts := strings.Split(pair, "=")
+			if len(parts) == 2 {
+				ipMap[parts[0]] = parts[1]
+			}
+		}
+	}
+
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs: nodeList,
+		Addrs:          nodeList,
+		ReadOnly:       false,
+		RouteByLatency: true,
+		DialTimeout:    2 * time.Second,
+		ReadTimeout:    500 * time.Millisecond,
+		WriteTimeout:   500 * time.Millisecond,
+		Dialer: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if localAddr, ok := ipMap[addr]; ok {
+				addr = localAddr
+			}
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, network, addr)
+		},
 	})
 	defer redisClusterClient.Close()
 
@@ -127,6 +153,39 @@ func main() {
 
 	financeLogger := log.New(os.Stdout, "[FINANCE_ADMIN] ", log.LstdFlags)
 	financeHandler := adminHttp.NewFinanceHandler(dbPool, financeLogger)
+
+	payoutLogger := log.New(os.Stdout, "[PAYOUT_ADMIN] ", log.LstdFlags)
+	payoutHandler := adminHttp.NewPayoutHandler(dbPool, payoutLogger)
+
+	supportLogger := log.New(os.Stdout, "[SUPPORT_ADMIN] ", log.LstdFlags)
+	supportHandler := adminHttp.NewSupportHandler(dbPool, supportLogger)
+
+	safetyLogger := log.New(os.Stdout, "[SAFETY_ADMIN] ", log.LstdFlags)
+	safetyHandler := adminHttp.NewSafetyHandler(dbPool, safetyLogger)
+
+	marketingLogger := log.New(os.Stdout, "[MARKETING_ADMIN] ", log.LstdFlags)
+	marketingHandler := adminHttp.NewMarketingHandler(dbPool, marketingLogger)
+
+	analyticsLogger := log.New(os.Stdout, "[ANALYTICS_ADMIN] ", log.LstdFlags)
+	analyticsHandler := adminHttp.NewAnalyticsHandler(dbPool, analyticsLogger)
+
+	configLogger := log.New(os.Stdout, "[CONFIG_ADMIN] ", log.LstdFlags)
+	configHandler := adminHttp.NewConfigHandler(dbPool, configLogger)
+
+	developerLogger := log.New(os.Stdout, "[DEV_ADMIN] ", log.LstdFlags)
+	developerHandler := adminHttp.NewDeveloperHandler(dbPool, developerLogger)
+
+	corporateLogger := log.New(os.Stdout, "[CORPORATE_ADMIN] ", log.LstdFlags)
+	corporateHandler := adminHttp.NewCorporateHandler(dbPool, corporateLogger)
+
+	auditLogger := log.New(os.Stdout, "[AUDIT_ADMIN] ", log.LstdFlags)
+	auditHandler := adminHttp.NewAuditHandler(dbPool, auditLogger)
+
+	cmsLogger := log.New(os.Stdout, "[CMS_ADMIN] ", log.LstdFlags)
+	cmsHandler := adminHttp.NewCMSHandler(dbPool, cmsLogger)
+
+	documentsLogger := log.New(os.Stdout, "[DOCUMENTS_ADMIN] ", log.LstdFlags)
+	documentsHandler := adminHttp.NewDocumentsHandler(dbPool, documentsLogger)
 
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
@@ -226,6 +285,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicles))
 	mux.HandleFunc("POST /api/v1/admin/vehicles/reminders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleSendDocReminders))
 	mux.HandleFunc("POST /api/v1/admin/vehicles/{plate}/override", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostVehicleOverride))
+	mux.HandleFunc("GET /api/v1/admin/customers/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetCustomerVehicleProfiles))
+	mux.HandleFunc("POST /api/v1/admin/customers/vehicles/update", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostCustomerVehicleProfileUpdate))
+
 
 	// Dispatch, Zones & Rules control endpoints
 	mux.HandleFunc("GET /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, dispatchHandler.HandleGetCities))
@@ -263,6 +325,179 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/finance/reconciliation/daily-close", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandlePostDailyClose))
 	mux.HandleFunc("GET /api/v1/admin/finance/disputes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, financeHandler.HandleGetDisputes))
 	mux.HandleFunc("POST /api/v1/admin/finance/disputes/{id}/evidence", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, financeHandler.HandlePostDisputeEvidence))
+
+	// Payouts control endpoints
+	mux.HandleFunc("GET /api/v1/admin/finance/payouts", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, payoutHandler.HandleGetPayouts))
+	mux.HandleFunc("GET /api/v1/admin/finance/payouts/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR", "AUDITOR"}, payoutHandler.HandleGetPayoutDetail))
+	mux.HandleFunc("POST /api/v1/admin/finance/payouts/bulk-approve", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleBulkApprovePayouts))
+	mux.HandleFunc("GET /api/v1/admin/finance/payouts/export-batch", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}, payoutHandler.HandleExportPayoutBatch))
+	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/retry", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleRetryPayout))
+	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/hold", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleHoldPayout))
+	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/release", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleReleasePayout))
+
+	// Support & Ticket control endpoints
+	supportRoles := []string{"SUPER_ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD", "SAFETY", "FINANCE"}
+	mux.HandleFunc("GET /api/v1/admin/support/tickets", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetTickets))
+	mux.HandleFunc("GET /api/v1/admin/support/tickets/{id}", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetTicketDetail))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleCreateTicket))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/bulk-assign", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleBulkAssignTickets))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/merge", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleMergeTickets))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/tags", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleUpdateTicketTags))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/message", authGuard.RequireAnyRole(supportRoles, supportHandler.HandlePostMessage))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/escalate", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleEscalateTicket))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/resolve", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleResolveTicket))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/close", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleCloseTicket))
+	mux.HandleFunc("POST /api/v1/admin/support/tickets/{id}/csat", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleSubmitCSAT))
+	mux.HandleFunc("GET /api/v1/admin/support/lost-found", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetLostFoundItems))
+	mux.HandleFunc("POST /api/v1/admin/support/lost-found", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleCreateLostFoundItem))
+	mux.HandleFunc("PATCH /api/v1/admin/support/lost-found/{id}", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleUpdateLostFoundItem))
+	mux.HandleFunc("POST /api/v1/admin/support/lost-found/{id}", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleUpdateLostFoundItem))
+	mux.HandleFunc("GET /api/v1/admin/support/macros", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetMacros))
+	mux.HandleFunc("POST /api/v1/admin/support/macros", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleCreateMacro))
+	mux.HandleFunc("GET /api/v1/admin/support/faqs", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetFAQs))
+	mux.HandleFunc("POST /api/v1/admin/support/faqs", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleCreateFAQ))
+	mux.HandleFunc("GET /api/v1/admin/support/stats", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleGetSupportStats))
+	mux.HandleFunc("POST /api/v1/admin/support/click-to-call", authGuard.RequireAnyRole(supportRoles, supportHandler.HandleClickToCall))
+
+	// Safety & Incident control endpoints
+	safetyRoles := []string{"SUPER_ADMIN", "SUPPORT_LEAD", "SAFETY"}
+	mux.HandleFunc("GET /api/v1/admin/safety/sos", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleGetSOSAlerts))
+	mux.HandleFunc("POST /api/v1/admin/safety/sos", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleCreateSOSAlert))
+	mux.HandleFunc("POST /api/v1/admin/safety/sos/{id}/acknowledge", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleAcknowledgeSOSAlert))
+	mux.HandleFunc("POST /api/v1/admin/safety/sos/{id}/resolve", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleResolveSOSAlert))
+	mux.HandleFunc("POST /api/v1/admin/safety/sos/{id}/actions", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleExecuteSOSAction))
+	mux.HandleFunc("GET /api/v1/admin/safety/incidents", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleGetIncidents))
+	mux.HandleFunc("POST /api/v1/admin/safety/incidents", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleCreateIncident))
+	mux.HandleFunc("GET /api/v1/admin/safety/incidents/{id}", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleGetIncidentDetail))
+	mux.HandleFunc("POST /api/v1/admin/safety/incidents/{id}/outcome", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleResolveIncidentOutcome))
+	mux.HandleFunc("POST /api/v1/admin/safety/incidents/{id}/claim", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleProcessD4MCareClaim))
+	mux.HandleFunc("GET /api/v1/admin/safety/anomalies", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleGetAnomalies))
+	mux.HandleFunc("POST /api/v1/admin/safety/anomalies/{id}/resolve", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleResolveAnomaly))
+	mux.HandleFunc("GET /api/v1/admin/safety/blacklist", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleGetBlacklist))
+	mux.HandleFunc("POST /api/v1/admin/safety/blacklist", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleAddBlacklistBlock))
+	mux.HandleFunc("DELETE /api/v1/admin/safety/blacklist/{id}", authGuard.RequireAnyRole(safetyRoles, safetyHandler.HandleRemoveBlacklistBlock))
+
+	// Marketing & Campaign control endpoints
+	marketingRoles := []string{"SUPER_ADMIN", "MARKETING", "OPERATIONS_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/marketing/segments", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetSegments))
+	mux.HandleFunc("POST /api/v1/admin/marketing/segments", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateSegment))
+	mux.HandleFunc("DELETE /api/v1/admin/marketing/segments/{id}", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleDeleteSegment))
+	mux.HandleFunc("POST /api/v1/admin/marketing/segments/estimate", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleEstimateSegment))
+	mux.HandleFunc("GET /api/v1/admin/marketing/campaigns", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetCampaigns))
+	mux.HandleFunc("POST /api/v1/admin/marketing/campaigns", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateCampaign))
+	mux.HandleFunc("POST /api/v1/admin/marketing/campaigns/{id}/status", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleUpdateCampaignStatus))
+	mux.HandleFunc("GET /api/v1/admin/marketing/campaigns/{id}/analytics", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetCampaignAnalytics))
+	mux.HandleFunc("POST /api/v1/admin/marketing/campaigns/{id}/conversions", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleRecordConversion))
+	mux.HandleFunc("GET /api/v1/admin/marketing/banners", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetBanners))
+	mux.HandleFunc("POST /api/v1/admin/marketing/banners", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateBanner))
+	mux.HandleFunc("PATCH /api/v1/admin/marketing/banners/{id}", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleToggleBannerStatus))
+	mux.HandleFunc("GET /api/v1/admin/marketing/templates/push", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetPushTemplates))
+	mux.HandleFunc("POST /api/v1/admin/marketing/templates/push", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreatePushTemplate))
+	mux.HandleFunc("GET /api/v1/admin/marketing/templates/sms", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetSMSTemplates))
+	mux.HandleFunc("POST /api/v1/admin/marketing/templates/sms", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateSMSTemplate))
+	mux.HandleFunc("GET /api/v1/admin/marketing/templates/email", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetEmailTemplates))
+	mux.HandleFunc("POST /api/v1/admin/marketing/templates/email", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateEmailTemplate))
+	mux.HandleFunc("GET /api/v1/admin/marketing/domains", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleGetDomains))
+	mux.HandleFunc("POST /api/v1/admin/marketing/domains", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleCreateDomain))
+	mux.HandleFunc("POST /api/v1/admin/marketing/domains/{id}/verify", authGuard.RequireAnyRole(marketingRoles, marketingHandler.HandleVerifyDomain))
+
+	// Analytics & Reports endpoints
+	analyticsRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "ANALYTICS", "FINANCE", "CITY_MANAGER", "AUDITOR"}
+	mux.HandleFunc("GET /api/v1/admin/analytics/summary", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetAnalyticsSummary))
+	mux.HandleFunc("GET /api/v1/admin/analytics/trips-over-time", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetTripsOverTime))
+	mux.HandleFunc("GET /api/v1/admin/analytics/revenue-over-time", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetRevenueOverTime))
+	mux.HandleFunc("GET /api/v1/admin/analytics/demand-by-hour", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetDemandByHour))
+	mux.HandleFunc("GET /api/v1/admin/analytics/funnel", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetFunnel))
+	mux.HandleFunc("GET /api/v1/admin/analytics/top-cities", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetTopCities))
+	mux.HandleFunc("GET /api/v1/admin/analytics/prebuilt/{dashboard}", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleGetPrebuiltDashboard))
+	mux.HandleFunc("GET /api/v1/admin/analytics/export", authGuard.RequireAnyRole(analyticsRoles, analyticsHandler.HandleExportCSV))
+
+	// CMS endpoints
+	cmsRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING"}
+	mux.HandleFunc("GET /api/v1/admin/cms/pages", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleGetPages))
+	mux.HandleFunc("POST /api/v1/admin/cms/pages", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleCreatePage))
+	mux.HandleFunc("GET /api/v1/admin/cms/pages/{id}", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleGetPageDetail))
+	mux.HandleFunc("POST /api/v1/admin/cms/pages/{id}/content", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleSaveContent))
+	mux.HandleFunc("POST /api/v1/admin/cms/pages/{id}/publish", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandlePublishPage))
+	mux.HandleFunc("GET /api/v1/admin/cms/pages/{id}/history", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleGetVersionHistory))
+	mux.HandleFunc("GET /api/v1/admin/cms/i18n", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleGetI18NStrings))
+	mux.HandleFunc("POST /api/v1/admin/cms/i18n", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleUpsertI18NString))
+	mux.HandleFunc("GET /api/v1/admin/cms/assets", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleGetAssets))
+	mux.HandleFunc("POST /api/v1/admin/cms/assets", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleCreateAsset))
+	mux.HandleFunc("PATCH /api/v1/admin/cms/assets/{id}", authGuard.RequireAnyRole(cmsRoles, cmsHandler.HandleUpdateAssetStatus))
+
+	// Documents vault + privacy requests
+	docRoles := []string{"SUPER_ADMIN", "COMPLIANCE", "FLEET_MANAGER", "FINANCE", "AUDITOR"}
+	mux.HandleFunc("GET /api/v1/admin/documents", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleGetDocuments))
+	mux.HandleFunc("GET /api/v1/admin/documents/expiring", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleGetExpiringDocuments))
+	mux.HandleFunc("GET /api/v1/admin/documents/{id}", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleGetDocumentDetail))
+	mux.HandleFunc("POST /api/v1/admin/documents/{id}/tags", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleUpdateTags))
+	mux.HandleFunc("PATCH /api/v1/admin/documents/{id}/tags", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleUpdateTags))
+	mux.HandleFunc("DELETE /api/v1/admin/documents/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "COMPLIANCE"}, documentsHandler.HandleDeleteDocument))
+	mux.HandleFunc("GET /api/v1/admin/compliance/privacy-requests", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleGetPrivacyRequests))
+	mux.HandleFunc("POST /api/v1/admin/compliance/privacy-requests", authGuard.RequireAnyRole(docRoles, documentsHandler.HandleCreatePrivacyRequest))
+	mux.HandleFunc("POST /api/v1/admin/compliance/privacy-requests/{id}/process", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "COMPLIANCE"}, documentsHandler.HandleProcessPrivacyRequest))
+
+	// Audit log endpoints (SUPER_ADMIN + AUDITOR only)
+	auditViewRoles := []string{"SUPER_ADMIN", "AUDITOR", "FINANCIAL_AUDITOR", "COMPLIANCE"}
+	mux.HandleFunc("GET /api/v1/admin/audit/logs", authGuard.RequireAnyRole(auditViewRoles, auditHandler.HandleGetAuditLogs))
+	mux.HandleFunc("GET /api/v1/admin/audit/actions", authGuard.RequireAnyRole(auditViewRoles, auditHandler.HandleGetAuditActions))
+	mux.HandleFunc("GET /api/v1/admin/audit/export", authGuard.RequireAnyRole(auditViewRoles, auditHandler.HandleExportAuditCSV))
+	mux.HandleFunc("DELETE /api/v1/admin/audit/cleanup", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, auditHandler.HandleRetentionCleanup))
+
+	// Developer / API endpoints
+	devRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/dev/keys", authGuard.RequireAnyRole(devRoles, developerHandler.HandleGetKeys))
+	mux.HandleFunc("POST /api/v1/admin/dev/keys", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleCreateKey))
+	mux.HandleFunc("PATCH /api/v1/admin/dev/keys/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleUpdateKey))
+	mux.HandleFunc("DELETE /api/v1/admin/dev/keys/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleRevokeKey))
+	mux.HandleFunc("GET /api/v1/admin/dev/webhooks", authGuard.RequireAnyRole(devRoles, developerHandler.HandleGetWebhooks))
+	mux.HandleFunc("POST /api/v1/admin/dev/webhooks", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleCreateWebhook))
+	mux.HandleFunc("PATCH /api/v1/admin/dev/webhooks/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleUpdateWebhook))
+	mux.HandleFunc("POST /api/v1/admin/dev/webhooks/{id}/test", authGuard.RequireAnyRole(devRoles, developerHandler.HandleTestWebhook))
+	mux.HandleFunc("GET /api/v1/admin/dev/logs", authGuard.RequireAnyRole(devRoles, developerHandler.HandleGetAPILogs))
+	mux.HandleFunc("GET /api/v1/admin/dev/incidents", authGuard.RequireAnyRole(devRoles, developerHandler.HandleGetIncidents))
+	mux.HandleFunc("POST /api/v1/admin/dev/incidents", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleUpsertIncident))
+	mux.HandleFunc("PATCH /api/v1/admin/dev/incidents/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, developerHandler.HandleUpsertIncident))
+
+	// Corporate / B2B endpoints
+	corpRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FINANCE"}
+	mux.HandleFunc("GET /api/v1/admin/corporate", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetAccounts))
+	mux.HandleFunc("POST /api/v1/admin/corporate", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, corporateHandler.HandleCreateAccount))
+	mux.HandleFunc("PATCH /api/v1/admin/corporate/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, corporateHandler.HandleUpdateAccount))
+	mux.HandleFunc("GET /api/v1/admin/corporate/{id}/employees", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetEmployees))
+	mux.HandleFunc("POST /api/v1/admin/corporate/{id}/employees", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleAddEmployee))
+	mux.HandleFunc("POST /api/v1/admin/corporate/{id}/employees/bulk", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, corporateHandler.HandleBulkUploadEmployees))
+	mux.HandleFunc("PATCH /api/v1/admin/corporate/{id}/employees/{empId}", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleUpdateEmployee))
+	mux.HandleFunc("GET /api/v1/admin/corporate/{id}/policies", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetPolicies))
+	mux.HandleFunc("POST /api/v1/admin/corporate/{id}/policies", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, corporateHandler.HandleUpsertPolicy))
+	mux.HandleFunc("PATCH /api/v1/admin/corporate/{id}/policies/{policyId}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, corporateHandler.HandleUpsertPolicy))
+	mux.HandleFunc("GET /api/v1/admin/corporate/{id}/invoices", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetInvoices))
+	mux.HandleFunc("POST /api/v1/admin/corporate/{id}/invoices/generate", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, corporateHandler.HandleGenerateInvoice))
+	mux.HandleFunc("PATCH /api/v1/admin/corporate/{id}/invoices/{invId}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, corporateHandler.HandleUpdateInvoiceStatus))
+	mux.HandleFunc("GET /api/v1/admin/corporate/{id}/analytics", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetCorporateAnalytics))
+
+	// Config / Settings endpoints
+	configRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/config/settings", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetSettings))
+	mux.HandleFunc("POST /api/v1/admin/config/settings", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertSettings))
+	mux.HandleFunc("GET /api/v1/admin/config/flags", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetFlags))
+	mux.HandleFunc("POST /api/v1/admin/config/flags", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertFlag))
+	mux.HandleFunc("PATCH /api/v1/admin/config/flags/{key}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertFlag))
+	mux.HandleFunc("GET /api/v1/admin/config/versions", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetAppVersions))
+	mux.HandleFunc("POST /api/v1/admin/config/versions", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleCreateAppVersion))
+	mux.HandleFunc("POST /api/v1/admin/config/versions/{id}/set-latest", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleSetLatestVersion))
+	mux.HandleFunc("GET /api/v1/admin/config/integrations", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetIntegrations))
+	mux.HandleFunc("PATCH /api/v1/admin/config/integrations/{key}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpdateIntegration))
+	mux.HandleFunc("POST /api/v1/admin/config/integrations/{key}/health-check", authGuard.RequireAnyRole(configRoles, configHandler.HandleHealthCheckIntegration))
+	mux.HandleFunc("GET /api/v1/admin/config/templates", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetTemplates))
+	mux.HandleFunc("POST /api/v1/admin/config/templates", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertTemplate))
+	mux.HandleFunc("GET /api/v1/admin/config/cancellation-rules", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetCancellationRules))
+	mux.HandleFunc("POST /api/v1/admin/config/cancellation-rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertCancellationRule))
+	mux.HandleFunc("PATCH /api/v1/admin/config/cancellation-rules/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertCancellationRule))
+	mux.HandleFunc("GET /api/v1/admin/config/rating-rules", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetRatingRules))
+	mux.HandleFunc("POST /api/v1/admin/config/rating-rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertRatingRule))
+	mux.HandleFunc("PATCH /api/v1/admin/config/rating-rules/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertRatingRule))
 
 	// Dashboard endpoints with proper RBAC protecting all roles
 	allAdminRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "MARKETING", "ANALYTICS", "CITY_MANAGER", "COMPLIANCE", "AUDITOR"}

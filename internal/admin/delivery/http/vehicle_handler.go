@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,6 +14,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+type CustomerVehicleProfile struct {
+	ID                     string    `json:"id"`
+	OwnerName              string    `json:"owner_name"`
+	OwnerPhone             string    `json:"owner_phone"`
+	VehicleMakeModel       string    `json:"vehicle_make_model"`
+	LicensePlate           string    `json:"license_plate"`
+	TransmissionRequirement string    `json:"transmission_requirement"` // MANUAL, AUTOMATIC
+	AssetTier              string    `json:"asset_tier"`               // HATCHBACK, PREMIUM_SUV, ULTRA_LUXURY
+	VerificationStatus     string    `json:"verification_status"`      // VERIFIED, PENDING_INSURANCE, FLAGGED
+	EscrowBalancePaise     int64     `json:"escrow_balance_paise"`
+	CityPrefix             string    `json:"city_prefix"`
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
 
 type VehicleHandler struct {
 	dbPool      *pgxpool.Pool
@@ -236,7 +252,8 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 	riderCustomerIDs := make(map[string]string) // customer_id -> city_prefix
 
 	for rows.Next() {
-		var orderID, driverIDOpt, driverName, city, customerID string
+		var orderID, driverName, city, customerID string
+		var driverIDOpt sql.NullString
 		err := rows.Scan(&orderID, &driverIDOpt, &driverName, &city, &customerID)
 		if err != nil {
 			h.logger.Printf("[VEHICLES_ERROR] Failed to scan row: %v", err)
@@ -247,7 +264,7 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 			riderCustomerIDs[customerID] = city
 		}
 
-		if driverIDOpt != "" && driverIDOpt != "00000000-0000-0000-0000-000000000000" {
+		if driverIDOpt.Valid && driverIDOpt.String != "" && driverIDOpt.String != "00000000-0000-0000-0000-000000000000" {
 			// Compute trip vehicle plate using order ID hash
 			val := hashUUID(orderID)
 			plate := fmt.Sprintf("WB-02-%c%c-%04d", 'A'+(val%26), 'A'+((val/26)%26), val%10000)
@@ -256,7 +273,7 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 			if !exists {
 				v = &Vehicle{
 					Plate:      plate,
-					OwnerID:    driverIDOpt,
+					OwnerID:    driverIDOpt.String,
 					OwnerName:  driverName,
 					OwnerType:  "DRIVER",
 					City:       city,
@@ -379,12 +396,13 @@ func (h *VehicleHandler) HandleSendDocReminders(w http.ResponseWriter, r *http.R
 	riderCustomerIDs := make(map[string]string)
 
 	for rows.Next() {
-		var orderID, driverIDOpt, driverName, city, customerID string
+		var orderID, driverName, city, customerID string
+		var driverIDOpt sql.NullString
 		if err := rows.Scan(&orderID, &driverIDOpt, &driverName, &city, &customerID); err == nil {
 			if customerID != "" {
 				riderCustomerIDs[customerID] = city
 			}
-			if driverIDOpt != "" && driverIDOpt != "00000000-0000-0000-0000-000000000000" {
+			if driverIDOpt.Valid && driverIDOpt.String != "" && driverIDOpt.String != "00000000-0000-0000-0000-000000000000" {
 				val := hashUUID(orderID)
 				plate := fmt.Sprintf("WB-02-%c%c-%04d", 'A'+(val%26), 'A'+((val/26)%26), val%10000)
 				if _, exists := vehicleMap[plate]; !exists {
@@ -504,4 +522,147 @@ func projectRiderName(customerID string) string {
 	firstName := firstNames[h%uint32(len(firstNames))]
 	lastName := lastNames[h%uint32(len(lastNames))]
 	return firstName + " " + lastName
+}
+
+func (h *VehicleHandler) HandleGetCustomerVehicleProfiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	sqlCustomers := `
+		SELECT DISTINCT 
+			o.customer_id::text,
+			COALESCE(o.city_prefix, 'KOL') as city_prefix
+		FROM orders o
+		WHERE o.customer_id IS NOT NULL
+	`
+	rows, err := h.dbPool.Query(ctx, sqlCustomers)
+	if err != nil {
+		h.logger.Printf("[VEHICLES_ERROR] Failed to query customers: %v", err)
+		http.Error(w, "database_query_failed", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var profiles []CustomerVehicleProfile
+
+	for rows.Next() {
+		var customerID, city string
+		if err := rows.Scan(&customerID, &city); err != nil {
+			h.logger.Printf("[VEHICLES_ERROR] Failed to scan customer: %v", err)
+			continue
+		}
+
+		val := hashUUID(customerID)
+		plate := fmt.Sprintf("WB-02-%c%c-%04d", 'A'+(val%26), 'A'+((val/26)%26), val%10000)
+
+		transmission := "AUTOMATIC"
+		if val%2 == 0 {
+			transmission = "MANUAL"
+		}
+
+		tier := "HATCHBACK"
+		if val%3 == 0 {
+			tier = "ULTRA_LUXURY"
+		} else if val%3 == 1 {
+			tier = "PREMIUM_SUV"
+		}
+
+		status := "VERIFIED"
+		if val%10 == 0 {
+			status = "FLAGGED"
+		} else if val%10 == 1 {
+			status = "PENDING_INSURANCE"
+		}
+
+		// Predefined vehicle make model
+		hHash := hashPlate(plate)
+		pv := predefinedVehicles[hHash%uint32(len(predefinedVehicles))]
+
+		profile := CustomerVehicleProfile{
+			ID:                     customerID,
+			OwnerName:              projectRiderName(customerID),
+			OwnerPhone:             fmt.Sprintf("+91 9831%d %04d", val%10, val%10000),
+			VehicleMakeModel:       pv.Model,
+			LicensePlate:           plate,
+			TransmissionRequirement: transmission,
+			AssetTier:              tier,
+			VerificationStatus:     status,
+			EscrowBalancePaise:     int64((val % 10000) * 100),
+			CityPrefix:             city,
+			UpdatedAt:              time.Now().Add(-time.Duration(val%100) * time.Hour),
+		}
+
+		// Merge Redis override
+		overrideKey := "customer:vehicle:override:" + customerID
+		ovBytes, err := h.redisClient.Get(ctx, overrideKey).Bytes()
+		if err == nil {
+			var ov struct {
+				TransmissionRequirement string `json:"transmission_requirement"`
+				AssetTier              string `json:"asset_tier"`
+				VerificationStatus     string `json:"verification_status"`
+			}
+			if json.Unmarshal(ovBytes, &ov) == nil {
+				if ov.TransmissionRequirement != "" {
+					profile.TransmissionRequirement = ov.TransmissionRequirement
+				}
+				if ov.AssetTier != "" {
+					profile.AssetTier = ov.AssetTier
+				}
+				if ov.VerificationStatus != "" {
+					profile.VerificationStatus = ov.VerificationStatus
+				}
+			}
+		}
+
+		profiles = append(profiles, profile)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"profiles": profiles,
+	})
+}
+
+func (h *VehicleHandler) HandlePostCustomerVehicleProfileUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProfileID               string `json:"profile_id"`
+		TransmissionRequirement string `json:"transmission_requirement"`
+		AssetTier              string `json:"asset_tier"`
+		VerificationStatus     string `json:"verification_status"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProfileID == "" {
+		http.Error(w, "invalid_json_body", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	overrideKey := "customer:vehicle:override:" + req.ProfileID
+	ovBytes, err := json.Marshal(req)
+	if err != nil {
+		http.Error(w, "failed_to_serialize_override", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.redisClient.Set(ctx, overrideKey, ovBytes, 0).Err()
+	if err != nil {
+		h.logger.Printf("[VEHICLES_ERROR] Redis save customer override failed for %s: %v", req.ProfileID, err)
+		http.Error(w, "redis_write_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))
 }

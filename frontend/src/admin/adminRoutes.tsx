@@ -48,20 +48,46 @@ const PromotionsDashboard = lazy(() =>
 const FinanceDashboard = lazy(() =>
   import('./pages/FinanceDashboard').then((m) => ({ default: m.FinanceDashboard }))
 );
+const PayoutsDashboard = lazy(() =>
+  import('./pages/PayoutsDashboard').then((m) => ({ default: m.PayoutsDashboard }))
+);
+const SupportDashboard = lazy(() =>
+  import('./pages/SupportDashboard').then((m) => ({ default: m.SupportDashboard }))
+);
+const SafetyDashboard = lazy(() =>
+  import('./pages/SafetyDashboard').then((m) => ({ default: m.SafetyDashboard }))
+);
+const MarketingDashboard = lazy(() =>
+  import('./pages/MarketingDashboard').then((m) => ({ default: m.MarketingDashboard }))
+);
 const AdminTeamManagement = lazy(() =>
   import('./components/AdminTeamManagement').then((m) => ({ default: m.AdminTeamManagement }))
 );
-
-// Placeholder component for routes that are not yet implemented
-const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
-  <div className="h-full flex items-center justify-center">
-    <div className="bg-canvas rounded-xl border border-canvas-soft p-10 text-center max-w-md animate-fade-in">
-      <div className="text-xl font-bold text-ink mb-2">{title}</div>
-      <div className="text-sm text-body">This module is under development and will be available soon.</div>
-      <div className="mt-4 text-xs text-mute font-mono">coming soon</div>
-    </div>
-  </div>
+const AnalyticsDashboard = lazy(() =>
+  import('./pages/AnalyticsExtendedDashboard').then((m) => ({ default: m.AnalyticsExtendedDashboard }))
 );
+const ComplianceDashboard = lazy(() =>
+  import('./pages/ComplianceExtendedDashboard').then((m) => ({ default: m.ComplianceExtendedDashboard }))
+);
+const AuditLogsDashboard = lazy(() =>
+  import('./pages/AuditLogsDashboard').then((m) => ({ default: m.AuditLogsDashboard }))
+);
+const CMSDashboard = lazy(() =>
+  import('./pages/CMSDashboard').then((m) => ({ default: m.CMSDashboard }))
+);
+const DocumentsVaultDashboard = lazy(() =>
+  import('./pages/DocumentsVaultDashboard').then((m) => ({ default: m.DocumentsVaultDashboard }))
+);
+const ConfigDashboard = lazy(() =>
+  import('./pages/ConfigDashboard').then((m) => ({ default: m.ConfigDashboard }))
+);
+const DeveloperDashboard = lazy(() =>
+  import('./pages/DeveloperDashboard').then((m) => ({ default: m.DeveloperDashboard }))
+);
+const CorporateDashboard = lazy(() =>
+  import('./pages/CorporateDashboard').then((m) => ({ default: m.CorporateDashboard }))
+);
+
 
 // Suspense wrapper for lazy routes
 const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -94,18 +120,21 @@ export const adminRoutes: RouteObject[] = [
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
   { path: 'finance', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payments', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
-  { path: 'payouts', element: <PlaceholderPage title="Payouts" /> },
-  { path: 'support', element: <PlaceholderPage title="Support / Tickets" /> },
-  { path: 'safety', element: <PlaceholderPage title="Safety & Incidents" /> },
-  { path: 'marketing', element: <PlaceholderPage title="Marketing & Campaigns" /> },
-  { path: 'communications', element: <PlaceholderPage title="Communications" /> },
-  { path: 'content', element: <PlaceholderPage title="Content (CMS)" /> },
-  { path: 'analytics', element: <PlaceholderPage title="Analytics & Reports" /> },
-  { path: 'compliance', element: <PlaceholderPage title="Compliance & KYC" /> },
-  { path: 'documents', element: <PlaceholderPage title="Documents Vault" /> },
-  { path: 'settings', element: <PlaceholderPage title="Configuration" /> },
-  { path: 'audit', element: <PlaceholderPage title="Audit Logs" /> },
-  { path: 'api', element: <PlaceholderPage title="Developer / API" /> },
+  { path: 'payouts', element: <LazyWrap><PayoutsDashboard /></LazyWrap> },
+  { path: 'support', element: <LazyWrap><SupportDashboard /></LazyWrap> },
+  { path: 'safety', element: <LazyWrap><SafetyDashboard /></LazyWrap> },
+  { path: 'marketing', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
+  { path: 'communications/push', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
+  { path: 'communications', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
+  { path: 'content', element: <LazyWrap><CMSDashboard /></LazyWrap> },
+  { path: 'analytics', element: <LazyWrap><AnalyticsDashboard /></LazyWrap> },
+  { path: 'compliance', element: <LazyWrap><ComplianceDashboard /></LazyWrap> },
+  { path: 'documents', element: <LazyWrap><DocumentsVaultDashboard /></LazyWrap> },
+  { path: 'settings', element: <LazyWrap><ConfigDashboard /></LazyWrap> },
+  { path: 'config',   element: <LazyWrap><ConfigDashboard /></LazyWrap> },
+  { path: 'audit', element: <LazyWrap><AuditLogsDashboard /></LazyWrap> },
+  { path: 'api', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
+  { path: 'corporate', element: <LazyWrap><CorporateDashboard /></LazyWrap> },
   { path: 'team', element: <AdminTeamManagement /> },
 ];
 
@@ -152,6 +181,7 @@ export const navItems: NavItem[] = [
   { key: 'settings', label: 'Configuration', path: '/settings', icon: 'Settings', group: 'system' },
   { key: 'audit', label: 'Audit Logs', path: '/audit', icon: 'Audit', group: 'system' },
   { key: 'api', label: 'Developer / API', path: '/api', icon: 'API', group: 'system' },
+  { key: 'corporate', label: 'Corporate / B2B', path: '/corporate', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE'] },
   { key: 'team', label: 'Team & Roles', path: '/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
 ];
 
