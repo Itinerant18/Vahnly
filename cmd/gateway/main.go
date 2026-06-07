@@ -187,6 +187,9 @@ func main() {
 	documentsLogger := log.New(os.Stdout, "[DOCUMENTS_ADMIN] ", log.LstdFlags)
 	documentsHandler := adminHttp.NewDocumentsHandler(dbPool, documentsLogger)
 
+	notificationsLogger := log.New(os.Stdout, "[NOTIFICATIONS_ADMIN] ", log.LstdFlags)
+	notificationsHandler := adminHttp.NewNotificationsHandler(dbPool, notificationsLogger)
+
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
 
@@ -476,6 +479,25 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/corporate/{id}/invoices/generate", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, corporateHandler.HandleGenerateInvoice))
 	mux.HandleFunc("PATCH /api/v1/admin/corporate/{id}/invoices/{invId}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, corporateHandler.HandleUpdateInvoiceStatus))
 	mux.HandleFunc("GET /api/v1/admin/corporate/{id}/analytics", authGuard.RequireAnyRole(corpRoles, corporateHandler.HandleGetCorporateAnalytics))
+
+	// Notifications Center endpoints
+	notifRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_LEAD", "SAFETY", "FINANCE"}
+	mux.HandleFunc("GET /api/v1/admin/notifications/stats", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetNotificationStats))
+	mux.HandleFunc("GET /api/v1/admin/notifications/rules", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetAlertRules))
+	mux.HandleFunc("POST /api/v1/admin/notifications/rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleUpsertAlertRule))
+	mux.HandleFunc("PATCH /api/v1/admin/notifications/rules/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleUpsertAlertRule))
+	mux.HandleFunc("PATCH /api/v1/admin/notifications/rules/{id}/toggle", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleToggleAlertRule))
+	mux.HandleFunc("GET /api/v1/admin/notifications/rules/{id}/recipients", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetRecipients))
+	mux.HandleFunc("PUT /api/v1/admin/notifications/rules/{id}/recipients", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleSetRecipients))
+	mux.HandleFunc("GET /api/v1/admin/notifications/channels", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetChannelConfigs))
+	mux.HandleFunc("PUT /api/v1/admin/notifications/channels/{channel}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleUpsertChannelConfig))
+	mux.HandleFunc("POST /api/v1/admin/notifications/channels/{channel}/test", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleTestChannel))
+	mux.HandleFunc("POST /api/v1/admin/notifications/simulate", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, notificationsHandler.HandleSimulateAlert))
+	mux.HandleFunc("POST /api/v1/admin/notifications/bulk-acknowledge", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleBulkAcknowledge))
+	mux.HandleFunc("GET /api/v1/admin/notifications", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetNotifications))
+	mux.HandleFunc("GET /api/v1/admin/notifications/{id}", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetNotificationDetail))
+	mux.HandleFunc("POST /api/v1/admin/notifications/{id}/acknowledge", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleAcknowledgeNotification))
+	mux.HandleFunc("POST /api/v1/admin/notifications/{id}/resolve", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleResolveNotification))
 
 	// Config / Settings endpoints
 	configRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}

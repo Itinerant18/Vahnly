@@ -87,6 +87,9 @@ const DeveloperDashboard = lazy(() =>
 const CorporateDashboard = lazy(() =>
   import('./pages/CorporateDashboard').then((m) => ({ default: m.CorporateDashboard }))
 );
+const NotificationsDashboard = lazy(() =>
+  import('./pages/NotificationsDashboard').then((m) => ({ default: m.NotificationsDashboard }))
+);
 
 
 // Suspense wrapper for lazy routes
@@ -135,6 +138,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'audit', element: <LazyWrap><AuditLogsDashboard /></LazyWrap> },
   { path: 'api', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
   { path: 'corporate', element: <LazyWrap><CorporateDashboard /></LazyWrap> },
+  { path: 'notifications', element: <LazyWrap><NotificationsDashboard /></LazyWrap> },
   { path: 'team', element: <AdminTeamManagement /> },
 ];
 
@@ -181,6 +185,7 @@ export const navItems: NavItem[] = [
   { key: 'settings', label: 'Configuration', path: '/settings', icon: 'Settings', group: 'system' },
   { key: 'audit', label: 'Audit Logs', path: '/audit', icon: 'Audit', group: 'system' },
   { key: 'api', label: 'Developer / API', path: '/api', icon: 'API', group: 'system' },
+  { key: 'notifications', label: 'Notifications Center', path: '/notifications', icon: 'Bell', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'SUPPORT_LEAD', 'SAFETY', 'FINANCE'] },
   { key: 'corporate', label: 'Corporate / B2B', path: '/corporate', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE'] },
   { key: 'team', label: 'Team & Roles', path: '/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
 ];

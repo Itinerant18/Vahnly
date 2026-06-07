@@ -22,6 +22,7 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
   Marketing: IconMarketing, Comms: IconComms, Content: IconContent,
   Analytics: IconAnalytics, Compliance: IconCompliance, Documents: IconDocuments,
   Settings: IconSettings, Audit: IconAudit, API: IconAPI, Team: IconTeam,
+  Bell: IconBell, Corporate: IconTeam,
 };
 
 // ─── Notification items (mock) ──────────────────────────────────────────
