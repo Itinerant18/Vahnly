@@ -90,7 +90,24 @@ const CorporateDashboard = lazy(() =>
 const NotificationsDashboard = lazy(() =>
   import('./pages/NotificationsDashboard').then((m) => ({ default: m.NotificationsDashboard }))
 );
-
+const AIIntelligenceDashboard = lazy(() =>
+  import('./pages/AIIntelligenceDashboard').then((m) => ({ default: m.AIIntelligenceDashboard }))
+);
+const DriverOpsDashboard = lazy(() =>
+  import('./pages/DriverOpsDashboard').then((m) => ({ default: m.DriverOpsDashboard }))
+);
+const PlatformDashboard = lazy(() =>
+  import('./pages/PlatformDashboard').then((m) => ({ default: m.PlatformDashboard }))
+);
+const ESGDashboard = lazy(() =>
+  import('./pages/ESGDashboard').then((m) => ({ default: m.ESGDashboard }))
+);
+const FranchiseDashboard = lazy(() =>
+  import('./pages/FranchiseDashboard').then((m) => ({ default: m.FranchiseDashboard }))
+);
+const AdminToolsDashboard = lazy(() =>
+  import('./pages/AdminToolsDashboard').then((m) => ({ default: m.AdminToolsDashboard }))
+);
 
 // Suspense wrapper for lazy routes
 const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -109,6 +126,7 @@ const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 export const adminRoutes: RouteObject[] = [
   { index: true, element: <LazyWrap><DashboardHome /></LazyWrap> },
   { path: 'operations', element: <ControlRoomDashboard /> },
+  { path: 'live', element: <ControlRoomDashboard /> },
   { path: 'trips', element: <LazyWrap><TripsList /></LazyWrap> },
   { path: 'trips/new', element: <LazyWrap><ManualBooking /></LazyWrap> },
   { path: 'trips/:id', element: <LazyWrap><TripDetail /></LazyWrap> },
@@ -121,6 +139,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'dispatch', element: <LazyWrap><DispatchDashboard /></LazyWrap> },
   { path: 'pricing', element: <LazyWrap><PricingDashboard /></LazyWrap> },
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
+  { path: 'promos', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
   { path: 'finance', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payments', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payouts', element: <LazyWrap><PayoutsDashboard /></LazyWrap> },
@@ -130,6 +149,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'communications/push', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
   { path: 'communications', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
   { path: 'content', element: <LazyWrap><CMSDashboard /></LazyWrap> },
+  { path: 'cms', element: <LazyWrap><CMSDashboard /></LazyWrap> },
   { path: 'analytics', element: <LazyWrap><AnalyticsDashboard /></LazyWrap> },
   { path: 'compliance', element: <LazyWrap><ComplianceDashboard /></LazyWrap> },
   { path: 'documents', element: <LazyWrap><DocumentsVaultDashboard /></LazyWrap> },
@@ -137,8 +157,15 @@ export const adminRoutes: RouteObject[] = [
   { path: 'config',   element: <LazyWrap><ConfigDashboard /></LazyWrap> },
   { path: 'audit', element: <LazyWrap><AuditLogsDashboard /></LazyWrap> },
   { path: 'api', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
+  { path: 'dev', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
   { path: 'corporate', element: <LazyWrap><CorporateDashboard /></LazyWrap> },
   { path: 'notifications', element: <LazyWrap><NotificationsDashboard /></LazyWrap> },
+  { path: 'ai-intelligence', element: <LazyWrap><AIIntelligenceDashboard /></LazyWrap> },
+  { path: 'driver-ops', element: <LazyWrap><DriverOpsDashboard /></LazyWrap> },
+  { path: 'platform', element: <LazyWrap><PlatformDashboard /></LazyWrap> },
+  { path: 'esg', element: <LazyWrap><ESGDashboard /></LazyWrap> },
+  { path: 'franchise', element: <LazyWrap><FranchiseDashboard /></LazyWrap> },
+  { path: 'admin-tools', element: <LazyWrap><AdminToolsDashboard /></LazyWrap> },
   { path: 'team', element: <AdminTeamManagement /> },
 ];
 
@@ -188,6 +215,12 @@ export const navItems: NavItem[] = [
   { key: 'notifications', label: 'Notifications Center', path: '/notifications', icon: 'Bell', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'SUPPORT_LEAD', 'SAFETY', 'FINANCE'] },
   { key: 'corporate', label: 'Corporate / B2B', path: '/corporate', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE'] },
   { key: 'team', label: 'Team & Roles', path: '/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
+  { key: 'ai-intelligence', label: 'AI Intelligence', path: '/ai-intelligence', icon: 'Analytics', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'COMPLIANCE', 'ANALYTICS'] },
+  { key: 'driver-ops', label: 'Driver Ops', path: '/driver-ops', icon: 'Drivers', group: 'fleet', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FLEET_MANAGER'] },
+  { key: 'platform', label: 'Platform Health', path: '/platform', icon: 'API', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+  { key: 'esg', label: 'Carbon & ESG', path: '/esg', icon: 'Compliance', group: 'system', allowedRoles: ['SUPER_ADMIN', 'COMPLIANCE', 'ANALYTICS'] },
+  { key: 'franchise', label: 'Franchise / Multi-tenant', path: '/franchise', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
+  { key: 'admin-tools', label: 'Admin Tools', path: '/admin-tools', icon: 'Settings', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
 ];
 
 export const navGroups: { key: string; label: string }[] = [

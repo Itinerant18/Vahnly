@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS driver_telematics_summary;
+DROP TABLE IF EXISTS telematics_events;
+DROP TABLE IF EXISTS inspection_items;
+DROP TABLE IF EXISTS vehicle_inspections;
+DROP TABLE IF EXISTS driver_training;
+DROP TABLE IF EXISTS training_modules;
+DROP TABLE IF EXISTS coaching_flags;
+DROP TABLE IF EXISTS incentive_offers;
+DROP TABLE IF EXISTS incentive_campaigns;

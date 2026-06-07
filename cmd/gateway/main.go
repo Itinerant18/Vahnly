@@ -190,6 +190,24 @@ func main() {
 	notificationsLogger := log.New(os.Stdout, "[NOTIFICATIONS_ADMIN] ", log.LstdFlags)
 	notificationsHandler := adminHttp.NewNotificationsHandler(dbPool, notificationsLogger)
 
+	aiLogger := log.New(os.Stdout, "[AI_ADMIN] ", log.LstdFlags)
+	aiHandler := adminHttp.NewAIHandler(dbPool, aiLogger)
+
+	driverOpsLogger := log.New(os.Stdout, "[DRIVER_OPS_ADMIN] ", log.LstdFlags)
+	driverOpsHandler := adminHttp.NewDriverOpsHandler(dbPool, driverOpsLogger)
+
+	platformLogger := log.New(os.Stdout, "[PLATFORM_ADMIN] ", log.LstdFlags)
+	platformHandler := adminHttp.NewPlatformHandler(dbPool, platformLogger)
+
+	esgLogger := log.New(os.Stdout, "[ESG_ADMIN] ", log.LstdFlags)
+	esgHandler := adminHttp.NewESGHandler(dbPool, esgLogger)
+
+	franchiseLogger := log.New(os.Stdout, "[FRANCHISE_ADMIN] ", log.LstdFlags)
+	franchiseHandler := adminHttp.NewFranchiseHandler(dbPool, franchiseLogger)
+
+	adminToolsLogger := log.New(os.Stdout, "[ADMIN_TOOLS] ", log.LstdFlags)
+	adminToolsHandler := adminHttp.NewAdminToolsHandler(dbPool, adminToolsLogger)
+
 	go handler.InternalBackplaneMultiplexer(mainCtx)
 	go startKafkaToRedisFanoutWorker(mainCtx, brokersList, redisClusterClient)
 
@@ -498,6 +516,66 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/notifications/{id}", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleGetNotificationDetail))
 	mux.HandleFunc("POST /api/v1/admin/notifications/{id}/acknowledge", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleAcknowledgeNotification))
 	mux.HandleFunc("POST /api/v1/admin/notifications/{id}/resolve", authGuard.RequireAnyRole(notifRoles, notificationsHandler.HandleResolveNotification))
+
+	// AI Intelligence endpoints (fraud, demand heatmap, VoC)
+	aiRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "COMPLIANCE", "ANALYTICS"}
+	mux.HandleFunc("GET /api/v1/admin/ai/fraud/events", authGuard.RequireAnyRole(aiRoles, aiHandler.HandleGetFraudEvents))
+	mux.HandleFunc("PATCH /api/v1/admin/ai/fraud/events/{id}", authGuard.RequireAnyRole(aiRoles, aiHandler.HandleUpdateFraudEvent))
+	mux.HandleFunc("GET /api/v1/admin/ai/fraud/rules", authGuard.RequireAnyRole(aiRoles, aiHandler.HandleGetFraudRules))
+	mux.HandleFunc("PATCH /api/v1/admin/ai/fraud/rules/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "COMPLIANCE"}, aiHandler.HandleUpdateFraudRule))
+	mux.HandleFunc("GET /api/v1/admin/ai/demand-forecasts", authGuard.RequireAnyRole(aiRoles, aiHandler.HandleGetDemandForecasts))
+	mux.HandleFunc("GET /api/v1/admin/ai/voc/topics", authGuard.RequireAnyRole(aiRoles, aiHandler.HandleGetVoCTopics))
+
+	// Driver Operations endpoints (incentives, coaching, inspection, telematics)
+	dopsRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/incentives", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetIncentiveCampaigns))
+	mux.HandleFunc("POST /api/v1/admin/driver-ops/incentives", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleUpsertIncentiveCampaign))
+	mux.HandleFunc("PATCH /api/v1/admin/driver-ops/incentives/{id}", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleUpsertIncentiveCampaign))
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/coaching/flags", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetCoachingFlags))
+	mux.HandleFunc("POST /api/v1/admin/driver-ops/coaching/flags/{id}/resolve", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleResolveCoachingFlag))
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/coaching/modules", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetTrainingModules))
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/inspections", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetInspections))
+	mux.HandleFunc("PATCH /api/v1/admin/driver-ops/inspections/{id}/review", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleReviewInspection))
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/telematics/events", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetTelematicsEvents))
+	mux.HandleFunc("GET /api/v1/admin/driver-ops/telematics/summaries", authGuard.RequireAnyRole(dopsRoles, driverOpsHandler.HandleGetTelematicsSummaries))
+
+	// Platform Engineering endpoints (service health, experiments, chatbot)
+	platRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "ANALYTICS"}
+	mux.HandleFunc("GET /api/v1/admin/platform/health", authGuard.RequireAnyRole(platRoles, platformHandler.HandleGetServiceHealth))
+	mux.HandleFunc("POST /api/v1/admin/platform/health/incidents", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, platformHandler.HandleUpsertHealthIncident))
+	mux.HandleFunc("PATCH /api/v1/admin/platform/health/incidents/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, platformHandler.HandleUpsertHealthIncident))
+	mux.HandleFunc("GET /api/v1/admin/platform/experiments", authGuard.RequireAnyRole(platRoles, platformHandler.HandleGetExperiments))
+	mux.HandleFunc("POST /api/v1/admin/platform/experiments", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, platformHandler.HandleUpsertExperiment))
+	mux.HandleFunc("PATCH /api/v1/admin/platform/experiments/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, platformHandler.HandleUpsertExperiment))
+	mux.HandleFunc("GET /api/v1/admin/platform/chatbot", authGuard.RequireAnyRole(platRoles, platformHandler.HandleGetChatbotStats))
+	mux.HandleFunc("POST /api/v1/admin/platform/chatbot/intents", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, platformHandler.HandleUpsertChatbotIntent))
+	mux.HandleFunc("PATCH /api/v1/admin/platform/chatbot/intents/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, platformHandler.HandleUpsertChatbotIntent))
+
+	// ESG / Carbon reporting endpoints
+	esgRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "COMPLIANCE", "ANALYTICS"}
+	mux.HandleFunc("GET /api/v1/admin/esg/summary", authGuard.RequireAnyRole(esgRoles, esgHandler.HandleGetESGSummary))
+	mux.HandleFunc("POST /api/v1/admin/esg/reports/{id}/publish", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, esgHandler.HandlePublishESGReport))
+
+	// Franchise / Multi-tenant endpoints
+	franchRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/franchise/tenants", authGuard.RequireAnyRole(franchRoles, franchiseHandler.HandleGetTenants))
+	mux.HandleFunc("POST /api/v1/admin/franchise/tenants", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, franchiseHandler.HandleUpsertTenant))
+	mux.HandleFunc("PATCH /api/v1/admin/franchise/tenants/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, franchiseHandler.HandleUpsertTenant))
+	mux.HandleFunc("GET /api/v1/admin/franchise/operators", authGuard.RequireAnyRole(franchRoles, franchiseHandler.HandleGetTenantOperators))
+	mux.HandleFunc("POST /api/v1/admin/franchise/operators", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, franchiseHandler.HandleAddTenantOperator))
+
+	// Admin Tools endpoints (impersonation, bulk ops, cron, exports)
+	toolsRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
+	mux.HandleFunc("GET /api/v1/admin/tools/impersonation", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminToolsHandler.HandleGetImpersonationSessions))
+	mux.HandleFunc("POST /api/v1/admin/tools/impersonation", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminToolsHandler.HandleStartImpersonation))
+	mux.HandleFunc("POST /api/v1/admin/tools/impersonation/{id}/end", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminToolsHandler.HandleEndImpersonation))
+	mux.HandleFunc("GET /api/v1/admin/tools/bulk-operations", authGuard.RequireAnyRole(toolsRoles, adminToolsHandler.HandleGetBulkOperations))
+	mux.HandleFunc("POST /api/v1/admin/tools/bulk-operations/{id}/approve", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminToolsHandler.HandleApproveBulkOperation))
+	mux.HandleFunc("GET /api/v1/admin/tools/cron-jobs", authGuard.RequireAnyRole(toolsRoles, adminToolsHandler.HandleGetCronJobs))
+	mux.HandleFunc("POST /api/v1/admin/tools/cron-jobs/{id}/toggle", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminToolsHandler.HandleToggleCronJob))
+	mux.HandleFunc("GET /api/v1/admin/tools/exports/queries", authGuard.RequireAnyRole(toolsRoles, adminToolsHandler.HandleGetExportQueries))
+	mux.HandleFunc("GET /api/v1/admin/tools/exports/jobs", authGuard.RequireAnyRole(toolsRoles, adminToolsHandler.HandleGetExportJobs))
+	mux.HandleFunc("POST /api/v1/admin/tools/exports/jobs", authGuard.RequireAnyRole(toolsRoles, adminToolsHandler.HandleSubmitExportJob))
 
 	// Config / Settings endpoints
 	configRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
