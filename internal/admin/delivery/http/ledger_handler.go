@@ -3,12 +3,15 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
 type DiscrepancyRecord struct {
@@ -108,6 +111,16 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
+	// Attribute this sensitive financial adjustment to the acting admin. The admin
+	// id comes from the verified JWT context; email/role from gateway-set headers.
+	adminID, _ := middleware.GetUserIDFromContext(ctx)
+	adminEmail := r.Header.Get("X-Admin-Email")
+	ip := getClientIP(r)
+	actor := adminEmail
+	if actor == "" {
+		actor = adminRole
+	}
+
 	// Enforce strict single-node serializable transaction commitment safety
 	tx, err := h.dbPool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if err != nil {
@@ -117,12 +130,14 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 	defer tx.Rollback(ctx)
 
 	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix backfill convention.
+	// The acting admin is embedded in the description so the ledger row itself carries immutable attribution.
 	insertQuery := `
 		INSERT INTO financial_ledger_entries
 		    (order_id, city_prefix, account_type, entry_type, amount_paise, description, regional_settlement_zone, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $2, NOW());
 	`
-	_, err = tx.Exec(ctx, insertQuery, req.OrderID, req.CityPrefix, req.AccountType, req.EntryType, req.AmountPaise, "[MANUAL_RECONCILIATION_ADJUSTMENT] "+req.Description)
+	entryDescription := "[MANUAL_RECONCILIATION_ADJUSTMENT by " + actor + "] " + req.Description
+	_, err = tx.Exec(ctx, insertQuery, req.OrderID, req.CityPrefix, req.AccountType, req.EntryType, req.AmountPaise, entryDescription)
 	if err != nil {
 		h.logger.Printf("[MANUAL_LEDGER_ADJUSTMENT_FAILURE] Order %s insert failed: %v", req.OrderID, err)
 		http.Error(w, "ledger_insertion_aborted", http.StatusInternalServerError)
@@ -134,7 +149,24 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 		return
 	}
 
-	h.logger.Printf("[MANUAL_LEDGER_ADJUSTMENT_COMMITTED] Order %s adjusted with %d Paise %s entry.", req.OrderID, req.AmountPaise, req.EntryType)
+	// Persist a tamper-evident audit record of who adjusted the ledger and how.
+	h.recordAuditLog(ctx, adminID, adminEmail, "LEDGER_MANUAL_CORRECTION",
+		fmt.Sprintf("Admin (%s) posted %s %d paise to %s on order %s [%s]. Reason: %s",
+			adminRole, req.EntryType, req.AmountPaise, req.AccountType, req.OrderID, req.CityPrefix, req.Description), ip)
+
+	h.logger.Printf("[MANUAL_LEDGER_ADJUSTMENT_COMMITTED] Order %s adjusted with %d Paise %s entry by %s.", req.OrderID, req.AmountPaise, req.EntryType, actor)
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(`{"status":"DISCREPANCY_RECONCILED_SUCCESSFULLY"}`))
+}
+
+// recordAuditLog writes a tamper-evident admin action row mirroring the convention
+// used across the other admin handlers.
+func (h *LedgerAdminHandler) recordAuditLog(ctx context.Context, adminID, email, action, details, ip string) {
+	var idVal interface{} = adminID
+	if adminID == "" {
+		idVal = "00000000-0000-0000-0000-000000000000"
+	}
+	_, _ = h.dbPool.Exec(ctx,
+		`INSERT INTO admin_audit_logs (admin_id, admin_email, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)`,
+		idVal, email, action, details, ip)
 }
