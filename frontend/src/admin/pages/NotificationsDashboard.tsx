@@ -134,8 +134,16 @@ export function NotificationsDashboard() {
 
   const base = '/api/v1/admin/notifications';
 
+  const authHeaders = (json = false): Record<string, string> => {
+    const token = localStorage.getItem('admin_jwt_token') || '';
+    const h: Record<string, string> = {};
+    if (token) h.Authorization = `Bearer ${token}`;
+    if (json) h['Content-Type'] = 'application/json';
+    return h;
+  };
+
   const loadStats = useCallback(() => {
-    fetch(`${base}/stats`).then(r => r.json()).then(d => setStats(d)).catch(() => {});
+    fetch(`${base}/stats`, { headers: authHeaders() }).then(r => r.json()).then(d => setStats(d)).catch(() => {});
   }, [base]);
 
   const loadNotifications = useCallback(() => {
@@ -143,7 +151,7 @@ export function NotificationsDashboard() {
     if (filterStatus) p.set('status', filterStatus);
     if (filterSeverity) p.set('severity', filterSeverity);
     if (filterType) p.set('alert_type', filterType);
-    fetch(`${base}?${p}`).then(r => r.json()).then(d => setNotifications(d.notifications ?? [])).catch(() => {});
+    fetch(`${base}?${p}`, { headers: authHeaders() }).then(r => r.json()).then(d => setNotifications(d.notifications ?? [])).catch(() => {});
   }, [base, filterStatus, filterSeverity, filterType]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
@@ -151,10 +159,10 @@ export function NotificationsDashboard() {
 
   useEffect(() => {
     if (tab === 'rules' || tab === 'recipients') {
-      fetch(`${base}/rules`).then(r => r.json()).then(d => setRules(d.rules ?? [])).catch(() => {});
+      fetch(`${base}/rules`, { headers: authHeaders() }).then(r => r.json()).then(d => setRules(d.rules ?? [])).catch(() => {});
     }
     if (tab === 'channels') {
-      fetch(`${base}/channels`).then(r => r.json()).then(d => {
+      fetch(`${base}/channels`, { headers: authHeaders() }).then(r => r.json()).then(d => {
         setChannels(d.channels ?? []);
         const edits: typeof channelEdits = {};
         (d.channels ?? []).forEach((c: ChannelConfig) => { edits[c.channel] = { ...c.config, is_enabled: c.is_enabled }; });
@@ -165,24 +173,24 @@ export function NotificationsDashboard() {
 
   useEffect(() => {
     if (!selectedRuleId) return;
-    fetch(`${base}/rules/${selectedRuleId}/recipients`).then(r => r.json()).then(d => setRecipients(d.recipients ?? [])).catch(() => {});
+    fetch(`${base}/rules/${selectedRuleId}/recipients`, { headers: authHeaders() }).then(r => r.json()).then(d => setRecipients(d.recipients ?? [])).catch(() => {});
   }, [selectedRuleId, base]);
 
   const openNotif = async (n: Notification) => {
-    const detail = await fetch(`${base}/${n.id}`).then(r => r.json()).catch(() => n);
+    const detail = await fetch(`${base}/${n.id}`, { headers: authHeaders() }).then(r => r.json()).catch(() => n);
     setSelectedNotif(detail);
     setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, status: x.status === 'UNREAD' ? 'READ' : x.status } : x));
   };
 
   const acknowledge = async (id: string) => {
-    await fetch(`${base}/${id}/acknowledge`, { method: 'POST' });
+    await fetch(`${base}/${id}/acknowledge`, { method: 'POST', headers: authHeaders() });
     const upd = (x: Notification) => x.id === id ? { ...x, status: 'ACKNOWLEDGED' } : x;
     setNotifications(p => p.map(upd));
     setSelectedNotif(p => p && p.id === id ? { ...p, status: 'ACKNOWLEDGED' } : p);
   };
 
   const resolve = async (id: string) => {
-    await fetch(`${base}/${id}/resolve`, { method: 'POST' });
+    await fetch(`${base}/${id}/resolve`, { method: 'POST', headers: authHeaders() });
     const upd = (x: Notification) => x.id === id ? { ...x, status: 'RESOLVED' } : x;
     setNotifications(p => p.map(upd));
     setSelectedNotif(p => p && p.id === id ? { ...p, status: 'RESOLVED' } : p);
@@ -192,7 +200,7 @@ export function NotificationsDashboard() {
     if (!checkedIds.size) return;
     await fetch(`${base}/bulk-acknowledge`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ ids: [...checkedIds] }),
     });
     setNotifications(p => p.map(x => checkedIds.has(x.id) ? { ...x, status: 'ACKNOWLEDGED' } : x));
@@ -201,7 +209,7 @@ export function NotificationsDashboard() {
   };
 
   const toggleRule = async (id: string) => {
-    const d = await fetch(`${base}/rules/${id}/toggle`, { method: 'PATCH' }).then(r => r.json());
+    const d = await fetch(`${base}/rules/${id}/toggle`, { method: 'PATCH', headers: authHeaders() }).then(r => r.json());
     setRules(p => p.map(r => r.id === id ? { ...r, is_enabled: d.is_enabled } : r));
   };
 
@@ -209,9 +217,9 @@ export function NotificationsDashboard() {
     if (!editingRule) return;
     const method = editingRule.id ? 'PATCH' : 'POST';
     const url = editingRule.id ? `${base}/rules/${editingRule.id}` : `${base}/rules`;
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingRule) });
+    await fetch(url, { method, headers: authHeaders(true), body: JSON.stringify(editingRule) });
     setEditingRule(null);
-    fetch(`${base}/rules`).then(r => r.json()).then(d => setRules(d.rules ?? []));
+    fetch(`${base}/rules`, { headers: authHeaders() }).then(r => r.json()).then(d => setRules(d.rules ?? []));
   };
 
   const addRecipient = async () => {
@@ -219,18 +227,18 @@ export function NotificationsDashboard() {
     const updated = [...recipients, { id: '', rule_id: selectedRuleId, ...newRecip }];
     await fetch(`${base}/rules/${selectedRuleId}/recipients`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ recipients: updated.map(({ email, phone, slack_user_id }) => ({ email, phone, slack_user_id })) }),
     });
     setNewRecip({ email: '', phone: '', slack_user_id: '' });
-    fetch(`${base}/rules/${selectedRuleId}/recipients`).then(r => r.json()).then(d => setRecipients(d.recipients ?? []));
+    fetch(`${base}/rules/${selectedRuleId}/recipients`, { headers: authHeaders() }).then(r => r.json()).then(d => setRecipients(d.recipients ?? []));
   };
 
   const removeRecipient = async (rid: string) => {
     const updated = recipients.filter(r => r.id !== rid);
     await fetch(`${base}/rules/${selectedRuleId}/recipients`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ recipients: updated.map(({ email, phone, slack_user_id }) => ({ email, phone, slack_user_id })) }),
     });
     setRecipients(updated);
@@ -241,21 +249,21 @@ export function NotificationsDashboard() {
     const { is_enabled, ...config } = edit;
     await fetch(`${base}/channels/${channel}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ config, is_enabled: !!is_enabled }),
     });
     alert(`${channel} config saved.`);
   };
 
   const testChannel = async (channel: string) => {
-    const d = await fetch(`${base}/channels/${channel}/test`, { method: 'POST' }).then(r => r.json());
+    const d = await fetch(`${base}/channels/${channel}/test`, { method: 'POST', headers: authHeaders() }).then(r => r.json());
     alert(d.message ?? 'Test sent');
   };
 
   const simulate = async (alertType: string) => {
     await fetch(`${base}/simulate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ alert_type: alertType }),
     });
     loadStats();
