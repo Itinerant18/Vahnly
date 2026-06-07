@@ -306,6 +306,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicles))
 	mux.HandleFunc("POST /api/v1/admin/vehicles/reminders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleSendDocReminders))
 	mux.HandleFunc("POST /api/v1/admin/vehicles/{plate}/override", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostVehicleOverride))
+	mux.HandleFunc("GET /api/v1/admin/vehicles/{plate}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicleDetail))
 	mux.HandleFunc("GET /api/v1/admin/customers/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetCustomerVehicleProfiles))
 	mux.HandleFunc("POST /api/v1/admin/customers/vehicles/update", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostCustomerVehicleProfileUpdate))
 

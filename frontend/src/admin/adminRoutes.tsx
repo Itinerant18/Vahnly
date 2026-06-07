@@ -36,6 +36,9 @@ const DriverOnboardingQueue = lazy(() =>
 const VehiclesList = lazy(() =>
   import('./pages/VehiclesList').then((m) => ({ default: m.VehiclesList }))
 );
+const VehicleDetail = lazy(() =>
+  import('./pages/VehicleDetail').then((m) => ({ default: m.VehicleDetail }))
+);
 const DispatchDashboard = lazy(() =>
   import('./pages/DispatchDashboard').then((m) => ({ default: m.DispatchDashboard }))
 );
@@ -136,6 +139,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'drivers/onboarding', element: <LazyWrap><DriverOnboardingQueue /></LazyWrap> },
   { path: 'drivers/:id', element: <LazyWrap><DriverDetail /></LazyWrap> },
   { path: 'vehicles', element: <LazyWrap><VehiclesList /></LazyWrap> },
+  { path: 'vehicles/:id', element: <LazyWrap><VehicleDetail /></LazyWrap> },
   { path: 'dispatch', element: <LazyWrap><DispatchDashboard /></LazyWrap> },
   { path: 'pricing', element: <LazyWrap><PricingDashboard /></LazyWrap> },
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },

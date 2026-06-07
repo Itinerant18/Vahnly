@@ -345,8 +345,10 @@ export const VehiclesList: React.FC = () => {
 						<tbody className="divide-y divide-canvas-soft text-xs">
 							{vehicles.map((v) => (
 								<tr key={v.plate} className="hover:bg-canvas-softer transition-colors">
-									<td className="p-4 font-mono font-bold text-ink whitespace-nowrap">
-										{v.plate}
+									<td className="p-4 font-mono font-bold whitespace-nowrap">
+										<Link to={`/vehicles/${encodeURIComponent(v.plate)}`} className="text-blue-600 hover:underline">
+											{v.plate}
+										</Link>
 									</td>
 									<td className="p-4">
 										<div className="font-semibold text-ink">{v.model}</div>

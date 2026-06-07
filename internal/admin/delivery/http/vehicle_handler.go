@@ -220,18 +220,13 @@ func (h *VehicleHandler) mergeVehicleOverrides(ctx context.Context, v *Vehicle) 
 	}
 }
 
-func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
+// buildVehicles reconstructs the full vehicle fleet (trip vehicles + rider garage
+// cars) from orders, projects deterministic properties, and applies stored overrides.
+// Shared by the list and detail endpoints.
+func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 	// 1. Query distinct drivers and orders to construct trip vehicles
 	sqlOrders := `
-		SELECT 
+		SELECT
 			o.id::text,
 			o.assigned_driver_id::text,
 			COALESCE(d.name, 'Unknown Driver') as driver_name,
@@ -243,8 +238,7 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 	rows, err := h.dbPool.Query(ctx, sqlOrders)
 	if err != nil {
 		h.logger.Printf("[VEHICLES_ERROR] Failed to query orders: %v", err)
-		http.Error(w, "database_query_failed", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -311,6 +305,23 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 		h.mergeVehicleOverrides(ctx, v)
 		vehicles = append(vehicles, *v)
 	}
+	return vehicles, nil
+}
+
+func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	vehicles, err := h.buildVehicles(ctx)
+	if err != nil {
+		http.Error(w, "database_query_failed", http.StatusInternalServerError)
+		return
+	}
 
 	// Apply Filters
 	q := r.URL.Query()
@@ -357,6 +368,37 @@ func (h *VehicleHandler) HandleGetVehicles(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(filtered)
+}
+
+func (h *VehicleHandler) HandleGetVehicleDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	plate := r.PathValue("plate")
+	if plate == "" {
+		http.Error(w, "missing_plate", http.StatusBadRequest)
+		return
+	}
+
+	vehicles, err := h.buildVehicles(ctx)
+	if err != nil {
+		http.Error(w, "database_query_failed", http.StatusInternalServerError)
+		return
+	}
+
+	for _, v := range vehicles {
+		if strings.EqualFold(v.Plate, plate) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(v)
+			return
+		}
+	}
+	http.Error(w, "vehicle_not_found", http.StatusNotFound)
 }
 
 func (h *VehicleHandler) HandleSendDocReminders(w http.ResponseWriter, r *http.Request) {
