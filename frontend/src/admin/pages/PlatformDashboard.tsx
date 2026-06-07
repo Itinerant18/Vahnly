@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface ServiceSnap {
   service_name: string;
   uptime_pct: number;
@@ -90,9 +98,9 @@ export function PlatformDashboard() {
 
   const load = useCallback(async () => {
     const [health, exp, chat] = await Promise.all([
-      fetch(`${API}/platform/health`).then(r => r.json()),
-      fetch(`${API}/platform/experiments`).then(r => r.json()),
-      fetch(`${API}/platform/chatbot`).then(r => r.json()),
+      fetch(`${API}/platform/health`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/platform/experiments`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/platform/chatbot`, { headers: authHeaders() }).then(r => r.json()),
     ]);
     setServices(health.services ?? []);
     setIncidents(health.incidents ?? []);
@@ -106,7 +114,7 @@ export function PlatformDashboard() {
 
   const resolveIncident = async (id: string) => {
     await fetch(`${API}/platform/health/incidents/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ status: 'RESOLVED', root_cause: 'Resolved by admin' }),
     });
     load();
@@ -114,7 +122,7 @@ export function PlatformDashboard() {
 
   const toggleIntent = async (intent: ChatbotIntent) => {
     await fetch(`${API}/platform/chatbot/intents/${intent.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ response_template: intent.response_template, confidence_threshold: intent.confidence_threshold, fallback_to_human: intent.fallback_to_human, is_active: !intent.is_active }),
     });
     load();

@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface Tenant {
   id: string;
   name: string;
@@ -41,14 +49,14 @@ export function FranchiseDashboard() {
   const [newOp, setNewOp] = useState({ tenant_id: '', admin_email: '', role: 'OPERATOR_ADMIN' });
 
   const loadTenants = useCallback(async () => {
-    const r = await fetch(`${API}/franchise/tenants`);
+    const r = await fetch(`${API}/franchise/tenants`, { headers: authHeaders() });
     const d = await r.json();
     setTenants(d.tenants ?? []);
   }, []);
 
   const loadOperators = useCallback(async () => {
     const qs = filterTenant ? `?tenant_id=${filterTenant}` : '';
-    const r = await fetch(`${API}/franchise/operators${qs}`);
+    const r = await fetch(`${API}/franchise/operators${qs}`, { headers: authHeaders() });
     const d = await r.json();
     setOperators(d.operators ?? []);
   }, [filterTenant]);
@@ -57,7 +65,7 @@ export function FranchiseDashboard() {
 
   const updateTenantStatus = async (id: string, tenant: Tenant, newStatus: string) => {
     await fetch(`${API}/franchise/tenants/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ ...tenant, status: newStatus }),
     });
     loadTenants();
@@ -65,7 +73,7 @@ export function FranchiseDashboard() {
 
   const addOperator = async () => {
     await fetch(`${API}/franchise/operators`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authHeaders(true),
       body: JSON.stringify(newOp),
     });
     setShowAddOp(false);

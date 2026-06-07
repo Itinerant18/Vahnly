@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface FraudEvent {
   id: string;
   entity_type: string;
@@ -87,27 +95,27 @@ export function AIIntelligenceDashboard() {
   const [samples, setSamples] = useState<VoCSample[]>([]);
 
   const loadFraud = useCallback(async () => {
-    const r = await fetch(`${API}/ai/fraud/events`);
+    const r = await fetch(`${API}/ai/fraud/events`, { headers: authHeaders() });
     const d = await r.json();
     setEvents(d.events ?? []);
     setFraudSummary(d.summary ?? {});
   }, []);
 
   const loadRules = useCallback(async () => {
-    const r = await fetch(`${API}/ai/fraud/rules`);
+    const r = await fetch(`${API}/ai/fraud/rules`, { headers: authHeaders() });
     const d = await r.json();
     setRules(d.rules ?? []);
   }, []);
 
   const loadForecasts = useCallback(async () => {
     const qs = cityFilter ? `?city=${encodeURIComponent(cityFilter)}` : '';
-    const r = await fetch(`${API}/ai/demand-forecasts${qs}`);
+    const r = await fetch(`${API}/ai/demand-forecasts${qs}`, { headers: authHeaders() });
     const d = await r.json();
     setForecasts(d.forecasts ?? []);
   }, [cityFilter]);
 
   const loadVoC = useCallback(async () => {
-    const r = await fetch(`${API}/ai/voc/topics`);
+    const r = await fetch(`${API}/ai/voc/topics`, { headers: authHeaders() });
     const d = await r.json();
     setTopics(d.topics ?? []);
     setSamples(d.samples ?? []);
@@ -118,13 +126,13 @@ export function AIIntelligenceDashboard() {
   useEffect(() => { loadVoC(); }, [loadVoC]);
 
   const updateFraud = async (id: string, status: string) => {
-    await fetch(`${API}/ai/fraud/events/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    await fetch(`${API}/ai/fraud/events/${id}`, { method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ status }) });
     loadFraud();
   };
 
   const toggleRule = async (rule: FraudRule) => {
     await fetch(`${API}/ai/fraud/rules/${rule.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ threshold: rule.threshold, weight: rule.weight, action: rule.action, is_enabled: !rule.is_enabled }),
     });
     loadRules();

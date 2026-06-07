@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface Campaign {
   id: string;
   name: string;
@@ -81,10 +89,10 @@ export function DriverOpsDashboard() {
 
   const load = useCallback(async () => {
     const [c, f, m, s] = await Promise.all([
-      fetch(`${API}/driver-ops/incentives`).then(r => r.json()),
-      fetch(`${API}/driver-ops/coaching/flags?open=true`).then(r => r.json()),
-      fetch(`${API}/driver-ops/coaching/modules`).then(r => r.json()),
-      fetch(`${API}/driver-ops/telematics/summaries`).then(r => r.json()),
+      fetch(`${API}/driver-ops/incentives`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/driver-ops/coaching/flags?open=true`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/driver-ops/coaching/modules`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/driver-ops/telematics/summaries`, { headers: authHeaders() }).then(r => r.json()),
     ]);
     setCampaigns(c.campaigns ?? []);
     setFlags(f.flags ?? []);
@@ -94,7 +102,7 @@ export function DriverOpsDashboard() {
 
   const loadInspections = useCallback(async () => {
     const qs = inspStatus ? `?status=${inspStatus}` : '';
-    const r = await fetch(`${API}/driver-ops/inspections${qs}`);
+    const r = await fetch(`${API}/driver-ops/inspections${qs}`, { headers: authHeaders() });
     const d = await r.json();
     setInspections(d.inspections ?? []);
   }, [inspStatus]);
@@ -103,13 +111,13 @@ export function DriverOpsDashboard() {
   useEffect(() => { loadInspections(); }, [loadInspections]);
 
   const resolveFlag = async (id: string) => {
-    await fetch(`${API}/driver-ops/coaching/flags/${id}/resolve`, { method: 'POST' });
+    await fetch(`${API}/driver-ops/coaching/flags/${id}/resolve`, { method: 'POST', headers: authHeaders() });
     load();
   };
 
   const reviewInspection = async (id: string, status: string) => {
     await fetch(`${API}/driver-ops/inspections/${id}/review`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ status, overall_score: status === 'APPROVED' ? 85 : 0, notes: '' }),
     });
     loadInspections();

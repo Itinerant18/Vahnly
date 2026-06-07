@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface ImpSession {
   id: string;
   admin_email: string;
@@ -107,11 +115,11 @@ export function AdminToolsDashboard() {
 
   const load = useCallback(async () => {
     const [imp, bulk, cron, eq, ej] = await Promise.all([
-      fetch(`${API}/tools/impersonation`).then(r => r.json()),
-      fetch(`${API}/tools/bulk-operations`).then(r => r.json()),
-      fetch(`${API}/tools/cron-jobs`).then(r => r.json()),
-      fetch(`${API}/tools/exports/queries`).then(r => r.json()),
-      fetch(`${API}/tools/exports/jobs`).then(r => r.json()),
+      fetch(`${API}/tools/impersonation`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/tools/bulk-operations`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/tools/cron-jobs`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/tools/exports/queries`, { headers: authHeaders() }).then(r => r.json()),
+      fetch(`${API}/tools/exports/jobs`, { headers: authHeaders() }).then(r => r.json()),
     ]);
     setSessions(imp.sessions ?? []);
     setBulkOps(bulk.operations ?? []);
@@ -124,13 +132,13 @@ export function AdminToolsDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const toggleCron = async (id: string) => {
-    await fetch(`${API}/tools/cron-jobs/${id}/toggle`, { method: 'POST' });
+    await fetch(`${API}/tools/cron-jobs/${id}/toggle`, { method: 'POST', headers: authHeaders() });
     load();
   };
 
   const approveBulk = async (id: string) => {
     await fetch(`${API}/tools/bulk-operations/${id}/approve`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authHeaders(true),
       body: JSON.stringify({ approved_by: 'admin@drivers-for-u.in' }),
     });
     load();
@@ -138,14 +146,14 @@ export function AdminToolsDashboard() {
 
   const submitExport = async (q: ExportQuery) => {
     await fetch(`${API}/tools/exports/jobs`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authHeaders(true),
       body: JSON.stringify({ query_id: q.id, query_name: q.name, params: {}, created_by: 'admin@drivers-for-u.in' }),
     });
     load();
   };
 
   const endSession = async (id: string) => {
-    await fetch(`${API}/tools/impersonation/${id}/end`, { method: 'POST' });
+    await fetch(`${API}/tools/impersonation/${id}/end`, { method: 'POST', headers: authHeaders() });
     load();
   };
 

@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 const API = '/api/v1/admin';
 
+const authHeaders = (json = false): Record<string, string> => {
+  const token = localStorage.getItem('admin_jwt_token') || '';
+  const h: Record<string, string> = {};
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 interface EmissionFactor {
   vehicle_type: string;
   co2_kg_per_km: number;
@@ -54,7 +62,7 @@ export function ESGDashboard() {
   const [mtd, setMtd] = useState<MTDSummary>({ total_emission_kg: 0, total_trips: 0 });
 
   const load = useCallback(async () => {
-    const r = await fetch(`${API}/esg/summary`);
+    const r = await fetch(`${API}/esg/summary`, { headers: authHeaders() });
     const d = await r.json();
     setFactors(d.emission_factors ?? []);
     setRecords(d.carbon_records ?? []);
@@ -65,7 +73,7 @@ export function ESGDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const publishReport = async (id: string) => {
-    await fetch(`${API}/esg/reports/${id}/publish`, { method: 'POST' });
+    await fetch(`${API}/esg/reports/${id}/publish`, { method: 'POST', headers: authHeaders() });
     load();
   };
 
