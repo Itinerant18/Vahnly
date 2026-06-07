@@ -112,10 +112,8 @@ func (s *HeatmapAnalyticsService) startBroadcastTicker(ctx context.Context) {
 				return true
 			})
 
-			if len(snapshot) == 0 {
-				continue
-			}
-
+			// Broadcast even when empty so dashboards can clear stale cells and
+			// distinguish a live-but-idle feed from a broken connection.
 			payloadBytes, err := json.Marshal(map[string]interface{}{
 				"region":    "KOL",
 				"timestamp": time.Now().Unix(),
@@ -173,10 +171,27 @@ func (s *HeatmapAnalyticsService) HandleHeatmapStream(w http.ResponseWriter, r *
 
 	log.Println("[ANALYTICS_SSE] Active operational dashboard client attached to spatial heatmap stream.")
 
+	// Send an immediate heartbeat so the client's onopen fires and the connection
+	// is confirmed live even before the first density snapshot is produced.
+	if _, err := fmt.Fprint(w, ": connected\n\n"); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	// Periodic keep-alive comments stop idle SSE connections (no drivers online)
+	// from being dropped by intermediary proxies.
+	keepAlive := time.NewTicker(15 * time.Second)
+	defer keepAlive.Stop()
+
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-keepAlive.C:
+			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
 		case data := <-clientChan:
 			// Format data payload matching the clear W3C SSE wire standard specification
 			_, err := fmt.Fprintf(w, "data: %s\n\n", string(data))
