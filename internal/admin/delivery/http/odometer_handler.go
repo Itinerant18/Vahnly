@@ -22,6 +22,10 @@ const odoRoadFactor = 1.3
 // odoTolerancePct is the |variance| beyond which a trip is flagged for audit.
 const odoTolerancePct = 15.0
 
+// odoExtraKmRatePaise is the provisional per-km rate used to size the corrective
+// fare adjustment when mileage variance is flagged (no fare engine in this service).
+const odoExtraKmRatePaise = 1200 // ₹12.00 / km
+
 type OdometerHandler struct {
 	db     *pgxpool.Pool
 	logger *log.Logger
@@ -46,17 +50,18 @@ type odoCheckpoint struct {
 }
 
 type odoAudit struct {
-	OrderID      string         `json:"order_id"`
-	Status       string         `json:"status"`
-	ExpectedKm   float64        `json:"expected_km"`
-	RoadFactor   float64        `json:"road_factor"`
-	TolerancePct float64        `json:"tolerance_pct"`
-	HasBoth      bool           `json:"has_both"`
-	ReportedKm   *int           `json:"reported_km,omitempty"`
-	VariancePct  *float64       `json:"variance_pct,omitempty"`
-	IsFlagged    bool           `json:"is_flagged"`
-	Start        *odoCheckpoint `json:"start"`
-	End          *odoCheckpoint `json:"end"`
+	OrderID         string         `json:"order_id"`
+	Status          string         `json:"status"`
+	FinancialStatus string         `json:"financial_status"`
+	ExpectedKm      float64        `json:"expected_km"`
+	RoadFactor      float64        `json:"road_factor"`
+	TolerancePct    float64        `json:"tolerance_pct"`
+	HasBoth         bool           `json:"has_both"`
+	ReportedKm      *int           `json:"reported_km,omitempty"`
+	VariancePct     *float64       `json:"variance_pct,omitempty"`
+	IsFlagged       bool           `json:"is_flagged"`
+	Start           *odoCheckpoint `json:"start"`
+	End             *odoCheckpoint `json:"end"`
 }
 
 func round2(x float64) float64 { return math.Round(x*100) / 100 }
@@ -65,22 +70,23 @@ func round2(x float64) float64 { return math.Round(x*100) / 100 }
 // the reported mileage and variance. Returns (audit, found=false) when the order
 // does not exist or the id is malformed.
 func (h *OdometerHandler) computeAudit(ctx context.Context, orderID string) (*odoAudit, bool) {
-	var status string
+	var status, financialStatus string
 	var straightKm float64
 	err := h.db.QueryRow(ctx,
-		`SELECT status::text, ST_Distance(pickup_location, dropoff_location) / 1000.0 FROM orders WHERE id = $1`,
-		orderID).Scan(&status, &straightKm)
+		`SELECT status::text, financial_status, ST_Distance(pickup_location, dropoff_location) / 1000.0 FROM orders WHERE id = $1`,
+		orderID).Scan(&status, &financialStatus, &straightKm)
 	if err != nil {
 		return nil, false
 	}
 
 	expectedKm := straightKm * odoRoadFactor
 	audit := &odoAudit{
-		OrderID:      orderID,
-		Status:       status,
-		ExpectedKm:   round2(expectedKm),
-		RoadFactor:   odoRoadFactor,
-		TolerancePct: odoTolerancePct,
+		OrderID:         orderID,
+		Status:          status,
+		FinancialStatus: financialStatus,
+		ExpectedKm:      round2(expectedKm),
+		RoadFactor:      odoRoadFactor,
+		TolerancePct:    odoTolerancePct,
 	}
 
 	rows, err := h.db.Query(ctx,
@@ -184,21 +190,107 @@ func (h *OdometerHandler) HandlePatchOdometerAudit(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Attribute the manual correction to the acting admin (sensitive: it can shift
-	// the extra-km fare). A downstream ledger re-reconciliation hook can be wired
-	// here once the fare engine exposes an in-process trigger.
+	// Recompute variance, then run the in-process FareEngine reconciliation hook.
+	audit, found := h.computeAudit(ctx, orderID)
+	reviewTriggered := false
+	if found && audit.HasBoth {
+		reviewTriggered = h.reconcileFinancials(ctx, orderID, audit)
+	}
+
+	// Attribute the manual correction to the acting admin (sensitive: it shifts the
+	// extra-km fare and can place the trip under financial review).
 	adminID, _ := middleware.GetUserIDFromContext(ctx)
 	adminEmail := r.Header.Get("X-Admin-Email")
+	reviewNote := ""
+	if reviewTriggered {
+		reviewNote = " -> order moved to FINANCIAL_REVIEW_REQUIRED, driver payout held, corrective ledger entry posted"
+	}
 	h.recordAuditLog(ctx, adminID, adminEmail, "ODOMETER_ADJUSTMENT",
-		fmt.Sprintf("Admin (%s) set %s odometer to %d km for order %s. Reason: %s",
-			adminRole, req.CheckpointType, req.OdometerValue, orderID, req.Reason), getClientIP(r))
+		fmt.Sprintf("Admin (%s) set %s odometer to %d km for order %s. Reason: %s%s",
+			adminRole, req.CheckpointType, req.OdometerValue, orderID, req.Reason, reviewNote), getClientIP(r))
 
-	audit, found := h.computeAudit(ctx, orderID)
 	if !found {
 		odoJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 		return
 	}
+	// Reflect the financial state mutated above without a second round-trip.
+	if reviewTriggered {
+		audit.FinancialStatus = "REVIEW_REQUIRED"
+	} else if audit.HasBoth {
+		audit.FinancialStatus = "CLEARED"
+	}
 	odoJSON(w, http.StatusOK, audit)
+}
+
+// reconcileFinancials is the in-process FareEngine hook. When a mileage variance is
+// flagged it: (1) moves the order to FINANCIAL_REVIEW_REQUIRED, (2) posts a balanced
+// (net-zero) CORRECTIVE_ADJUSTMENT ledger pair — never editing existing rows, keeping
+// the double-entry trail immutable, and (3) places the order's driver on payout hold,
+// reusing the existing drivers.payout_hold guard enforced at payout approval. Within
+// tolerance, it clears the order back to CLEARED (auto-reconciled). Returns whether a
+// review hold was triggered.
+func (h *OdometerHandler) reconcileFinancials(ctx context.Context, orderID string, audit *odoAudit) bool {
+	if !audit.IsFlagged {
+		_, _ = h.db.Exec(ctx, `UPDATE orders SET financial_status = 'CLEARED' WHERE id = $1`, orderID)
+		return false
+	}
+
+	var cityPrefix string
+	var driverID *string
+	if err := h.db.QueryRow(ctx,
+		`SELECT city_prefix, assigned_driver_id::text FROM orders WHERE id = $1`, orderID).
+		Scan(&cityPrefix, &driverID); err != nil {
+		h.logger.Printf("[FARE_HOOK] lookup failed for order %s: %v", orderID, err)
+		return false
+	}
+
+	deltaKm := float64(*audit.ReportedKm) - audit.ExpectedKm
+	correctivePaise := int64(math.Round(math.Abs(deltaKm) * odoExtraKmRatePaise))
+	if correctivePaise <= 0 {
+		correctivePaise = 1 // keep a non-zero, auditable corrective record
+	}
+
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		h.logger.Printf("[FARE_HOOK] tx begin failed for order %s: %v", orderID, err)
+		return false
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `UPDATE orders SET financial_status = 'REVIEW_REQUIRED' WHERE id = $1`, orderID); err != nil {
+		h.logger.Printf("[FARE_HOOK] status update failed for order %s: %v", orderID, err)
+		return false
+	}
+
+	// Balanced compensating pair: extra fare provisionally owed customer -> driver.
+	desc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT PENDING_REVIEW] mileage variance %.1f%% (%.1f km delta) on order %s",
+		*audit.VariancePct, deltaKm, orderID)
+	insert := `INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
+	           VALUES ($1, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5)`
+	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "DEBIT", correctivePaise, desc); err != nil {
+		h.logger.Printf("[FARE_HOOK] debit insert failed for order %s: %v", orderID, err)
+		return false
+	}
+	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "CREDIT", correctivePaise, desc); err != nil {
+		h.logger.Printf("[FARE_HOOK] credit insert failed for order %s: %v", orderID, err)
+		return false
+	}
+
+	if driverID != nil && *driverID != "" {
+		holdReason := fmt.Sprintf("Odometer variance %.1f%% under financial review (order %s)", *audit.VariancePct, orderID)
+		if _, err := tx.Exec(ctx,
+			`UPDATE drivers SET payout_hold = true, payout_hold_reason = $1 WHERE id = $2`,
+			holdReason, *driverID); err != nil {
+			h.logger.Printf("[FARE_HOOK] payout hold failed for driver %s: %v", *driverID, err)
+			return false
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		h.logger.Printf("[FARE_HOOK] commit failed for order %s: %v", orderID, err)
+		return false
+	}
+	return true
 }
 
 func (h *OdometerHandler) recordAuditLog(ctx context.Context, adminID, email, action, details, ip string) {

@@ -12,6 +12,7 @@ interface OdoCheckpoint {
 interface OdoAudit {
   order_id: string;
   status: string;
+  financial_status: string;
   expected_km: number;
   road_factor: number;
   tolerance_pct: number;
@@ -165,6 +166,13 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
         <span className="text-[10px] uppercase tracking-wider font-bold text-mute">Odometer / mileage audit</span>
         <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${badge.cls}`}>{badge.text}</span>
       </div>
+
+      {audit.financial_status === 'REVIEW_REQUIRED' && (
+        <div className="flex items-center gap-2 p-2 rounded-md bg-red-50 border border-red-200 text-[10px] font-bold text-red-700 uppercase tracking-wider">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+          Financial review required — corrective ledger entry posted, driver payout held
+        </div>
+      )}
 
       <div className="flex gap-3">
         <CheckpointCard label="Start" cp={audit.start} onZoom={setLightbox} onAdjust={() => beginEdit('START')} />
