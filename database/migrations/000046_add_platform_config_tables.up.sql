@@ -143,7 +143,7 @@ INSERT INTO notification_templates (template_key, name, channel, event_trigger, 
     ('sms_driver_assigned',   'Driver Assigned (SMS)',     'SMS',   'DRIVER_ASSIGNED',  '',                              'Driver {{driver_name}} ({{plate}}) assigned. OTP: {{otp}}. Track: driversfor-u.in/track',      ARRAY['driver_name','plate','otp']),
     ('email_trip_receipt',    'Trip Receipt (Email)',      'EMAIL', 'TRIP_COMPLETED',   'Your trip receipt – ₹{{fare}}', 'Dear {{rider_name}},\n\nTrip from {{pickup}} to {{dropoff}}.\nFare: ₹{{fare}}\nDate: {{date}}', ARRAY['rider_name','pickup','dropoff','fare','date']),
     ('wa_driver_assigned',    'Driver Assigned (WhatsApp)','WHATSAPP','DRIVER_ASSIGNED','',                              '🚗 Your Drivers-for-U driver is on the way!\n\nDriver: {{driver_name}}\nVehicle: {{plate}}\nETA: {{eta_min}} mins\nOTP: {{otp}}', ARRAY['driver_name','plate','eta_min','otp']),
-    ('push_sos_ack',          'SOS Acknowledged (Push)',   'PUSH',  'SOS_ACKNOWLEDGED', 'SOS received — help is coming', 'Our safety team has been alerted. Emergency services notified. Stay calm.',                     ARRAY[])
+    ('push_sos_ack',          'SOS Acknowledged (Push)',   'PUSH',  'SOS_ACKNOWLEDGED', 'SOS received — help is coming', 'Our safety team has been alerted. Emergency services notified. Stay calm.',                     ARRAY[]::VARCHAR(50)[])
 ON CONFLICT (template_key) DO NOTHING;
 
 -- ── 20.6 Cancellation & refund policy rules ───────────────────────────────────

@@ -103,6 +103,24 @@ func main() {
 		log.Println("[WAVE 3 OK] Split-state conditions injected. Reconciler daemon will repair logs within 15 seconds.")
 	}
 
+	// ─── WAVE 4: TRIP PLAYER — ODOMETER AUDIT SCENARIO ENGINE ────────
+	log.Println("\n═══════════════════════════════════════════════════════════════")
+	log.Println("  WAVE 4: TRIP PLAYER — INJECTING ODOMETER AUDIT SCENARIOS   ")
+	log.Println("═══════════════════════════════════════════════════════════════")
+
+	scenarios, err := loadAuditScenarios("data/audit_scenarios.json")
+	if err != nil {
+		log.Printf("[WAVE 4] ⚠️ Failed loading audit scenarios: %v (skipping audit wave)", err)
+	} else {
+		passed, failed := runAuditScenarios(ctx, scenarios)
+		log.Printf("\n[WAVE 4 RESULTS] ✅ Passed: %d | ❌ Failed: %d / %d total", passed, failed, len(scenarios))
+		if failed == 0 {
+			log.Println("[WAVE 4 OK] All audit scenarios validated successfully. Odometer variance + financial reconciliation loop verified.")
+		} else {
+			log.Println("[WAVE 4 WARN] Some audit scenarios failed. Review output above for details.")
+		}
+	}
+
 	log.Println("\nKeeping simulator context warm for 8s to process background loops...")
 	time.Sleep(8 * time.Second)
 	log.Println("\n═══════════════════════════════════════════════════════════════")

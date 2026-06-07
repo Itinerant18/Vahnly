@@ -1,0 +1,79 @@
+[
+  {
+    "scenario_id": "low_variance_auto_reconciled",
+    "description": "10km trip with 10.5km reported → variance within tolerance → AUTO_RECONCILED",
+    "route_km": 10.0,
+    "start_checkpoint": {
+      "odometer_reading": 50000,
+      "fuel_level": 90
+    },
+    "end_checkpoint": {
+      "odometer_reading": 50011,
+      "fuel_level": 85
+    },
+    "expected_flagged": false,
+    "expected_financial_status": "CLEARED",
+    "variance_trigger": "low"
+  },
+  {
+    "scenario_id": "high_variance_review_required",
+    "description": "10km trip with 15km reported → variance >15% → FINANCIAL_REVIEW_REQUIRED",
+    "route_km": 10.0,
+    "start_checkpoint": {
+      "odometer_reading": 50000,
+      "fuel_level": 88
+    },
+    "end_checkpoint": {
+      "odometer_reading": 50015,
+      "fuel_level": 78
+    },
+    "expected_flagged": true,
+    "expected_financial_status": "REVIEW_REQUIRED",
+    "variance_trigger": "high"
+  },
+  {
+    "scenario_id": "missing_end_checkpoint",
+    "description": "Trip completed with START checkpoint only → no END → has_both=false",
+    "route_km": 12.0,
+    "start_checkpoint": {
+      "odometer_reading": 60000,
+      "fuel_level": 92
+    },
+    "end_checkpoint": null,
+    "expected_flagged": false,
+    "expected_financial_status": "CLEARED",
+    "variance_trigger": "missing"
+  },
+  {
+    "scenario_id": "exact_match_nominal",
+    "description": "15km trip with exactly 15km reported → 0% variance → CLEARED",
+    "route_km": 15.0,
+    "start_checkpoint": {
+      "odometer_reading": 70000,
+      "fuel_level": 95
+    },
+    "end_checkpoint": {
+      "odometer_reading": 70015,
+      "fuel_level": 88
+    },
+    "expected_flagged": false,
+    "expected_financial_status": "CLEARED",
+    "variance_trigger": "exact"
+  },
+  {
+    "scenario_id": "negative_variance_undershoot",
+    "description": "20km trip with 15km reported → -25% variance → FINANCIAL_REVIEW_REQUIRED",
+    "route_km": 20.0,
+    "start_checkpoint": {
+      "odometer_reading": 80000,
+      "fuel_level": 80
+    },
+    "end_checkpoint": {
+      "odometer_reading": 80015,
+      "fuel_level": 72
+    },
+    "expected_flagged": true,
+    "expected_financial_status": "REVIEW_REQUIRED",
+    "variance_trigger": "high"
+  }
+]

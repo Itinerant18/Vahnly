@@ -11,9 +11,11 @@ import {
   declineOffer,
   getDriverProfile,
   getPendingOffer,
+  OdometerCheckpointPayload,
   PendingOfferOrder,
   setDriverStatus,
   startTrip,
+  submitOdometerCheckpoint,
 } from '@/api/client';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
@@ -470,6 +472,40 @@ export default function DriverTerminalPage() {
     }
   };
 
+  // Exponential backoff retry helper for odometer checkpoint submission
+  const submitCheckpointWithRetry = async (
+    orderId: string,
+    payload: OdometerCheckpointPayload,
+    maxAttempts = 3,
+  ): Promise<boolean> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        if (token) {
+          await submitOdometerCheckpoint(token, orderId, payload);
+          logAudit('ODOMETER_CHECKPOINT_SYNCED', { orderId, type: payload.checkpoint_type, attempt });
+          return true;
+        }
+      } catch (err) {
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt), 8000);
+        logAudit('ODOMETER_CHECKPOINT_RETRY', { orderId, type: payload.checkpoint_type, attempt, backoffMs });
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
+    return false;
+  };
+
+  // Queue failed checkpoint for offline sync when connectivity resumes
+  const queueOfflineCheckpoint = (orderId: string, payload: OdometerCheckpointPayload) => {
+    try {
+      const queue = JSON.parse(sessionStorage.getItem('offline_odometer_queue') || '[]');
+      queue.push({ orderId, payload, queuedAt: new Date().toISOString() });
+      sessionStorage.setItem('offline_odometer_queue', JSON.stringify(queue));
+      logAudit('ODOMETER_CHECKPOINT_QUEUED_OFFLINE', { orderId, type: payload.checkpoint_type });
+    } catch (e) {
+      console.warn('[OFFLINE_QUEUE] Storage write failed:', e);
+    }
+  };
+
   const handleVerifyOtpAndStart = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpVerificationCode) {
@@ -489,19 +525,34 @@ export default function DriverTerminalPage() {
     });
 
     if (/^\d{4}$/.test(otpVerificationCode)) {
-      logAudit('TRIP_STARTED', { orderId: activeTrip?.order_id });
       setOtpError('');
-      setDutyState('DELIVERING');
 
-      if (activeTrip?.order_id) {
-        try {
-          if (token) {
+      if (activeTrip?.order_id && token) {
+        // Phase 2: Submit START odometer checkpoint with retry before transitioning
+        const checkpoint: OdometerCheckpointPayload = {
+          checkpoint_type: 'START',
+          odometer_reading: parseInt(startOdometer, 10),
+          fuel_level: startFuel,
+          photo_url: startOdoPhoto || '',
+          timestamp: new Date().toISOString(),
+        };
+
+        const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
+
+        if (!synced) {
+          // Offline queueing: store for later sync, proceed with local state transition
+          queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
+          // Fallback: still call the legacy startTrip endpoint
+          try {
             await startTrip(token, activeTrip.order_id, driverID);
+          } catch (err) {
+            console.warn('Start trip fallback sync also failed:', err);
           }
-        } catch (err) {
-          console.warn('Start trip sync failed:', err);
         }
       }
+
+      logAudit('TRIP_STARTED', { orderId: activeTrip?.order_id });
+      setDutyState('DELIVERING');
     } else {
       setOtpError('Authentication failed: Invalid OTP sequence pattern entered.');
       logAudit('OTP_FAILED_ATTEMPT', { code: otpVerificationCode });
@@ -538,18 +589,32 @@ export default function DriverTerminalPage() {
       tolls: tollCharges,
       parking: parkingCharges
     });
-    
-    setDutyState('COMPLETED');
 
-    if (activeTrip?.order_id) {
-      try {
-        if (token) {
+    if (activeTrip?.order_id && token) {
+      // Phase 2: Submit END odometer checkpoint with retry before completing
+      const checkpoint: OdometerCheckpointPayload = {
+        checkpoint_type: 'END',
+        odometer_reading: parseInt(endOdometer, 10),
+        fuel_level: endFuel,
+        photo_url: endOdoPhoto || '',
+        timestamp: new Date().toISOString(),
+      };
+
+      const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
+
+      if (!synced) {
+        // Offline queueing: store for later sync, proceed with local state
+        queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
+        // Fallback: still call the legacy completeTrip endpoint
+        try {
           await completeTrip(token, activeTrip.order_id, driverID);
+        } catch (err) {
+          console.warn('Complete trip fallback sync also failed:', err);
         }
-      } catch (err) {
-        console.warn('Complete trip sync failed:', err);
       }
     }
+
+    setDutyState('COMPLETED');
   };
 
   const handlePaymentConfirmationSubmit = (method: string) => {

@@ -83,112 +83,114 @@ BEGIN
     SELECT id INTO v_admin_id FROM system_admins WHERE email = 'aniketkarmakar018@gmail.com' LIMIT 1;
     SELECT id INTO v_trip_id FROM orders LIMIT 1;
 
-    -- SOS Alert
-    INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status, assigned_agent_id, audio_stream_url, latitude, longitude, emergency_contacts_notified, authorities_dispatched, notes, created_at, updated_at)
-    VALUES (
-        'SOS-10001',
-        v_trip_id,
-        'RIDER',
-        'ACTIVE',
-        v_admin_id,
-        'https://platform-safety-recordings.s3.amazonaws.com/sos/SOS-10001.mp3',
-        22.5726,
-        88.3639,
-        true,
-        false,
-        'Rider reported aggressive behaviour and vehicle speeding.',
-        NOW() - INTERVAL '10 minutes',
-        NOW() - INTERVAL '10 minutes'
-    ) ON CONFLICT (id) DO NOTHING;
+    IF v_trip_id IS NOT NULL THEN
+        -- SOS Alert
+        INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status, assigned_agent_id, audio_stream_url, latitude, longitude, emergency_contacts_notified, authorities_dispatched, notes, created_at, updated_at)
+        VALUES (
+            'SOS-10001',
+            v_trip_id,
+            'RIDER',
+            'ACTIVE',
+            v_admin_id,
+            'https://platform-safety-recordings.s3.amazonaws.com/sos/SOS-10001.mp3',
+            22.5726,
+            88.3639,
+            true,
+            false,
+            'Rider reported aggressive behaviour and vehicle speeding.',
+            NOW() - INTERVAL '10 minutes',
+            NOW() - INTERVAL '10 minutes'
+        ) ON CONFLICT (id) DO NOTHING;
 
-    -- Resolved SOS Alert
-    INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status, assigned_agent_id, audio_stream_url, latitude, longitude, emergency_contacts_notified, authorities_dispatched, notes, created_at, updated_at, resolved_at)
-    VALUES (
-        'SOS-10002',
-        v_trip_id,
-        'DRIVER',
-        'RESOLVED',
-        v_admin_id,
-        NULL,
-        22.5832,
-        88.3678,
-        false,
-        true,
-        'Driver vehicle collided with guardrail. Authorities dispatched immediately. Handled.',
-        NOW() - INTERVAL '1 day',
-        NOW() - INTERVAL '23 hours',
-        NOW() - INTERVAL '23 hours'
-    ) ON CONFLICT (id) DO NOTHING;
+        -- Resolved SOS Alert
+        INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status, assigned_agent_id, audio_stream_url, latitude, longitude, emergency_contacts_notified, authorities_dispatched, notes, created_at, updated_at, resolved_at)
+        VALUES (
+            'SOS-10002',
+            v_trip_id,
+            'DRIVER',
+            'RESOLVED',
+            v_admin_id,
+            NULL,
+            22.5832,
+            88.3678,
+            false,
+            true,
+            'Driver vehicle collided with guardrail. Authorities dispatched immediately. Handled.',
+            NOW() - INTERVAL '1 day',
+            NOW() - INTERVAL '23 hours',
+            NOW() - INTERVAL '23 hours'
+        ) ON CONFLICT (id) DO NOTHING;
 
-    -- Accident Incident with Claim
-    INSERT INTO safety_incidents (id, sos_alert_id, trip_id, category, reporter_id, reporter_type, description, status, evidence_urls, outcome_type, outcome_details, d4m_care_claim_id, d4m_care_claim_status, d4m_care_claim_amount_paise, assigned_agent_id, created_at, updated_at)
-    VALUES (
-        'INC-20001',
-        'SOS-10002',
-        v_trip_id,
-        'ACCIDENT',
-        v_driver_id,
-        'DRIVER',
-        'Minor front bumper collision with a guardrail while turning. No injuries reported.',
-        'UNDER_INVESTIGATION',
-        ARRAY['https://platform-safety-recordings.s3.amazonaws.com/incidents/bumper_dent_1.jpg', 'https://platform-safety-recordings.s3.amazonaws.com/incidents/bumper_dent_2.jpg'],
-        NULL,
-        NULL,
-        'CLM-30001',
-        'FILED',
-        1850000, -- ₹18,500.00
-        v_admin_id,
-        NOW() - INTERVAL '1 day',
-        NOW() - INTERVAL '1 day'
-    ) ON CONFLICT (id) DO NOTHING;
+        -- Accident Incident with Claim
+        INSERT INTO safety_incidents (id, sos_alert_id, trip_id, category, reporter_id, reporter_type, description, status, evidence_urls, outcome_type, outcome_details, d4m_care_claim_id, d4m_care_claim_status, d4m_care_claim_amount_paise, assigned_agent_id, created_at, updated_at)
+        VALUES (
+            'INC-20001',
+            'SOS-10002',
+            v_trip_id,
+            'ACCIDENT',
+            v_driver_id,
+            'DRIVER',
+            'Minor front bumper collision with a guardrail while turning. No injuries reported.',
+            'UNDER_INVESTIGATION',
+            ARRAY['https://platform-safety-recordings.s3.amazonaws.com/incidents/bumper_dent_1.jpg', 'https://platform-safety-recordings.s3.amazonaws.com/incidents/bumper_dent_2.jpg'],
+            NULL,
+            NULL,
+            'CLM-30001',
+            'FILED',
+            1850000, -- ₹18,500.00
+            v_admin_id,
+            NOW() - INTERVAL '1 day',
+            NOW() - INTERVAL '1 day'
+        ) ON CONFLICT (id) DO NOTHING;
 
-    -- Harassment Incident (Resolved with ban)
-    INSERT INTO safety_incidents (id, sos_alert_id, trip_id, category, reporter_id, reporter_type, description, status, evidence_urls, outcome_type, outcome_details, d4m_care_claim_id, d4m_care_claim_status, d4m_care_claim_amount_paise, assigned_agent_id, created_at, updated_at, resolved_at)
-    VALUES (
-        'INC-20002',
-        'SOS-10001',
-        v_trip_id,
-        'HARASSMENT',
-        v_rider_id,
-        'RIDER',
-        'Driver made multiple highly inappropriate comments and refused to stop vehicle initially.',
-        'RESOLVED',
-        ARRAY['https://platform-safety-recordings.s3.amazonaws.com/incidents/harassment_audio.mp3'],
-        'BAN',
-        'Driver was verified to have violated harassment policies via audio evidence. Banned from matching.',
-        NULL,
-        'NOT_FILED',
-        0,
-        v_admin_id,
-        NOW() - INTERVAL '2 hours',
-        NOW() - INTERVAL '30 minutes',
-        NOW() - INTERVAL '30 minutes'
-    ) ON CONFLICT (id) DO NOTHING;
+        -- Harassment Incident (Resolved with ban)
+        INSERT INTO safety_incidents (id, sos_alert_id, trip_id, category, reporter_id, reporter_type, description, status, evidence_urls, outcome_type, outcome_details, d4m_care_claim_id, d4m_care_claim_status, d4m_care_claim_amount_paise, assigned_agent_id, created_at, updated_at, resolved_at)
+        VALUES (
+            'INC-20002',
+            'SOS-10001',
+            v_trip_id,
+            'HARASSMENT',
+            v_rider_id,
+            'RIDER',
+            'Driver made multiple highly inappropriate comments and refused to stop vehicle initially.',
+            'RESOLVED',
+            ARRAY['https://platform-safety-recordings.s3.amazonaws.com/incidents/harassment_audio.mp3'],
+            'BAN',
+            'Driver was verified to have violated harassment policies via audio evidence. Banned from matching.',
+            NULL,
+            'NOT_FILED',
+            0,
+            v_admin_id,
+            NOW() - INTERVAL '2 hours',
+            NOW() - INTERVAL '30 minutes',
+            NOW() - INTERVAL '30 minutes'
+        ) ON CONFLICT (id) DO NOTHING;
 
-    -- Anomalies
-    INSERT INTO ride_check_anomalies (trip_id, anomaly_type, description, severity, latitude, longitude, status, created_at)
-    VALUES (
-        v_trip_id,
-        'LONG_STOP',
-        'Vehicle remained stationary for 8 minutes in a high-traffic zone without progress.',
-        'MEDIUM',
-        22.5712,
-        88.3621,
-        'PENDING',
-        NOW() - INTERVAL '15 minutes'
-    );
+        -- Anomalies
+        INSERT INTO ride_check_anomalies (trip_id, anomaly_type, description, severity, latitude, longitude, status, created_at)
+        VALUES (
+            v_trip_id,
+            'LONG_STOP',
+            'Vehicle remained stationary for 8 minutes in a high-traffic zone without progress.',
+            'MEDIUM',
+            22.5712,
+            88.3621,
+            'PENDING',
+            NOW() - INTERVAL '15 minutes'
+        );
 
-    INSERT INTO ride_check_anomalies (trip_id, anomaly_type, description, severity, latitude, longitude, status, created_at)
-    VALUES (
-        v_trip_id,
-        'OFF_ROUTE',
-        'Vehicle deviated by 1.2km from the expected OSRM routing profile.',
-        'HIGH',
-        22.5855,
-        88.3590,
-        'PENDING',
-        NOW() - INTERVAL '5 minutes'
-    );
+        INSERT INTO ride_check_anomalies (trip_id, anomaly_type, description, severity, latitude, longitude, status, created_at)
+        VALUES (
+            v_trip_id,
+            'OFF_ROUTE',
+            'Vehicle deviated by 1.2km from the expected OSRM routing profile.',
+            'HIGH',
+            22.5855,
+            88.3590,
+            'PENDING',
+            NOW() - INTERVAL '5 minutes'
+        );
+    END IF;
 
     -- Blacklist Seed
     INSERT INTO safety_blacklist (user_id, user_type, block_type, target_user_id, target_user_type, reason, created_at, created_by)

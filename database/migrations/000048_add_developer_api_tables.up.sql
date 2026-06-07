@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
     endpoint_url        TEXT         NOT NULL,
     owner_type          VARCHAR(20)  DEFAULT 'PARTNER' NOT NULL,
     owner_id            VARCHAR(100) DEFAULT '' NOT NULL,
+    owner_name          VARCHAR(200) DEFAULT '' NOT NULL,
     subscribed_events   VARCHAR(100)[] DEFAULT '{}'::VARCHAR(100)[] NOT NULL,
     signing_secret      VARCHAR(100) DEFAULT '' NOT NULL,
     is_active           BOOLEAN DEFAULT true NOT NULL,

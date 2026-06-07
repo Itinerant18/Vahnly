@@ -355,3 +355,37 @@ export async function updateDriverLocation(
     },
   });
 }
+
+// --- Phase 2: Driver Odometer Ingestion ---
+
+export interface OdometerCheckpointResponse {
+  id: string;
+  order_id: string;
+  checkpoint_type: 'START' | 'END';
+  odometer_reading: number;
+  fuel_level: number;
+  photo_url: string;
+  captured_at: string;
+  status: string;
+}
+
+export interface OdometerCheckpointPayload {
+  checkpoint_type: 'START' | 'END';
+  odometer_reading: number;
+  fuel_level: number;
+  photo_url: string;
+  timestamp: string;
+}
+
+export async function submitOdometerCheckpoint(
+  token: string,
+  orderId: string,
+  checkpoint: OdometerCheckpointPayload,
+): Promise<OdometerCheckpointResponse> {
+  return request<OdometerCheckpointResponse>(`/api/v1/driver/orders/${orderId}/odometer`, {
+    method: 'POST',
+    token,
+    body: checkpoint,
+  });
+}
+

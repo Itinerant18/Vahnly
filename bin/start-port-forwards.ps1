@@ -1,5 +1,5 @@
 # bin/start-port-forwards.ps1
-$kubectl = "C:\Program Files\Docker\Docker\Resources\bin\kubectl.exe"
+$kubectl = "C:\Users\itine\AppData\Local\Programs\DockerDesktop\resources\bin\kubectl.exe"
 
 Write-Host "Cleaning up existing port forwards..."
 Get-Process | Where-Object { $_.Name -eq "kubectl" } | Stop-Process -Force -ErrorAction SilentlyContinue
