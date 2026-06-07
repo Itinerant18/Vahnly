@@ -28,6 +28,13 @@ export const ActiveTripRadar: React.FC = () => {
   const [streamStatuses, setStreamStatuses] = useState<Record<string, 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING'>>({});
   const activeStreamsRef = useRef<Record<string, ResilientStreamManager>>({});
 
+  // Stagnant-asset watchdog: record the last telemetry timestamp per active order
+  // and flag any that have gone silent past the threshold — i.e. a driver whose
+  // stream may still read CONNECTED but has stopped reporting position ("phantom").
+  const STAGNANT_THRESHOLD_MS = 45000;
+  const lastSeenRef = useRef<Map<string, number>>(new Map());
+  const [stagnantOrders, setStagnantOrders] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetchActiveOrders();
     const interval = setInterval(fetchActiveOrders, 10000); // Auto-refresh order records list every 10 seconds
@@ -45,6 +52,7 @@ export const ActiveTripRadar: React.FC = () => {
         console.log(`[RADAR_STREAM] Teardown telemetry channel for Order: ${orderId}`);
         activeStreamsRef.current[orderId].disconnect();
         delete activeStreamsRef.current[orderId];
+        lastSeenRef.current.delete(orderId);
         setStreamStatuses(prev => {
           const next = { ...prev };
           delete next[orderId];
@@ -63,7 +71,9 @@ export const ActiveTripRadar: React.FC = () => {
           cityPrefix: order.city_prefix,
           onMessage: (data: any) => {
             if (!data) return;
-            
+            // Heartbeat: any packet means the asset is still reporting in.
+            lastSeenRef.current.set(order.id, Date.now());
+
             setOrders(prevOrders => {
               return prevOrders.map(o => {
                 if (o.id !== order.id) return o;
@@ -95,6 +105,9 @@ export const ActiveTripRadar: React.FC = () => {
           },
         });
         
+        // Seed the heartbeat at connect time so a stream that connects but never
+        // emits telemetry still trips the watchdog after the threshold elapses.
+        lastSeenRef.current.set(order.id, Date.now());
         activeStreamsRef.current[order.id] = manager;
         manager.connect();
       }
@@ -109,6 +122,31 @@ export const ActiveTripRadar: React.FC = () => {
       });
     };
   }, []);
+
+  // Stagnant-asset watchdog loop: every 5s, flag active orders whose last
+  // telemetry is older than the threshold. Recovery is automatic — a fresh
+  // packet updates lastSeenRef and the next tick clears the flag.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setStagnantOrders(prev => {
+        const next = new Set<string>();
+        for (const o of orders) {
+          if (o.status === 'COMPLETED' || o.status === 'CANCELLED') continue;
+          const last = lastSeenRef.current.get(o.id);
+          if (last !== undefined && now - last > STAGNANT_THRESHOLD_MS) {
+            next.add(o.id);
+          }
+        }
+        // Skip the state update (and re-render) when the set is unchanged.
+        if (next.size === prev.size && [...next].every(id => prev.has(id))) {
+          return prev;
+        }
+        return next;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [orders]);
 
   const fetchActiveOrders = async () => {
     try {
@@ -277,6 +315,13 @@ export const ActiveTripRadar: React.FC = () => {
         </button>
       </div>
 
+      {stagnantOrders.size > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-bold uppercase tracking-wider">
+          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          {stagnantOrders.size} stagnant asset{stagnantOrders.size > 1 ? 's' : ''} — no telemetry for &gt;{STAGNANT_THRESHOLD_MS / 1000}s. Verify driver connectivity.
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-canvas-soft bg-white">
         <table className="w-full text-left text-xs font-mono border-collapse">
           <thead>
@@ -301,7 +346,7 @@ export const ActiveTripRadar: React.FC = () => {
               </tr>
             ) : (
               orders.map((order) => (
-                <tr key={order.id} className="hover:bg-canvas-softer/50 transition">
+                <tr key={order.id} className={`transition ${stagnantOrders.has(order.id) ? 'bg-amber-50 hover:bg-amber-100/70' : 'hover:bg-canvas-softer/50'}`}>
                   <td className="p-4 text-body select-all">
                     <div>{order.id.slice(0, 18)}...</div>
                     {(order.status !== 'COMPLETED' && order.status !== 'CANCELLED') && (
@@ -351,6 +396,13 @@ export const ActiveTripRadar: React.FC = () => {
                   </td>
                   <td className="p-4 text-center">
                     {renderStreamStatus(order)}
+                    {stagnantOrders.has(order.id) && (
+                      <div className="mt-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-300 animate-pulse select-none">
+                          ⚠ Stagnant
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-center">
                     {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' ? (
