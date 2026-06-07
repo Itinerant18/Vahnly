@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { OdometerVerificationPanel } from './OdometerVerificationPanel';
 
 interface DiscrepancyRecord {
   order_id: string;
@@ -19,6 +20,11 @@ export const LedgerReconciliation: React.FC = () => {
   const [adjustmentPaise, setAdjustmentPaise] = useState<number>(0);
   const [reason, setReason] = useState<string>('');
   const [auditLog, setAuditLog] = useState<string | null>(null);
+
+  // Odometer audit gate: a flagged mileage variance must be signed off before the
+  // ledger correction for that order can be committed.
+  const [odoState, setOdoState] = useState<{ isFlagged: boolean; acknowledged: boolean }>({ isFlagged: false, acknowledged: false });
+  const odoBlocks = odoState.isFlagged && !odoState.acknowledged;
 
   useEffect(() => {
     fetchLedgerDiscrepancies();
@@ -56,6 +62,7 @@ export const LedgerReconciliation: React.FC = () => {
   const handleSelectRecord = (rec: DiscrepancyRecord) => {
     setSelectedRecord(rec);
     setAuditLog(null);
+    setOdoState({ isFlagged: false, acknowledged: false });
     // Autofill the absolute offset needed to balance the sequence
     setAdjustmentPaise(Math.abs(rec.discrepancy_paise));
     setEntryType(rec.discrepancy_paise > 0 ? 'CREDIT' : 'DEBIT');
@@ -223,14 +230,26 @@ export const LedgerReconciliation: React.FC = () => {
                 />
               </div>
 
+              {/* Odometer / mileage audit for this trip — gates the ledger commit. */}
+              <OdometerVerificationPanel
+                key={selectedRecord.order_id}
+                orderId={selectedRecord.order_id}
+                onAuditState={setOdoState}
+              />
+
               <div className="border-t border-canvas-soft pt-4 mt-2">
                 <button
                   type="submit"
-                  disabled={isLoading || adjustmentPaise <= 0}
+                  disabled={isLoading || adjustmentPaise <= 0 || odoBlocks}
                   className="w-full bg-ink hover:bg-black-elevated disabled:opacity-40 text-on-dark font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider cursor-pointer active:scale-95 select-none"
                 >
                   Commit balancing log entry
                 </button>
+                {odoBlocks && (
+                  <p className="mt-2 text-[10px] text-status-alert font-medium text-center">
+                    Mileage variance flagged — inspect the odometer photos and sign off above before committing.
+                  </p>
+                )}
               </div>
             </form>
           ) : (
