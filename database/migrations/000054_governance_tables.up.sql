@@ -32,30 +32,31 @@ CREATE TABLE IF NOT EXISTS esg_reports (
 
 -- ── Multi-tenant / Franchise Mode ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tenants (
-  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            VARCHAR(200) NOT NULL,
-  slug            VARCHAR(100) NOT NULL UNIQUE,
-  plan            VARCHAR(30)  NOT NULL DEFAULT 'STANDARD',
-  contact_email   VARCHAR(200) NOT NULL,
-  contact_phone   VARCHAR(20)  NOT NULL DEFAULT '',
-  cities          TEXT[]       NOT NULL DEFAULT '{}',
-  commission_pct  NUMERIC(5,2) NOT NULL DEFAULT 20.0,
-  credit_limit_paise INT       NOT NULL DEFAULT 0,
-  is_active       BOOLEAN      NOT NULL DEFAULT true,
-  config          JSONB        NOT NULL DEFAULT '{}',
-  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name              VARCHAR(200) NOT NULL,
+  slug              VARCHAR(100) NOT NULL UNIQUE,
+  plan              VARCHAR(30)  NOT NULL DEFAULT 'STANDARD',
+  contact_email     VARCHAR(200) NOT NULL,
+  contact_phone     VARCHAR(20)  NOT NULL DEFAULT '',
+  allowed_cities    TEXT[]       NOT NULL DEFAULT '{}',
+  revenue_share_pct NUMERIC(5,2) NOT NULL DEFAULT 20.0,
+  status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+  active_drivers    INT          NOT NULL DEFAULT 0,
+  active_riders     INT          NOT NULL DEFAULT 0,
+  config            JSONB        NOT NULL DEFAULT '{}',
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  suspended_at      TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS tenant_operators (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name          VARCHAR(200) NOT NULL,
-  email         VARCHAR(200) NOT NULL,
-  role          VARCHAR(50)  NOT NULL DEFAULT 'OPERATOR',
+  admin_email   VARCHAR(200) NOT NULL,
+  role          VARCHAR(50)  NOT NULL DEFAULT 'OPERATOR_ADMIN',
   is_active     BOOLEAN      NOT NULL DEFAULT true,
   last_login_at TIMESTAMPTZ,
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  UNIQUE(tenant_id, email)
+  UNIQUE(tenant_id, admin_email)
 );
 
 -- Seeds: emission factors
@@ -83,16 +84,16 @@ INSERT INTO esg_reports (period, total_trips, total_distance_km, total_emission_
  '{"trees_equivalent":7900,"grievances_resolved_pct":95.8,"avg_driver_earning_paise":84100,"fuel_saved_liters":430}');
 
 -- Seeds: tenants
-INSERT INTO tenants (name, slug, plan, contact_email, contact_phone, cities, commission_pct, is_active, config) VALUES
-('RideEasy Kolkata',    'rideeasy-kol',   'PREMIUM',    'ops@rideeasy.in',    '+91-9800000001', ARRAY['KOL'],        18.5, true, '{"brand_color":"#1a73e8","whitelabel":true}'),
-('FastWheels Bangalore','fastwheels-blr', 'ENTERPRISE', 'admin@fastwheels.io', '+91-9900000002', ARRAY['BLR','MYS'], 17.0, true, '{"brand_color":"#ff6600","whitelabel":true,"sso_provider":"google"}'),
-('CityRides Pune',      'cityrides-pun',  'STANDARD',   'info@cityrides.co',  '+91-9700000003', ARRAY['PUN'],        20.0, false,'{"brand_color":"#2d6a4f","whitelabel":false}');
+INSERT INTO tenants (name, slug, plan, contact_email, contact_phone, allowed_cities, revenue_share_pct, status, active_drivers, active_riders, suspended_at, config) VALUES
+('RideEasy Kolkata',    'rideeasy-kol',   'PREMIUM',    'ops@rideeasy.in',    '+91-9800000001', ARRAY['KOL'],        18.5, 'ACTIVE',    420, 12400, NULL,                       '{"brand_color":"#1a73e8","whitelabel":true}'),
+('FastWheels Bangalore','fastwheels-blr', 'ENTERPRISE', 'admin@fastwheels.io', '+91-9900000002', ARRAY['BLR','MYS'], 17.0, 'ACTIVE',    870, 31200, NULL,                       '{"brand_color":"#ff6600","whitelabel":true,"sso_provider":"google"}'),
+('CityRides Pune',      'cityrides-pun',  'STANDARD',   'info@cityrides.co',  '+91-9700000003', ARRAY['PUN'],        20.0, 'SUSPENDED', 0,   2100,  NOW() - INTERVAL '14 days', '{"brand_color":"#2d6a4f","whitelabel":false}');
 
-INSERT INTO tenant_operators (tenant_id, name, email, role, is_active, last_login_at)
-SELECT id, 'Priya Sharma',  'priya@rideeasy.in',   'ADMIN',    true, NOW() - INTERVAL '2 hours' FROM tenants WHERE slug = 'rideeasy-kol'
+INSERT INTO tenant_operators (tenant_id, admin_email, role, is_active, last_login_at)
+SELECT id, 'priya@rideeasy.in',   'OPERATOR_ADMIN',  true, NOW() - INTERVAL '2 hours' FROM tenants WHERE slug = 'rideeasy-kol'
 UNION ALL
-SELECT id, 'Rajan Menon',   'rajan@rideeasy.in',   'OPERATOR', true, NOW() - INTERVAL '1 day'   FROM tenants WHERE slug = 'rideeasy-kol'
+SELECT id, 'rajan@rideeasy.in',   'OPERATOR_ADMIN',  true, NOW() - INTERVAL '1 day'   FROM tenants WHERE slug = 'rideeasy-kol'
 UNION ALL
-SELECT id, 'Arun Kumar',    'arun@fastwheels.io',  'ADMIN',    true, NOW() - INTERVAL '3 hours' FROM tenants WHERE slug = 'fastwheels-blr'
+SELECT id, 'arun@fastwheels.io',  'OPERATOR_ADMIN',  true, NOW() - INTERVAL '3 hours' FROM tenants WHERE slug = 'fastwheels-blr'
 UNION ALL
-SELECT id, 'Meera Pillai',  'meera@fastwheels.io', 'READ_ONLY',true, NOW() - INTERVAL '5 days'  FROM tenants WHERE slug = 'fastwheels-blr';
+SELECT id, 'meera@fastwheels.io', 'OPERATOR_VIEWER', true, NOW() - INTERVAL '5 days'  FROM tenants WHERE slug = 'fastwheels-blr';

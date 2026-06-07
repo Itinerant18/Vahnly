@@ -86,7 +86,7 @@ func (h *FranchiseHandler) HandleUpsertTenant(w http.ResponseWriter, r *http.Req
 
 	id := r.PathValue("id")
 	if id != "" {
-		_, err := h.db.Exec(ctx, `UPDATE tenants SET name=$1, contact_email=$2, contact_phone=$3, allowed_cities=$4, revenue_share_pct=$5, status=$6 WHERE id=$7`,
+		_, err := h.db.Exec(ctx, `UPDATE tenants SET name=$1, contact_email=$2, contact_phone=$3, allowed_cities=$4, revenue_share_pct=$5, status=$6, suspended_at=CASE WHEN $6='SUSPENDED' THEN NOW() WHEN $6='ACTIVE' THEN NULL ELSE suspended_at END WHERE id=$7`,
 			body.Name, body.ContactEmail, body.ContactPhone, body.AllowedCities, body.RevenueSharePct, body.Status, id)
 		if err != nil {
 			http.Error(w, "update failed", http.StatusInternalServerError)
