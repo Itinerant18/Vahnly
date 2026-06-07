@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,6 +29,9 @@ func platJSON(w http.ResponseWriter, status int, v any) {
 // ── Service Health ────────────────────────────────────────────────────────────
 
 func (h *PlatformHandler) HandleGetServiceHealth(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -88,6 +92,9 @@ func (h *PlatformHandler) HandleGetServiceHealth(w http.ResponseWriter, r *http.
 }
 
 func (h *PlatformHandler) HandleUpsertHealthIncident(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -132,6 +139,9 @@ func (h *PlatformHandler) HandleUpsertHealthIncident(w http.ResponseWriter, r *h
 // ── Experiments ───────────────────────────────────────────────────────────────
 
 func (h *PlatformHandler) HandleGetExperiments(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -159,7 +169,16 @@ func (h *PlatformHandler) HandleGetExperiments(w http.ResponseWriter, r *http.Re
 		IsWinner        bool     `json:"is_winner"`
 	}
 
-	rows, err := h.db.Query(ctx, `SELECT id, name, description, hypothesis, metric, status, variants, target_cities, start_date::text, end_date::text, created_at FROM experiments ORDER BY created_at DESC`)
+	// Enforce city scope: scoped admins see experiments targeting their cities plus
+	// global experiments (empty target_cities). SUPER_ADMIN / ALL scope sees everything.
+	const expSelect = `SELECT id, name, description, hypothesis, metric, status, variants, target_cities, start_date::text, end_date::text, created_at FROM experiments`
+	var rows pgx.Rows
+	var err error
+	if allowed := adminAllowedCities(ctx); allowed != nil {
+		rows, err = h.db.Query(ctx, expSelect+` WHERE cardinality(target_cities) = 0 OR target_cities && $1 ORDER BY created_at DESC`, allowed)
+	} else {
+		rows, err = h.db.Query(ctx, expSelect+` ORDER BY created_at DESC`)
+	}
 	if err != nil {
 		http.Error(w, "query error", http.StatusInternalServerError)
 		return
@@ -195,6 +214,9 @@ func (h *PlatformHandler) HandleGetExperiments(w http.ResponseWriter, r *http.Re
 }
 
 func (h *PlatformHandler) HandleUpsertExperiment(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -238,6 +260,9 @@ func (h *PlatformHandler) HandleUpsertExperiment(w http.ResponseWriter, r *http.
 // ── Chatbot ───────────────────────────────────────────────────────────────────
 
 func (h *PlatformHandler) HandleGetChatbotStats(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -283,6 +308,9 @@ func (h *PlatformHandler) HandleGetChatbotStats(w http.ResponseWriter, r *http.R
 }
 
 func (h *PlatformHandler) HandleUpsertChatbotIntent(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 

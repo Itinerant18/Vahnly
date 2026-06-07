@@ -26,6 +26,9 @@ func franchJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func (h *FranchiseHandler) HandleGetTenants(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -67,6 +70,9 @@ func (h *FranchiseHandler) HandleGetTenants(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *FranchiseHandler) HandleUpsertTenant(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -106,6 +112,9 @@ func (h *FranchiseHandler) HandleUpsertTenant(w http.ResponseWriter, r *http.Req
 }
 
 func (h *FranchiseHandler) HandleGetTenantOperators(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -146,6 +155,9 @@ func (h *FranchiseHandler) HandleGetTenantOperators(w http.ResponseWriter, r *ht
 }
 
 func (h *FranchiseHandler) HandleAddTenantOperator(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 

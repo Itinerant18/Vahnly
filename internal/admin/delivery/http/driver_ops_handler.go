@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,6 +29,9 @@ func dopsJSON(w http.ResponseWriter, status int, v any) {
 // ── Incentives ────────────────────────────────────────────────────────────────
 
 func (h *DriverOpsHandler) HandleGetIncentiveCampaigns(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -46,7 +50,16 @@ func (h *DriverOpsHandler) HandleGetIncentiveCampaigns(w http.ResponseWriter, r 
 		DriversClaimed  int             `json:"drivers_claimed"`
 	}
 
-	rows, err := h.db.Query(ctx, `SELECT id, name, trigger_type, condition_config, reward_type, reward_value, target_cities, starts_at, ends_at, is_active, drivers_targeted, drivers_claimed FROM incentive_campaigns ORDER BY created_at DESC`)
+	// Enforce city scope: scoped admins see campaigns targeting their cities plus
+	// global campaigns (empty target_cities). SUPER_ADMIN / ALL scope sees everything.
+	const baseSelect = `SELECT id, name, trigger_type, condition_config, reward_type, reward_value, target_cities, starts_at, ends_at, is_active, drivers_targeted, drivers_claimed FROM incentive_campaigns`
+	var rows pgx.Rows
+	var err error
+	if allowed := adminAllowedCities(ctx); allowed != nil {
+		rows, err = h.db.Query(ctx, baseSelect+` WHERE cardinality(target_cities) = 0 OR target_cities && $1 ORDER BY created_at DESC`, allowed)
+	} else {
+		rows, err = h.db.Query(ctx, baseSelect+` ORDER BY created_at DESC`)
+	}
 	if err != nil {
 		h.logger.Printf("GetIncentiveCampaigns: %v", err)
 		http.Error(w, "query error", http.StatusInternalServerError)
@@ -69,6 +82,9 @@ func (h *DriverOpsHandler) HandleGetIncentiveCampaigns(w http.ResponseWriter, r 
 }
 
 func (h *DriverOpsHandler) HandleUpsertIncentiveCampaign(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -112,6 +128,9 @@ func (h *DriverOpsHandler) HandleUpsertIncentiveCampaign(w http.ResponseWriter, 
 // ── Coaching ──────────────────────────────────────────────────────────────────
 
 func (h *DriverOpsHandler) HandleGetCoachingFlags(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -152,6 +171,9 @@ func (h *DriverOpsHandler) HandleGetCoachingFlags(w http.ResponseWriter, r *http
 }
 
 func (h *DriverOpsHandler) HandleResolveCoachingFlag(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -165,6 +187,9 @@ func (h *DriverOpsHandler) HandleResolveCoachingFlag(w http.ResponseWriter, r *h
 }
 
 func (h *DriverOpsHandler) HandleGetTrainingModules(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -200,6 +225,9 @@ func (h *DriverOpsHandler) HandleGetTrainingModules(w http.ResponseWriter, r *ht
 // ── Vehicle Inspection ────────────────────────────────────────────────────────
 
 func (h *DriverOpsHandler) HandleGetInspections(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -241,6 +269,9 @@ func (h *DriverOpsHandler) HandleGetInspections(w http.ResponseWriter, r *http.R
 }
 
 func (h *DriverOpsHandler) HandleReviewInspection(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -265,6 +296,9 @@ func (h *DriverOpsHandler) HandleReviewInspection(w http.ResponseWriter, r *http
 // ── Telematics ────────────────────────────────────────────────────────────────
 
 func (h *DriverOpsHandler) HandleGetTelematicsEvents(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -299,6 +333,9 @@ func (h *DriverOpsHandler) HandleGetTelematicsEvents(w http.ResponseWriter, r *h
 }
 
 func (h *DriverOpsHandler) HandleGetTelematicsSummaries(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 

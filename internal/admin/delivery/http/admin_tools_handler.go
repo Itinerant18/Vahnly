@@ -28,6 +28,9 @@ func toolsJSON(w http.ResponseWriter, status int, v any) {
 // ── Impersonation ─────────────────────────────────────────────────────────────
 
 func (h *AdminToolsHandler) HandleGetImpersonationSessions(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -63,6 +66,9 @@ func (h *AdminToolsHandler) HandleGetImpersonationSessions(w http.ResponseWriter
 }
 
 func (h *AdminToolsHandler) HandleStartImpersonation(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -87,6 +93,9 @@ func (h *AdminToolsHandler) HandleStartImpersonation(w http.ResponseWriter, r *h
 }
 
 func (h *AdminToolsHandler) HandleEndImpersonation(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -102,6 +111,9 @@ func (h *AdminToolsHandler) HandleEndImpersonation(w http.ResponseWriter, r *htt
 // ── Bulk Operations ───────────────────────────────────────────────────────────
 
 func (h *AdminToolsHandler) HandleGetBulkOperations(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -139,6 +151,9 @@ func (h *AdminToolsHandler) HandleGetBulkOperations(w http.ResponseWriter, r *ht
 }
 
 func (h *AdminToolsHandler) HandleApproveBulkOperation(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -161,6 +176,9 @@ func (h *AdminToolsHandler) HandleApproveBulkOperation(w http.ResponseWriter, r 
 // ── Cron / Job Monitor ────────────────────────────────────────────────────────
 
 func (h *AdminToolsHandler) HandleGetCronJobs(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -221,6 +239,9 @@ func (h *AdminToolsHandler) HandleGetCronJobs(w http.ResponseWriter, r *http.Req
 }
 
 func (h *AdminToolsHandler) HandleToggleCronJob(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -236,6 +257,9 @@ func (h *AdminToolsHandler) HandleToggleCronJob(w http.ResponseWriter, r *http.R
 // ── Data Export Marketplace ───────────────────────────────────────────────────
 
 func (h *AdminToolsHandler) HandleGetExportQueries(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -269,6 +293,9 @@ func (h *AdminToolsHandler) HandleGetExportQueries(w http.ResponseWriter, r *htt
 }
 
 func (h *AdminToolsHandler) HandleGetExportJobs(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -304,6 +331,9 @@ func (h *AdminToolsHandler) HandleGetExportJobs(w http.ResponseWriter, r *http.R
 }
 
 func (h *AdminToolsHandler) HandleSubmitExportJob(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 

@@ -17,8 +17,9 @@ type AuthMiddleware struct {
 }
 
 type CustomClaims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	CityScope string `json:"city_scope,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -68,6 +69,7 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 		// Inject verified user context fields into the request context pipeline
 		ctx := context.WithValue(r.Context(), UserIDContextKey, claims.UserID)
 		ctx = context.WithValue(ctx, UserRoleContextKey, claims.Role)
+		ctx = context.WithValue(ctx, CityScopeContextKey, claims.CityScope)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
@@ -83,6 +85,14 @@ const UserRoleContextKey ContextKey = "userRole"
 func GetUserRoleFromContext(ctx context.Context) (string, bool) {
 	role, ok := ctx.Value(UserRoleContextKey).(string)
 	return role, ok
+}
+
+const CityScopeContextKey ContextKey = "cityScope"
+
+// GetCityScopeFromContext returns the raw city_scope claim (e.g. "KOL" or "KOL,BLR").
+func GetCityScopeFromContext(ctx context.Context) (string, bool) {
+	scope, ok := ctx.Value(CityScopeContextKey).(string)
+	return scope, ok
 }
 
 // RequireRole guards administrative routes against non-authorized client access

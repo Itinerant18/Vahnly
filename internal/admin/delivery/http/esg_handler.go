@@ -26,6 +26,9 @@ func esgJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func (h *ESGHandler) HandleGetESGSummary(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -111,6 +114,9 @@ func (h *ESGHandler) HandleGetESGSummary(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *ESGHandler) HandlePublishESGReport(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPost) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 

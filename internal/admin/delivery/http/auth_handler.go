@@ -262,8 +262,9 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	// 5. Generate signed JWT token
 	expirationTime := time.Now().Add(12 * time.Hour)
 	claims := &middleware.CustomClaims{
-		UserID: dbUserID,
-		Role:   dbRole,
+		UserID:    dbUserID,
+		Role:      dbRole,
+		CityScope: dbCityScope,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

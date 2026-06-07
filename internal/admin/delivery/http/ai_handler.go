@@ -30,6 +30,9 @@ func aiJSON(w http.ResponseWriter, status int, v any) {
 // ── Fraud Detection ───────────────────────────────────────────────────────────
 
 func (h *AIHandler) HandleGetFraudEvents(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -96,6 +99,9 @@ func (h *AIHandler) HandleGetFraudEvents(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AIHandler) HandleUpdateFraudEvent(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -117,6 +123,9 @@ func (h *AIHandler) HandleUpdateFraudEvent(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AIHandler) HandleGetFraudRules(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -152,6 +161,9 @@ func (h *AIHandler) HandleGetFraudRules(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *AIHandler) HandleUpdateFraudRule(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodPatch) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -178,16 +190,28 @@ func (h *AIHandler) HandleUpdateFraudRule(w http.ResponseWriter, r *http.Request
 // ── Demand Heatmap ────────────────────────────────────────────────────────────
 
 func (h *AIHandler) HandleGetDemandForecasts(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	city := r.URL.Query().Get("city")
 	args := []any{}
-	where := "WHERE forecast_hour >= NOW()"
+	conds := []string{"forecast_hour >= NOW()"}
+	idx := 1
 	if city != "" {
-		where += " AND city = $1"
+		conds = append(conds, fmt.Sprintf("city = $%d", idx))
 		args = append(args, city)
+		idx++
 	}
+	// Enforce the requesting admin's city scope (no-op for SUPER_ADMIN / ALL scope).
+	if allowed := adminAllowedCities(r.Context()); allowed != nil {
+		conds = append(conds, fmt.Sprintf("city = ANY($%d)", idx))
+		args = append(args, allowed)
+		idx++
+	}
+	where := "WHERE " + strings.Join(conds, " AND ")
 
 	type Forecast struct {
 		ID              string    `json:"id"`
@@ -223,6 +247,9 @@ func (h *AIHandler) HandleGetDemandForecasts(w http.ResponseWriter, r *http.Requ
 // ── Voice of Customer ─────────────────────────────────────────────────────────
 
 func (h *AIHandler) HandleGetVoCTopics(w http.ResponseWriter, r *http.Request) {
+	if !methodAllowed(w, r, http.MethodGet) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
