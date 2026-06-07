@@ -96,6 +96,18 @@ export function PlatformDashboard() {
   const [chatStats, setChatStats] = useState<ChatStats | null>(null);
   const [intents, setIntents] = useState<ChatbotIntent[]>([]);
 
+  const emptyIncident = { service_name: '', title: '', severity: 'HIGH', impact_description: '' };
+  const [showIncident, setShowIncident] = useState(false);
+  const [newIncident, setNewIncident] = useState(emptyIncident);
+
+  const emptyExperiment = { name: '', hypothesis: '', metric: '', target_cities: '' };
+  const [showExperiment, setShowExperiment] = useState(false);
+  const [newExperiment, setNewExperiment] = useState(emptyExperiment);
+
+  const emptyIntent = { intent_name: '', response_template: '', confidence_threshold: 0.75, fallback_to_human: false };
+  const [showIntent, setShowIntent] = useState(false);
+  const [newIntent, setNewIntent] = useState(emptyIntent);
+
   const load = useCallback(async () => {
     const [health, exp, chat] = await Promise.all([
       fetch(`${API}/platform/health`, { headers: authHeaders() }).then(r => r.json()),
@@ -117,6 +129,49 @@ export function PlatformDashboard() {
       method: 'PATCH', headers: authHeaders(true),
       body: JSON.stringify({ status: 'RESOLVED', root_cause: 'Resolved by admin' }),
     });
+    load();
+  };
+
+  const createIncident = async () => {
+    if (!newIncident.service_name || !newIncident.title) return;
+    await fetch(`${API}/platform/health/incidents`, {
+      method: 'POST', headers: authHeaders(true),
+      body: JSON.stringify({ ...newIncident, status: 'INVESTIGATING', root_cause: '' }),
+    });
+    setShowIncident(false);
+    setNewIncident(emptyIncident);
+    load();
+  };
+
+  const createExperiment = async () => {
+    if (!newExperiment.name || !newExperiment.metric) return;
+    await fetch(`${API}/platform/experiments`, {
+      method: 'POST', headers: authHeaders(true),
+      body: JSON.stringify({
+        name: newExperiment.name,
+        description: '',
+        hypothesis: newExperiment.hypothesis,
+        metric: newExperiment.metric,
+        status: 'DRAFT',
+        variants: [{ name: 'control', split_pct: 50 }, { name: 'treatment', split_pct: 50 }],
+        target_cities: newExperiment.target_cities.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+        start_date: '',
+        end_date: '',
+      }),
+    });
+    setShowExperiment(false);
+    setNewExperiment(emptyExperiment);
+    load();
+  };
+
+  const createIntent = async () => {
+    if (!newIntent.intent_name || !newIntent.response_template) return;
+    await fetch(`${API}/platform/chatbot/intents`, {
+      method: 'POST', headers: authHeaders(true),
+      body: JSON.stringify({ ...newIntent, confidence_threshold: Number(newIntent.confidence_threshold), is_active: true }),
+    });
+    setShowIntent(false);
+    setNewIntent(emptyIntent);
     load();
   };
 
@@ -170,6 +225,27 @@ export function PlatformDashboard() {
             ))}
           </div>
 
+          <div className="flex justify-end">
+            <button onClick={() => setShowIncident(v => !v)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              {showIncident ? 'Cancel' : 'Report Incident'}
+            </button>
+          </div>
+
+          {showIncident && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+              <p className="font-medium text-blue-800">Report Service Incident</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input value={newIncident.service_name} onChange={e => setNewIncident(p => ({ ...p, service_name: e.target.value }))} placeholder="Service name (e.g. payment-gateway)" className="border rounded px-3 py-1.5 text-sm" />
+                <select value={newIncident.severity} onChange={e => setNewIncident(p => ({ ...p, severity: e.target.value }))} className="border rounded px-3 py-1.5 text-sm">
+                  {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input value={newIncident.title} onChange={e => setNewIncident(p => ({ ...p, title: e.target.value }))} placeholder="Title" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
+                <textarea value={newIncident.impact_description} onChange={e => setNewIncident(p => ({ ...p, impact_description: e.target.value }))} placeholder="Impact description" className="border rounded px-3 py-1.5 text-sm md:col-span-2" rows={2} />
+              </div>
+              <button onClick={createIncident} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+            </div>
+          )}
+
           {incidents.length > 0 && (
             <div>
               <h3 className="font-semibold text-gray-700 mb-3">Incidents</h3>
@@ -200,6 +276,26 @@ export function PlatformDashboard() {
 
       {tab === 'experiments' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => setShowExperiment(v => !v)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              {showExperiment ? 'Cancel' : '+ New Experiment'}
+            </button>
+          </div>
+
+          {showExperiment && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+              <p className="font-medium text-blue-800">New Experiment</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input value={newExperiment.name} onChange={e => setNewExperiment(p => ({ ...p, name: e.target.value }))} placeholder="Experiment name" className="border rounded px-3 py-1.5 text-sm" />
+                <input value={newExperiment.metric} onChange={e => setNewExperiment(p => ({ ...p, metric: e.target.value }))} placeholder="Primary metric" className="border rounded px-3 py-1.5 text-sm" />
+                <input value={newExperiment.hypothesis} onChange={e => setNewExperiment(p => ({ ...p, hypothesis: e.target.value }))} placeholder="Hypothesis" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
+                <input value={newExperiment.target_cities} onChange={e => setNewExperiment(p => ({ ...p, target_cities: e.target.value }))} placeholder="Cities (blank = all)" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
+              </div>
+              <p className="text-xs text-gray-500">Created as DRAFT with control/treatment 50-50 split.</p>
+              <button onClick={createExperiment} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+            </div>
+          )}
+
           {experiments.map(exp => {
             const expResults = resultsByExp(exp.id);
             return (
@@ -258,7 +354,31 @@ export function PlatformDashboard() {
           </div>
 
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Intents</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-700">Intents</h3>
+              <button onClick={() => setShowIntent(v => !v)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                {showIntent ? 'Cancel' : '+ New Intent'}
+              </button>
+            </div>
+
+            {showIntent && (
+              <div className="p-4 mb-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input value={newIntent.intent_name} onChange={e => setNewIntent(p => ({ ...p, intent_name: e.target.value }))} placeholder="Intent name (e.g. trip_cancellation)" className="border rounded px-3 py-1.5 text-sm" />
+                  <label className="text-xs text-gray-500 flex items-center gap-2">
+                    Confidence ≥
+                    <input type="number" step="0.05" min="0" max="1" value={newIntent.confidence_threshold} onChange={e => setNewIntent(p => ({ ...p, confidence_threshold: Number(e.target.value) }))} className="border rounded px-3 py-1.5 text-sm w-24" />
+                  </label>
+                  <textarea value={newIntent.response_template} onChange={e => setNewIntent(p => ({ ...p, response_template: e.target.value }))} placeholder="Response template" className="border rounded px-3 py-1.5 text-sm md:col-span-2" rows={2} />
+                  <label className="text-xs text-gray-600 flex items-center gap-2">
+                    <input type="checkbox" checked={newIntent.fallback_to_human} onChange={e => setNewIntent(p => ({ ...p, fallback_to_human: e.target.checked }))} />
+                    Fall back to human agent
+                  </label>
+                </div>
+                <button onClick={createIntent} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+              </div>
+            )}
+
             <div className="space-y-2">
               {intents.map(intent => (
                 <div key={intent.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded">

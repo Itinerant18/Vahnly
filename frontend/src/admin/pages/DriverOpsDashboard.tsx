@@ -87,6 +87,10 @@ export function DriverOpsDashboard() {
   const [summaries, setSummaries] = useState<TelSummary[]>([]);
   const [inspStatus, setInspStatus] = useState('');
 
+  const emptyCampaign = { name: '', trigger_type: 'PEAK_HOUR', reward_type: 'FIXED', reward_value: 0, target_cities: '', starts_at: '', ends_at: '' };
+  const [showCreate, setShowCreate] = useState(false);
+  const [newCampaign, setNewCampaign] = useState(emptyCampaign);
+
   const load = useCallback(async () => {
     const [c, f, m, s] = await Promise.all([
       fetch(`${API}/driver-ops/incentives`, { headers: authHeaders() }).then(r => r.json()),
@@ -112,6 +116,27 @@ export function DriverOpsDashboard() {
 
   const resolveFlag = async (id: string) => {
     await fetch(`${API}/driver-ops/coaching/flags/${id}/resolve`, { method: 'POST', headers: authHeaders() });
+    load();
+  };
+
+  const createCampaign = async () => {
+    if (!newCampaign.name || !newCampaign.starts_at || !newCampaign.ends_at) return;
+    await fetch(`${API}/driver-ops/incentives`, {
+      method: 'POST', headers: authHeaders(true),
+      body: JSON.stringify({
+        name: newCampaign.name,
+        trigger_type: newCampaign.trigger_type,
+        condition_config: {},
+        reward_type: newCampaign.reward_type,
+        reward_value: Number(newCampaign.reward_value),
+        target_cities: newCampaign.target_cities.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+        starts_at: new Date(newCampaign.starts_at).toISOString(),
+        ends_at: new Date(newCampaign.ends_at).toISOString(),
+        is_active: true,
+      }),
+    });
+    setShowCreate(false);
+    setNewCampaign(emptyCampaign);
     load();
   };
 
@@ -145,6 +170,32 @@ export function DriverOpsDashboard() {
 
       {tab === 'incentives' && (
         <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={() => setShowCreate(v => !v)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              {showCreate ? 'Cancel' : '+ New Campaign'}
+            </button>
+          </div>
+
+          {showCreate && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+              <p className="font-medium text-blue-800">New Incentive Campaign</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <input value={newCampaign.name} onChange={e => setNewCampaign(p => ({ ...p, name: e.target.value }))} placeholder="Campaign name" className="border rounded px-3 py-1.5 text-sm col-span-2 md:col-span-3" />
+                <select value={newCampaign.trigger_type} onChange={e => setNewCampaign(p => ({ ...p, trigger_type: e.target.value }))} className="border rounded px-3 py-1.5 text-sm">
+                  {['PEAK_HOUR', 'LOW_SUPPLY', 'MANUAL'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={newCampaign.reward_type} onChange={e => setNewCampaign(p => ({ ...p, reward_type: e.target.value }))} className="border rounded px-3 py-1.5 text-sm">
+                  {['FIXED', 'PERCENT', 'BONUS_TRIPS'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input type="number" value={newCampaign.reward_value} onChange={e => setNewCampaign(p => ({ ...p, reward_value: Number(e.target.value) }))} placeholder="Reward value" className="border rounded px-3 py-1.5 text-sm" />
+                <input value={newCampaign.target_cities} onChange={e => setNewCampaign(p => ({ ...p, target_cities: e.target.value }))} placeholder="Cities (KOL,BLR)" className="border rounded px-3 py-1.5 text-sm" />
+                <label className="text-xs text-gray-500 flex flex-col">Starts<input type="date" value={newCampaign.starts_at} onChange={e => setNewCampaign(p => ({ ...p, starts_at: e.target.value }))} className="border rounded px-3 py-1.5 text-sm" /></label>
+                <label className="text-xs text-gray-500 flex flex-col">Ends<input type="date" value={newCampaign.ends_at} onChange={e => setNewCampaign(p => ({ ...p, ends_at: e.target.value }))} className="border rounded px-3 py-1.5 text-sm" /></label>
+              </div>
+              <button onClick={createCampaign} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+            </div>
+          )}
+
           {campaigns.map(c => (
             <div key={c.id} className="p-4 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-start justify-between">
