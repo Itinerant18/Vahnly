@@ -17,7 +17,10 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <BrowserRouter basename="/admin">
+    <BrowserRouter
+      basename="/admin"
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <AdminShell />
     </BrowserRouter>
   </React.StrictMode>,

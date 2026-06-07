@@ -75,7 +75,7 @@ Get-Content '.env' | ForEach-Object {
 
 # ── 3. Tear down any prior state ─────────────────────────────────────────────
 Write-Host "==> Tearing down any prior stack (this is safe)..."
-docker compose down -v 2>$null | Out-Null
+try { docker compose down -v 2>&1 | Out-Null } catch { <# no prior stack — fine #> }
 Get-Process | Where-Object { $_.Name -eq 'kubectl' } | Stop-Process -Force -ErrorAction SilentlyContinue
 # Stop the local Windows Postgres service if it's hogging 5432.
 try { Stop-Service -Name 'postgresql*' -ErrorAction SilentlyContinue } catch { }
