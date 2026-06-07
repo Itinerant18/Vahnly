@@ -254,6 +254,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/driver/earnings", authGuard.AuthenticateJWT(handler.HandleDriverGetEarnings))
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
+	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(handler.HandleDriverOdometerCheckpoint))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
 	mux.HandleFunc("POST /api/v1/sos/trigger", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleTriggerSOS)))
 
