@@ -135,6 +135,12 @@ export const DriverOnboardingQueue: React.FC = () => {
 		return applicants.filter((app) => app.stage.toUpperCase() === stageName);
 	};
 
+	// Compliance gate: KYC can only be verified once every uploaded document has been
+	// reviewed and approved. An empty checklist also blocks approval.
+	const kycDocs = selectedApplicant?.kyc_documents_checklist ?? [];
+	const pendingDocs = kycDocs.filter((doc) => doc.status !== 'APPROVED');
+	const allDocsApproved = kycDocs.length > 0 && pendingDocs.length === 0;
+
 	return (
 		<div className="w-full h-full flex flex-col overflow-hidden p-6 space-y-6 bg-canvas">
 			<div>
@@ -264,8 +270,9 @@ export const DriverOnboardingQueue: React.FC = () => {
 							<div className="flex flex-wrap gap-2">
 								<button
 									onClick={() => handleAction('verify-kyc')}
-									className="flex-1 bg-ink hover:bg-black-elevated text-on-dark text-xs font-semibold rounded-pill h-9 px-4 transition-colors"
-									disabled={actionLoading}
+									className="flex-1 bg-ink hover:bg-black-elevated text-on-dark text-xs font-semibold rounded-pill h-9 px-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-ink"
+									disabled={actionLoading || !allDocsApproved}
+									title={!allDocsApproved ? 'All KYC documents must be approved before verifying' : undefined}
 								>
 									Approve KYC & Verify
 								</button>
@@ -277,6 +284,14 @@ export const DriverOnboardingQueue: React.FC = () => {
 									Reject Applicant
 								</button>
 							</div>
+
+							{!allDocsApproved && (
+								<p className="text-[10px] text-status-alert font-medium">
+									{kycDocs.length === 0
+										? 'No documents uploaded yet — cannot verify KYC.'
+										: `${pendingDocs.length} document(s) pending review before KYC can be approved.`}
+								</p>
+							)}
 
 							<div className="flex gap-2">
 								<button
