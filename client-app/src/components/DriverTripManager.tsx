@@ -2,6 +2,7 @@ import React from 'react';
 import { DutyState, useDriverDutyStore } from '../store/useDriverDutyStore';
 import { OfferPopup } from './OfferPopup';
 import { SlideToConfirm } from './SlideToConfirm';
+import { FinalBill } from '../api/client';
 
 interface DashboardHomeProps {
   dutyState: DutyState;
@@ -528,6 +529,7 @@ interface CompletedPaneProps {
   toggleRiderCommentTag: (t: string) => void;
   handlePaymentConfirmationSubmit: (m: string) => void;
   calculateTotalBill: () => number;
+  finalBill?: FinalBill | null;
 }
 
 export const CompletedPane: React.FC<CompletedPaneProps> = ({
@@ -543,54 +545,65 @@ export const CompletedPane: React.FC<CompletedPaneProps> = ({
   toggleRiderCommentTag,
   handlePaymentConfirmationSubmit,
   calculateTotalBill,
+  finalBill,
 }) => {
+  const displayTotal = finalBill ? finalBill.total_fare_paise / 100 : calculateTotalBill();
+  const baseFare = finalBill ? finalBill.base_fare_paise / 100 : (activeTrip.quoted_fare_paise / 100);
+  const distanceCharge = finalBill ? finalBill.distance_charge_paise / 100 : (Math.max(0, (parseFloat(endOdometer) - parseFloat(startOdometer)) - 15) * 18);
+  const waitCharge = finalBill ? finalBill.wait_charge_paise / 100 : waitingCharges;
+  const tolls = finalBill ? finalBill.tolls_paise / 100 : tollCharges;
+  const parking = finalBill ? finalBill.parking_charges_paise / 100 : parkingCharges;
+  const surge = finalBill ? finalBill.night_surge_paise / 100 : 50;
+  const care = finalBill ? finalBill.care_surcharge_paise / 100 : 15;
+  const waitMinutes = finalBill ? finalBill.wait_minutes : Math.round(waitingCharges / 2);
+
   return (
     <div className="space-y-4 text-left animate-fadeIn">
       <h3 className="text-sm font-bold tracking-wider font-mono uppercase text-white border-b border-zinc-900 pb-3 flex justify-between items-center">
         <span>Receipt & Settlement</span>
-        <span className="text-emerald-500 font-mono">₹{calculateTotalBill().toFixed(2)}</span>
+        <span className="text-emerald-500 font-mono">₹{displayTotal.toFixed(2)}</span>
       </h3>
 
       <div className="bg-zinc-900/50 border border-zinc-900 rounded-xl p-4 space-y-2 font-mono text-[10px] text-zinc-400">
         <div className="flex justify-between">
           <span>Base Package Quoted:</span>
-          <span className="text-white">₹{(activeTrip.quoted_fare_paise / 100).toFixed(2)}</span>
+          <span className="text-white">₹{baseFare.toFixed(2)}</span>
         </div>
-        {parseFloat(endOdometer) - parseFloat(startOdometer) > 15 && (
+        {(finalBill ? finalBill.distance_charge_paise > 0 : (parseFloat(endOdometer) - parseFloat(startOdometer) > 15)) && (
           <div className="flex justify-between">
             <span>Extra Mileage Charge:</span>
-            <span className="text-white">₹{(Math.max(0, (parseFloat(endOdometer) - parseFloat(startOdometer)) - 15) * 18).toFixed(2)}</span>
+            <span className="text-white">₹{distanceCharge.toFixed(2)}</span>
           </div>
         )}
-        {waitingCharges > 0 && (
+        {waitCharge > 0 && (
           <div className="flex justify-between">
-            <span>Waiting Fee ({Math.round(waitingCharges / 2)} mins):</span>
-            <span className="text-white">₹{waitingCharges.toFixed(2)}</span>
+            <span>Waiting Fee ({waitMinutes} mins):</span>
+            <span className="text-white">₹{waitCharge.toFixed(2)}</span>
           </div>
         )}
-        {tollCharges > 0 && (
+        {tolls > 0 && (
           <div className="flex justify-between">
             <span>Tolls/Gate Fee:</span>
-            <span className="text-white">₹{tollCharges.toFixed(2)}</span>
+            <span className="text-white">₹{tolls.toFixed(2)}</span>
           </div>
         )}
-        {parkingCharges > 0 && (
+        {parking > 0 && (
           <div className="flex justify-between">
             <span>Parking Fee:</span>
-            <span className="text-white">₹{parkingCharges.toFixed(2)}</span>
+            <span className="text-white">₹{parking.toFixed(2)}</span>
           </div>
         )}
         <div className="flex justify-between">
           <span>Night / Surge Commissions:</span>
-          <span className="text-white">₹50.00</span>
+          <span className="text-white">₹{surge.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>D4M Safety Care Premium:</span>
-          <span className="text-white">₹15.00</span>
+          <span className="text-white">₹{care.toFixed(2)}</span>
         </div>
         <div className="border-t border-zinc-800 pt-2 flex justify-between font-bold text-xs text-white">
           <span>Grand Total Net:</span>
-          <span className="text-emerald-400">₹{calculateTotalBill().toFixed(2)}</span>
+          <span className="text-emerald-400">₹{displayTotal.toFixed(2)}</span>
         </div>
       </div>
 
@@ -700,6 +713,7 @@ interface DriverTripManagerProps {
   toggleRiderCommentTag: (t: string) => void;
   handlePaymentConfirmationSubmit: (m: string) => void;
   calculateTotalBill: () => number;
+  finalBill?: FinalBill | null;
 }
 
 export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
@@ -775,6 +789,7 @@ export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
           toggleRiderCommentTag={props.toggleRiderCommentTag}
           handlePaymentConfirmationSubmit={props.handlePaymentConfirmationSubmit}
           calculateTotalBill={props.calculateTotalBill}
+          finalBill={props.finalBill}
         />
       );
     default:

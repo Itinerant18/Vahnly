@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS order_events CASCADE;
+DROP TABLE IF EXISTS orders_gps_trail CASCADE;

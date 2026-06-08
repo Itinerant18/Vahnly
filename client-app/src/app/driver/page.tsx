@@ -20,6 +20,10 @@ import {
   driverArriveAtPickup,
   driverStartTrip,
   ApiClientError,
+  addOrderEvent,
+  driverEndTrip,
+  driverConfirmPayment,
+  FinalBill,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -146,6 +150,7 @@ export default function DriverTerminalPage() {
   // Post-trip ratings
   const [riderRating, setRiderRating] = useState(5);
   const [riderCommentTags, setRiderCommentTags] = useState<string[]>([]);
+  const [finalBill, setFinalBill] = useState<FinalBill | null>(null);
 
   // Wait timer reference time and Cancel picker overlay states
   const [arrivedTime, setArrivedTime] = useState<Date | null>(null);
@@ -627,14 +632,40 @@ export default function DriverTerminalPage() {
     }
   };
 
-  const handleTollAddition = () => {
-    setTollCharges((prev) => prev + 50);
-    logAudit('BILLING_MODIFIER_ADDED', { type: 'TOLL', amount: 50 });
+  const handleTollAddition = async () => {
+    if (activeTrip?.order_id && token) {
+      try {
+        await addOrderEvent(token, activeTrip.order_id, {
+          event_type: 'ADD_TOLL',
+          amount_paise: 5000,
+          description: 'Highway toll fee added mid-trip',
+        });
+        setTollCharges((prev) => prev + 50);
+        logAudit('BILLING_MODIFIER_ADDED', { type: 'TOLL', amount: 50 });
+      } catch (err) {
+        alert('Failed to record toll event on server. Please try again.');
+      }
+    } else {
+      setTollCharges((prev) => prev + 50);
+    }
   };
 
-  const handleParkingAddition = () => {
-    setParkingCharges((prev) => prev + 30);
-    logAudit('BILLING_MODIFIER_ADDED', { type: 'PARKING', amount: 30 });
+  const handleParkingAddition = async () => {
+    if (activeTrip?.order_id && token) {
+      try {
+        await addOrderEvent(token, activeTrip.order_id, {
+          event_type: 'ADD_STOP',
+          amount_paise: 3000,
+          description: 'Stop/parking fee added mid-trip',
+        });
+        setParkingCharges((prev) => prev + 30);
+        logAudit('BILLING_MODIFIER_ADDED', { type: 'PARKING', amount: 30 });
+      } catch (err) {
+        alert('Failed to record parking event on server. Please try again.');
+      }
+    } else {
+      setParkingCharges((prev) => prev + 30);
+    }
   };
 
   const handleSlideToEndTrip = async () => {
@@ -659,33 +690,38 @@ export default function DriverTerminalPage() {
     });
 
     if (activeTrip?.order_id && token) {
-      // Phase 2: Submit END odometer checkpoint with retry before completing
-      const checkpoint: OdometerCheckpointPayload = {
-        checkpoint_type: 'END',
-        odometer_reading: parseInt(endOdometer, 10),
-        fuel_level: endFuel,
-        photo_url: endOdoPhoto || '',
-        timestamp: new Date().toISOString(),
-      };
-
-      const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
-
-      if (!synced) {
-        // Offline queueing: store for later sync, proceed with local state
-        queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
-        // Fallback: still call the legacy completeTrip endpoint
-        try {
-          await completeTrip(token, activeTrip.order_id, driverID);
-        } catch (err) {
-          console.warn('Complete trip fallback sync also failed:', err);
-        }
+      try {
+        const bill = await driverEndTrip(token, activeTrip.order_id, {
+          odometer_reading: parseInt(endOdometer, 10),
+          fuel_level: endFuel,
+          photo_url: endOdoPhoto || '',
+        });
+        setFinalBill(bill);
+        logAudit('TRIP_END_SYNCED', { orderId: activeTrip.order_id, total: bill.total_fare_paise });
+      } catch (err) {
+        console.warn('End trip sync failed, using local fallback calculations:', err);
+        setFinalBill({
+          order_id: activeTrip.order_id,
+          base_fare_paise: activeTrip.quoted_fare_paise,
+          distance_km: endNum - startNum,
+          distance_charge_paise: Math.max(0, (endNum - startNum) - 15) * 1800,
+          wait_minutes: Math.round(waitingCharges / 2),
+          wait_charge_paise: Math.round(waitingCharges) * 100,
+          overtime_minutes: 10,
+          overtime_charge_paise: 500,
+          tolls_paise: tollCharges * 100,
+          parking_charges_paise: parkingCharges * 100,
+          night_surge_paise: 5000,
+          care_surcharge_paise: 1500,
+          total_fare_paise: calculateTotalBill() * 100,
+        });
       }
     }
 
     setDutyState('COMPLETED');
   };
 
-  const handlePaymentConfirmationSubmit = (method: string) => {
+  const handlePaymentConfirmationSubmit = async (method: string) => {
     logAudit('PAYMENT_CONFIRMED', {
       orderId: activeTrip?.order_id,
       method,
@@ -693,7 +729,19 @@ export default function DriverTerminalPage() {
       tags: riderCommentTags
     });
 
-    alert(`Payment of ₹${calculateTotalBill().toFixed(2)} settled via ${method}. Feedback synced.`);
+    if (activeTrip?.order_id && token) {
+      try {
+        await driverConfirmPayment(token, activeTrip.order_id, {
+          payment_method: method as 'UPI' | 'CASH',
+          rider_rating: riderRating,
+          tags: riderCommentTags,
+        });
+      } catch (err) {
+        console.warn('Payment confirmation sync failed:', err);
+      }
+    }
+
+    alert(`Payment of ₹${(finalBill ? finalBill.total_fare_paise / 100 : calculateTotalBill()).toFixed(2)} settled via ${method}. Feedback synced.`);
     
     // Clear trip states
     setActiveTrip(null);
@@ -702,11 +750,13 @@ export default function DriverTerminalPage() {
     setTollCharges(0);
     setParkingCharges(0);
     setRiderCommentTags([]);
+    setFinalBill(null);
     setDutyState('ONLINE');
   };
 
   // Payout breakdown values
   const calculateTotalBill = () => {
+    if (finalBill) return finalBill.total_fare_paise / 100;
     if (!activeTrip) return 0;
     const baseFare = activeTrip.quoted_fare_paise / 100;
     const startNum = parseFloat(startOdometer) || 0;
@@ -1199,6 +1249,7 @@ export default function DriverTerminalPage() {
             toggleRiderCommentTag={toggleRiderCommentTag}
             handlePaymentConfirmationSubmit={handlePaymentConfirmationSubmit}
             calculateTotalBill={calculateTotalBill}
+            finalBill={finalBill}
           />
         </div>
       </main>

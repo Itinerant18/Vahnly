@@ -2300,6 +2300,20 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 		if bytes, marshalErr := json.Marshal(payload); marshalErr == nil {
 			_ = h.clusterClient.Publish(ctx, RedisTelemetryChannel, string(bytes)).Err()
 		}
+
+		// Flush GPS ping to orders_gps_trail table in a non-blocking goroutine
+		go func(oID string, lat, lng float64) {
+			dbCtx, dbCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer dbCancel()
+			insertGPSQuery := `
+				INSERT INTO orders_gps_trail (order_id, latitude, longitude, captured_at)
+				VALUES ($1::uuid, $2, $3, NOW())
+			`
+			_, dbErr := h.dbPool.Exec(dbCtx, insertGPSQuery, oID, lat, lng)
+			if dbErr != nil {
+				log.Printf("[GPS_TRAIL_ERROR] Failed saving active order GPS ping for order %s: %v", oID, dbErr)
+			}
+		}(orderID, req.Latitude, req.Longitude)
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{

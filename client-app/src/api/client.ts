@@ -668,4 +668,57 @@ export async function driverStartTrip(
   });
 }
 
+export interface FinalBill {
+  order_id: string;
+  base_fare_paise: number;
+  distance_km: number;
+  distance_charge_paise: number;
+  wait_minutes: number;
+  wait_charge_paise: number;
+  overtime_minutes: number;
+  overtime_charge_paise: number;
+  tolls_paise: number;
+  parking_charges_paise: number;
+  night_surge_paise: number;
+  care_surcharge_paise: number;
+  total_fare_paise: number;
+}
+
+export async function addOrderEvent(
+  token: string,
+  orderId: string,
+  payload: { event_type: 'ADD_TOLL' | 'ADD_STOP'; amount_paise: number; description: string },
+): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>(`/api/v1/driver/orders/${orderId}/events`, {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
+export async function driverEndTrip(
+  token: string,
+  orderId: string,
+  payload: { odometer_reading: number; fuel_level: number; photo_url?: string },
+): Promise<FinalBill> {
+  return request<FinalBill>(`/api/v1/driver/orders/${orderId}/end`, {
+    method: 'PATCH',
+    token,
+    body: payload,
+  });
+}
+
+export async function driverConfirmPayment(
+  token: string,
+  orderId: string,
+  payload: { payment_method: 'UPI' | 'CASH'; rider_rating: number; tags: string[] },
+): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>(`/api/v1/driver/orders/${orderId}/confirm-payment`, {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
+
 
