@@ -1,0 +1,4 @@
+ALTER TABLE drivers 
+ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP,
+ADD COLUMN IF NOT EXISTS terms_version VARCHAR(10),
+ADD COLUMN IF NOT EXISTS terms_ip_address VARCHAR(45);

@@ -22,6 +22,7 @@ export default function DriverOnboardingWizard() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [showScore, setShowScore] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+  const [termsScrolledToBottom, setTermsScrolledToBottom] = useState(false);
 
   // Hidden file input references for KYC document uploading
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -288,6 +289,14 @@ export default function DriverOnboardingWizard() {
     const currentAnswers = { ...onboardingData.quizAnswers, [qId]: optionIdx };
     setOnboardingData({ quizAnswers: currentAnswers });
     logEvent('QUIZ_ANSWER_SELECT', { questionId: qId, selectedOption: optionIdx });
+  };
+
+  const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 2;
+    if (isAtBottom) {
+      setTermsScrolledToBottom(true);
+    }
   };
 
   const evaluateQuizAndSubmit = async () => {
@@ -685,15 +694,26 @@ export default function DriverOnboardingWizard() {
             <div className="space-y-4 animate-fadeIn">
               <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 7 — Digitally Sign Agreements</h2>
               <div className="space-y-4 text-zinc-400 text-xs leading-relaxed">
-                <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 max-h-48 overflow-y-auto space-y-3 font-sans">
+                <div 
+                  onScroll={handleTermsScroll}
+                  className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 max-h-48 overflow-y-auto space-y-3 font-sans"
+                >
                   <h4 className="font-bold text-white text-xs">Terms & Conditions of Partner Dispatch Node</h4>
                   <p>1. The Driver Partner acts as an independent service provider executing matching allocations on behalf of registered vehicle owners.</p>
                   <p>2. Payment ledgers, fees, night surcharges, and wait-time commissions are settled directly via platform escrow accounts upon successful trip confirmations.</p>
                   <p>3. Telemetry tracking coordinates are ingested every 4-5 seconds and are mandatory to maintain connectivity inside Redis spatial clusters.</p>
                   <p>4. Safety regulations and maximum fatigue controls (mandatory rest after 10 hours) must be followed without exception.</p>
                 </div>
+
+                <div className="flex justify-between items-center text-[9px] font-mono font-bold uppercase tracking-wider">
+                  {termsScrolledToBottom ? (
+                    <span className="text-emerald-500">✓ Terms Read & Completed</span>
+                  ) : (
+                    <span className="text-zinc-500">↓ Please scroll to the bottom of terms to read</span>
+                  )}
+                </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-3 font-sans">
                   <label className="flex items-start gap-2 cursor-pointer pt-2">
                     <input
                       type="checkbox"
@@ -768,10 +788,11 @@ export default function DriverOnboardingWizard() {
             {currentStep < 8 ? (
               <button
                 onClick={nextStep}
+                disabled={currentStep === 7 && (!termsScrolledToBottom || !onboardingData.agreedToTerms || !onboardingData.signatureName.trim())}
                 type="button"
-                className="bg-white hover:bg-zinc-200 text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95"
+                className="bg-white hover:bg-zinc-200 text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
-                Next
+                {currentStep === 7 ? 'I Agree and Digitally Sign' : 'Next'}
               </button>
             ) : (
               <button

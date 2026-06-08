@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/platform/driver-delivery/internal/domain"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
@@ -81,15 +83,59 @@ func (h *OnboardingHandler) HandleSaveStep(w http.ResponseWriter, r *http.Reques
 	defer tx.Rollback(ctx)
 
 	// Merge onboarding data JSONB and update onboarding step
-	query := `
-		UPDATE drivers 
-		SET onboarding_data = COALESCE(onboarding_data, '{}'::jsonb) || $1,
-		    onboarding_step = $2,
-		    updated_at = NOW()
-		WHERE id = $3
-	`
-	_, err = tx.Exec(ctx, query, jsonData, stepID, driverID)
-	if err != nil {
+	var query string
+	var queryErr error
+	if stepID == 7 {
+		ip := r.Header.Get("X-Forwarded-For")
+		if ip == "" {
+			ip = r.Header.Get("X-Real-IP")
+		}
+		if ip == "" {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err == nil {
+				ip = host
+			} else {
+				ip = r.RemoteAddr
+			}
+		}
+
+		drvUUID, parseErr := uuid.Parse(driverID)
+		if parseErr != nil {
+			http.Error(w, "Invalid driver UUID format", http.StatusBadRequest)
+			return
+		}
+
+		auditData := domain.TermsAudit{
+			DriverID:   drvUUID,
+			Version:    "1.0",
+			AcceptedAt: time.Now(),
+			IPAddress:  ip,
+			UserAgent:  r.Header.Get("User-Agent"),
+		}
+
+		query = `
+			UPDATE drivers 
+			SET onboarding_data = COALESCE(onboarding_data, '{}'::jsonb) || $1,
+			    onboarding_step = $2,
+			    terms_accepted_at = $3,
+			    terms_version = $4,
+			    terms_ip_address = $5,
+			    updated_at = NOW()
+			WHERE id = $6
+		`
+		_, queryErr = tx.Exec(ctx, query, jsonData, stepID, auditData.AcceptedAt, auditData.Version, auditData.IPAddress, driverID)
+	} else {
+		query = `
+			UPDATE drivers 
+			SET onboarding_data = COALESCE(onboarding_data, '{}'::jsonb) || $1,
+			    onboarding_step = $2,
+			    updated_at = NOW()
+			WHERE id = $3
+		`
+		_, queryErr = tx.Exec(ctx, query, jsonData, stepID, driverID)
+	}
+
+	if queryErr != nil {
 		http.Error(w, "Failed to commit onboarding step", http.StatusInternalServerError)
 		return
 	}

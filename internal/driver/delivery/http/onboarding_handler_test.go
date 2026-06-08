@@ -38,3 +38,21 @@ func TestOnboardingHandler_ValidateQuiz(t *testing.T) {
 		t.Fatalf("expected 401 unauthorized for missing auth context, got %d", rec.Code)
 	}
 }
+
+func TestOnboardingHandler_HandleSaveStep_Unauthorized(t *testing.T) {
+	handler := NewOnboardingHandler(nil)
+
+	payload := map[string]interface{}{
+		"signatureName": "Aniket Karmakar",
+		"agreedToTerms": true,
+	}
+	bodyBytes, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/driver/onboarding/step/7", bytes.NewReader(bodyBytes))
+	rec := httptest.NewRecorder()
+
+	handler.HandleSaveStep(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 unauthorized for missing auth context, got %d", rec.Code)
+	}
+}
