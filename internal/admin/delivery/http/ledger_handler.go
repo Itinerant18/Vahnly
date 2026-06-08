@@ -127,7 +127,7 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 		http.Error(w, "isolation_level_negotiation_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix backfill convention.
 	// The acting admin is embedded in the description so the ledger row itself carries immutable attribution.

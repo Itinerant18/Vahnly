@@ -314,7 +314,7 @@ func (h *AdminTripHandler) HandleAdminGetOrders(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(trips)
+	_ = json.NewEncoder(w).Encode(trips)
 }
 
 type CancelOrderRequest struct {
@@ -388,7 +388,7 @@ func (h *AdminTripHandler) HandleAdminCancelOrder(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *http.Request) {
@@ -684,7 +684,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 type CreateTripRequest struct {
@@ -775,7 +775,7 @@ func (h *AdminTripHandler) HandleAdminCreateTrip(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":   "success",
 		"order_id": orderID,
 	})
@@ -808,7 +808,7 @@ func (h *AdminTripHandler) HandleAdminReopenTrip(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 type ReassignDriverRequest struct {
@@ -875,7 +875,7 @@ func (h *AdminTripHandler) HandleAdminReassignTrip(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 func (h *AdminTripHandler) HandleAdminMarkFraud(w http.ResponseWriter, r *http.Request) {
@@ -921,7 +921,7 @@ func (h *AdminTripHandler) HandleAdminMarkFraud(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 func (h *AdminTripHandler) HandleAdminSendInvoice(w http.ResponseWriter, r *http.Request) {
@@ -937,7 +937,7 @@ func (h *AdminTripHandler) HandleAdminSendInvoice(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Invoice generated and queued for transmission successfully.",
 	})

@@ -309,11 +309,6 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	adminEmail := r.Header.Get("X-Admin-Email")
-	if adminEmail == "" {
-		adminEmail = "admin@example.com"
-	}
-
 	var req struct {
 		TransactionID string `json:"transaction_id"`
 		AmountPaise   int64  `json:"amount_paise"`
@@ -440,11 +435,6 @@ func (h *FinanceHandler) HandleApproveRefund(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	adminEmail := r.Header.Get("X-Admin-Email")
-	if adminEmail == "" {
-		adminEmail = "admin@example.com"
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -483,7 +473,7 @@ func (h *FinanceHandler) HandleApproveRefund(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Execute Settlement
-	err = h.executeRefundSettlement(ctx, tx, id, transactionID, txUserID, amountPaise, txOrderID, txGateway, adminEmail)
+	err = h.executeRefundSettlement(ctx, tx, id, transactionID, txUserID, amountPaise, txOrderID, txGateway, r.Header.Get("X-Admin-Email"))
 	if err != nil {
 		h.logger.Printf("[FINANCE_ERROR] Manual refund approval failed: %v", err)
 		http.Error(w, "refund_settlement_failed", http.StatusInternalServerError)
@@ -512,16 +502,11 @@ func (h *FinanceHandler) HandleRejectRefund(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	adminEmail := r.Header.Get("X-Admin-Email")
-	if adminEmail == "" {
-		adminEmail = "admin@example.com"
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
 	query := "UPDATE refunds SET status = 'FAILED', approved_by = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = 'PENDING'"
-	res, err := h.dbPool.Exec(ctx, query, id, adminEmail)
+	res, err := h.dbPool.Exec(ctx, query, id, r.Header.Get("X-Admin-Email"))
 	if err != nil {
 		http.Error(w, "database_update_failed", http.StatusInternalServerError)
 		return
@@ -1174,22 +1159,17 @@ func (h *FinanceHandler) HandlePostDailyClose(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	adminEmail := r.Header.Get("X-Admin-Email")
-	if adminEmail == "" {
-		adminEmail = "admin@example.com"
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
-	h.logger.Printf("[LEDGER_CLOSE] Daily ledger close initiated by %s.", adminEmail)
+	h.logger.Printf("[LEDGER_CLOSE] Daily ledger close initiated by %s.", r.Header.Get("X-Admin-Email"))
 
 	// Record audit log
 	auditQuery := `
 		INSERT INTO admin_audit_logs (admin_id, admin_email, action, details, ip_address)
 		VALUES ('00000000-0000-0000-0000-000000000000', $1, 'DAILY_LEDGER_CLOSE', 'Operator manually closed and verified ledger balancing for the day.', $2)
 	`
-	_, _ = h.dbPool.Exec(ctx, auditQuery, adminEmail, r.RemoteAddr)
+	_, _ = h.dbPool.Exec(ctx, auditQuery, r.Header.Get("X-Admin-Email"), r.RemoteAddr)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"CLOSE_COMPLETED","msg":"Daily financial ledger closed successfully"}`))

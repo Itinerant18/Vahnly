@@ -401,7 +401,7 @@ func (h *MarketingHandler) HandleCreateCampaign(w http.ResponseWriter, r *http.R
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var schedTime *time.Time
 	if req.ScheduleTime != nil && *req.ScheduleTime != "" {
