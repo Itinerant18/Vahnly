@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"golang.org/x/crypto/bcrypt"
@@ -164,7 +164,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		h.recordAuditLog(ctx, dbUserID, req.Email, "LOGIN_FAILURE", "Attempt during lockout cooldown", ip)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusLocked)
-		json.NewEncoder(w).Encode(AuthResponse{
+		_ = json.NewEncoder(w).Encode(AuthResponse{
 			Message: fmt.Sprintf("Account locked due to consecutive failures. Try again after %v.", dbLockedUntil.Format(time.RFC3339)),
 		})
 		return
@@ -190,7 +190,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	isSSOLogin := req.SSOProvider != ""
 	if isSSOLogin {
 		// SSO Authentication
-		if strings.ToUpper(dbSSOProvider) != strings.ToUpper(req.SSOProvider) || dbSSOID != req.SSOID {
+			if !strings.EqualFold(dbSSOProvider, req.SSOProvider) || dbSSOID != req.SSOID {
 			// If SSO info is not linked yet, but request claims SSO, we link it for demo/testing or reject. Let's register SSO details on first match.
 			if dbSSOProvider == "" {
 				_, _ = h.dbPool.Exec(ctx, "UPDATE system_admins SET sso_provider = $1, sso_id = $2 WHERE id = $3", req.SSOProvider, req.SSOID, dbUserID)
@@ -237,7 +237,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		if req.TwoFactorCode == "" {
 			// Signal to frontend that MFA verification layer is required
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(AuthResponse{
+			_ = json.NewEncoder(w).Encode(AuthResponse{
 				MFARequired: true,
 				Email:       req.Email,
 				Message:     "Mandatory 2FA code verification is required.",
@@ -283,7 +283,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	h.recordAuditLog(ctx, dbUserID, req.Email, "LOGIN_SUCCESS", fmt.Sprintf("Authentication completed. Role: %s, Scope: %s", dbRole, dbCityScope), ip)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(AuthResponse{
+	_ = json.NewEncoder(w).Encode(AuthResponse{
 		Token:     tokenString,
 		ExpiresAt: expirationTime,
 		Role:      dbRole,
@@ -317,7 +317,7 @@ func (h *AdminAuthHandler) HandleEnroll2FA(w http.ResponseWriter, r *http.Reques
 	h.recordAuditLog(ctx, adminID, email, "2FA_ENROLLED", "TOTP secret provisioned", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"secret":       secret,
 		"otpauth_uri":  totpEnrolmentURI(secret, email, "Drivers-For-U Admin"),
 		"instructions": "Scan in an authenticator app, then verify a 6-digit code at next login.",
@@ -375,7 +375,7 @@ func (h *AdminAuthHandler) HandleAdminRegister(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // HandleListAdmins retrieves the list of all administrators
@@ -426,7 +426,7 @@ func (h *AdminAuthHandler) HandleListAdmins(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(list)
 }
 
 // HandleInviteAdmin creates a new admin user record with random initial password hash
@@ -493,7 +493,7 @@ func (h *AdminAuthHandler) HandleInviteAdmin(w http.ResponseWriter, r *http.Requ
 	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", req.Email, "ADMIN_INVITED", fmt.Sprintf("Invited as %s with scope %s", requestedRole, cityScope), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Admin profile invited successfully."})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Admin profile invited successfully."})
 }
 
 // HandleEditRole updates role and city scope parameters
@@ -537,7 +537,7 @@ func (h *AdminAuthHandler) HandleEditRole(w http.ResponseWriter, r *http.Request
 	h.recordAuditLog(ctx, req.AdminID, "", "ROLE_UPDATED", fmt.Sprintf("New Role: %s, Scope: %s", requestedRole, req.CityScope), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
 // HandleSuspendAdmin locks administrative accounts by toggling the active boolean gate
@@ -579,7 +579,7 @@ func (h *AdminAuthHandler) HandleSuspendAdmin(w http.ResponseWriter, r *http.Req
 	h.recordAuditLog(ctx, req.AdminID, "", actionStr, "Admin suspension state altered", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
 // HandleReset2FA clears the 2FA secret
@@ -615,7 +615,7 @@ func (h *AdminAuthHandler) HandleReset2FA(w http.ResponseWriter, r *http.Request
 	h.recordAuditLog(ctx, req.AdminID, "", "MFA_RESET", "TOTP/SMS 2FA security parameter reset requested", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
 // HandleGetAuditLogs lists the compliance logs matching filters
@@ -678,5 +678,5 @@ func (h *AdminAuthHandler) HandleGetAuditLogs(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
+	_ = json.NewEncoder(w).Encode(logs)
 }

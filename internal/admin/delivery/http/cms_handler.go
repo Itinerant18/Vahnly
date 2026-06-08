@@ -70,7 +70,6 @@ func (h *CMSHandler) HandleGetPages(w http.ResponseWriter, r *http.Request) {
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", idx)
 		args = append(args, status)
-		idx++
 	}
 	query += " ORDER BY page_type, title"
 
@@ -210,7 +209,7 @@ func (h *CMSHandler) HandleSaveContent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "tx_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Determine next version number
 	var nextVersion int

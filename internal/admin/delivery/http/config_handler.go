@@ -94,7 +94,7 @@ func (h *ConfigHandler) HandleUpsertSettings(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "tx_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, s := range req.Settings {
 		_, _ = tx.Exec(ctx,
@@ -278,7 +278,7 @@ func (h *ConfigHandler) HandleCreateAppVersion(w http.ResponseWriter, r *http.Re
 		http.Error(w, "tx_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if req.IsLatest {
 		_, _ = tx.Exec(ctx, `UPDATE app_versions SET is_latest = false WHERE platform = $1`, req.Platform)
@@ -316,7 +316,7 @@ func (h *ConfigHandler) HandleSetLatestVersion(w http.ResponseWriter, r *http.Re
 	defer cancel()
 
 	tx, _ := h.dbPool.Begin(ctx)
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var platform string
 	_ = tx.QueryRow(ctx, `SELECT platform FROM app_versions WHERE id = $1`, id).Scan(&platform)
