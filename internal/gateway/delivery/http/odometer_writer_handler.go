@@ -5,10 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+)
+
+// FareEngine reconciliation tunables (driver-write path). Mirror the admin audit
+// handler's constants so an auto-flag and a manual correction agree on tolerance.
+const (
+	odoRoadFactorGW       = 1.3  // straight-line -> road distance approximation
+	odoTolerancePctGW     = 15.0 // |variance| beyond which a trip is flagged
+	odoExtraKmRatePaiseGW = 1200 // ₹12.00 / km provisional corrective rate
 )
 
 // HandleDriverOdometerCheckpoint is the driver-facing POST handler that captures
@@ -87,6 +96,9 @@ func (h *GatewayHandler) HandleDriverOdometerCheckpoint(w http.ResponseWriter, r
 	}
 
 	// --- Sequence & state-machine validation ---
+	// Captured in the END branch so the post-commit FareEngine hook can compute
+	// variance without re-reading the START checkpoint.
+	var reconcileStartReading int
 	if req.CheckpointType == "START" {
 		// START is valid from ARRIVED_AT_PICKUP (normal flow) or EN_ROUTE_TO_PICKUP (early capture)
 		if currentStatus != "ARRIVED_AT_PICKUP" && currentStatus != "EN_ROUTE_TO_PICKUP" {
@@ -120,6 +132,7 @@ func (h *GatewayHandler) HandleDriverOdometerCheckpoint(w http.ResponseWriter, r
 			http.Error(w, fmt.Sprintf("invalid_end_reading: end odometer (%d) must be greater than start odometer (%d). Please re-read the odometer.", req.OdometerReading, startReading), http.StatusBadRequest)
 			return
 		}
+		reconcileStartReading = startReading
 	}
 
 	// --- Atomic transaction: checkpoint insert + status transition ---
@@ -193,6 +206,17 @@ func (h *GatewayHandler) HandleDriverOdometerCheckpoint(w http.ResponseWriter, r
 		return
 	}
 
+	// FareEngine auto-hook: on trip END, run the financial reconciliation that the
+	// admin audit UI previously only got from a manual correction. Runs in its own
+	// transaction (best-effort) so a reconciliation failure never undoes the already
+	// committed checkpoint. This closes the production loop — a high-variance trip is
+	// placed under FINANCIAL_REVIEW the moment the driver submits the END odometer.
+	if req.CheckpointType == "END" {
+		hookCtx, hookCancel := context.WithTimeout(context.Background(), 4*time.Second)
+		h.autoReconcileVariance(hookCtx, orderID, reconcileStartReading, req.OdometerReading)
+		hookCancel()
+	}
+
 	// Determine the new status for the response
 	newStatus := "DELIVERING"
 	if req.CheckpointType == "END" {
@@ -214,4 +238,82 @@ func (h *GatewayHandler) HandleDriverOdometerCheckpoint(w http.ResponseWriter, r
 
 	log.Printf("[ODOMETER_WRITER] %s checkpoint recorded for order %s — odometer=%d km, fuel=%d%%, status→%s",
 		req.CheckpointType, orderID, req.OdometerReading, req.FuelLevel, newStatus)
+}
+
+// autoReconcileVariance is the driver-write-path FareEngine hook. It compares the
+// reported mileage (END − START odometer) against the expected route distance and,
+// when |variance| exceeds tolerance, places the order under financial review:
+// flips orders.financial_status to REVIEW_REQUIRED, posts a balanced (net-zero)
+// CORRECTIVE_ADJUSTMENT ledger pair (never editing existing rows — the double-entry
+// trail stays immutable), and holds the assigned driver's payout. Within tolerance
+// it is a no-op: financial_status keeps its CLEARED default. Best-effort: any failure
+// is logged and the transaction rolled back, leaving the committed checkpoint intact.
+func (h *GatewayHandler) autoReconcileVariance(ctx context.Context, orderID string, startReading, endReading int) {
+	var cityPrefix string
+	var driverID *string
+	var straightKm float64
+	if err := h.dbPool.QueryRow(ctx,
+		`SELECT city_prefix, assigned_driver_id::text, ST_Distance(pickup_location, dropoff_location) / 1000.0
+		   FROM orders WHERE id = $1::uuid`, orderID).Scan(&cityPrefix, &driverID, &straightKm); err != nil {
+		log.Printf("[FARE_HOOK] order lookup failed for %s: %v", orderID, err)
+		return
+	}
+
+	expectedKm := straightKm * odoRoadFactorGW
+	if expectedKm <= 0 {
+		return
+	}
+	reported := endReading - startReading
+	variancePct := (float64(reported) - expectedKm) / expectedKm * 100
+	if math.Abs(variancePct) <= odoTolerancePctGW {
+		return // within tolerance — auto-reconciled, financial_status stays CLEARED
+	}
+
+	deltaKm := float64(reported) - expectedKm
+	correctivePaise := int64(math.Round(math.Abs(deltaKm) * odoExtraKmRatePaiseGW))
+	if correctivePaise <= 0 {
+		correctivePaise = 1 // keep a non-zero, auditable corrective record
+	}
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[FARE_HOOK] tx begin failed for order %s: %v", orderID, err)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `UPDATE orders SET financial_status = 'REVIEW_REQUIRED' WHERE id = $1::uuid`, orderID); err != nil {
+		log.Printf("[FARE_HOOK] status update failed for order %s: %v", orderID, err)
+		return
+	}
+
+	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix
+	// backfill convention ($2 -> both columns) used by the rest of the ledger writers.
+	desc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT PENDING_REVIEW] mileage variance %.1f%% (%.1f km delta) on order %s", variancePct, deltaKm, orderID)
+	insert := `INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
+	           VALUES ($1::uuid, $2, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5)`
+	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "DEBIT", correctivePaise, desc); err != nil {
+		log.Printf("[FARE_HOOK] debit insert failed for order %s: %v", orderID, err)
+		return
+	}
+	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "CREDIT", correctivePaise, desc); err != nil {
+		log.Printf("[FARE_HOOK] credit insert failed for order %s: %v", orderID, err)
+		return
+	}
+
+	if driverID != nil && *driverID != "" {
+		holdReason := fmt.Sprintf("Odometer variance %.1f%% under financial review (order %s)", variancePct, orderID)
+		if _, err := tx.Exec(ctx,
+			`UPDATE drivers SET payout_hold = true, payout_hold_reason = $1 WHERE id = $2::uuid`,
+			holdReason, *driverID); err != nil {
+			log.Printf("[FARE_HOOK] payout hold failed for driver %s: %v", *driverID, err)
+			return
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[FARE_HOOK] commit failed for order %s: %v", orderID, err)
+		return
+	}
+	log.Printf("[FARE_HOOK] order %s flagged REVIEW_REQUIRED (variance %.1f%%), payout held, corrective ledger posted", orderID, variancePct)
 }

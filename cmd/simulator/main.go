@@ -22,6 +22,10 @@ const (
 	kafkaBroker      = "127.0.0.1:19092"
 	targetH3Cell     = "88754cb247fffff"
 	starvationH3Cell = "88283473fffffff"
+	// auditDriverIndex is the trip-player's own login driver (phone +91 98765 43210 ->
+	// ...a11). It is held OUT of the Wave-1/2 chaos so it never picks up a match-timeout
+	// cooldown; Wave 4 then provisions it cleanly as the deterministic audit driver.
+	auditDriverIndex = 11
 )
 
 // ChaosController manages real-time fault injection properties.
@@ -56,6 +60,9 @@ func main() {
 	var wg sync.WaitGroup
 
 	for i := 1; i <= 25; i++ {
+		if i == auditDriverIndex {
+			continue // reserve the audit driver — keep it out of chaos contention/cooldown
+		}
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
@@ -103,8 +110,11 @@ func main() {
 		log.Println("[WAVE 3 OK] Split-state conditions injected. Reconciler daemon will repair logs within 15 seconds.")
 	}
 
-	log.Println("Sleeping 10s to let previous waves of bookings drain...")
-	time.Sleep(10 * time.Second)
+	// Drain long enough for the Wave-2 high-contention backlog (unmatched orders in the
+	// audit pickup cell) to exhaust its re-queue retries. Otherwise those stale orders
+	// keep stealing the audit driver and starve the first scenario.
+	log.Println("Sleeping 25s to let the Wave-2 booking backlog drain before audit scenarios...")
+	time.Sleep(25 * time.Second)
 
 	// ─── WAVE 4: TRIP PLAYER — ODOMETER AUDIT SCENARIO ENGINE ────────
 	log.Println("\n═══════════════════════════════════════════════════════════════")

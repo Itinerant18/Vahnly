@@ -89,6 +89,11 @@ func main() {
 		Topic:        "order.created",
 		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireOne,
+		// Synchronous request-path producer: flush each message immediately.
+		// The default BatchTimeout is 1s, which alone exhausts the handler's
+		// 1000ms request context and yields "context deadline exceeded".
+		BatchTimeout: 10 * time.Millisecond,
+		BatchSize:    1,
 	}
 	defer kafkaWriter.Close()
 

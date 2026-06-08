@@ -265,8 +265,10 @@ func (h *OdometerHandler) reconcileFinancials(ctx context.Context, orderID strin
 	// Balanced compensating pair: extra fare provisionally owed customer -> driver.
 	desc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT PENDING_REVIEW] mileage variance %.1f%% (%.1f km delta) on order %s",
 		*audit.VariancePct, deltaKm, orderID)
-	insert := `INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
-	           VALUES ($1, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5)`
+	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix
+	// backfill convention ($2 -> both columns) used by the rest of the ledger writers.
+	insert := `INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
+	           VALUES ($1, $2, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5)`
 	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "DEBIT", correctivePaise, desc); err != nil {
 		h.logger.Printf("[FARE_HOOK] debit insert failed for order %s: %v", orderID, err)
 		return false
