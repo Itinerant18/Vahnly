@@ -8,18 +8,19 @@ import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import {
-  arriveAtPickup,
   completeTrip,
   getDriverProfile,
   getPendingOffer,
   OdometerCheckpointPayload,
   OrderOffer,
-  startTrip,
   submitOdometerCheckpoint,
   setDriverDutyState,
   getDriverDutyStats,
-  verifyTripOTP,
+  driverArriveAtPickup,
+  driverStartTrip,
+  ApiClientError,
 } from '@/api/client';
+import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
 import { startTelemetryStream } from '@/services/telemetryStream';
@@ -144,6 +145,11 @@ export default function DriverTerminalPage() {
   // Post-trip ratings
   const [riderRating, setRiderRating] = useState(5);
   const [riderCommentTags, setRiderCommentTags] = useState<string[]>([]);
+
+  // Wait timer reference time and Cancel picker overlay states
+  const [arrivedTime, setArrivedTime] = useState<Date | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedCancelReason, setSelectedCancelReason] = useState('');
   
   // Map visualization state: simulated marker position along route (0 to 100%)
   const [mapGlideProgress, setMapGlideProgress] = useState(0);
@@ -232,24 +238,33 @@ export default function DriverTerminalPage() {
   // Wait time calculator once arrived
   useEffect(() => {
     if (dutyState === 'ARRIVED') {
+      let currentArrivedTime = arrivedTime;
+      if (!currentArrivedTime) {
+        currentArrivedTime = new Date();
+        setArrivedTime(currentArrivedTime);
+      }
       waitTimerRef.current = setInterval(() => {
-        setFreeWaitSeconds((prev) => {
-          if (prev > 0) {
-            return prev - 1;
-          } else {
-            // After 5 mins (300s), add waiting charge of ₹2 per min (approx ₹0.033 per second)
-            setWaitingCharges((charge) => charge + 0.0333);
-            return 0;
-          }
-        });
+        const now = new Date();
+        const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - currentArrivedTime!.getTime()) / 1000));
+        
+        const remainingFree = Math.max(0, 300 - elapsedSeconds);
+        setFreeWaitSeconds(remainingFree);
+        
+        if (elapsedSeconds > 300) {
+          const excessSeconds = elapsedSeconds - 300;
+          setWaitingCharges(excessSeconds * (2 / 60));
+        } else {
+          setWaitingCharges(0);
+        }
       }, 1000);
     } else {
       if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+      setArrivedTime(null);
     }
     return () => {
       if (waitTimerRef.current) clearInterval(waitTimerRef.current);
     };
-  }, [dutyState]);
+  }, [dutyState, arrivedTime]);
 
   // Poll stats every 30 seconds when not offline
   useEffect(() => {
@@ -503,13 +518,14 @@ export default function DriverTerminalPage() {
   const handleArrivedAtPickup = async () => {
     logAudit('ARRIVED_AT_PICKUP_NODE', { orderId: activeTrip?.order_id, time: new Date().toISOString() });
     setDutyState('ARRIVED');
+    setArrivedTime(new Date());
     setFreeWaitSeconds(300);
     setWaitingCharges(0);
 
     if (activeTrip?.order_id) {
       try {
         if (token) {
-          await arriveAtPickup(token, activeTrip.order_id, driverID);
+          await driverArriveAtPickup(token, activeTrip.order_id);
         }
       } catch (err) {
         console.warn('Arrive sync failed:', err);
@@ -571,39 +587,33 @@ export default function DriverTerminalPage() {
 
     if (activeTrip?.order_id && token) {
       try {
-        const res = await verifyTripOTP(token, activeTrip.order_id, otpVerificationCode);
+        const res = await driverStartTrip(token, activeTrip.order_id, {
+          odometerReading: parseInt(startOdometer, 10),
+          fuelPercentage: startFuel,
+          otp: otpVerificationCode,
+          photoUrl: startOdoPhoto || '',
+        });
+
         if (res.success) {
           setOtpError('');
-
-          // Phase 2: Submit START odometer checkpoint with retry before transitioning
-          const checkpoint: OdometerCheckpointPayload = {
-            checkpoint_type: 'START',
-            odometer_reading: parseInt(startOdometer, 10),
-            fuel_level: startFuel,
-            photo_url: startOdoPhoto || '',
-            timestamp: new Date().toISOString(),
-          };
-
-          const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
-
-          if (!synced) {
-            // Offline queueing: store for later sync, proceed with local state transition
-            queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
-            // Fallback: still call the legacy startTrip endpoint
-            try {
-              await startTrip(token, activeTrip.order_id, driverID);
-            } catch (err) {
-              console.warn('Start trip fallback sync also failed:', err);
-            }
-          }
-
           logAudit('TRIP_STARTED', { orderId: activeTrip.order_id });
           setDutyState('DELIVERING');
-        } else {
-          setOtpError('Authentication failed: Invalid OTP.');
         }
       } catch (err: any) {
-        setOtpError(err.message || 'OTP verification failed.');
+        if (err instanceof ApiClientError) {
+          try {
+            const errorJson = JSON.parse(err.body);
+            setOtpError(errorJson.message || errorJson.error || 'OTP verification failed.');
+          } catch {
+            if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
+              setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
+            } else {
+              setOtpError(err.body || 'OTP verification failed.');
+            }
+          }
+        } else {
+          setOtpError(err.message || 'OTP verification failed.');
+        }
       }
     } else {
       // Fallback fallback for static sandbox
@@ -893,6 +903,71 @@ export default function DriverTerminalPage() {
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
       <OfferPopup />
 
+      {/* CANCEL ALLOCATION PICKER OVERLAY */}
+      {showCancelModal && activeTrip && (
+        <div className="fixed inset-0 z-[100000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl w-full max-w-sm space-y-4 text-left font-mono">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Cancel Allocation</h3>
+              <p className="text-[9px] text-zinc-500">Select a cancellation reason. Penalty charges may apply.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              {[
+                { label: 'Rider No Show', value: 'RIDER_NO_SHOW' },
+                { label: 'Wrong Address', value: 'WRONG_ADDRESS' },
+                { label: 'Vehicle Breakdown', value: 'VEHICLE_BREAKDOWN' },
+                { label: 'Safety Concerns', value: 'SAFETY' },
+                { label: 'Other Options', value: 'OTHER' }
+              ].map((reason) => (
+                <button
+                  key={reason.value}
+                  type="button"
+                  onClick={() => setSelectedCancelReason(reason.value)}
+                  className={`w-full text-left py-2.5 px-3 rounded-xl border text-[10px] uppercase font-bold tracking-wide transition cursor-pointer ${
+                    selectedCancelReason === reason.value
+                      ? 'bg-red-950/40 border-red-800 text-red-400'
+                      : 'bg-zinc-900/60 border-zinc-850 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {reason.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setSelectedCancelReason('');
+                }}
+                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[10px] font-bold uppercase py-3 rounded-xl text-zinc-400 text-center transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedCancelReason) {
+                    alert('Please select a reason.');
+                    return;
+                  }
+                  logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id, reason: selectedCancelReason });
+                  setActiveTrip(null);
+                  setDutyState('ONLINE');
+                  setShowCancelModal(false);
+                  setSelectedCancelReason('');
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase py-3 rounded-xl text-center transition cursor-pointer"
+              >
+                Confirm Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOP HEADER MENU CONTROL */}
       <header className="bg-zinc-950 border-b border-zinc-900 p-4 sticky top-0 z-50 flex justify-between items-center w-full text-left">
         <div className="flex items-center gap-3">
@@ -1024,6 +1099,26 @@ export default function DriverTerminalPage() {
               </>
             )}
           </svg>
+
+          {/* Turn-by-Turn Navigation Floating Panel */}
+          {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
+            <div className="absolute top-16 left-4 z-20 bg-zinc-950/90 border border-zinc-800 p-3 rounded-xl font-mono text-[10px] space-y-1 max-w-xs shadow-lg animate-fadeIn text-left">
+              <span className="text-[8px] font-bold text-zinc-505 uppercase tracking-widest block">Simulation Route Navigation</span>
+              <div className="text-white font-bold flex items-center gap-1.5">
+                <span>🛞</span>
+                <span>{dutyState === 'EN_ROUTE' ? 'Drive to Pickup Location' : 'Drive to Dropoff Location'}</span>
+              </div>
+              <div className="text-zinc-400">
+                {dutyState === 'EN_ROUTE' 
+                  ? `Next: Turn Left onto Howrah Bridge Rd in ${(150 - mapGlideProgress * 1.5).toFixed(0)}m`
+                  : `Next: Turn Right onto E.M. Bypass in ${(200 - mapGlideProgress * 2).toFixed(0)}m`
+                }
+              </div>
+              <div className="text-zinc-505 text-[8px] uppercase tracking-wider">
+                Current speed: {42 + Math.floor(Math.random() * 8)} km/h · GPS Lock Active
+              </div>
+            </div>
+          )}
 
           {/* Offline Map Overlay message */}
           {dutyState === 'OFFLINE' && (
@@ -1181,12 +1276,40 @@ export default function DriverTerminalPage() {
                   <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
                 </div>
                 <div className="bg-blue-900/30 text-blue-400 border border-blue-800 text-[8px] font-mono font-bold px-2 py-1 rounded">
-                  ETA: 6 MINS
+                  ETA: {Math.max(1, Math.round(6 - (mapGlideProgress / 100) * 5))} MINS
                 </div>
               </div>
  
-              <div className="text-xs space-y-1 font-mono text-zinc-400 leading-normal">
+              <div className="text-xs space-y-1 font-mono text-zinc-400 leading-normal bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
                 <div>📍 <span className="text-zinc-500 font-bold">Pickup Address:</span> {activeTrip.pickup_address}</div>
+                {activeTrip.special_notes && (
+                  <div className="mt-1.5 text-[9px] text-amber-500"><span className="text-zinc-500 font-bold">Notes:</span> "{activeTrip.special_notes}"</div>
+                )}
+              </div>
+
+              {/* Rider details card */}
+              <div className="bg-zinc-900/60 p-4 border border-zinc-905 rounded-xl space-y-3 font-mono">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg font-bold text-white">
+                      👤
+                    </div>
+                    <div>
+                      <span className="text-[7px] text-zinc-500 uppercase tracking-widest block">Rider details</span>
+                      <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-amber-500 text-[10px]">★</span>
+                        <span className="text-[9px] text-zinc-400 font-bold">{activeTrip.customer_rating.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[7px] text-zinc-500 uppercase tracking-widest block">Phone Number</span>
+                    <span className="text-[10px] text-white font-bold block mt-0.5">
+                      +91 98XXX XXXXX
+                    </span>
+                  </div>
+                </div>
               </div>
  
               {/* Route control button triggers */}
@@ -1206,7 +1329,7 @@ export default function DriverTerminalPage() {
                 <button
                   onClick={() => {
                     logAudit('NAV_EXTERNAL_TRIGGERED', { orderId: activeTrip.order_id });
-                    alert('Redirecting to Google Maps external turn-by-turn navigation system.');
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${activeTrip.pickup_lat},${activeTrip.pickup_lng}`, '_blank');
                   }}
                   className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 rounded-xl text-[9px] font-mono font-bold uppercase text-zinc-300 cursor-pointer"
                 >
@@ -1217,13 +1340,7 @@ export default function DriverTerminalPage() {
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm('Cancel this allocation? Cancellation penalties may apply to this node.')) {
-                      logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id });
-                      setActiveTrip(null);
-                      setDutyState('ONLINE');
-                    }
-                  }}
+                  onClick={() => setShowCancelModal(true)}
                   className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-red-500 border border-zinc-800 py-3 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer"
                 >
                   Cancel Allocation
@@ -1242,19 +1359,45 @@ export default function DriverTerminalPage() {
           {/* ARRIVED AT PICKUP OPTIONAL LOCK SCREEN */}
           {dutyState === 'ARRIVED' && activeTrip && (
             <div className="space-y-4 text-left animate-fadeIn">
-              <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
-                <div>
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Arrived & Waiting for Passenger</span>
-                  <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
+              <div className="border-b border-zinc-900 pb-3">
+                <span className="bg-amber-950 text-amber-400 font-mono font-bold text-[8px] uppercase tracking-widest px-2.5 py-1 rounded border border-amber-900">
+                  🔐 SECURE PICKUP CHECKPOINT PANEL
+                </span>
+                <div className="flex justify-between items-center mt-2.5">
+                  <div>
+                    <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Client</span>
+                    <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
+                  </div>
                 </div>
-                
-                <div className="font-mono text-[9px] font-bold">
-                  {freeWaitSeconds > 0 ? (
-                    <span className="text-zinc-500">Free Wait: {Math.floor(freeWaitSeconds / 60)}:{(freeWaitSeconds % 60).toString().padStart(2, '0')}</span>
-                  ) : (
-                    <span className="text-amber-500 animate-pulse">Wait Charge: ₹{waitingCharges.toFixed(2)}</span>
-                  )}
-                </div>
+              </div>
+
+              {/* Wait charge accumulator/countdown ring */}
+              <div className="flex items-center gap-3 bg-zinc-900/40 border border-zinc-900 p-3 rounded-xl font-mono">
+                {freeWaitSeconds > 0 ? (
+                  <>
+                    <div className="h-8 w-8 rounded-full border-2 border-zinc-800 border-t-zinc-400 animate-spin flex items-center justify-center text-[10px] font-bold text-zinc-400">
+                      ⏳
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-zinc-500 uppercase tracking-widest block">Free Waiting Period</span>
+                      <span className="text-xs font-bold text-white font-mono">
+                        {Math.floor(freeWaitSeconds / 60)}:{(freeWaitSeconds % 60).toString().padStart(2, '0')} Remaining
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-8 w-8 rounded-full bg-red-950 border border-red-800 flex items-center justify-center text-xs animate-pulse">
+                      🚨
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-zinc-505 uppercase tracking-widest block text-red-400 font-bold">Waiting Charges Incurred</span>
+                      <span className="text-xs font-bold text-amber-500 animate-pulse">
+                        ₹{waitingCharges.toFixed(2)} (Accumulating at ₹2/min)
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Speedometer odometer captures & OTP verification lock */}
@@ -1292,7 +1435,7 @@ export default function DriverTerminalPage() {
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <label className="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Dashboard Scan</label>
+                    <label className="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Dashboard Scan (Optional)</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -1318,12 +1461,28 @@ export default function DriverTerminalPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 text-center mt-2 font-sans"
-                >
-                  Verify OTP & Start Trip
-                </button>
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 text-center font-sans"
+                  >
+                    Verify OTP & Start Trip
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Report rider no-show? This will cancel the booking with reason RIDER_NO_SHOW.')) {
+                        logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id, reason: 'RIDER_NO_SHOW' });
+                        setActiveTrip(null);
+                        setDutyState('ONLINE');
+                      }
+                    }}
+                    className="w-full bg-zinc-900 hover:bg-zinc-850 text-red-500 border border-zinc-800 py-3 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer text-center"
+                  >
+                    Report Rider No-Show
+                  </button>
+                </div>
               </form>
             </div>
           )}

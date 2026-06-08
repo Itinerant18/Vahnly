@@ -178,21 +178,25 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	pickupGeom := fmt.Sprintf("SRID=4326;POINT(%f %f)", req.PickupLng, req.PickupLat)
 	dropoffGeom := fmt.Sprintf("SRID=4326;POINT(%f %f)", req.DropoffLng, req.DropoffLat)
 
+	// Hash default OTP "1234" for the new order
+	sum := sha256.Sum256([]byte("1234"))
+	otpHashed := hex.EncodeToString(sum[:])
+
 	if req.OrderID != "" {
 		orderID = req.OrderID
 		dbQuery := `
-			INSERT INTO orders (id, city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, pickup_osm_node_id, base_fare_paise)
-			VALUES ($1::uuid, $2, $3, 'CREATED'::order_status_enum, ST_GeographyFromText($4), ST_GeographyFromText($5), $6, $7, $8)
+			INSERT INTO orders (id, city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, pickup_osm_node_id, base_fare_paise, otp_hash)
+			VALUES ($1::uuid, $2, $3, 'CREATED'::order_status_enum, ST_GeographyFromText($4), ST_GeographyFromText($5), $6, $7, $8, $9)
 			RETURNING id;
 		`
-		err = h.dbPool.QueryRow(ctx, dbQuery, req.OrderID, req.CityPrefix, req.CustomerID, pickupGeom, dropoffGeom, req.PickupH3Cell, req.PickupOSMNodeID, req.BaseFarePaise).Scan(&orderID)
+		err = h.dbPool.QueryRow(ctx, dbQuery, req.OrderID, req.CityPrefix, req.CustomerID, pickupGeom, dropoffGeom, req.PickupH3Cell, req.PickupOSMNodeID, req.BaseFarePaise, otpHashed).Scan(&orderID)
 	} else {
 		dbQuery := `
-			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, pickup_osm_node_id, base_fare_paise)
-			VALUES ($1, $2, 'CREATED'::order_status_enum, ST_GeographyFromText($3), ST_GeographyFromText($4), $5, $6, $7)
+			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, pickup_osm_node_id, base_fare_paise, otp_hash)
+			VALUES ($1, $2, 'CREATED'::order_status_enum, ST_GeographyFromText($3), ST_GeographyFromText($4), $5, $6, $7, $8)
 			RETURNING id;
 		`
-		err = h.dbPool.QueryRow(ctx, dbQuery, req.CityPrefix, req.CustomerID, pickupGeom, dropoffGeom, req.PickupH3Cell, req.PickupOSMNodeID, req.BaseFarePaise).Scan(&orderID)
+		err = h.dbPool.QueryRow(ctx, dbQuery, req.CityPrefix, req.CustomerID, pickupGeom, dropoffGeom, req.PickupH3Cell, req.PickupOSMNodeID, req.BaseFarePaise, otpHashed).Scan(&orderID)
 	}
 
 	if err != nil {
@@ -963,6 +967,304 @@ func (h *GatewayHandler) HandleStartTrip(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"DELIVERING"}`))
+}
+
+// HandleDriverArrived updates the order state to ARRIVED_AT_PICKUP and driver's duty state to ARRIVED.
+// Path: PATCH /api/v1/driver/orders/{id}/arrived
+func (h *GatewayHandler) HandleDriverArrived(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	driverID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || driverID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[DRIVER_ARRIVED] Transaction initiation failed: %v", err)
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Fetch current status, assigned_driver_id, customer_id and lock row
+	var currentStatus string
+	var assignedDriverID *string
+	var customerID string
+	query := `
+		SELECT status::text, assigned_driver_id::text, customer_id::text 
+		FROM orders 
+		WHERE id = $1::uuid 
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found", http.StatusNotFound)
+			return
+		}
+		log.Printf("[DRIVER_ARRIVED] Order lookup failed for %s: %v", orderID, err)
+		http.Error(w, "database_read_exception", http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Reject if order status is not EN_ROUTE_TO_PICKUP or matches assigned driver
+	if currentStatus != "EN_ROUTE_TO_PICKUP" {
+		http.Error(w, fmt.Sprintf("invalid_state: expected EN_ROUTE_TO_PICKUP, got %s", currentStatus), http.StatusConflict)
+		return
+	}
+	if assignedDriverID == nil || *assignedDriverID != driverID {
+		http.Error(w, "forbidden: driver identity mismatch", http.StatusForbidden)
+		return
+	}
+
+	// 3. Update order status to ARRIVED_AT_PICKUP and waiting_started_at to NOW()
+	updateOrderQuery := `
+		UPDATE orders 
+		SET status = 'ARRIVED_AT_PICKUP'::order_status_enum,
+		    waiting_started_at = NOW()
+		WHERE id = $1::uuid
+	`
+	_, err = tx.Exec(ctx, updateOrderQuery, orderID)
+	if err != nil {
+		log.Printf("[DRIVER_ARRIVED] Order status update failed for %s: %v", orderID, err)
+		http.Error(w, "failed_state_transition", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Update driver's duty_state to ARRIVED and current_state to ONLINE_EN_ROUTE
+	updateDriverQuery := `
+		UPDATE drivers 
+		SET duty_state = 'ARRIVED'::driver_duty_state,
+		    current_state = 'ONLINE_EN_ROUTE'::driver_state_enum,
+		    updated_at = NOW()
+		WHERE id = $1::uuid
+	`
+	_, err = tx.Exec(ctx, updateDriverQuery, driverID)
+	if err != nil {
+		log.Printf("[DRIVER_ARRIVED] Driver state update failed for %s: %v", driverID, err)
+		http.Error(w, "failed_driver_state_transition", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Trigger push notification outbox
+	notificationQuery := `
+		INSERT INTO notification_outbox (user_id, title, body, payload, status)
+		VALUES ($1::uuid, 'Your driver has arrived', 'Your driver is waiting at the pickup location.', $2::jsonb, 'PENDING');
+	`
+	payloadJSON := fmt.Sprintf(`{"order_id": "%s"}`, orderID)
+	_, err = tx.Exec(ctx, notificationQuery, customerID, payloadJSON)
+	if err != nil {
+		log.Printf("[DRIVER_ARRIVED] Push notification logging failed: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[DRIVER_ARRIVED] Commit failed: %v", err)
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"success":true,"status":"ARRIVED_AT_PICKUP"}`))
+}
+
+// HandleDriverStartTrip handles PATCH /api/v1/driver/orders/{id}/start
+func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	driverID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || driverID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		OdometerReading int    `json:"odometer_reading"`
+		FuelLevel       int    `json:"fuel_level"`
+		OTP             string `json:"otp"`
+		PhotoURL        string `json:"photo_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate inputs
+	if req.OdometerReading <= 0 {
+		http.Error(w, "invalid_odometer_reading: must be a positive integer", http.StatusBadRequest)
+		return
+	}
+	if req.OTP == "" {
+		http.Error(w, "missing_otp", http.StatusBadRequest)
+		return
+	}
+	if req.FuelLevel < 0 || req.FuelLevel > 100 {
+		req.FuelLevel = max(0, min(100, req.FuelLevel))
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)
+	defer cancel()
+
+	// Start atomic transaction
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[START_TRIP] Transaction begin failed: %v", err)
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Fetch current status, assigned_driver_id, otp_hash, otp_attempts
+	var currentStatus string
+	var assignedDriverID *string
+	var otpHash *string
+	var otpAttempts int
+	query := `
+		SELECT status::text, assigned_driver_id::text, otp_hash, otp_attempts 
+		FROM orders 
+		WHERE id = $1::uuid 
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &otpHash, &otpAttempts)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found", http.StatusNotFound)
+			return
+		}
+		log.Printf("[START_TRIP] Order lookup failed for %s: %v", orderID, err)
+		http.Error(w, "database_read_exception", http.StatusInternalServerError)
+		return
+	}
+
+	// Validation checks
+	if currentStatus != "ARRIVED_AT_PICKUP" {
+		http.Error(w, fmt.Sprintf("invalid_state: expected ARRIVED_AT_PICKUP, got %s", currentStatus), http.StatusConflict)
+		return
+	}
+	if assignedDriverID == nil || *assignedDriverID != driverID {
+		http.Error(w, "forbidden: driver identity mismatch", http.StatusForbidden)
+		return
+	}
+
+	// 2. OTP brute-force lockout guard
+	if otpAttempts >= 3 {
+		http.Error(w, "too_many_otp_attempts", http.StatusForbidden)
+		return
+	}
+
+	// Compare hashed OTP
+	sum := sha256.Sum256([]byte(req.OTP))
+	inputHash := hex.EncodeToString(sum[:])
+	
+	targetHash := ""
+	if otpHash != nil {
+		targetHash = *otpHash
+	}
+	// Fallback to hashing "1234" if no otp_hash in DB yet
+	if targetHash == "" {
+		fallbackSum := sha256.Sum256([]byte("1234"))
+		targetHash = hex.EncodeToString(fallbackSum[:])
+	}
+
+	if inputHash != targetHash {
+		// Increment otp_attempts
+		_, _ = tx.Exec(ctx, "UPDATE orders SET otp_attempts = otp_attempts + 1 WHERE id = $1::uuid", orderID)
+		_ = tx.Commit(ctx) // Commit the increment to DB
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "invalid_otp",
+			"message": fmt.Sprintf("Incorrect OTP entered. Attempt %d of 3.", otpAttempts+1),
+		})
+		return
+	}
+
+	// 3. Write START odometer checkpoint (Odometer Guard)
+	checkpointID := ""
+	err = tx.QueryRow(ctx, `
+		INSERT INTO trip_odometer_checkpoints (order_id, checkpoint_type, odometer_value, fuel_percentage, photo_url, captured_at, created_by)
+		VALUES ($1::uuid, 'START', $2, $3, $4, NOW(), $5::uuid)
+		ON CONFLICT (order_id, checkpoint_type) DO UPDATE
+		SET odometer_value = EXCLUDED.odometer_value,
+		    fuel_percentage = EXCLUDED.fuel_percentage,
+		    photo_url = EXCLUDED.photo_url,
+		    captured_at = EXCLUDED.captured_at
+		RETURNING id::text`,
+		orderID, req.OdometerReading, req.FuelLevel, req.PhotoURL, driverID,
+	).Scan(&checkpointID)
+	if err != nil {
+		log.Printf("[START_TRIP] Checkpoint write failed: %v", err)
+		http.Error(w, "checkpoint_write_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Update order status to DELIVERING, picked_up_at = NOW(), and reset otp_attempts
+	_, err = tx.Exec(ctx, `
+		UPDATE orders 
+		SET status = 'DELIVERING'::order_status_enum,
+		    picked_up_at = NOW(),
+		    otp_attempts = 0
+		WHERE id = $1::uuid
+	`, orderID)
+	if err != nil {
+		log.Printf("[START_TRIP] Order status transition to DELIVERING failed: %v", err)
+		http.Error(w, "status_transition_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Update driver state to DELIVERING / ONLINE_DELIVERING
+	_, err = tx.Exec(ctx, `
+		UPDATE drivers 
+		SET duty_state = 'DELIVERING'::driver_duty_state,
+		    current_state = 'ONLINE_DELIVERING'::driver_state_enum,
+		    updated_at = NOW()
+		WHERE id = $1::uuid
+	`, driverID)
+	if err != nil {
+		log.Printf("[START_TRIP] Driver state update failed: %v", err)
+		http.Error(w, "driver_state_transition_failed", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[START_TRIP] Transaction commit failed: %v", err)
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":         true,
+		"status":          "DELIVERING",
+		"checkpoint_id":   checkpointID,
+		"odometer_value":  req.OdometerReading,
+		"fuel_percentage": req.FuelLevel,
+	})
 }
 
 // HandleCompleteTrip concludes journey lifetimes, runs an idempotency fence, and locks in precise financial ledger splits

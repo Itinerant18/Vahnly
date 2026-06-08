@@ -1,3 +1,5 @@
+import { StartTripPayload } from '../types/trip';
+
 export type DriverStatus = 'ONLINE_AVAILABLE' | 'OFFLINE';
 export type DevicePlatform = 'ANDROID_FCM' | 'IOS_APNS';
 
@@ -626,6 +628,43 @@ export async function verifyTripOTP(
     method: 'POST',
     token,
     body: { otp },
+  });
+}
+
+export async function driverArriveAtPickup(token: string, orderId: string): Promise<{ success: boolean; status: string }> {
+  return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/arrived`, {
+    method: 'PATCH',
+    token,
+    body: {},
+  });
+}
+
+export async function driverStartTrip(
+  token: string,
+  orderId: string,
+  payload: StartTripPayload,
+): Promise<{
+  success: boolean;
+  status: string;
+  checkpoint_id: string;
+  odometer_value: number;
+  fuel_percentage: number;
+}> {
+  return request<{
+    success: boolean;
+    status: string;
+    checkpoint_id: string;
+    odometer_value: number;
+    fuel_percentage: number;
+  }>(`/api/v1/driver/orders/${orderId}/start`, {
+    method: 'PATCH',
+    token,
+    body: {
+      odometer_reading: payload.odometerReading,
+      fuel_level: payload.fuelPercentage,
+      otp: payload.otp,
+      photo_url: payload.photoUrl,
+    },
   });
 }
 

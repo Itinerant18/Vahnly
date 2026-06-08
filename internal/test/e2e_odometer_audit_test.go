@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -12,6 +14,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/segmentio/kafka-go"
+
+	. "github.com/platform/driver-delivery/internal/gateway/delivery/http"
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
 // TestOdometerAuditReconciliation validates the complete odometer ingestion → admin
@@ -292,4 +298,131 @@ func advanceOrderStatus(ctx context.Context, t *testing.T, db *pgxpool.Pool, ord
 	if err != nil {
 		t.Fatalf("Failed advancing order to %s: %v", status, err)
 	}
+}
+
+func TestGatewayOTPAndOdometerLimits(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	postgresURL := os.Getenv("DATABASE_URL")
+	if postgresURL == "" {
+		postgresURL = "postgresql://postgres:HardenedProdPassword@localhost:5432/delivery_platform?sslmode=disable"
+	}
+	dbPool, err := pgxpool.New(ctx, postgresURL)
+	if err != nil {
+		t.Fatalf("Database connection failed: %v", err)
+	}
+	defer dbPool.Close()
+
+	redisNodes := os.Getenv("REDIS_CLUSTER_NODES")
+	if redisNodes == "" {
+		redisNodes = "127.0.0.1:6379"
+	}
+	redisClient := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs: strings.Split(redisNodes, ","),
+	})
+	defer redisClient.Close()
+
+	orderID := "00000000-0000-0000-aaaa-000000000001"
+	driverID := "00000000-0000-0000-aaaa-000000000099"
+
+	cleanup(ctx, dbPool, orderID, driverID)
+	seedDriverAndOrder(ctx, t, dbPool, driverID, orderID, 5.0)
+
+	// Update order status to ARRIVED_AT_PICKUP (required for starting trip)
+	_, _ = dbPool.Exec(ctx, "UPDATE orders SET status = 'ARRIVED_AT_PICKUP'::order_status_enum, otp_hash = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', otp_attempts = 0 WHERE id = $1::uuid", orderID)
+
+	// Instantiate GatewayHandler with mock Kafka writer to avoid nil pointer panic
+	mockKafkaWriter := &kafka.Writer{
+		Addr: kafka.TCP("localhost:9092"),
+	}
+	h := NewGatewayHandler(dbPool, mockKafkaWriter, nil, redisClient)
+
+	// Helper function to create request with context
+	newTestRequest := func(method, path, body string, uid, role string) *http.Request {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		ctx := context.WithValue(req.Context(), middleware.UserIDContextKey, uid)
+		ctx = context.WithValue(ctx, middleware.UserRoleContextKey, role)
+		return req.WithContext(ctx)
+	}
+
+	// 1. Negative/zero odometer reading returns 400
+	t.Run("NegativeOdometer_Returns400", func(t *testing.T) {
+		req := newTestRequest("PATCH", "/api/v1/driver/orders/"+orderID+"/start", `{"odometer_reading": -10, "fuel_level": 80, "otp": "1234"}`, driverID, "DRIVER")
+		req.SetPathValue("id", orderID)
+		rec := httptest.NewRecorder()
+		h.HandleDriverStartTrip(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request, got %d", rec.Code)
+		}
+	})
+
+	// 2. Incorrect OTP returns 401 and increments attempts
+	t.Run("IncorrectOTP_Returns401", func(t *testing.T) {
+		req := newTestRequest("PATCH", "/api/v1/driver/orders/"+orderID+"/start", `{"odometer_reading": 50000, "fuel_level": 80, "otp": "9999"}`, driverID, "DRIVER")
+		req.SetPathValue("id", orderID)
+		rec := httptest.NewRecorder()
+		h.HandleDriverStartTrip(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401 Unauthorized, got %d", rec.Code)
+		}
+
+		// Verify otp_attempts is now 1 in the database
+		var attempts int
+		err = dbPool.QueryRow(ctx, "SELECT otp_attempts FROM orders WHERE id = $1::uuid", orderID).Scan(&attempts)
+		if err != nil {
+			t.Fatalf("Failed to query otp_attempts: %v", err)
+		}
+		if attempts != 1 {
+			t.Errorf("Expected otp_attempts = 1, got %d", attempts)
+		}
+	})
+
+	// 3. Brute force lockout happens after the 3rd failed attempt
+	t.Run("BruteForceLockout_AttemptsCount", func(t *testing.T) {
+		// Set otp_attempts to 3 in DB
+		_, err = dbPool.Exec(ctx, "UPDATE orders SET otp_attempts = 3 WHERE id = $1::uuid", orderID)
+		if err != nil {
+			t.Fatalf("Failed to update attempts: %v", err)
+		}
+
+		req := newTestRequest("PATCH", "/api/v1/driver/orders/"+orderID+"/start", `{"odometer_reading": 50000, "fuel_level": 80, "otp": "1234"}`, driverID, "DRIVER")
+		req.SetPathValue("id", orderID)
+		rec := httptest.NewRecorder()
+		h.HandleDriverStartTrip(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected 403 Forbidden, got %d", rec.Code)
+		}
+	})
+
+	// 4. Success scenario correctly transitions order status to DELIVERING
+	t.Run("SuccessOTP_StartsTrip", func(t *testing.T) {
+		// Reset attempts in DB
+		_, err = dbPool.Exec(ctx, "UPDATE orders SET otp_attempts = 0 WHERE id = $1::uuid", orderID)
+		if err != nil {
+			t.Fatalf("Failed to reset attempts: %v", err)
+		}
+
+		req := newTestRequest("PATCH", "/api/v1/driver/orders/"+orderID+"/start", `{"odometer_reading": 50010, "fuel_level": 80, "otp": "1234"}`, driverID, "DRIVER")
+		req.SetPathValue("id", orderID)
+		rec := httptest.NewRecorder()
+		h.HandleDriverStartTrip(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected 200 OK, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify status and picked_up_at
+		var status string
+		err = dbPool.QueryRow(ctx, "SELECT status::text FROM orders WHERE id = $1::uuid", orderID).Scan(&status)
+		if err != nil {
+			t.Fatalf("Failed to query status: %v", err)
+		}
+		if status != "DELIVERING" {
+			t.Errorf("Expected order status DELIVERING, got %s", status)
+		}
+	})
 }
