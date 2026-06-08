@@ -8,26 +8,23 @@ import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import {
-  acceptOffer,
   arriveAtPickup,
   completeTrip,
-  declineOffer,
   getDriverProfile,
   getPendingOffer,
   OdometerCheckpointPayload,
-  PendingOfferOrder,
-  setDriverStatus,
+  OrderOffer,
   startTrip,
   submitOdometerCheckpoint,
   setDriverDutyState,
-  triggerDriverSOS,
   getDriverDutyStats,
   verifyTripOTP,
 } from '@/api/client';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
 import { startTelemetryStream } from '@/services/telemetryStream';
-import { OfferPopup, OrderOffer } from '@/components/OfferPopup';
+import { OfferPopup } from '@/components/OfferPopup';
+import { useOfferStore } from '@/store/useOfferStore';
 import { cellToBoundary } from 'h3-js';
 
 interface ActiveOrderAssignment {
@@ -46,22 +43,7 @@ interface ActiveOrderAssignment {
   transmission: string;
   trip_type: string; // "In-city" | "Outstation" | "Mini-outstation"
   special_notes?: string;
-  backend_offer?: PendingOfferOrder;
-}
-
-function toOrderOffer(assignment: ActiveOrderAssignment): OrderOffer {
-  return assignment.backend_offer ?? {
-    id: assignment.order_id,
-    city_prefix: 'KOL',
-    pickup_h3_cell: '',
-    pickup_lat: assignment.pickup_lat,
-    pickup_lng: assignment.pickup_lng,
-    dropoff_lat: assignment.dropoff_lat,
-    dropoff_lng: assignment.dropoff_lng,
-    base_fare_paise: assignment.quoted_fare_paise,
-    surge_multiplier: 1,
-    customer_id: 'Rider',
-  };
+  backend_offer?: OrderOffer;
 }
 
 function clampPercent(value: number): number {
@@ -136,9 +118,7 @@ export default function DriverTerminalPage() {
   const [sosActive, setSosActive] = useState(false);
   const [sosCountdown, setSosCountdown] = useState(5);
   
-  // Trip management variables
-  const [incomingOffer, setIncomingOffer] = useState<ActiveOrderAssignment | null>(null);
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(15);
+
   
   // En-Route and Arrived timer trackers
   const [freeWaitSeconds, setFreeWaitSeconds] = useState(300); // 5-minute wait timer
@@ -354,14 +334,22 @@ export default function DriverTerminalPage() {
         token,
         {
           onAssignment: (frame) => {
+            const currentDutyState = useDriverDutyStore.getState().dutyState;
+            if (currentDutyState !== 'ONLINE') {
+              console.warn('[DRIVER_OFFER] Ignoring assignment frame since duty state is:', currentDutyState);
+              return;
+            }
             void getPendingOffer(token)
               .then((pendingOffer) => {
                 if (pendingOffer.order) {
-                  triggerIncomingMatchNotification(
-                    frame.order_id,
-                    pendingOffer.order,
-                    pendingOffer.offer_expires_in_seconds,
-                  );
+                  const checkState = useDriverDutyStore.getState().dutyState;
+                  if (checkState !== 'ONLINE') {
+                    console.warn('[DRIVER_OFFER] Ignoring hydration response since state is:', checkState);
+                    return;
+                  }
+                  useOfferStore.getState().setOffer(pendingOffer.order);
+                  useDriverDutyStore.getState().setDutyState('OFFER_PENDING');
+                  logAudit('INCOMING_OFFER_RECEIVED', { orderId: pendingOffer.order.orderId, source: 'WEBSOCKET' });
                 }
               })
               .catch((err) => console.warn('[DRIVER_OFFER] Assignment hydration failed:', err));
@@ -389,11 +377,14 @@ export default function DriverTerminalPage() {
     void getPendingOffer(token)
       .then((pendingOffer) => {
         if (pendingOffer.order && (pendingOffer.offer_expires_in_seconds ?? 0) > 0) {
-          triggerIncomingMatchNotification(
-            pendingOffer.order.id,
-            pendingOffer.order,
-            pendingOffer.offer_expires_in_seconds,
-          );
+          const currentDutyState = useDriverDutyStore.getState().dutyState;
+          if (currentDutyState !== 'ONLINE') {
+            console.warn('[DRIVER_OFFER] Ignoring fallback offer since duty state is:', currentDutyState);
+            return;
+          }
+          useOfferStore.getState().setOffer(pendingOffer.order);
+          useDriverDutyStore.getState().setDutyState('OFFER_PENDING');
+          logAudit('INCOMING_OFFER_RECEIVED', { orderId: pendingOffer.order.orderId, source: 'HTTP_FALLBACK' });
         }
       })
       .catch((err) => {
@@ -477,80 +468,37 @@ export default function DriverTerminalPage() {
       closeOnlineStreams();
       
       setDutyState('OFFLINE');
-      setIncomingOffer(null);
       setActiveTrip(null);
       logAudit('DUTY_OFFLINE', { driverID });
     }
   };
 
-  const triggerIncomingMatchNotification = (
-    orderId: string,
-    offer: PendingOfferOrder,
-    expiresInSeconds?: number,
-  ) => {
-    // Only accept incoming offers if idle/online available
-    setIncomingOffer({
-      order_id: orderId,
-      customer_name: 'Rider',
-      customer_phone: 'Unavailable',
-      customer_rating: 0,
-      pickup_address: `${offer.pickup_lat.toFixed(5)}, ${offer.pickup_lng.toFixed(5)}`,
-      pickup_lat: offer.pickup_lat,
-      pickup_lng: offer.pickup_lng,
-      dropoff_address: `${offer.dropoff_lat.toFixed(5)}, ${offer.dropoff_lng.toFixed(5)}`,
-      dropoff_lat: offer.dropoff_lat,
-      dropoff_lng: offer.dropoff_lng,
-      quoted_fare_paise: Math.round(offer.base_fare_paise * offer.surge_multiplier),
-      vehicle_tier: 'PREMIUM_SUV',
-      transmission: 'AUTOMATIC',
-      trip_type: 'In-city Round',
-      special_notes: undefined,
-      backend_offer: offer,
-    });
-    setDutyState('OFFER_PENDING');
-    setCountdownSeconds(expiresInSeconds && expiresInSeconds > 0 ? expiresInSeconds : 15);
-    logAudit('INCOMING_OFFER_RECEIVED', { orderId, source: offer ? 'HTTP_FALLBACK' : 'WEBSOCKET' });
-  };
+  const { currentOffer, status: offerStatus } = useOfferStore();
 
-  const handleAcceptOffer = async () => {
-    if (!incomingOffer) return;
-    const acceptedAt = new Date().toISOString();
-    logAudit('OFFER_ACCEPTED', { orderId: incomingOffer.order_id, ts: acceptedAt });
-    
-    setDutyState('EN_ROUTE');
-    setActiveTrip(incomingOffer);
-    setIncomingOffer(null);
-
-    try {
-      if (token) {
-        await acceptOffer(token, incomingOffer.order_id, driverID);
-      }
-    } catch (err) {
-      console.warn('[TERMINAL_WS] Assignment claimed locally. Syncing background parameters.');
+  useEffect(() => {
+    if (offerStatus === 'ACCEPTED' && currentOffer) {
+      setActiveTrip({
+        order_id: currentOffer.orderId,
+        customer_name: currentOffer.riderName,
+        customer_phone: 'Unavailable',
+        customer_rating: currentOffer.riderRating,
+        pickup_address: currentOffer.pickup.address,
+        pickup_lat: currentOffer.pickup.lat,
+        pickup_lng: currentOffer.pickup.lng,
+        dropoff_address: currentOffer.drop.address,
+        dropoff_lat: currentOffer.drop.lat,
+        dropoff_lng: currentOffer.drop.lng,
+        quoted_fare_paise: currentOffer.fareEstimate,
+        vehicle_tier: currentOffer.carTypeRequested || 'PREMIUM_SUV',
+        transmission: currentOffer.transmissionRequired || 'AUTOMATIC',
+        trip_type: currentOffer.tripType,
+        special_notes: currentOffer.notes,
+        backend_offer: currentOffer,
+      });
+      // Clear offer from store now that it is active
+      useOfferStore.getState().clearOffer();
     }
-  };
-
-  const handleDeclineOfferSubmit = async (reason: string) => {
-    const declinedAt = new Date().toISOString();
-    logAudit('OFFER_DECLINED', { orderId: incomingOffer?.order_id, reason, ts: declinedAt });
-    
-    const oId = incomingOffer?.order_id;
-    setIncomingOffer(null);
-    setCountdownSeconds(15);
-    setDutyState('ONLINE');
-
-    if (oId) {
-      try {
-        if (token) {
-          await declineOffer(token, oId, driverID, cityPrefix);
-        }
-      } catch (err) {
-        console.warn('Decline sync failed:', err);
-      }
-    }
-
-    alert('Offer declined. A 30-second priority matching cooldown has been applied to this node.');
-  };
+  }, [offerStatus, currentOffer]);
 
   const handleArrivedAtPickup = async () => {
     logAudit('ARRIVED_AT_PICKUP_NODE', { orderId: activeTrip?.order_id, time: new Date().toISOString() });
@@ -943,14 +891,7 @@ export default function DriverTerminalPage() {
       )}
 
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
-      {dutyState === 'OFFER_PENDING' && incomingOffer && (
-        <OfferPopup
-          offer={toOrderOffer(incomingOffer)}
-          timeoutSeconds={countdownSeconds}
-          onAccept={handleAcceptOffer}
-          onDecline={(reason) => handleDeclineOfferSubmit(reason ?? 'driver_declined')}
-        />
-      )}
+      <OfferPopup />
 
       {/* TOP HEADER MENU CONTROL */}
       <header className="bg-zinc-950 border-b border-zinc-900 p-4 sticky top-0 z-50 flex justify-between items-center w-full text-left">
@@ -1203,22 +1144,25 @@ export default function DriverTerminalPage() {
               <div className="flex gap-2 pt-2 border-t border-zinc-900 mt-3">
                 <button
                   onClick={() => {
-                    triggerIncomingMatchNotification(
-                      'ord-demo-' + Math.floor(Math.random() * 10000),
-                      {
-                        id: 'ord-demo-' + Math.floor(Math.random() * 10000),
-                        city_prefix: 'KOL',
-                        pickup_h3_cell: '883011833ffffff',
-                        pickup_lat: 22.5726,
-                        pickup_lng: 88.3639,
-                        dropoff_lat: 22.5855,
-                        dropoff_lng: 88.3411,
-                        base_fare_paise: 45000,
-                        surge_multiplier: 1.25,
-                        customer_id: 'cust-demo-123',
-                      },
-                      25
-                    );
+                    const mockOrderId = 'ord-demo-' + Math.floor(Math.random() * 10000);
+                    useOfferStore.getState().setOffer({
+                      orderId: mockOrderId,
+                      riderName: 'Aarav Mehta',
+                      riderRating: 4.85,
+                      pickup: { address: 'Howrah Railway Station, Kolkata', lat: 22.5726, lng: 88.3639 },
+                      drop: { address: 'Science City, Kolkata', lat: 22.5855, lng: 88.3411 },
+                      fareEstimate: 54000,
+                      etaMinutes: 5,
+                      tripType: 'CITY',
+                      carTypeRequested: 'PREMIUM_SUV',
+                      transmissionRequired: 'AUTOMATIC',
+                      distanceKm: 9.8,
+                      durationMinutes: 22,
+                      notes: 'Need silent ride, carrying luggage.',
+                      d4mCareOptIn: true,
+                    });
+                    useDriverDutyStore.getState().setDutyState('OFFER_PENDING');
+                    logAudit('INCOMING_OFFER_RECEIVED', { orderId: mockOrderId, source: 'DEMO' });
                   }}
                   className="w-full bg-zinc-900 hover:bg-zinc-850 text-amber-500 border border-zinc-850 py-2.5 rounded-xl text-[9px] font-mono font-bold uppercase tracking-wider transition cursor-pointer text-center"
                 >

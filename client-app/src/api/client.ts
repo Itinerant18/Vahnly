@@ -1,7 +1,7 @@
 export type DriverStatus = 'ONLINE_AVAILABLE' | 'OFFLINE';
 export type DevicePlatform = 'ANDROID_FCM' | 'IOS_APNS';
 
-type HttpMethod = 'GET' | 'POST';
+type HttpMethod = 'GET' | 'POST' | 'PATCH';
 
 function readEnv(key: string): string | undefined {
   if (typeof process !== 'undefined' && process.env?.[key]) {
@@ -90,18 +90,24 @@ export interface PricingQuote {
   circuit_breaker_nominal: boolean;
 }
 
-export interface PendingOfferOrder {
-  id: string;
-  city_prefix: string;
-  pickup_h3_cell: string;
-  pickup_lat: number;
-  pickup_lng: number;
-  dropoff_lat: number;
-  dropoff_lng: number;
-  base_fare_paise: number;
-  surge_multiplier: number;
-  customer_id: string;
+export interface OrderOffer {
+  orderId: string;
+  riderName: string;
+  riderRating: number;
+  pickup: { address: string; lat: number; lng: number };
+  drop: { address: string; lat: number; lng: number };
+  fareEstimate: number;
+  etaMinutes: number;
+  tripType: 'CITY' | 'OUTSTATION' | 'MINI_OUTSTATION';
+  notes?: string;
+  carTypeRequested?: string;
+  transmissionRequired?: string;
+  d4mCareOptIn?: boolean;
+  distanceKm?: number;
+  durationMinutes?: number;
 }
+
+export type PendingOfferOrder = OrderOffer;
 
 export interface PendingOfferResponse {
   order: PendingOfferOrder | null;
@@ -266,6 +272,20 @@ export async function declineOffer(
     method: 'POST',
     token,
     body: { order_id: orderId, driver_id: driverId, city_prefix: cityPrefix },
+  });
+}
+
+export async function respondToOffer(
+  token: string,
+  orderId: string,
+  response: 'ACCEPTED' | 'DECLINED',
+  reason?: string,
+  correlationId?: string,
+): Promise<{ success: boolean; status: string }> {
+  return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/offer-response`, {
+    method: 'PATCH',
+    token,
+    body: { response, reason, correlation_id: correlationId },
   });
 }
 
