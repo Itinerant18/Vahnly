@@ -2044,12 +2044,12 @@ func (h *GatewayHandler) HandleUpdateOrderRoute(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":               true,
-		"order_id":              orderID,
-		"dropoff_lat":           req.DropoffLat,
-		"dropoff_lng":           req.DropoffLng,
-		"stops":                 req.Stops,
-		"calculated_fare_paise": updatedFarePaise,
+		"success":                 true,
+		"order_id":                orderID,
+		"dropoff_lat":             req.DropoffLat,
+		"dropoff_lng":             req.DropoffLng,
+		"stops":                   req.Stops,
+		"calculated_fare_paise":   updatedFarePaise,
 		"active_surge_multiplier": 1.0,
 	})
 }
@@ -2109,5 +2109,3 @@ func (h *GatewayHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request
 		"trip_id": req.TripID,
 	})
 }
-
-

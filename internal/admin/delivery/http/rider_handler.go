@@ -149,12 +149,12 @@ type RiderTransaction struct {
 }
 
 type RiderRefund struct {
-	RefundID      string    `json:"refund_id"`
-	OrderID       string    `json:"order_id"`
-	AmountPaise   int64     `json:"amount_paise"`
-	Status        string    `json:"status"`
-	Reason        string    `json:"reason"`
-	CreatedAt     time.Time `json:"created_at"`
+	RefundID    string    `json:"refund_id"`
+	OrderID     string    `json:"order_id"`
+	AmountPaise int64     `json:"amount_paise"`
+	Status      string    `json:"status"`
+	Reason      string    `json:"reason"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type RiderChargeback struct {
@@ -189,8 +189,8 @@ type RiderPromoApplied struct {
 }
 
 type RiderSupportTab struct {
-	Tickets        []RiderSupportTicket  `json:"tickets"`
-	Chats          []RiderSupportChat    `json:"chats"`
+	Tickets        []RiderSupportTicket `json:"tickets"`
+	Chats          []RiderSupportChat   `json:"chats"`
 	CallRecordings []RiderCallRecording `json:"call_recordings"`
 }
 
@@ -466,8 +466,6 @@ func (h *RiderHandler) recordAuditLog(ctx context.Context, adminID string, email
 	_, _ = h.dbPool.Exec(ctx, query, idVal, email, action, details, ip)
 }
 
-
-
 // HandleGetRiders returns list of riders matching filters and search parameters
 func (h *RiderHandler) HandleGetRiders(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -736,7 +734,6 @@ func (h *RiderHandler) HandleGetRiderDetail(w http.ResponseWriter, r *http.Reque
 		var dID *string
 
 		if err := rows.Scan(&tID, &city, &cID, &status, &fare, &createdAt, &dID, &dName, &tType, &rating, &pMethod); err == nil {
-
 
 			// Mapping fields directly to Trips array
 			details.Payments.Transactions = append(details.Payments.Transactions, RiderTransaction{

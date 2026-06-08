@@ -341,14 +341,19 @@ func (h *CMSHandler) HandleGetI18NStrings(w http.ResponseWriter, r *http.Request
 	var args []interface{}
 	idx := 1
 	if ns != "" {
-		query += fmt.Sprintf(" AND namespace = $%d", idx); args = append(args, ns); idx++
+		query += fmt.Sprintf(" AND namespace = $%d", idx)
+		args = append(args, ns)
+		idx++
 	}
 	if lang != "" {
-		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); idx++
+		query += fmt.Sprintf(" AND language_code = $%d", idx)
+		args = append(args, lang)
+		idx++
 	}
 	if search != "" {
 		query += fmt.Sprintf(" AND (key_name ILIKE $%d OR value ILIKE $%d)", idx, idx)
-		args = append(args, "%"+search+"%"); idx++
+		args = append(args, "%"+search+"%")
+		idx++
 	}
 
 	var total int64
@@ -391,8 +396,12 @@ func (h *CMSHandler) HandleUpsertI18NString(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.LanguageCode == "" { req.LanguageCode = "en" }
-	if req.Namespace == "" { req.Namespace = "common" }
+	if req.LanguageCode == "" {
+		req.LanguageCode = "en"
+	}
+	if req.Namespace == "" {
+		req.Namespace = "common"
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
@@ -446,10 +455,14 @@ func (h *CMSHandler) HandleGetAssets(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 	idx := 1
 	if assetType != "" {
-		query += fmt.Sprintf(" AND asset_type = $%d", idx); args = append(args, assetType); idx++
+		query += fmt.Sprintf(" AND asset_type = $%d", idx)
+		args = append(args, assetType)
+		idx++
 	}
 	if platform != "" {
-		query += fmt.Sprintf(" AND platform = $%d", idx); args = append(args, platform); idx++
+		query += fmt.Sprintf(" AND platform = $%d", idx)
+		args = append(args, platform)
+		idx++
 	}
 	query += " ORDER BY asset_type, display_order"
 
@@ -489,7 +502,9 @@ func (h *CMSHandler) HandleCreateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.Platform == "" { req.Platform = "ALL" }
+	if req.Platform == "" {
+		req.Platform = "ALL"
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
@@ -542,4 +557,3 @@ func (h *CMSHandler) HandleUpdateAssetStatus(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"updated"}`))
 }
-

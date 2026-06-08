@@ -25,28 +25,28 @@ func NewPayoutHandler(dbPool *pgxpool.Pool, logger *log.Logger) *PayoutHandler {
 }
 
 type PayoutListItem struct {
-	ID                   string    `json:"id"`
-	DriverID             string    `json:"driver_id"`
-	DriverName           string    `json:"driver_name"`
-	DriverPhone          string    `json:"driver_phone"`
-	BackgroundStatus     string    `json:"background_check_status"`
-	BankName             *string   `json:"bank_name"`
-	BankAccountNumber    *string   `json:"bank_account_number"`
-	BankIfsc             *string   `json:"bank_ifsc"`
-	BankVerified         bool      `json:"bank_verified"`
-	PayoutHold           bool      `json:"payout_hold"`
-	PayoutHoldReason     *string   `json:"payout_hold_reason"`
-	AmountPaise          int64     `json:"amount_paise"`
-	TdsPaise             int64     `json:"tds_paise"`
+	ID                    string    `json:"id"`
+	DriverID              string    `json:"driver_id"`
+	DriverName            string    `json:"driver_name"`
+	DriverPhone           string    `json:"driver_phone"`
+	BackgroundStatus      string    `json:"background_check_status"`
+	BankName              *string   `json:"bank_name"`
+	BankAccountNumber     *string   `json:"bank_account_number"`
+	BankIfsc              *string   `json:"bank_ifsc"`
+	BankVerified          bool      `json:"bank_verified"`
+	PayoutHold            bool      `json:"payout_hold"`
+	PayoutHoldReason      *string   `json:"payout_hold_reason"`
+	AmountPaise           int64     `json:"amount_paise"`
+	TdsPaise              int64     `json:"tds_paise"`
 	ProfessionalFeesPaise int64     `json:"professional_fees_paise"`
-	NetAmountPaise       int64     `json:"net_amount_paise"`
-	Status               string    `json:"status"`
-	FailureReason        *string   `json:"failure_reason"`
-	HoldReason           *string   `json:"hold_reason"`
-	PayoutBatchID        *string   `json:"payout_batch_id"`
-	BankReference        *string   `json:"bank_reference"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	NetAmountPaise        int64     `json:"net_amount_paise"`
+	Status                string    `json:"status"`
+	FailureReason         *string   `json:"failure_reason"`
+	HoldReason            *string   `json:"hold_reason"`
+	PayoutBatchID         *string   `json:"payout_batch_id"`
+	BankReference         *string   `json:"bank_reference"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 // HandleGetPayouts retrieves all payouts with sorting and query filtering
@@ -138,14 +138,38 @@ func (h *PayoutHandler) HandleGetPayouts(w http.ResponseWriter, r *http.Request)
 			&item.CreatedAt, &item.UpdatedAt,
 		)
 		if err == nil {
-			if bankName.Valid { val := bankName.String; item.BankName = &val }
-			if bankAccount.Valid { val := bankAccount.String; item.BankAccountNumber = &val }
-			if bankIfsc.Valid { val := bankIfsc.String; item.BankIfsc = &val }
-			if payoutHoldReason.Valid { val := payoutHoldReason.String; item.PayoutHoldReason = &val }
-			if failureReason.Valid { val := failureReason.String; item.FailureReason = &val }
-			if holdReason.Valid { val := holdReason.String; item.HoldReason = &val }
-			if payoutBatchID.Valid { val := payoutBatchID.String; item.PayoutBatchID = &val }
-			if bankRef.Valid { val := bankRef.String; item.BankReference = &val }
+			if bankName.Valid {
+				val := bankName.String
+				item.BankName = &val
+			}
+			if bankAccount.Valid {
+				val := bankAccount.String
+				item.BankAccountNumber = &val
+			}
+			if bankIfsc.Valid {
+				val := bankIfsc.String
+				item.BankIfsc = &val
+			}
+			if payoutHoldReason.Valid {
+				val := payoutHoldReason.String
+				item.PayoutHoldReason = &val
+			}
+			if failureReason.Valid {
+				val := failureReason.String
+				item.FailureReason = &val
+			}
+			if holdReason.Valid {
+				val := holdReason.String
+				item.HoldReason = &val
+			}
+			if payoutBatchID.Valid {
+				val := payoutBatchID.String
+				item.PayoutBatchID = &val
+			}
+			if bankRef.Valid {
+				val := bankRef.String
+				item.BankReference = &val
+			}
 			payouts = append(payouts, item)
 		} else {
 			h.logger.Printf("[PAYOUTS_ERROR] Row scan failed: %v", err)
@@ -207,14 +231,38 @@ func (h *PayoutHandler) HandleGetPayoutDetail(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if bankName.Valid { val := bankName.String; item.BankName = &val }
-	if bankAccount.Valid { val := bankAccount.String; item.BankAccountNumber = &val }
-	if bankIfsc.Valid { val := bankIfsc.String; item.BankIfsc = &val }
-	if payoutHoldReason.Valid { val := payoutHoldReason.String; item.PayoutHoldReason = &val }
-	if failureReason.Valid { val := failureReason.String; item.FailureReason = &val }
-	if holdReason.Valid { val := holdReason.String; item.HoldReason = &val }
-	if payoutBatchID.Valid { val := payoutBatchID.String; item.PayoutBatchID = &val }
-	if bankRef.Valid { val := bankRef.String; item.BankReference = &val }
+	if bankName.Valid {
+		val := bankName.String
+		item.BankName = &val
+	}
+	if bankAccount.Valid {
+		val := bankAccount.String
+		item.BankAccountNumber = &val
+	}
+	if bankIfsc.Valid {
+		val := bankIfsc.String
+		item.BankIfsc = &val
+	}
+	if payoutHoldReason.Valid {
+		val := payoutHoldReason.String
+		item.PayoutHoldReason = &val
+	}
+	if failureReason.Valid {
+		val := failureReason.String
+		item.FailureReason = &val
+	}
+	if holdReason.Valid {
+		val := holdReason.String
+		item.HoldReason = &val
+	}
+	if payoutBatchID.Valid {
+		val := payoutBatchID.String
+		item.PayoutBatchID = &val
+	}
+	if bankRef.Valid {
+		val := bankRef.String
+		item.BankReference = &val
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(mustMarshal(item))
@@ -396,9 +444,15 @@ func (h *PayoutHandler) HandleExportPayoutBatch(w http.ResponseWriter, r *http.R
 			&item.Amount, &item.TDS, &item.Fees, &item.Net, &item.CreatedAt,
 		)
 		if err == nil {
-			if bankName.Valid { item.BankName = bankName.String }
-			if bankAccount.Valid { item.AccountNumber = bankAccount.String }
-			if bankIfsc.Valid { item.IFSC = bankIfsc.String }
+			if bankName.Valid {
+				item.BankName = bankName.String
+			}
+			if bankAccount.Valid {
+				item.AccountNumber = bankAccount.String
+			}
+			if bankIfsc.Valid {
+				item.IFSC = bankIfsc.String
+			}
 			items = append(items, item)
 		}
 	}

@@ -112,19 +112,19 @@ func (h *ConfigHandler) HandleUpsertSettings(w http.ResponseWriter, r *http.Requ
 // ── 20.2 Feature Flags ───────────────────────────────────────────────────────
 
 type FeatureFlag struct {
-	ID                 int       `json:"id"`
-	FlagKey            string    `json:"flag_key"`
-	Name               string    `json:"name"`
-	Description        string    `json:"description"`
-	IsEnabled          bool      `json:"is_enabled"`
-	RolloutPercentage  int       `json:"rollout_percentage"`
-	TargetCities       []string  `json:"target_cities"`
-	TargetRoles        []string  `json:"target_roles"`
-	IsKillSwitch       bool      `json:"is_kill_switch"`
-	CreatedBy          string    `json:"created_by"`
-	UpdatedBy          string    `json:"updated_by"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                int       `json:"id"`
+	FlagKey           string    `json:"flag_key"`
+	Name              string    `json:"name"`
+	Description       string    `json:"description"`
+	IsEnabled         bool      `json:"is_enabled"`
+	RolloutPercentage int       `json:"rollout_percentage"`
+	TargetCities      []string  `json:"target_cities"`
+	TargetRoles       []string  `json:"target_roles"`
+	IsKillSwitch      bool      `json:"is_kill_switch"`
+	CreatedBy         string    `json:"created_by"`
+	UpdatedBy         string    `json:"updated_by"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func (h *ConfigHandler) HandleGetFlags(w http.ResponseWriter, r *http.Request) {
@@ -392,10 +392,10 @@ func (h *ConfigHandler) HandleUpdateIntegration(w http.ResponseWriter, r *http.R
 	}
 	key := r.PathValue("key")
 	var req struct {
-		IsEnabled  *bool   `json:"is_enabled"`
-		APIKey     string  `json:"api_key"`     // plaintext — we store masked version
-		WebhookURL string  `json:"webhook_url"`
-		ConfigJSON string  `json:"config_json"`
+		IsEnabled  *bool  `json:"is_enabled"`
+		APIKey     string `json:"api_key"` // plaintext — we store masked version
+		WebhookURL string `json:"webhook_url"`
+		ConfigJSON string `json:"config_json"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
@@ -418,16 +418,24 @@ func (h *ConfigHandler) HandleUpdateIntegration(w http.ResponseWriter, r *http.R
 	args := []interface{}{key, adminEmail}
 	idx := 3
 	if req.IsEnabled != nil {
-		query += fmt.Sprintf(", is_enabled = $%d", idx); args = append(args, *req.IsEnabled); idx++
+		query += fmt.Sprintf(", is_enabled = $%d", idx)
+		args = append(args, *req.IsEnabled)
+		idx++
 	}
 	if masked != "" {
-		query += fmt.Sprintf(", api_key_masked = $%d", idx); args = append(args, masked); idx++
+		query += fmt.Sprintf(", api_key_masked = $%d", idx)
+		args = append(args, masked)
+		idx++
 	}
 	if req.WebhookURL != "" {
-		query += fmt.Sprintf(", webhook_url = $%d", idx); args = append(args, req.WebhookURL); idx++
+		query += fmt.Sprintf(", webhook_url = $%d", idx)
+		args = append(args, req.WebhookURL)
+		idx++
 	}
 	if req.ConfigJSON != "" {
-		query += fmt.Sprintf(", config_json = $%d::JSONB", idx); args = append(args, req.ConfigJSON); idx++
+		query += fmt.Sprintf(", config_json = $%d::JSONB", idx)
+		args = append(args, req.ConfigJSON)
+		idx++
 	}
 	query += " WHERE integration_key = $1"
 	_, _ = h.dbPool.Exec(ctx, query, args...)
@@ -498,10 +506,14 @@ func (h *ConfigHandler) HandleGetTemplates(w http.ResponseWriter, r *http.Reques
 	var args []interface{}
 	idx := 1
 	if channel != "" {
-		query += fmt.Sprintf(" AND channel = $%d", idx); args = append(args, strings.ToUpper(channel)); idx++
+		query += fmt.Sprintf(" AND channel = $%d", idx)
+		args = append(args, strings.ToUpper(channel))
+		idx++
 	}
 	if lang != "" {
-		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); idx++
+		query += fmt.Sprintf(" AND language_code = $%d", idx)
+		args = append(args, lang)
+		idx++
 	}
 	query += " ORDER BY channel, name"
 
@@ -535,7 +547,9 @@ func (h *ConfigHandler) HandleUpsertTemplate(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.LanguageCode == "" { req.LanguageCode = "en" }
+	if req.LanguageCode == "" {
+		req.LanguageCode = "en"
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
@@ -652,15 +666,15 @@ func (h *ConfigHandler) HandleUpsertCancellationRule(w http.ResponseWriter, r *h
 // ── 20.7 Rating Threshold Rules ───────────────────────────────────────────────
 
 type RatingRule struct {
-	ID                       int     `json:"id"`
-	AppliesTo                string  `json:"applies_to"`
-	ThresholdType            string  `json:"threshold_type"`
-	MinTripsRequired         int     `json:"min_trips_required"`
-	RatingBelow              float64 `json:"rating_below"`
-	Action                   string  `json:"action"`
-	CooldownDays             int     `json:"cooldown_days"`
-	NotificationTemplateKey  string  `json:"notification_template_key"`
-	IsActive                 bool    `json:"is_active"`
+	ID                      int     `json:"id"`
+	AppliesTo               string  `json:"applies_to"`
+	ThresholdType           string  `json:"threshold_type"`
+	MinTripsRequired        int     `json:"min_trips_required"`
+	RatingBelow             float64 `json:"rating_below"`
+	Action                  string  `json:"action"`
+	CooldownDays            int     `json:"cooldown_days"`
+	NotificationTemplateKey string  `json:"notification_template_key"`
+	IsActive                bool    `json:"is_active"`
 }
 
 func (h *ConfigHandler) HandleGetRatingRules(w http.ResponseWriter, r *http.Request) {

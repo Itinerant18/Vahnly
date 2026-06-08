@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 	"github.com/platform/driver-delivery/internal/telemetry/repository"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestSetDriverLocation_GhostDriverEviction(t *testing.T) {

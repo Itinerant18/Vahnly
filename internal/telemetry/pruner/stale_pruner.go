@@ -11,7 +11,7 @@ import (
 )
 
 type StaleTelemetryPruner struct {
-	clusterClient *redis.ClusterClient
+	clusterClient  *redis.ClusterClient
 	dbPool         *pgxpool.Pool
 	pruneInterval  time.Duration
 	staleThreshold time.Duration
@@ -19,7 +19,7 @@ type StaleTelemetryPruner struct {
 
 func NewStaleTelemetryPruner(client *redis.ClusterClient, db *pgxpool.Pool) *StaleTelemetryPruner {
 	return &StaleTelemetryPruner{
-		clusterClient: client,
+		clusterClient:  client,
 		dbPool:         db,
 		pruneInterval:  30 * time.Second, // Sweeps spatial indexes every 30 seconds
 		staleThreshold: 60 * time.Second, // Evicts sessions older than 60 seconds
@@ -53,12 +53,11 @@ func (p *StaleTelemetryPruner) ExecuteGarbageCollection(ctx context.Context, cit
 	maxStaleEpoch := now - int64(p.staleThreshold.Seconds())
 
 	pipe := p.clusterClient.Pipeline()
-	
+
 	// 1. Queue atomic sweeps across all tracked H3 spatial cell indices
 	for _, cell := range cells {
 		// Key syntax matches the scattered spatial tracking ZSET contract
 		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cell)
-
 
 		// First, capture the stale driver IDs before evicting them to sync PostgreSQL
 		pipe.ZRangeByScore(pruneCtx, zsetKey, &redis.ZRangeBy{

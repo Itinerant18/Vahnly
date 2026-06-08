@@ -69,7 +69,7 @@ type DriverOverviewTab struct {
 }
 
 type DriverKYCDocument struct {
-	Name       string    `json:"name"` // License, ID, Address Proof, Bank, Selfie
+	Name       string    `json:"name"`   // License, ID, Address Proof, Bank, Selfie
 	Status     string    `json:"status"` // APPROVED, REJECTED, PENDING, REUPLOAD
 	URL        string    `json:"url"`
 	UploadedAt time.Time `json:"uploaded_at"`
@@ -134,15 +134,15 @@ type DriverDetailResponse struct {
 
 // DriverOnboardingApplicant represents a card in the onboarding pipeline
 type DriverOnboardingApplicant struct {
-	DriverID             string              `json:"driver_id"`
-	Name                 string              `json:"name"`
-	Phone                string              `json:"phone"`
-	CityPrefix           string              `json:"city_prefix"`
-	Stage                string              `json:"stage"` // APPLIED, DOCS_UPLOADED, BACKGROUND_CHECK, TRAINING, APPROVED
+	DriverID              string              `json:"driver_id"`
+	Name                  string              `json:"name"`
+	Phone                 string              `json:"phone"`
+	CityPrefix            string              `json:"city_prefix"`
+	Stage                 string              `json:"stage"` // APPLIED, DOCS_UPLOADED, BACKGROUND_CHECK, TRAINING, APPROVED
 	KYCDocumentsChecklist []DriverKYCDocument `json:"kyc_documents_checklist"`
-	AppliedAt            time.Time           `json:"applied_at"`
-	BackgroundStatus     string              `json:"background_status"`
-	TrainingCompleted    bool                `json:"training_completed"`
+	AppliedAt             time.Time           `json:"applied_at"`
+	BackgroundStatus      string              `json:"background_status"`
+	TrainingCompleted     bool                `json:"training_completed"`
 }
 
 func projectDriverOverview(driverID string, name string, phone string, city string, verified bool, state string) DriverDetailResponse {
@@ -210,8 +210,8 @@ func projectDriverOverview(driverID string, name string, phone string, city stri
 		Incentives: []DriverIncentiveGoal{
 			{GoalID: "INC-DAILY-10", Description: "Complete 10 trips today", TargetTrips: 10, CurrentTrip: int(h % 9), BonusPaise: 50000, Completed: false},
 		},
-		Training: []string{"Standard Onboarding Course", "Safety Protocols & SOS Guidelines"},
-		TicketsCount: int(h % 4),
+		Training:       []string{"Standard Onboarding Course", "Safety Protocols & SOS Guidelines"},
+		TicketsCount:   int(h % 4),
 		IncidentsCount: int(h % 2),
 		Notifications: []RiderNotificationLog{
 			{Type: "SMS", Payload: "Incentive campaign active: ₹500 extra for 10 trips", Timestamp: time.Now().Add(-2 * time.Hour)},
@@ -495,15 +495,15 @@ func (h *DriverHandler) HandleGetDriverOnboarding(w http.ResponseWriter, r *http
 			}
 
 			applicants = append(applicants, DriverOnboardingApplicant{
-				DriverID:             dID,
-				Name:                 proj.Name,
-				Phone:                proj.Phone,
-				CityPrefix:           proj.CityPrefix,
-				Stage:                stage,
+				DriverID:              dID,
+				Name:                  proj.Name,
+				Phone:                 proj.Phone,
+				CityPrefix:            proj.CityPrefix,
+				Stage:                 stage,
 				KYCDocumentsChecklist: proj.KYCDocuments,
-				AppliedAt:            createdAt,
-				BackgroundStatus:     bgStatus,
-				TrainingCompleted:    hasSafetyTraining,
+				AppliedAt:             createdAt,
+				BackgroundStatus:      bgStatus,
+				TrainingCompleted:     hasSafetyTraining,
 			})
 		}
 	}

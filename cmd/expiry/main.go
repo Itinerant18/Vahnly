@@ -52,7 +52,7 @@ func main() {
 	gatewayHandler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClient)
 
 	janitorWorker := expiry.NewOfferTimeoutJanitor(dbPool, redisClient, gatewayHandler)
-	
+
 	// Launch the background janitor loop
 	go janitorWorker.StartJanitorLoop(ctx, cityPrefix)
 

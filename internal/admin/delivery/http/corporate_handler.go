@@ -26,24 +26,24 @@ func NewCorporateHandler(dbPool *pgxpool.Pool, logger *log.Logger) *CorporateHan
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
 type CorporateAccount struct {
-	ID                   string  `json:"id"`
-	CompanyName          string  `json:"company_name"`
-	GSTIN                string  `json:"gstin"`
-	BillingEmail         string  `json:"billing_email"`
-	BillingAddress       string  `json:"billing_address"`
-	CityPrefix           string  `json:"city_prefix"`
-	PlanType             string  `json:"plan_type"`
-	IsActive             bool    `json:"is_active"`
-	CreditLimitPaise     int64   `json:"credit_limit_paise"`
-	CurrentBalancePaise  int64   `json:"current_balance_paise"`
-	ContractStartDate    *string `json:"contract_start_date"`
-	ContractEndDate      *string `json:"contract_end_date"`
-	PrimaryContactName   string  `json:"primary_contact_name"`
-	PrimaryContactPhone  string  `json:"primary_contact_phone"`
-	SSOProvider          string  `json:"sso_provider"`
-	SSODomain            string  `json:"sso_domain"`
-	CreatedBy            string  `json:"created_by"`
-	CreatedAt            string  `json:"created_at"`
+	ID                  string  `json:"id"`
+	CompanyName         string  `json:"company_name"`
+	GSTIN               string  `json:"gstin"`
+	BillingEmail        string  `json:"billing_email"`
+	BillingAddress      string  `json:"billing_address"`
+	CityPrefix          string  `json:"city_prefix"`
+	PlanType            string  `json:"plan_type"`
+	IsActive            bool    `json:"is_active"`
+	CreditLimitPaise    int64   `json:"credit_limit_paise"`
+	CurrentBalancePaise int64   `json:"current_balance_paise"`
+	ContractStartDate   *string `json:"contract_start_date"`
+	ContractEndDate     *string `json:"contract_end_date"`
+	PrimaryContactName  string  `json:"primary_contact_name"`
+	PrimaryContactPhone string  `json:"primary_contact_phone"`
+	SSOProvider         string  `json:"sso_provider"`
+	SSODomain           string  `json:"sso_domain"`
+	CreatedBy           string  `json:"created_by"`
+	CreatedAt           string  `json:"created_at"`
 	// Computed
 	EmployeeCount int `json:"employee_count"`
 }
@@ -64,10 +64,14 @@ func (h *CorporateHandler) HandleGetAccounts(w http.ResponseWriter, r *http.Requ
 	var args []interface{}
 	idx := 1
 	if search != "" {
-		base += fmt.Sprintf(" AND ca.company_name ILIKE $%d", idx); args = append(args, "%"+search+"%"); idx++
+		base += fmt.Sprintf(" AND ca.company_name ILIKE $%d", idx)
+		args = append(args, "%"+search+"%")
+		idx++
 	}
 	if plan != "" {
-		base += fmt.Sprintf(" AND ca.plan_type = $%d", idx); args = append(args, plan); idx++
+		base += fmt.Sprintf(" AND ca.plan_type = $%d", idx)
+		args = append(args, plan)
+		idx++
 	}
 
 	var total int64
@@ -121,8 +125,12 @@ func (h *CorporateHandler) HandleCreateAccount(w http.ResponseWriter, r *http.Re
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.PlanType == "" { req.PlanType = "STANDARD" }
-	if req.CityPrefix == "" { req.CityPrefix = "KOL" }
+	if req.PlanType == "" {
+		req.PlanType = "STANDARD"
+	}
+	if req.CityPrefix == "" {
+		req.CityPrefix = "KOL"
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
@@ -174,18 +182,18 @@ func (h *CorporateHandler) HandleUpdateAccount(w http.ResponseWriter, r *http.Re
 // ── Employees ─────────────────────────────────────────────────────────────────
 
 type CorporateEmployee struct {
-	ID                 string `json:"id"`
-	CorporateID        string `json:"corporate_id"`
-	Name               string `json:"name"`
-	Email              string `json:"email"`
-	Phone              string `json:"phone"`
-	EmployeeID         string `json:"employee_id"`
-	Department         string `json:"department"`
-	CostCenter         string `json:"cost_center"`
-	Role               string `json:"role"`
-	IsActive           bool   `json:"is_active"`
-	MonthlyLimitPaise  int64  `json:"monthly_limit_paise"`
-	CreatedAt          string `json:"created_at"`
+	ID                string `json:"id"`
+	CorporateID       string `json:"corporate_id"`
+	Name              string `json:"name"`
+	Email             string `json:"email"`
+	Phone             string `json:"phone"`
+	EmployeeID        string `json:"employee_id"`
+	Department        string `json:"department"`
+	CostCenter        string `json:"cost_center"`
+	Role              string `json:"role"`
+	IsActive          bool   `json:"is_active"`
+	MonthlyLimitPaise int64  `json:"monthly_limit_paise"`
+	CreatedAt         string `json:"created_at"`
 }
 
 func (h *CorporateHandler) HandleGetEmployees(w http.ResponseWriter, r *http.Request) {
@@ -208,10 +216,13 @@ func (h *CorporateHandler) HandleGetEmployees(w http.ResponseWriter, r *http.Req
 	idx := 2
 	if search != "" {
 		base += fmt.Sprintf(" AND (name ILIKE $%d OR email ILIKE $%d)", idx, idx)
-		args = append(args, "%"+search+"%"); idx++
+		args = append(args, "%"+search+"%")
+		idx++
 	}
 	if dept != "" {
-		base += fmt.Sprintf(" AND department = $%d", idx); args = append(args, dept); idx++
+		base += fmt.Sprintf(" AND department = $%d", idx)
+		args = append(args, dept)
+		idx++
 	}
 
 	var total int64
@@ -251,7 +262,9 @@ func (h *CorporateHandler) HandleAddEmployee(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.Role == "" { req.Role = "EMPLOYEE" }
+	if req.Role == "" {
+		req.Role = "EMPLOYEE"
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
@@ -292,27 +305,39 @@ func (h *CorporateHandler) HandleBulkUploadEmployees(w http.ResponseWriter, r *h
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		lineNum++
-		if lineNum == 1 || line == "" { continue } // skip header and blank lines
+		if lineNum == 1 || line == "" {
+			continue
+		} // skip header and blank lines
 		cols := strings.Split(line, ",")
 		if len(cols) < 3 {
 			skipped++
 			errDetails = append(errDetails, fmt.Sprintf("line %d: insufficient columns", lineNum))
 			continue
 		}
-		name  := strings.TrimSpace(cols[0])
+		name := strings.TrimSpace(cols[0])
 		email := strings.TrimSpace(cols[1])
 		phone := ""
-		if len(cols) > 2 { phone = strings.TrimSpace(cols[2]) }
+		if len(cols) > 2 {
+			phone = strings.TrimSpace(cols[2])
+		}
 		empID := ""
-		if len(cols) > 3 { empID = strings.TrimSpace(cols[3]) }
+		if len(cols) > 3 {
+			empID = strings.TrimSpace(cols[3])
+		}
 		dept := ""
-		if len(cols) > 4 { dept = strings.TrimSpace(cols[4]) }
+		if len(cols) > 4 {
+			dept = strings.TrimSpace(cols[4])
+		}
 		cc := ""
-		if len(cols) > 5 { cc = strings.TrimSpace(cols[5]) }
+		if len(cols) > 5 {
+			cc = strings.TrimSpace(cols[5])
+		}
 		role := "EMPLOYEE"
 		if len(cols) > 6 {
 			r := strings.ToUpper(strings.TrimSpace(cols[6]))
-			if r == "ADMIN" || r == "MANAGER" { role = r }
+			if r == "ADMIN" || r == "MANAGER" {
+				role = r
+			}
 		}
 
 		if email == "" {
@@ -325,10 +350,14 @@ func (h *CorporateHandler) HandleBulkUploadEmployees(w http.ResponseWriter, r *h
 			 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (corporate_id, email) DO NOTHING RETURNING id::TEXT`,
 			corpID, name, email, phone, empID, dept, cc, role,
 		).Scan(&dummy)
-		if err == pgx.ErrNoRows { skipped++ } else if err != nil {
+		if err == pgx.ErrNoRows {
+			skipped++
+		} else if err != nil {
 			skipped++
 			errDetails = append(errDetails, fmt.Sprintf("line %d: %v", lineNum, err))
-		} else { inserted++ }
+		} else {
+			inserted++
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -345,7 +374,7 @@ func (h *CorporateHandler) HandleUpdateEmployee(w http.ResponseWriter, r *http.R
 		return
 	}
 	corpID := r.PathValue("id")
-	empID  := r.PathValue("empId")
+	empID := r.PathValue("empId")
 	var req CorporateEmployee
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
@@ -366,19 +395,19 @@ func (h *CorporateHandler) HandleUpdateEmployee(w http.ResponseWriter, r *http.R
 // ── Trip Policies ─────────────────────────────────────────────────────────────
 
 type CorporateTripPolicy struct {
-	ID                      int      `json:"id"`
-	CorporateID             string   `json:"corporate_id"`
-	PolicyName              string   `json:"policy_name"`
-	MaxFarePaise            int64    `json:"max_fare_paise"`
-	AllowedTripTypes        []string `json:"allowed_trip_types"`
-	AllowedCarTypes         []string `json:"allowed_car_types"`
-	RequiresApproval        bool     `json:"requires_approval"`
-	ApprovalThresholdPaise  int64    `json:"approval_threshold_paise"`
-	AllowedHoursStart       int      `json:"allowed_hours_start"`
-	AllowedHoursEnd         int      `json:"allowed_hours_end"`
-	AllowedDays             []string `json:"allowed_days"`
-	CostCenterRequired      bool     `json:"cost_center_required"`
-	IsDefault               bool     `json:"is_default"`
+	ID                     int      `json:"id"`
+	CorporateID            string   `json:"corporate_id"`
+	PolicyName             string   `json:"policy_name"`
+	MaxFarePaise           int64    `json:"max_fare_paise"`
+	AllowedTripTypes       []string `json:"allowed_trip_types"`
+	AllowedCarTypes        []string `json:"allowed_car_types"`
+	RequiresApproval       bool     `json:"requires_approval"`
+	ApprovalThresholdPaise int64    `json:"approval_threshold_paise"`
+	AllowedHoursStart      int      `json:"allowed_hours_start"`
+	AllowedHoursEnd        int      `json:"allowed_hours_end"`
+	AllowedDays            []string `json:"allowed_days"`
+	CostCenterRequired     bool     `json:"cost_center_required"`
+	IsDefault              bool     `json:"is_default"`
 }
 
 func (h *CorporateHandler) HandleGetPolicies(w http.ResponseWriter, r *http.Request) {
@@ -671,10 +700,10 @@ func (h *CorporateHandler) HandleGetCorporateAnalytics(w http.ResponseWriter, r 
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"total_trips":       totalTrips,
+		"total_trips":         totalTrips,
 		"total_revenue_paise": totalRevenue,
-		"total_employees":   totalEmployees,
-		"daily_trips":       dailyTrips,
-		"by_department":     deptBreakdown,
+		"total_employees":     totalEmployees,
+		"daily_trips":         dailyTrips,
+		"by_department":       deptBreakdown,
 	})
 }

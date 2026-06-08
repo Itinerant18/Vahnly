@@ -42,22 +42,22 @@ type CampaignVariant struct {
 }
 
 type MarketingCampaign struct {
-	ID                int               `json:"id"`
-	Name              string            `json:"name"`
-	SegmentID         *int              `json:"segment_id"`
-	SegmentName       *string           `json:"segment_name"`
-	Channel           string            `json:"channel"` // PUSH, SMS, EMAIL, IN_APP_BANNER, WHATSAPP
-	ScheduleType      string            `json:"schedule_type"` // IMMEDIATE, SCHEDULED, RECURRING, TRIGGER_BASED
-	ScheduleTime      *time.Time        `json:"schedule_time"`
-	RecurrenceCron    *string           `json:"recurrence_cron"`
-	TriggerEvent      *string           `json:"trigger_event"`
-	ThrottlingLimit   *int              `json:"throttling_limit"`
-	QuietHoursStart   *int              `json:"quiet_hours_start"`
-	QuietHoursEnd     *int              `json:"quiet_hours_end"`
-	Status            string            `json:"status"` // DRAFT, SCHEDULED, ACTIVE, COMPLETED, PAUSED
-	CreatedAt         time.Time         `json:"created_at"`
-	UpdatedAt         time.Time         `json:"updated_at"`
-	Variants          []CampaignVariant `json:"variants"`
+	ID              int               `json:"id"`
+	Name            string            `json:"name"`
+	SegmentID       *int              `json:"segment_id"`
+	SegmentName     *string           `json:"segment_name"`
+	Channel         string            `json:"channel"`       // PUSH, SMS, EMAIL, IN_APP_BANNER, WHATSAPP
+	ScheduleType    string            `json:"schedule_type"` // IMMEDIATE, SCHEDULED, RECURRING, TRIGGER_BASED
+	ScheduleTime    *time.Time        `json:"schedule_time"`
+	RecurrenceCron  *string           `json:"recurrence_cron"`
+	TriggerEvent    *string           `json:"trigger_event"`
+	ThrottlingLimit *int              `json:"throttling_limit"`
+	QuietHoursStart *int              `json:"quiet_hours_start"`
+	QuietHoursEnd   *int              `json:"quiet_hours_end"`
+	Status          string            `json:"status"` // DRAFT, SCHEDULED, ACTIVE, COMPLETED, PAUSED
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+	Variants        []CampaignVariant `json:"variants"`
 }
 
 type CampaignConversion struct {
@@ -71,18 +71,18 @@ type CampaignConversion struct {
 }
 
 type InAppBanner struct {
-	ID          int        `json:"id"`
-	Title       string     `json:"title"`
-	Body        string     `json:"body"`
-	ImageURL    *string    `json:"image_url"`
-	DeepLink    *string    `json:"deep_link"`
-	Placement   string     `json:"placement"` // HOME_SCREEN, BOOKING_CONFIRM, POST_TRIP
-	SegmentID   *int       `json:"segment_id"`
-	SegmentName *string    `json:"segment_name"`
-	Status      string     `json:"status"` // ACTIVE, INACTIVE
-	StartTime   time.Time  `json:"start_time"`
-	EndTime     time.Time  `json:"end_time"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID          int       `json:"id"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	ImageURL    *string   `json:"image_url"`
+	DeepLink    *string   `json:"deep_link"`
+	Placement   string    `json:"placement"` // HOME_SCREEN, BOOKING_CONFIRM, POST_TRIP
+	SegmentID   *int      `json:"segment_id"`
+	SegmentName *string   `json:"segment_name"`
+	Status      string    `json:"status"` // ACTIVE, INACTIVE
+	StartTime   time.Time `json:"start_time"`
+	EndTime     time.Time `json:"end_time"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type PushTemplate struct {
@@ -185,7 +185,7 @@ func (h *MarketingHandler) HandleCreateSegment(w http.ResponseWriter, r *http.Re
 
 	filtersBytes, _ := json.Marshal(req.Filters)
 	// Random mock size estimation for saved segments:
-	size := 100 + (time.Now().UnixNano()%4900)
+	size := 100 + (time.Now().UnixNano() % 4900)
 
 	var id int
 	err := h.dbPool.QueryRow(ctx, `
@@ -620,13 +620,19 @@ func (h *MarketingHandler) HandleGetBanners(w http.ResponseWriter, r *http.Reque
 			&segID, &segName, &item.Status, &item.StartTime, &item.EndTime, &item.CreatedAt,
 		)
 		if err == nil {
-			if image.Valid { item.ImageURL = &image.String }
-			if link.Valid { item.DeepLink = &link.String }
+			if image.Valid {
+				item.ImageURL = &image.String
+			}
+			if link.Valid {
+				item.DeepLink = &link.String
+			}
 			if segID.Valid {
 				val := int(segID.Int32)
 				item.SegmentID = &val
 			}
-			if segName.Valid { item.SegmentName = &segName.String }
+			if segName.Valid {
+				item.SegmentName = &segName.String
+			}
 			banners = append(banners, item)
 		}
 	}
@@ -744,8 +750,12 @@ func (h *MarketingHandler) HandleGetPushTemplates(w http.ResponseWriter, r *http
 		var image, link sql.NullString
 		err := rows.Scan(&item.ID, &item.Name, &item.TitleTemplate, &item.BodyTemplate, &image, &link, &item.Variables, &item.CreatedAt)
 		if err == nil {
-			if image.Valid { item.ImageURL = &image.String }
-			if link.Valid { item.DeepLink = &link.String }
+			if image.Valid {
+				item.ImageURL = &image.String
+			}
+			if link.Valid {
+				item.DeepLink = &link.String
+			}
 			templates = append(templates, item)
 		}
 	}
@@ -908,7 +918,7 @@ func (h *MarketingHandler) HandleCreateEmailTemplate(w http.ResponseWriter, r *h
 		Name        string   `json:"name"`
 		Subject     string   `json:"subject"`
 		HTMLContent string   `json:"html_content"`
-		Variables     []string `json:"variables"`
+		Variables   []string `json:"variables"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.Subject == "" || req.HTMLContent == "" {

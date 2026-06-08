@@ -51,10 +51,10 @@ func (r *FleetRebalancer) evaluateGridDeficits(ctx context.Context) {
 	// 1. Scan active supply and demand cells
 	// In a full production ML setup, this would query Triton for time-series projections.
 	// Here we evaluate a heuristic ratio based on current live metrics.
-	
+
 	// Example targeted evaluation for a known high-density commercial zone
-	commercialZoneH3 := "88283082b9fffff" 
-	
+	commercialZoneH3 := "88283082b9fffff"
+
 	supplyKey := fmt.Sprintf("surge:supply:%s:%s", r.cityPrefix, commercialZoneH3)
 	demandKey := fmt.Sprintf("surge:demand:%s:%s", r.cityPrefix, commercialZoneH3)
 
@@ -82,7 +82,7 @@ func (r *FleetRebalancer) broadcastRepositioningPrompts(ctx context.Context, tar
 	// Find idle drivers in a neighboring low-demand cell (mocked nearby cell)
 	idleCellH3 := "88283082b9fcdef"
 	driverSetKey := fmt.Sprintf("drivers:zset:%s:%s", r.cityPrefix, idleCellH3)
-	
+
 	drivers, err := r.redisClient.ZRevRange(ctx, driverSetKey, 0, 5).Result()
 	if err != nil || len(drivers) == 0 {
 		return
@@ -96,10 +96,10 @@ func (r *FleetRebalancer) broadcastRepositioningPrompts(ctx context.Context, tar
 			Message:     "High demand nearby! Move 3 minutes north for priority dispatch matching.",
 			BonusVector: 1.2,
 		}
-		
+
 		payload, _ := json.Marshal(prompt)
 		channel := fmt.Sprintf("gateway:driver:notifications:%s", driverID)
-		
+
 		r.redisClient.Publish(ctx, channel, payload)
 		log.Printf("[REBALANCER] Agentic prompt dispatched to driver %s", driverID)
 	}

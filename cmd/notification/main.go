@@ -25,7 +25,7 @@ func main() {
 	defer dbPool.Close()
 
 	daemon := notification.NewOutboxNotificationDaemon(dbPool)
-	
+
 	// Start outbox processing loops concurrently
 	go daemon.StartProcessingLoop(ctx)
 

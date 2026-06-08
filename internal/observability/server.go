@@ -126,11 +126,11 @@ func (h *HealthServer) statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats := map[string]interface{}{
-		"algorithm":            h.algorithmUsed,
-		"uptime":               time.Since(h.startedAt).String(),
-		"circuit_breaker":      cbStateStr,
-		"metrics_endpoint":     "/metrics",
-		"kafka_brokers":        strings.Join(h.kafkaBrokers, ","),
+		"algorithm":        h.algorithmUsed,
+		"uptime":           time.Since(h.startedAt).String(),
+		"circuit_breaker":  cbStateStr,
+		"metrics_endpoint": "/metrics",
+		"kafka_brokers":    strings.Join(h.kafkaBrokers, ","),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

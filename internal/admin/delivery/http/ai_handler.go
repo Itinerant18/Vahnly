@@ -42,13 +42,19 @@ func (h *AIHandler) HandleGetFraudEvents(w http.ResponseWriter, r *http.Request)
 	idx := 1
 
 	if v := q.Get("status"); v != "" {
-		conds = append(conds, fmt.Sprintf("status = $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("status = $%d", idx))
+		args = append(args, v)
+		idx++
 	}
 	if v := q.Get("fraud_type"); v != "" {
-		conds = append(conds, fmt.Sprintf("fraud_type = $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("fraud_type = $%d", idx))
+		args = append(args, v)
+		idx++
 	}
 	if v := q.Get("min_score"); v != "" {
-		conds = append(conds, fmt.Sprintf("score >= $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("score >= $%d", idx))
+		args = append(args, v)
+		idx++
 	}
 	_ = idx
 	where := ""
@@ -57,15 +63,15 @@ func (h *AIHandler) HandleGetFraudEvents(w http.ResponseWriter, r *http.Request)
 	}
 
 	type FraudEvent struct {
-		ID          string          `json:"id"`
-		EntityType  string          `json:"entity_type"`
-		EntityID    string          `json:"entity_id"`
-		FraudType   string          `json:"fraud_type"`
-		Score       float64         `json:"score"`
-		Evidence    json.RawMessage `json:"evidence"`
-		Status      string          `json:"status"`
-		ReviewedAt  *time.Time      `json:"reviewed_at,omitempty"`
-		CreatedAt   time.Time       `json:"created_at"`
+		ID         string          `json:"id"`
+		EntityType string          `json:"entity_type"`
+		EntityID   string          `json:"entity_id"`
+		FraudType  string          `json:"fraud_type"`
+		Score      float64         `json:"score"`
+		Evidence   json.RawMessage `json:"evidence"`
+		Status     string          `json:"status"`
+		ReviewedAt *time.Time      `json:"reviewed_at,omitempty"`
+		CreatedAt  time.Time       `json:"created_at"`
 	}
 
 	sql := fmt.Sprintf(`SELECT id, entity_type, entity_id, fraud_type, score, evidence, status, reviewed_at, created_at
@@ -254,16 +260,16 @@ func (h *AIHandler) HandleGetVoCTopics(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	type Topic struct {
-		ID             string    `json:"id"`
-		Topic          string    `json:"topic"`
-		Source         string    `json:"source"`
-		MentionCount   int       `json:"mention_count"`
-		PositiveCount  int       `json:"positive_count"`
-		NegativeCount  int       `json:"negative_count"`
-		SentimentScore float64   `json:"sentiment_score"`
-		PeriodStart    string    `json:"period_start"`
-		PeriodEnd      string    `json:"period_end"`
-		Trending       bool      `json:"trending"`
+		ID             string  `json:"id"`
+		Topic          string  `json:"topic"`
+		Source         string  `json:"source"`
+		MentionCount   int     `json:"mention_count"`
+		PositiveCount  int     `json:"positive_count"`
+		NegativeCount  int     `json:"negative_count"`
+		SentimentScore float64 `json:"sentiment_score"`
+		PeriodStart    string  `json:"period_start"`
+		PeriodEnd      string  `json:"period_end"`
+		Trending       bool    `json:"trending"`
 	}
 
 	rows, err := h.db.Query(ctx, `SELECT id, topic, source, mention_count, positive_count, negative_count, sentiment_score, period_start::text, period_end::text, trending FROM voc_topics ORDER BY trending DESC, mention_count DESC LIMIT 50`)

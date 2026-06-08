@@ -20,8 +20,8 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/events"
-	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
+	"go.opentelemetry.io/otel"
 )
 
 const maxHungarianCommitWorkers = 16

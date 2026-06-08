@@ -21,34 +21,34 @@ type SurgeFreezeRequest struct {
 }
 
 type FareConfig struct {
-	CityPrefix                  string    `json:"city_prefix"`
-	CarType                     string    `json:"car_type"`
-	TripType                    string    `json:"trip_type"`
-	BaseFarePaise               int64     `json:"base_fare_paise"`
-	PerKmFarePaise              int64     `json:"per_km_fare_paise"`
-	PerMinuteFarePaise          int64     `json:"per_minute_fare_paise"`
-	MinimumFarePaise            int64     `json:"minimum_fare_paise"`
-	NightChargeStart            string    `json:"night_charge_start"` // "23:00"
-	NightChargeEnd              string    `json:"night_charge_end"`   // "05:00"
-	NightChargeMultiplier       float64   `json:"night_charge_multiplier"`
-	WaitChargeAfterMinutes      int       `json:"wait_charge_after_minutes"`
-	WaitChargePerMinutePaise    int64     `json:"wait_charge_per_minute_paise"`
-	CancellationFeeRiderPaise   int64     `json:"cancellation_fee_rider_paise"`
-	CancellationFeeDriverPaise  int64     `json:"cancellation_fee_driver_paise"`
-	D4MCareChargePaise          int64     `json:"d4m_care_charge_paise"`
-	OutstationPerDayPaise       int64     `json:"outstation_per_day_paise"`
+	CityPrefix                   string    `json:"city_prefix"`
+	CarType                      string    `json:"car_type"`
+	TripType                     string    `json:"trip_type"`
+	BaseFarePaise                int64     `json:"base_fare_paise"`
+	PerKmFarePaise               int64     `json:"per_km_fare_paise"`
+	PerMinuteFarePaise           int64     `json:"per_minute_fare_paise"`
+	MinimumFarePaise             int64     `json:"minimum_fare_paise"`
+	NightChargeStart             string    `json:"night_charge_start"` // "23:00"
+	NightChargeEnd               string    `json:"night_charge_end"`   // "05:00"
+	NightChargeMultiplier        float64   `json:"night_charge_multiplier"`
+	WaitChargeAfterMinutes       int       `json:"wait_charge_after_minutes"`
+	WaitChargePerMinutePaise     int64     `json:"wait_charge_per_minute_paise"`
+	CancellationFeeRiderPaise    int64     `json:"cancellation_fee_rider_paise"`
+	CancellationFeeDriverPaise   int64     `json:"cancellation_fee_driver_paise"`
+	D4MCareChargePaise           int64     `json:"d4m_care_charge_paise"`
+	OutstationPerDayPaise        int64     `json:"outstation_per_day_paise"`
 	OutstationKmOutsideCityPaise int64     `json:"outstation_km_outside_city_paise"`
-	OutstationDriverAllowance   int64     `json:"outstation_driver_allowance_paise"`
-	OutstationNightHaltPaise    int64     `json:"outstation_night_halt_paise"`
-	TaxPercent                  float64   `json:"tax_percent"`
-	PlatformFeePaise            int64     `json:"platform_fee_paise"`
-	ConvenienceFeePaise         int64     `json:"convenience_fee_paise"`
-	EffectiveFrom               time.Time `json:"effective_from"`
-	EffectiveTo                 time.Time `json:"effective_to"`
-	VersionID                   int64     `json:"version_id"`
-	CreatedBy                   string    `json:"created_by"`
-	ChangeReason                string    `json:"change_reason"`
-	CreatedAt                   time.Time `json:"created_at"`
+	OutstationDriverAllowance    int64     `json:"outstation_driver_allowance_paise"`
+	OutstationNightHaltPaise     int64     `json:"outstation_night_halt_paise"`
+	TaxPercent                   float64   `json:"tax_percent"`
+	PlatformFeePaise             int64     `json:"platform_fee_paise"`
+	ConvenienceFeePaise          int64     `json:"convenience_fee_paise"`
+	EffectiveFrom                time.Time `json:"effective_from"`
+	EffectiveTo                  time.Time `json:"effective_to"`
+	VersionID                    int64     `json:"version_id"`
+	CreatedBy                    string    `json:"created_by"`
+	ChangeReason                 string    `json:"change_reason"`
+	CreatedAt                    time.Time `json:"created_at"`
 }
 
 type AutoSurgeRule struct {
@@ -63,8 +63,8 @@ type SurgeRules struct {
 }
 
 type TakeRateTier struct {
-	MinTrips   int     `json:"min_trips"`
-	MaxTrips   int     `json:"max_trips"`
+	MinTrips    int     `json:"min_trips"`
+	MaxTrips    int     `json:"max_trips"`
 	TakeRatePct float64 `json:"take_rate_percent"`
 }
 
@@ -128,10 +128,10 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 		return
 	}
 
-	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin overridden key %s set to %s for %d minutes", 
+	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin overridden key %s set to %s for %d minutes",
 		matrixKey, multiplierValue, req.DurationMins)
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", "admin@platform.com", "PRICING_SURGE_FREEZE", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", "admin@platform.com", "PRICING_SURGE_FREEZE",
 		fmt.Sprintf("Enforced emergency surge freeze multiplier cap %f on cell %s in city %s", req.MaxMultiplier, req.H3Cell, req.CityPrefix), getClientIP(r))
 
 	w.WriteHeader(http.StatusOK)
@@ -176,20 +176,20 @@ func (h *PricingAdminHandler) HandleGetFares(w http.ResponseWriter, r *http.Requ
 			NightChargeStart:           "23:00",
 			NightChargeEnd:             "05:00",
 			NightChargeMultiplier:      1.25,
-			WaitChargeAfterMinutes:      5,
-			WaitChargePerMinutePaise:    300,
-			CancellationFeeRiderPaise:   5000,
-			CancellationFeeDriverPaise:  2000,
-			D4MCareChargePaise:          1500,
-			TaxPercent:                  5.0,
-			PlatformFeePaise:            2000,
-			ConvenienceFeePaise:         1000,
-			EffectiveFrom:               time.Now(),
-			EffectiveTo:                 time.Now().AddDate(1, 0, 0),
-			VersionID:                   1,
-			CreatedBy:                   "system@platform.com",
-			ChangeReason:                "Initial system setup baseline",
-			CreatedAt:                   time.Now(),
+			WaitChargeAfterMinutes:     5,
+			WaitChargePerMinutePaise:   300,
+			CancellationFeeRiderPaise:  5000,
+			CancellationFeeDriverPaise: 2000,
+			D4MCareChargePaise:         1500,
+			TaxPercent:                 5.0,
+			PlatformFeePaise:           2000,
+			ConvenienceFeePaise:        1000,
+			EffectiveFrom:              time.Now(),
+			EffectiveTo:                time.Now().AddDate(1, 0, 0),
+			VersionID:                  1,
+			CreatedBy:                  "system@platform.com",
+			ChangeReason:               "Initial system setup baseline",
+			CreatedAt:                  time.Now(),
 		}
 		if tripType == "outstation" {
 			config.OutstationPerDayPaise = 250000
@@ -287,7 +287,7 @@ func (h *PricingAdminHandler) HandlePostFare(w http.ResponseWriter, r *http.Requ
 	// Push to version history list in Redis
 	_ = h.clusterClient.LPush(ctx, historyKey, payloadBytes).Err()
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "FARE_CONFIG_VERSIONED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "FARE_CONFIG_VERSIONED",
 		fmt.Sprintf("Created version %d for city %s class %s (%s). Reason: %s", req.VersionID, req.CityPrefix, req.CarType, req.TripType, req.ChangeReason), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -358,7 +358,7 @@ func (h *PricingAdminHandler) HandleRevertFare(w http.ResponseWriter, r *http.Re
 	_ = h.clusterClient.Set(ctx, activeKey, revertedBytes, 0).Err()
 	_ = h.clusterClient.LPush(ctx, historyKey, revertedBytes).Err()
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "FARE_CONFIG_REVERTED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "FARE_CONFIG_REVERTED",
 		fmt.Sprintf("Reverted active configuration for %s %s to historical version %d", req.CityPrefix, req.CarType, req.VersionID), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -431,7 +431,7 @@ func (h *PricingAdminHandler) HandlePostSurgeRules(w http.ResponseWriter, r *htt
 		return
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "SURGE_RULES_UPDATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "SURGE_RULES_UPDATED",
 		fmt.Sprintf("Updated automated surge parameters. Surge Cap: %fx, Cooldown: %ds", req.SurgeCap, req.CooldownSecs), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -520,7 +520,7 @@ func (h *PricingAdminHandler) HandlePostCommission(w http.ResponseWriter, r *htt
 		return
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "DRIVER_COMMISSION_UPDATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "DRIVER_COMMISSION_UPDATED",
 		fmt.Sprintf("Updated take-rate model for %s %s to %s", req.CityPrefix, req.CarType, req.ModelType), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")

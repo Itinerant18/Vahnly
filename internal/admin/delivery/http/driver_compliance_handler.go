@@ -23,7 +23,7 @@ type DriverComplianceProfile struct {
 	LicenseNumber             string    `json:"license_number"`
 	CityPrefix                string    `json:"city_prefix"`
 	HasManualCertification    bool      `json:"has_manual_certification"`
-	HasAutomaticCertification  bool      `json:"has_automatic_certification"`
+	HasAutomaticCertification bool      `json:"has_automatic_certification"`
 	IsLuxuryQualified         bool      `json:"is_luxury_qualified"`
 	BackgroundCheckStatus     string    `json:"background_check_status"`
 	CurrentState              string    `json:"current_state"`
@@ -50,7 +50,7 @@ type VerifyDriverRequest struct {
 	DriverID                  string `json:"driver_id"`
 	Approve                   bool   `json:"approve"`
 	HasManualCertification    bool   `json:"has_manual_certification"`
-	HasAutomaticCertification  bool   `json:"has_automatic_certification"`
+	HasAutomaticCertification bool   `json:"has_automatic_certification"`
 	IsLuxuryQualified         bool   `json:"is_luxury_qualified"`
 	BackgroundCheckStatus     string `json:"background_check_status"`
 }

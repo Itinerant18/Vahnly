@@ -22,7 +22,7 @@ type GeofenceZonePayload struct {
 	CityPrefix           string       `json:"city_prefix"`
 	IsActive             bool         `json:"is_active"`
 	PolygonCoords        [][2]float64 `json:"polygon_coordinates"` // Array of [lat, lng] map points
-	PolicyType           string       `json:"policy_type"`          // "ACTIVE_DISPATCH", "BLACKLIST_BLOCK", "SURGE_FLOOR_FORCE", "TRANSMISSION_RESTRICT"
+	PolicyType           string       `json:"policy_type"`         // "ACTIVE_DISPATCH", "BLACKLIST_BLOCK", "SURGE_FLOOR_FORCE", "TRANSMISSION_RESTRICT"
 	SurgeMultiplier      float64      `json:"surge_multiplier"`
 	AllowedTransmissions string       `json:"allowed_transmissions"` // "ALL", "AUTOMATIC_ONLY", "MANUAL_ONLY"
 	ActivationStart      *time.Time   `json:"activation_start"`

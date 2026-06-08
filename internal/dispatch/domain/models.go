@@ -16,7 +16,7 @@ type OrderCreatedPayload struct {
 	PickupOSMNodeID int64   `json:"pickup_osm_node_id"`
 	BaseFarePaise   int64   `json:"base_fare_paise"`
 	RetryCount      int     `json:"retry_count"` // MILESTONE 3: Track allocation depth across batch re-queue passes
-	
+
 	// App-level pipeline logging parameter context
 	KafkaMessageContext kafka.Message `json:"-"`
 

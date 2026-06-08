@@ -59,30 +59,27 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 	var estimatedEtaSeconds float64
 	var err error
 
-	routingCtx, cancel := context.WithTimeout(ctx, 15*time.Millisecond)
-	defer cancel()
-
 	// MILESTONE 2: Extract live density fields hydrated by the SpatialScanner pipeline
 	demandDensity := float32(driver.LocalDemandCount)
 	supplyDensity := float32(driver.LocalSupplyCount)
 
+	var cancellationRiskScore float64 = 0.0
+
 	if etaCorrector != nil {
+		routingCtx, cancel := context.WithTimeout(ctx, 15*time.Millisecond)
+		defer cancel()
+
 		rpcStart := time.Now()
 		estimatedEtaSeconds, err = observability.ExecuteWithBreaker(routingCtx, func(cbCtx context.Context) (float64, error) {
 			return etaCorrector.ComputeCorrectedETA(cbCtx, driver.OSMNodeID, order.PickupOSMNodeID, demandDensity, supplyDensity)
 		})
 		observability.TritonRPCDurationSeconds.Observe(time.Since(rpcStart).Seconds())
-	} else {
-		estimatedEtaSeconds = driver.DistanceMeters / 11.1
-	}
 
-	if err != nil {
-		estimatedEtaSeconds = driver.DistanceMeters / 11.1 // Circuit-breaker fallback
-	}
+		if err != nil {
+			estimatedEtaSeconds = driver.DistanceMeters / 11.1 // Circuit-breaker fallback
+		}
 
-	// Model 2: Compute Live Cancellation Risk Assessment via Triton Classifier (NEW)
-	var cancellationRiskScore float64 = 0.0
-	if etaCorrector != nil {
+		// Model 2: Compute Live Cancellation Risk Assessment via Triton Classifier (NEW)
 		// Package specific driver behavioral features into the classification tensor vector
 		riskFeatures := []float32{
 			driver.AcceptanceRate,
@@ -90,17 +87,19 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 			supplyDensity,
 			float32(driver.IdleSeconds),
 		}
-		
+
 		// Query the secondary classification tree model on Triton
 		riskProb, riskErr := etaCorrector.ComputeCancellationRisk(routingCtx, riskFeatures)
 		if riskErr == nil {
 			cancellationRiskScore = riskProb
-			
+
 			// FENCE VALUE EXCLUSION: Prune high-risk drivers from matching eligibility entirely
 			if cancellationRiskScore >= 0.75 {
 				return 1e7, estimatedEtaSeconds
 			}
 		}
+	} else {
+		estimatedEtaSeconds = driver.DistanceMeters / 11.1
 	}
 
 	surgePenalty := 0.0
@@ -265,13 +264,16 @@ func SolveKuhnMunkres(matrix [][]float64) map[int]int {
 	p := make([]int, n+1)
 	way := make([]int, n+1)
 
+	// Hoist array allocations to prevent O(n) reallocations per iteration
+	minv := make([]float64, n+1)
+	used := make([]bool, n+1)
+
 	for i := 1; i <= n; i++ {
 		p[0] = i
-		minv := make([]float64, n+1)
-		for j := range minv {
+		for j := 0; j <= n; j++ {
 			minv[j] = math.MaxFloat64
+			used[j] = false
 		}
-		used := make([]bool, n+1)
 		j0 := 0
 
 		for {

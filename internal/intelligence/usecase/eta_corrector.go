@@ -53,7 +53,7 @@ func (uc *ETACorrectorUseCase) ComputeCorrectedETA(ctx context.Context, sourceNo
 	// 3. Query Triton Inference cluster for the spatial multiplier
 	multiplier, err := uc.tritonClient.PredictETAMultiplier(inferenceCtx, uc.modelName, "1", features)
 	if err != nil {
-		// CIRCUIT BREAKER FALLBACK: If Triton overloads or logs an error, instantly return 
+		// CIRCUIT BREAKER FALLBACK: If Triton overloads or logs an error, instantly return
 		// the baseline CH routing output to maintain our sub-500ms processing latency SLA
 		log.Printf("[INTELLIGENCE_FALLBACK] Triton inference failed. Using baseline CH ETA: %v", err)
 		return baseETA, nil
@@ -76,7 +76,7 @@ func (uc *ETACorrectorUseCase) ComputeCancellationRisk(ctx context.Context, feat
 
 	risk, err := uc.tritonClient.PredictETAMultiplier(inferenceCtx, "cancellation_risk_classifier", "1", features)
 	if err != nil {
-		// CIRCUIT BREAKER FALLBACK: If Triton overloads or logs an error, instantly return 
+		// CIRCUIT BREAKER FALLBACK: If Triton overloads or logs an error, instantly return
 		// a neutral risk score (0.0) to maintain our processing SLA.
 		log.Printf("[INTELLIGENCE_FALLBACK] Triton cancellation risk inference failed. Using default 0.0: %v", err)
 		return 0.0, nil

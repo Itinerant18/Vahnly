@@ -46,14 +46,14 @@ type AnalyticsFunnel struct {
 }
 
 type AnalyticsSummary struct {
-	TotalTrips        int64   `json:"total_trips"`
-	CompletedTrips    int64   `json:"completed_trips"`
-	CancelledTrips    int64   `json:"cancelled_trips"`
-	RevenuePaise      int64   `json:"revenue_paise"`
-	CancellationRate  float64 `json:"cancellation_rate"`
-	UniqueRiders      int64   `json:"unique_riders"`
-	ActiveDrivers     int64   `json:"active_drivers"`
-	AvgFarePaise      int64   `json:"avg_fare_paise"`
+	TotalTrips       int64   `json:"total_trips"`
+	CompletedTrips   int64   `json:"completed_trips"`
+	CancelledTrips   int64   `json:"cancelled_trips"`
+	RevenuePaise     int64   `json:"revenue_paise"`
+	CancellationRate float64 `json:"cancellation_rate"`
+	UniqueRiders     int64   `json:"unique_riders"`
+	ActiveDrivers    int64   `json:"active_drivers"`
+	AvgFarePaise     int64   `json:"avg_fare_paise"`
 }
 
 // HandleGetAnalyticsSummary returns KPI totals for a date range (?from=&to= in RFC3339)
@@ -298,11 +298,11 @@ func (h *AnalyticsHandler) HandleGetPrebuiltDashboard(w http.ResponseWriter, r *
 		todayStart := time.Now().UTC().Truncate(24 * time.Hour)
 		_ = h.dbPool.QueryRow(ctx, `SELECT COUNT(*), COALESCE(SUM(base_fare_paise) FILTER (WHERE status='COMPLETED'), 0) FROM orders WHERE created_at >= $1`, todayStart).Scan(&todayTrips, &todayRevenue)
 		result = map[string]any{
-			"active_trips":  activeTrips,
-			"online_drivers": onlineDrivers,
-			"open_sos":      openSOS,
-			"open_tickets":  openTickets,
-			"today_trips":   todayTrips,
+			"active_trips":        activeTrips,
+			"online_drivers":      onlineDrivers,
+			"open_sos":            openSOS,
+			"open_tickets":        openTickets,
+			"today_trips":         todayTrips,
 			"today_revenue_paise": todayRevenue,
 		}
 
@@ -387,9 +387,9 @@ func (h *AnalyticsHandler) HandleGetPrebuiltDashboard(w http.ResponseWriter, r *
 		var promoRedemptions int64
 		_ = h.dbPool.QueryRow(ctx, `SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at < $2`, from, to).Scan(&promoRedemptions)
 		result = map[string]any{
-			"active_campaigns":   activeCampaigns,
-			"total_segments":     totalSegments,
-			"orders_in_period":   promoRedemptions,
+			"active_campaigns": activeCampaigns,
+			"total_segments":   totalSegments,
+			"orders_in_period": promoRedemptions,
 		}
 
 	case "safety":

@@ -318,7 +318,6 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/customers/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetCustomerVehicleProfiles))
 	mux.HandleFunc("POST /api/v1/admin/customers/vehicles/update", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostCustomerVehicleProfileUpdate))
 
-
 	// Dispatch, Zones & Rules control endpoints
 	mux.HandleFunc("GET /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, dispatchHandler.HandleGetCities))
 	mux.HandleFunc("POST /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "COMPLIANCE"}, dispatchHandler.HandlePostCity))

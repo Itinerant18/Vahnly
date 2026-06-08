@@ -7,9 +7,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-	"github.com/uber/h3-go/v3" 
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
+	"github.com/redis/go-redis/v9"
+	"github.com/uber/h3-go/v3"
 )
 
 const RedisTelemetryChannel = "gateway:telemetry:broadcast"
@@ -29,7 +29,7 @@ func NewTelemetryUseCase(rr domain.RedisRepository, kp domain.KafkaProducer, mp 
 		kafkaProducer:   kp,
 		metricsProvider: mp,
 		clusterClient:   client,
-		ttl:             30 * time.Second, 
+		ttl:             30 * time.Second,
 	}
 }
 
@@ -54,7 +54,7 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 		return nil
 	}
 
-	// 3. Compute H3 Resolution 8 Index (~0.7 km² per cell) 
+	// 3. Compute H3 Resolution 8 Index (~0.7 km² per cell)
 	latRad := loc.Latitude * (math.Pi / 180.0)
 	lngRad := loc.Longitude * (math.Pi / 180.0)
 	centerCoord := h3.GeoCoord{Latitude: latRad, Longitude: lngRad}
@@ -68,8 +68,8 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 		if err != nil {
 			fmt.Printf("Non-blocking driver metrics fetch failure for %s: %v\n", loc.DriverID, err)
 		} else {
-			loc.OSMNodeID               = metrics.OSMNodeID
-			loc.AcceptanceRate          = metrics.AcceptanceRate
+			loc.OSMNodeID = metrics.OSMNodeID
+			loc.AcceptanceRate = metrics.AcceptanceRate
 			loc.CancellationProbability = metrics.CancellationProbability
 		}
 	}
@@ -96,15 +96,15 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 
 			activeTripKey := fmt.Sprintf("driver:active:trip:%s", dID)
 			orderID, err := u.clusterClient.Get(forkCtx, activeTripKey).Result()
-			
+
 			// If an active lease is found, broadcast coordinates down the Pub/Sub backplane channel
 			if err == nil && orderID != "" {
 				telemetryPayload := map[string]interface{}{
-					"order_id":   orderID,
-					"driver_id":  dID,
-					"latitude":   lat,
-					"longitude":  lng,
-					"timestamp":  time.Now().Unix(),
+					"order_id":  orderID,
+					"driver_id": dID,
+					"latitude":  lat,
+					"longitude": lng,
+					"timestamp": time.Now().Unix(),
 				}
 				bytes, mErr := json.Marshal(telemetryPayload)
 				if mErr == nil {
@@ -114,7 +114,7 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 		}(loc.DriverID, loc.Latitude, loc.Longitude)
 	}
 
-	// 6. Fire asynchronous event down the shared Kafka Backbone 
+	// 6. Fire asynchronous event down the shared Kafka Backbone
 	if err := u.kafkaProducer.PublishLocationUpdate(ctx, loc); err != nil {
 		fmt.Printf("Non-blocking downstream Kafka producer failure: %v\n", err)
 	}

@@ -24,7 +24,7 @@ func NewRegionRouter(redis *redis.ClusterClient, kw *kafka.Writer, currentRegion
 		"kolkata": {RegionID: "kolkata", MinLat: 22.4, MaxLat: 22.8, MinLon: 88.2, MaxLon: 88.5},
 		"howrah":  {RegionID: "howrah", MinLat: 22.5, MaxLat: 22.7, MinLon: 88.0, MaxLon: 88.2},
 	}
-	
+
 	return &RegionRouter{
 		regions:       regions,
 		redisClient:   redis,
@@ -71,13 +71,13 @@ func (rr *RegionRouter) DetectAndHandoff(ctx context.Context, loc domain.DriverL
 
 	// 5. Evict from local region's spatial index immediately to prevent ghost dispatching
 	rr.redisClient.ZRem(ctx, "driver:locations:"+rr.currentRegion, loc.DriverID)
-	
+
 	// Also evict from the H3 index to satisfy nominal dispatcher scans
 	if loc.H3Cell != "" {
 		spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", loc.CityPrefix, loc.H3Cell)
 		rr.redisClient.ZRem(ctx, spatialZSetKey, loc.DriverID)
 	}
-	
+
 	return nil
 }
 

@@ -46,7 +46,7 @@ func (l *GraphLoader) loadNodes(ctx context.Context, path string) error {
 
 	// Wrap in a buffered reader to process line-by-line efficiently
 	reader := csv.NewReader(bufio.NewReader(file))
-	
+
 	// Skip header line block: id,latitude,longitude,importance_order
 	if _, err := reader.Read(); err != nil {
 		return err
@@ -91,7 +91,7 @@ func (l *GraphLoader) loadEdges(ctx context.Context, path string) error {
 	defer file.Close()
 
 	reader := csv.NewReader(bufio.NewReader(file))
-	
+
 	// Skip header line block: from_node_id,to_node_id,weight_seconds,is_shortcut
 	if _, err := reader.Read(); err != nil {
 		return err

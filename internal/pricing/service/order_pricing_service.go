@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/pricing/surge"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
-	"github.com/platform/driver-delivery/internal/pricing/surge"
 )
 
 // SurgeZoneUpdatedEvent matches the JSON schema emitted by the Surge Calculator (Job 3)
@@ -47,11 +47,11 @@ type OrderPricingService struct {
 func NewOrderPricingService(brokers []string, groupID string, client *redis.ClusterClient) *OrderPricingService {
 	return &OrderPricingService{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:        brokers,
-			Topic:          "surge.zone.updated", // Consumes output from our Job 3 pricing engine
-			GroupID:        groupID,              // Horizontal group scaling configuration
-			MinBytes:       10,
-			MaxBytes:       10e6,
+			Brokers:  brokers,
+			Topic:    "surge.zone.updated", // Consumes output from our Job 3 pricing engine
+			GroupID:  groupID,              // Horizontal group scaling configuration
+			MinBytes: 10,
+			MaxBytes: 10e6,
 		}),
 		clusterClient:  client,
 		surgeRegulator: surge.NewSurgeRegulator(0.20, 15*time.Second, 3.5),
@@ -64,7 +64,7 @@ func NewOrderPricingService(brokers []string, groupID string, client *redis.Clus
 // StartSurgeMatrixSync pumps event loops from Kafka to continuously update the shared cluster state
 func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 	s.logger.Println("Order Pricing Service: Safely synchronized distributed surge cache paths.")
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -191,7 +191,7 @@ func (s *OrderPricingService) CalculateDynamicFarePaise(ctx context.Context, h3C
 	// Mock or active gRPC client binding handler method reference targeting external Triton models
 	mockTritonModelCall := func() (float64, error) {
 		// Simulating normal execution latency inside nominal bounds
-		time.Sleep(12 * time.Millisecond) 
+		time.Sleep(12 * time.Millisecond)
 		return 1.45, nil
 	}
 
@@ -212,7 +212,7 @@ func (s *OrderPricingService) GetFareQuote(ctx context.Context, city string, h3C
 
 	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", city, h3Cell)
 	multiplierStr, err := s.clusterClient.Get(ctx, matrixKey).Result()
-	
+
 	multiplier := 1.0
 	if err == nil {
 		parsed, parseErr := strconv.ParseFloat(multiplierStr, 64)

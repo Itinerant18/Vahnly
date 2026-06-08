@@ -1109,10 +1109,10 @@ func (h *FinanceHandler) HandleGetReconciliation(w http.ResponseWriter, r *http.
 }
 
 type CashFloatReport struct {
-	DriverID        string `json:"driver_id"`
-	DriverName      string `json:"driver_name"`
-	CityPrefix      string `json:"city_prefix"`
-	CashFloatPaise  int64  `json:"cash_float_paise"`
+	DriverID       string `json:"driver_id"`
+	DriverName     string `json:"driver_name"`
+	CityPrefix     string `json:"city_prefix"`
+	CashFloatPaise int64  `json:"cash_float_paise"`
 }
 
 func (h *FinanceHandler) HandleGetCashCollect(w http.ResponseWriter, r *http.Request) {
@@ -1199,15 +1199,15 @@ func (h *FinanceHandler) HandlePostDailyClose(w http.ResponseWriter, r *http.Req
 // ─── DISPUTES ENDPOINTS ──────────────────────────────────────────────────────
 
 type DisputeListItem struct {
-	ID                string    `json:"id"`
-	TransactionID     string    `json:"transaction_id"`
-	AmountPaise       int64     `json:"amount_paise"`
-	Status            string    `json:"status"`
-	Reason            string    `json:"reason"`
-	EvidenceURL       *string   `json:"evidence_url"`
-	GatewayDisputeID  *string   `json:"gateway_dispute_id"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	TransactionID    string    `json:"transaction_id"`
+	AmountPaise      int64     `json:"amount_paise"`
+	Status           string    `json:"status"`
+	Reason           string    `json:"reason"`
+	EvidenceURL      *string   `json:"evidence_url"`
+	GatewayDisputeID *string   `json:"gateway_dispute_id"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 func (h *FinanceHandler) HandleGetDisputes(w http.ResponseWriter, r *http.Request) {

@@ -194,14 +194,14 @@ func (h *DriverOpsHandler) HandleGetTrainingModules(w http.ResponseWriter, r *ht
 	defer cancel()
 
 	type Module struct {
-		ID          string    `json:"id"`
-		Title       string    `json:"title"`
-		Category    string    `json:"category"`
-		ContentURL  string    `json:"content_url"`
-		DurationMin int       `json:"duration_mins"`
-		IsMandatory bool      `json:"is_mandatory"`
-		PassScore   int       `json:"pass_score"`
-		IsActive    bool      `json:"is_active"`
+		ID          string `json:"id"`
+		Title       string `json:"title"`
+		Category    string `json:"category"`
+		ContentURL  string `json:"content_url"`
+		DurationMin int    `json:"duration_mins"`
+		IsMandatory bool   `json:"is_mandatory"`
+		PassScore   int    `json:"pass_score"`
+		IsActive    bool   `json:"is_active"`
 	}
 
 	rows, err := h.db.Query(ctx, `SELECT id, title, category, content_url, duration_mins, is_mandatory, pass_score, is_active FROM training_modules ORDER BY is_mandatory DESC, category, title`)
@@ -303,15 +303,15 @@ func (h *DriverOpsHandler) HandleGetTelematicsEvents(w http.ResponseWriter, r *h
 	defer cancel()
 
 	type TelEvent struct {
-		ID         string     `json:"id"`
-		DriverID   string     `json:"driver_id"`
-		TripID     *string    `json:"trip_id,omitempty"`
-		EventType  string     `json:"event_type"`
-		Severity   string     `json:"severity"`
-		SpeedKmph  *float64   `json:"speed_kmph,omitempty"`
-		Lat        *float64   `json:"lat,omitempty"`
-		Lng        *float64   `json:"lng,omitempty"`
-		OccurredAt time.Time  `json:"occurred_at"`
+		ID         string    `json:"id"`
+		DriverID   string    `json:"driver_id"`
+		TripID     *string   `json:"trip_id,omitempty"`
+		EventType  string    `json:"event_type"`
+		Severity   string    `json:"severity"`
+		SpeedKmph  *float64  `json:"speed_kmph,omitempty"`
+		Lat        *float64  `json:"lat,omitempty"`
+		Lng        *float64  `json:"lng,omitempty"`
+		OccurredAt time.Time `json:"occurred_at"`
 	}
 
 	rows, err := h.db.Query(ctx, `SELECT id, driver_id, trip_id, event_type, severity, speed_kmph, lat, lng, occurred_at FROM telematics_events ORDER BY occurred_at DESC LIMIT 100`)

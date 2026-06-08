@@ -33,19 +33,19 @@ func (h *ESGHandler) HandleGetESGSummary(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 
 	type EmissionFactor struct {
-		VehicleType  string  `json:"vehicle_type"`
-		CO2KgPerKm   float64 `json:"co2_kg_per_km"`
-		Description  string  `json:"description"`
+		VehicleType string  `json:"vehicle_type"`
+		CO2KgPerKm  float64 `json:"co2_kg_per_km"`
+		Description string  `json:"description"`
 	}
 
 	type CarbonRecord struct {
-		ID           string    `json:"id"`
-		TripID       *string   `json:"trip_id,omitempty"`
-		VehicleType  string    `json:"vehicle_type"`
-		DistanceKm   float64   `json:"distance_km"`
-		EmissionKg   float64   `json:"emission_kg"`
-		OffsetKg     float64   `json:"offset_kg"`
-		RecordedDate string    `json:"recorded_date"`
+		ID           string  `json:"id"`
+		TripID       *string `json:"trip_id,omitempty"`
+		VehicleType  string  `json:"vehicle_type"`
+		DistanceKm   float64 `json:"distance_km"`
+		EmissionKg   float64 `json:"emission_kg"`
+		OffsetKg     float64 `json:"offset_kg"`
+		RecordedDate string  `json:"recorded_date"`
 	}
 
 	type ESGReport struct {

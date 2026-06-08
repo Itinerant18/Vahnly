@@ -93,11 +93,11 @@ func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	// STAGE 1: INGESTION & SUPPLY DEPLOYMENT SIMULATION
 	// =========================================================================
 	t.Log("STAGE 1: Simulating active driver location ingestion and cache pool priming...")
-	
+
 	// Position our mock driver into the Redis sorted set using the current timestamp as the score
 	spatialSetKey := fmt.Sprintf("drivers:set:%s:%s", mockCityPrefix, mockH3CellToken)
 	currentTimestamp := float64(time.Now().Unix())
-	
+
 	err = redisClient.ZAdd(ctx, spatialSetKey, redis.Z{
 		Score:  currentTimestamp,
 		Member: mockDriverID,
@@ -115,7 +115,7 @@ func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	// STAGE 2: DEMAND CREATION & upfront PRICING HOOK
 	// =========================================================================
 	t.Log("STAGE 2: Generating rider booking request and evaluating upfront ledger fare splits...")
-	
+
 	// Establish base calculations using 64-bit integer points (Paise) to eliminate accuracy drift
 	baseFarePaise := int64(35000) // ₹350.00 base rate
 	surgeMultiplier := 1.25
@@ -135,7 +135,7 @@ func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	// STAGE 3: COMBINATORIAL MATCH EXECUTION & PROTOBUF STREAM ENCODING
 	// =========================================================================
 	t.Log("STAGE 3: Launching Kuhn-Munkres optimization sweeps and marshalling Protobuf binary frames...")
-	
+
 	// Verify that our sharded keys match sorting boundaries cleanly
 	evictedCount, _ := redisClient.ZRemRangeByScore(ctx, spatialSetKey, "-inf", fmt.Sprintf("%d", time.Now().Unix()-30)).Result()
 	t.Logf("Spatial housekeeping sweep completed. Evicted %d stale ghost drivers.", evictedCount)
@@ -186,8 +186,8 @@ func TestLocationIngestionAndMatchingLifecycle(t *testing.T) {
 	}
 
 	// Post balancing double-entry transactions across split records
-	driverPayoutPaise := int64(math.Round(float64(finalCalculatedFarePaise) * 0.80))       // 80% Driver Allocation (35000 Paise)
-	platformCommissionPaise := finalCalculatedFarePaise - driverPayoutPaise                // 20% Platform Margin (8750 Paise)
+	driverPayoutPaise := int64(math.Round(float64(finalCalculatedFarePaise) * 0.80)) // 80% Driver Allocation (35000 Paise)
+	platformCommissionPaise := finalCalculatedFarePaise - driverPayoutPaise          // 20% Platform Margin (8750 Paise)
 
 	ledgerInsertQuery := `
 		INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
