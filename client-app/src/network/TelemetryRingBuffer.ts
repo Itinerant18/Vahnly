@@ -6,6 +6,7 @@ export interface GPSCoordinatePacket {
   bearing: number;
   speed_kms: number;
   timestamp_utc: number;
+  server_ts?: number;
 }
 
 type TelemetryUploader = (packets: GPSCoordinatePacket[]) => Promise<boolean>;

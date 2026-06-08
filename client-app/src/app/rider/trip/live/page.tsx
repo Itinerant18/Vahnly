@@ -137,6 +137,10 @@ function LiveTripContent() {
           status = message.status;
         }
 
+        if (message && typeof message === 'object' && 'fare_estimate' in message) {
+          setEstimatedFare(message.fare_estimate / 100);
+        }
+
         if (status) {
           if (status === 'ARRIVED_AT_PICKUP') {
             setTripStatus('ARRIVED');

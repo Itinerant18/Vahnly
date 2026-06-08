@@ -435,6 +435,50 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
   setEndOdoPhoto,
   handleSlideToEndTrip,
 }) => {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const currentTotalFare = (activeTrip.quoted_fare_paise / 100) + tollCharges + parkingCharges;
+
+  if (isCollapsed) {
+    return (
+      <div className="space-y-4 text-left animate-fadeIn">
+        <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
+          <div>
+            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Transit in Progress</span>
+            <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-900 rounded border border-zinc-800 cursor-pointer"
+            >
+              ▼ EXPAND
+            </button>
+            <div className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[8px] font-mono font-bold px-2 py-1 rounded animate-pulse">
+              DELIVERING
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-850 flex justify-between items-center font-mono">
+          <div>
+            <span className="text-zinc-500 text-[7px] uppercase block">Current Fare</span>
+            <span className="text-base font-bold text-white block mt-0.5">₹{currentTotalFare.toFixed(2)}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-zinc-500 text-[7px] uppercase block">Rider Name</span>
+            <span className="text-xs font-bold text-zinc-300 block mt-0.5">{activeTrip.customer_name}</span>
+          </div>
+        </div>
+
+        <SlideToConfirm
+          label="Slide to End Journey"
+          onConfirm={handleSlideToEndTrip}
+          color="red"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 text-left animate-fadeIn">
       <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
@@ -442,8 +486,16 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
           <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Transit in Progress</span>
           <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
         </div>
-        <div className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[8px] font-mono font-bold px-2 py-1 rounded animate-pulse">
-          DELIVERING
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-900 rounded border border-zinc-800 cursor-pointer"
+          >
+            ▲ COLLAPSE
+          </button>
+          <div className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[8px] font-mono font-bold px-2 py-1 rounded animate-pulse">
+            DELIVERING
+          </div>
         </div>
       </div>
 

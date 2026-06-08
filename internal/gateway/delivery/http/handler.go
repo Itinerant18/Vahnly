@@ -45,6 +45,9 @@ const RedisTelemetryChannel = "gateway:telemetry:broadcast"
 // SOSCallback allows linking SOS triggers to the administrative incidents manager
 var SOSCallback func(tripID string, lat, lng float64)
 
+// StalledTripCallback allows flagging stalled/idle trips to the administrative incidents manager
+var StalledTripCallback func(driverID string, tripID string, lat, lng float64, duration int)
+
 // ActiveWebSocketSession encapsulates everything needed for active connection management
 type ActiveWebSocketSession struct {
 	MessageChan chan []byte
@@ -282,14 +285,17 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 		select {
 		case <-r.Context().Done():
 			return
-		case rawBinaryPayload, active := <-messageChan:
+		case rawPayload, active := <-messageChan:
 			if !active {
 				return
 			}
 
 			_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
-			// MILESTONE 31: Write payloads natively using BinaryMessage framing bounds
-			err = wsConn.WriteMessage(websocket.BinaryMessage, rawBinaryPayload)
+			if len(rawPayload) > 0 && rawPayload[0] == '{' {
+				err = wsConn.WriteMessage(websocket.TextMessage, rawPayload)
+			} else {
+				err = wsConn.WriteMessage(websocket.BinaryMessage, rawPayload)
+			}
 			if err != nil {
 				return
 			}
@@ -336,6 +342,14 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 			}
 			if found {
 				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
+					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"fare_estimate"`) {
+						select {
+						case session.MessageChan <- []byte(msg.Payload):
+						default:
+						}
+						continue
+					}
+
 					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
 					var binaryBuffer []byte
 					var marshalErr error
@@ -2299,6 +2313,38 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 		}
 		if bytes, marshalErr := json.Marshal(payload); marshalErr == nil {
 			_ = h.clusterClient.Publish(ctx, RedisTelemetryChannel, string(bytes)).Err()
+		}
+
+		// Check if order is currently in DELIVERING state to run stopped checks
+		var orderStatus string
+		statusErr := h.dbPool.QueryRow(ctx, "SELECT status::text FROM orders WHERE id = $1::uuid", orderID).Scan(&orderStatus)
+		if statusErr == nil && orderStatus == "DELIVERING" {
+			if req.SpeedKms <= 1.0 {
+				stoppedKey := fmt.Sprintf("driver:stopped:since:%s", req.DriverID)
+				stoppedSinceStr, getErr := h.clusterClient.Get(ctx, stoppedKey).Result()
+				var stoppedSince int64
+				if getErr == redis.Nil {
+					stoppedSince = time.Now().Unix()
+					_ = h.clusterClient.Set(ctx, stoppedKey, strconv.FormatInt(stoppedSince, 10), 10*time.Minute).Err()
+				} else if getErr == nil {
+					stoppedSince, _ = strconv.ParseInt(stoppedSinceStr, 10, 64)
+				}
+
+				if stoppedSince > 0 && time.Now().Unix()-stoppedSince > 180 { // 3 minutes
+					flaggedKey := fmt.Sprintf("driver:stopped:flagged:%s:%s", req.DriverID, orderID)
+					alreadyFlagged, _ := h.clusterClient.Exists(ctx, flaggedKey).Result()
+					if alreadyFlagged == 0 {
+						_ = h.clusterClient.Set(ctx, flaggedKey, "1", 30*time.Minute).Err()
+						if StalledTripCallback != nil {
+							go StalledTripCallback(req.DriverID, orderID, req.Latitude, req.Longitude, int(time.Now().Unix()-stoppedSince))
+						}
+					}
+				}
+			} else {
+				_ = h.clusterClient.Del(ctx, fmt.Sprintf("driver:stopped:since:%s", req.DriverID)).Err()
+			}
+		} else {
+			_ = h.clusterClient.Del(ctx, fmt.Sprintf("driver:stopped:since:%s", req.DriverID)).Err()
 		}
 
 		// Flush GPS ping to orders_gps_trail table in a non-blocking goroutine

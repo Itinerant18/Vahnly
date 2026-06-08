@@ -48,7 +48,7 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	}
 
 	var req struct {
-		EventType   string `json:"event_type"` // 'ADD_TOLL' or 'ADD_STOP'
+		EventType   string `json:"event_type"` // 'ADD_TOLL', 'ADD_STOP', 'toll_added', 'parking_added', 'waiting_added'
 		AmountPaise int64  `json:"amount_paise"`
 		Description string `json:"description"`
 	}
@@ -57,8 +57,8 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if req.EventType != "ADD_TOLL" && req.EventType != "ADD_STOP" {
-		http.Error(w, "invalid_event_type: must be ADD_TOLL or ADD_STOP", http.StatusBadRequest)
+	if req.EventType != "ADD_TOLL" && req.EventType != "ADD_STOP" && req.EventType != "toll_added" && req.EventType != "parking_added" && req.EventType != "waiting_added" {
+		http.Error(w, "invalid_event_type: must be ADD_TOLL, ADD_STOP, toll_added, parking_added, or waiting_added", http.StatusBadRequest)
 		return
 	}
 	if req.AmountPaise <= 0 {
@@ -81,13 +81,14 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	var currentStatus string
 	var assignedDriverID *string
 	var cityPrefix string
+	var baseFarePaise int64
 	query := `
-		SELECT status::text, assigned_driver_id::text, city_prefix
+		SELECT status::text, assigned_driver_id::text, city_prefix, base_fare_paise
 		FROM orders 
 		WHERE id = $1::uuid 
 		FOR UPDATE
 	`
-	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &cityPrefix)
+	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &cityPrefix, &baseFarePaise)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "order_not_found", http.StatusNotFound)
@@ -131,10 +132,30 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// 3. Compute updated total fare estimate
+	var eventsSum int64
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount_paise), 0) FROM order_events WHERE order_id = $1::uuid
+	`, orderID).Scan(&eventsSum)
+	if err != nil {
+		log.Printf("[ADD_ORDER_EVENT] Failed querying events sum: %v", err)
+	}
+
+	fareEstimate := baseFarePaise + eventsSum + 5000 + 1500
+
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("[ADD_ORDER_EVENT] Transaction commit failed: %v", err)
 		http.Error(w, "commit_failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Publish the updated fare estimate to Redis Pub/Sub so it can be streamed to the rider
+	pubPayload := map[string]interface{}{
+		"order_id":      orderID,
+		"fare_estimate": fareEstimate,
+	}
+	if bytes, marshalErr := json.Marshal(pubPayload); marshalErr == nil {
+		_ = h.clusterClient.Publish(ctx, RedisPubSubChannel, string(bytes)).Err()
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -313,8 +334,8 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 	// Query events for tolls and parking
 	var tollsPaise, parkingPaise int64
 	err = tx.QueryRow(ctx, `
-		SELECT COALESCE(SUM(CASE WHEN event_type = 'ADD_TOLL' THEN amount_paise ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN event_type = 'ADD_STOP' THEN amount_paise ELSE 0 END), 0)
+		SELECT COALESCE(SUM(CASE WHEN event_type IN ('ADD_TOLL', 'toll_added') THEN amount_paise ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN event_type IN ('ADD_STOP', 'parking_added', 'waiting_added') THEN amount_paise ELSE 0 END), 0)
 		FROM order_events
 		WHERE order_id = $1::uuid
 	`, orderID).Scan(&tollsPaise, &parkingPaise)
@@ -522,8 +543,8 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 	// Query events for tolls and parking
 	var tollsPaise, parkingPaise int64
 	err = tx.QueryRow(ctx, `
-		SELECT COALESCE(SUM(CASE WHEN event_type = 'ADD_TOLL' THEN amount_paise ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN event_type = 'ADD_STOP' THEN amount_paise ELSE 0 END), 0)
+		SELECT COALESCE(SUM(CASE WHEN event_type IN ('ADD_TOLL', 'toll_added') THEN amount_paise ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN event_type IN ('ADD_STOP', 'parking_added', 'waiting_added') THEN amount_paise ELSE 0 END), 0)
 		FROM order_events
 		WHERE order_id = $1::uuid
 	`, orderID).Scan(&tollsPaise, &parkingPaise)

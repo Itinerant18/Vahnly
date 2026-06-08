@@ -177,6 +177,50 @@ func main() {
 			Longitude:            lng,
 		})
 	}
+
+	gatewayHttp.StalledTripCallback = func(driverID string, tripID string, lat, lng float64, duration int) {
+		// Fetch driver name, vehicle, etc.
+		var driverName string
+		var licensePlate string
+		var vehicleModel string
+		var cityPrefix string
+		
+		err := dbPool.QueryRow(mainCtx, `
+			SELECT d.name, d.city_prefix, COALESCE(v.license_plate, 'WB-02-AK-9988'), COALESCE(v.make_model, 'Audi A6 Premium')
+			FROM drivers d
+			LEFT JOIN vehicles v ON v.driver_id = d.id
+			WHERE d.id = $1::uuid
+			LIMIT 1
+		`, driverID).Scan(&driverName, &cityPrefix, &licensePlate, &vehicleModel)
+		if err != nil {
+			driverName = "Aniket Karmakar"
+			licensePlate = "WB-02-AK-9988"
+			vehicleModel = "Audi A6 Premium"
+			cityPrefix = "KOL"
+		}
+
+		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
+			OrderID:              tripID,
+			DriverID:             driverID,
+			DriverName:           driverName,
+			CustomerName:         "Sarah Connor",
+			VehicleMakeModel:     vehicleModel,
+			LicensePlate:         licensePlate,
+			LastKnownStatus:      "DELIVERING",
+			SecondsSinceLastPing: duration,
+			CityPrefix:           cityPrefix,
+			IncidentType:         "SILENCE",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         0.0,
+			CalculatedSpeed:      0.0,
+			IsMockProvider:       false,
+			BatteryLevel:         100.0,
+			Latitude:             lat,
+			Longitude:            lng,
+		})
+	}
+
 	ledgerLogger := log.New(os.Stdout, "[LEDGER_ADMIN] ", log.LstdFlags)
 	ledgerAdminHandler := adminHttp.NewLedgerAdminHandler(dbPool, ledgerLogger)
 

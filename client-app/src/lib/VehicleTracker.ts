@@ -14,6 +14,7 @@ export class VehicleTracker {
   private ringBuffer: TelemetryRingBuffer;
   private driverID: string;
   private cityPrefix: string;
+  private worker: Worker | null = null;
 
   // --- Visual Interpolation Properties ---
   private coordinateQueue: CoordinateBatch[] = [];
@@ -22,6 +23,7 @@ export class VehicleTracker {
   private targetLat: number = 0;
   private targetLng: number = 0;
   private lastUpdateTime: number = 0;
+  private lastProcessedTimestamp: number = 0;
   private animationFrameId: number | null = null;
   private onPositionUpdate: ((lat: number, lng: number) => void) | null = null;
 
@@ -54,21 +56,49 @@ export class VehicleTracker {
 
     if (isNativePlatform) {
       console.log('[VEHICLE_TRACKER] Initializing native background execution threads via Capacitor Bridge...');
-      // In production configurations, invoke native background tracking plugins directly:
-      // await Geolocation.requestPermissions();
-      // this.watchId = await Geolocation.watchPosition({...})
     } else {
       console.warn('[VEHICLE_TRACKER] Native hardware absent. Initializing fallback browser tracking loops.');
     }
 
-    // Standard high-accuracy telemetry sampling interval routine
-    this.executePollingLoop();
+    if (typeof window !== 'undefined') {
+      try {
+        const workerCode = `
+          let timer = null;
+          self.onmessage = function(e) {
+            if (e.data === 'start') {
+              if (timer) clearInterval(timer);
+              timer = setInterval(() => {
+                self.postMessage('tick');
+              }, 2000);
+            } else if (e.data === 'stop') {
+              if (timer) {
+                clearInterval(timer);
+                timer = null;
+              }
+            }
+          };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        this.worker = new Worker(URL.createObjectURL(blob));
+        this.worker.onmessage = (e) => {
+          if (e.data === 'tick') {
+            this.pollGeolocation();
+          }
+        };
+        this.worker.postMessage('start');
+        console.log('[VEHICLE_TRACKER] Inline Web Worker successfully spawned for unthrottled geolocation ticking.');
+      } catch (err) {
+        console.warn('[VEHICLE_TRACKER] Failed to spawn Web Worker, falling back to setTimeout:', err);
+        this.executePollingLoop();
+      }
+    } else {
+      this.executePollingLoop();
+    }
   }
 
-  private executePollingLoop(): void {
+  private pollGeolocation(): void {
     if (!this.isTrackingActive || typeof window === 'undefined') return;
 
-    // Standard fallback coordinate generator centered on the Kolkata primary operational hub
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const telemetryPacket: GPSCoordinatePacket = {
@@ -81,25 +111,31 @@ export class VehicleTracker {
           timestamp_utc: Date.now(),
         };
 
-        // Push data to the ring buffer. If offline, historical points are preserved.
         const isDeviceOnline = navigator.onLine;
         this.ringBuffer.logCoordinate(telemetryPacket, isDeviceOnline);
-
-        // Schedule next execution pulse sequence (e.g., 2-second capture frequency metrics)
-        setTimeout(() => this.executePollingLoop(), 2000);
       },
       (err) => {
         console.error('[VEHICLE_TRACKER] Geolocation harvest exception:', err);
-        setTimeout(() => this.executePollingLoop(), 5000); // Backoff retry delay on failure
       },
       { enableHighAccuracy: true, timeout: 1500 }
     );
   }
 
+  private executePollingLoop(): void {
+    if (!this.isTrackingActive || typeof window === 'undefined') return;
+
+    this.pollGeolocation();
+    setTimeout(() => this.executePollingLoop(), 2000);
+  }
+
   public stopTrackingCore(): void {
     this.isTrackingActive = false;
+    if (this.worker) {
+      this.worker.postMessage('stop');
+      this.worker.terminate();
+      this.worker = null;
+    }
     if (this.watchId) {
-      // Clear native hardware listeners cleanly to prevent battery drain
       this.watchId = null;
     }
     console.log('[VEHICLE_TRACKER] Telemetry tracking lifecycle terminated.');
@@ -116,7 +152,16 @@ export class VehicleTracker {
    * This bypasses React entirely.
    */
   public pushCoordinate(batch: CoordinateBatch): void {
+    if (batch.timestamp <= this.lastProcessedTimestamp) {
+      // Drop duplicate or out-of-order coordinate
+      return;
+    }
+    if (this.coordinateQueue.some((q) => q.timestamp === batch.timestamp)) {
+      // Drop duplicate in queue
+      return;
+    }
     this.coordinateQueue.push(batch);
+    this.coordinateQueue.sort((a, b) => a.timestamp - b.timestamp);
   }
 
   /**
@@ -135,6 +180,7 @@ export class VehicleTracker {
         if (now - batch.timestamp >= this.RENDER_DELAY_MS) {
           // Dequeue this batch
           this.coordinateQueue.shift();
+          this.lastProcessedTimestamp = batch.timestamp;
 
           // Set it as the new target
           this.targetLat = batch.lat;
