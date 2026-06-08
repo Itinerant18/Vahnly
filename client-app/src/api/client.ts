@@ -74,6 +74,8 @@ export interface DriverProfile {
   city_prefix: string;
   created_at: string;
   total_trips: number;
+  onboarding_step?: number;
+  verification_status?: string;
 }
 
 export interface DriverStatusResponse {
@@ -388,4 +390,223 @@ export async function submitOdometerCheckpoint(
     body: checkpoint,
   });
 }
+
+// --- Phase 3: Driver Onboarding & Authentication ---
+
+export interface OnboardingStepResponse {
+  success: boolean;
+  onboarding_step: number;
+}
+
+export interface DocumentUploadResponse {
+  document_id: string;
+  storage_url: string;
+  status: string;
+  document_type: string;
+}
+
+export interface PresignedUrlResponse {
+  upload_url: string;
+  storage_url: string;
+}
+
+export interface QuizValidationResponse {
+  passed: boolean;
+  score: number;
+}
+
+export interface DriverRegisterResponse {
+  message: string;
+  driver_id: string;
+}
+
+export async function driverRegister(payload: any): Promise<DriverRegisterResponse> {
+  return request<DriverRegisterResponse>('/api/v1/driver/register', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+// saveOnboardingStep saves step data, supports offline caching queue
+export async function saveOnboardingStep(
+  token: string,
+  stepId: number,
+  data: Record<string, any>,
+): Promise<OnboardingStepResponse> {
+  const path = `/api/v1/driver/onboarding/step/${stepId}`;
+  
+  // Check if browser is offline
+  if (typeof window !== 'undefined' && !navigator.onLine) {
+    queueOfflinePayload(token, stepId, data);
+    return { success: true, onboarding_step: stepId };
+  }
+
+  try {
+    return await request<OnboardingStepResponse>(path, {
+      method: 'POST',
+      token,
+      body: data,
+    });
+  } catch (error) {
+    // If it's a network error (e.g. failure to fetch), queue it offline
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      queueOfflinePayload(token, stepId, data);
+      return { success: true, onboarding_step: stepId };
+    }
+    throw error;
+  }
+}
+
+// queueOfflinePayload writes failed payloads to localStorage queue
+function queueOfflinePayload(token: string, stepId: number, data: Record<string, any>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const queue = JSON.parse(localStorage.getItem('onboarding-offline-queue') || '[]');
+    queue.push({ token, stepId, data, timestamp: new Date().toISOString() });
+    localStorage.setItem('onboarding-offline-queue', JSON.stringify(queue));
+    console.log(`[OFFLINE] Queued onboarding step ${stepId} for sync`);
+  } catch (e) {
+    console.error('Failed to queue offline onboarding payload:', e);
+  }
+}
+
+// syncOfflineOnboarding tries to upload all queued payloads sequentially
+export async function syncOfflineOnboarding(): Promise<void> {
+  if (typeof window === 'undefined' || !navigator.onLine) return;
+  try {
+    const queueRaw = localStorage.getItem('onboarding-offline-queue');
+    if (!queueRaw) return;
+    const queue = JSON.parse(queueRaw) as Array<{ token: string; stepId: number; data: Record<string, any> }>;
+    if (queue.length === 0) return;
+
+    console.log(`[OFFLINE] Syncing ${queue.length} queued onboarding payloads...`);
+    const remaining: typeof queue = [];
+    
+    for (const item of queue) {
+      try {
+        await request<OnboardingStepResponse>(`/api/v1/driver/onboarding/step/${item.stepId}`, {
+          method: 'POST',
+          token: item.token,
+          body: item.data,
+        });
+      } catch (err) {
+        // Keep in queue if it failed due to network again
+        remaining.push(item);
+      }
+    }
+
+    if (remaining.length > 0) {
+      localStorage.setItem('onboarding-offline-queue', JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem('onboarding-offline-queue');
+      console.log('[OFFLINE] Offline onboarding sync complete.');
+    }
+  } catch (e) {
+    console.error('Failed to sync offline onboarding queue:', e);
+  }
+}
+
+export async function uploadDocument(
+  token: string,
+  docType: string,
+  file: File,
+): Promise<DocumentUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('document_type', docType);
+
+  const response = await fetch(buildUrl('/api/v1/driver/onboarding/upload'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-Region-Prefix': REGION_PREFIX,
+    },
+    body: formData,
+  });
+
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new ApiClientError(
+      bodyText || `upload_failed_${response.status}`,
+      response.status,
+      bodyText,
+    );
+  }
+  return JSON.parse(bodyText) as DocumentUploadResponse;
+}
+
+export async function getPresignedUrl(
+  token: string,
+  filename: string,
+  docType: string,
+): Promise<PresignedUrlResponse> {
+  return request<PresignedUrlResponse>('/api/v1/driver/onboarding/presigned-url', {
+    method: 'POST',
+    token,
+    body: { filename, document_type: docType },
+  });
+}
+
+export async function validateQuiz(
+  token: string,
+  answers: Record<string, number>,
+): Promise<QuizValidationResponse> {
+  return request<QuizValidationResponse>('/api/v1/driver/onboarding/quiz', {
+    method: 'POST',
+    token,
+    body: { answers },
+  });
+}
+
+export async function setDriverDutyState(
+  token: string,
+  dutyState: 'ONLINE' | 'OFFLINE',
+  latitude?: number,
+  longitude?: number,
+): Promise<{ success: boolean; duty_state: string }> {
+  return request<{ success: boolean; duty_state: string }>('/api/v1/driver/duty', {
+    method: 'POST',
+    token,
+    body: { duty_state: dutyState, latitude, longitude },
+  });
+}
+
+export async function triggerDriverSOS(
+  token: string,
+): Promise<{ success: boolean; sos_id: string; trip_id: string; message: string }> {
+  return request<{ success: boolean; sos_id: string; trip_id: string; message: string }>('/api/v1/driver/sos', {
+    method: 'POST',
+    token,
+  });
+}
+
+export interface DriverDutyStats {
+  trips_count: number;
+  earnings_rupees: number;
+  online_hours: number;
+  acceptance_rate: number;
+  rating: number;
+}
+
+export async function getDriverDutyStats(
+  token: string,
+): Promise<DriverDutyStats> {
+  return request<DriverDutyStats>('/api/v1/driver/stats', {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function verifyTripOTP(
+  token: string,
+  orderId: string,
+  otp: string,
+): Promise<{ success: boolean; status: string }> {
+  return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/verify-otp`, {
+    method: 'POST',
+    token,
+    body: { otp },
+  });
+}
+
 

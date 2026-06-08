@@ -1,0 +1,7 @@
+ALTER TABLE drivers 
+DROP COLUMN IF EXISTS duty_state,
+DROP COLUMN IF EXISTS last_lat,
+DROP COLUMN IF EXISTS last_lng,
+DROP COLUMN IF EXISTS rating;
+
+DROP TYPE IF EXISTS driver_duty_state;

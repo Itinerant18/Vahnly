@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useDriverDutyStore } from '@/store/useDriverDutyStore';
+import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import {
   acceptOffer,
@@ -16,6 +19,10 @@ import {
   setDriverStatus,
   startTrip,
   submitOdometerCheckpoint,
+  setDriverDutyState,
+  triggerDriverSOS,
+  getDriverDutyStats,
+  verifyTripOTP,
 } from '@/api/client';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
@@ -76,20 +83,45 @@ function h3CellToSvgPoints(cell: string): string {
 }
 
 export default function DriverTerminalPage() {
+  const router = useRouter();
   const { user, token } = useAuthStore();
+  const [kycPending, setKycPending] = useState(false);
   
   // Account settings matching session or sandbox defaults
   const driverID = user?.id || 'drv-aniket-7602';
   const driverName = user?.name || 'Aniket Karmakar';
   const cityPrefix = 'KOL'; // Regional Hub KOL
 
-  // Duty State Machine Configuration States:
-  // OFFLINE | ONLINE_AVAILABLE | OFFER_PENDING | EN_ROUTE_TO_PICKUP | ARRIVED_AT_PICKUP | DELIVERING | COMPLETED
-  const [dutyState, setDutyState] = useState<
-    'OFFLINE' | 'ONLINE_AVAILABLE' | 'OFFER_PENDING' | 'EN_ROUTE_TO_PICKUP' | 'ARRIVED_AT_PICKUP' | 'DELIVERING' | 'COMPLETED'
-  >('OFFLINE');
+  const { dutyState, setDutyState } = useDriverDutyStore();
+  const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
   
+  // Resilient WebSocket hook for monitoring real-time dispatch streams
+  const { status: wsStatus } = useResilientWebSocket(
+    activeTrip?.order_id || 'global-driver',
+    cityPrefix,
+    dutyState !== 'OFFLINE'
+  );
+
   const [streamStatus, setStreamStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING'>('DISCONNECTED');
+
+  // Sync streamStatus with wsStatus
+  useEffect(() => {
+    setStreamStatus(wsStatus);
+  }, [wsStatus]);
+
+  // Statistics polling state
+  const [stats, setStats] = useState({
+    trips_count: 4,
+    earnings_rupees: 2840,
+    online_hours: 5.2,
+    acceptance_rate: 96,
+    rating: 4.92,
+  });
+
+  // SOS hold to confirm trigger states
+  const sosHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [sosHolding, setSosHolding] = useState(false);
+  const [sosProgress, setSosProgress] = useState(0);
   
   // Map settings and overlay triggers
   const [showHeatmap, setShowHeatmap] = useState(true);
@@ -107,7 +139,6 @@ export default function DriverTerminalPage() {
   // Trip management variables
   const [incomingOffer, setIncomingOffer] = useState<ActiveOrderAssignment | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(15);
-  const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
   
   // En-Route and Arrived timer trackers
   const [freeWaitSeconds, setFreeWaitSeconds] = useState(300); // 5-minute wait timer
@@ -148,6 +179,39 @@ export default function DriverTerminalPage() {
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const startSosHold = () => {
+    if (sosActive) return;
+    setSosHolding(true);
+    setSosProgress(0);
+
+    const startTime = Date.now();
+    const duration = 2000;
+
+    sosHoldTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / duration) * 100, 100);
+      setSosProgress(progress);
+
+      if (progress >= 100) {
+        clearInterval(sosHoldTimerRef.current!);
+        sosHoldTimerRef.current = null;
+        setSosHolding(false);
+        setSosProgress(0);
+        setSosActive(true);
+        setSosCountdown(5);
+      }
+    }, 50);
+  };
+
+  const cancelSosHold = () => {
+    if (sosHoldTimerRef.current) {
+      clearInterval(sosHoldTimerRef.current);
+      sosHoldTimerRef.current = null;
+    }
+    setSosHolding(false);
+    setSosProgress(0);
+  };
+
   // Auto audit log logger
   const logAudit = (event: string, meta: any) => {
     const timestamp = new Date().toISOString();
@@ -187,7 +251,7 @@ export default function DriverTerminalPage() {
 
   // Wait time calculator once arrived
   useEffect(() => {
-    if (dutyState === 'ARRIVED_AT_PICKUP') {
+    if (dutyState === 'ARRIVED') {
       waitTimerRef.current = setInterval(() => {
         setFreeWaitSeconds((prev) => {
           if (prev > 0) {
@@ -207,10 +271,28 @@ export default function DriverTerminalPage() {
     };
   }, [dutyState]);
 
+  // Poll stats every 30 seconds when not offline
+  useEffect(() => {
+    if (!token || dutyState === 'OFFLINE') return;
+
+    const fetchStats = async () => {
+      try {
+        const data = await getDriverDutyStats(token);
+        setStats(data);
+      } catch (err) {
+        console.warn('Failed to fetch stats:', err);
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, [token, dutyState]);
+
   // Simulated SVG Map Glide coordinate adjustments
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (dutyState === 'EN_ROUTE_TO_PICKUP' || dutyState === 'DELIVERING') {
+    if (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') {
       setMapGlideProgress(0);
       interval = setInterval(() => {
         setMapGlideProgress((prev) => {
@@ -220,10 +302,10 @@ export default function DriverTerminalPage() {
           }
           // Log a sample coordinate ping every 5 seconds equivalent (progress splits)
           if (next % 10 === 0) {
-            const currentLat = dutyState === 'EN_ROUTE_TO_PICKUP'
+            const currentLat = dutyState === 'EN_ROUTE'
               ? 22.5487 + (next / 100) * (22.5726 - 22.5487)
               : 22.5726 + (next / 100) * (22.5855 - 22.5726);
-            const currentLng = dutyState === 'EN_ROUTE_TO_PICKUP'
+            const currentLng = dutyState === 'EN_ROUTE'
               ? 88.3561 + (next / 100) * (88.3639 - 88.3561)
               : 88.3639 + (next / 100) * (88.3411 - 88.3639);
             logAudit('GPS_PING', { lat: currentLat.toFixed(6), lng: currentLng.toFixed(6), speed_kmh: 42 + Math.floor(Math.random() * 15) });
@@ -334,11 +416,25 @@ export default function DriverTerminalPage() {
     getDriverProfile(token)
       .then((profile) => {
         if (cancelled) return;
+
+        // Redirect based on KYC / Verification status
+        const status = profile.verification_status || 'ONBOARDING';
+        if (status === 'ONBOARDING' || status === 'REJECTED') {
+          router.push('/driver-onboarding');
+          return;
+        }
+        if (status === 'PENDING') {
+          setKycPending(true);
+          return;
+        }
+
+        // Proceed to load terminal dashboard for VERIFIED drivers
+        setKycPending(false);
         if (profile.current_state === 'ONLINE_AVAILABLE') {
-          setDutyState('ONLINE_AVAILABLE');
+          setDutyState('ONLINE');
           openOnlineStreams();
         } else if (profile.current_state === 'ONLINE_EN_ROUTE') {
-          setDutyState('EN_ROUTE_TO_PICKUP');
+          setDutyState('EN_ROUTE');
         } else if (profile.current_state === 'ONLINE_DELIVERING') {
           setDutyState('DELIVERING');
         } else {
@@ -357,22 +453,23 @@ export default function DriverTerminalPage() {
     if (dutyState === 'OFFLINE') {
       if (token) {
         try {
-          await setDriverStatus(token, driverID, 'ONLINE_AVAILABLE');
+          // Send KOL center lat/lng coordinates (22.5726, 88.3639) for dispatcher GeoHash
+          await setDriverDutyState(token, 'ONLINE', 22.5726, 88.3639);
         } catch (err) {
-          console.warn('[DRIVER_STATUS] Online status sync failed:', err);
+          console.warn('[DRIVER_STATUS] Online duty state sync failed:', err);
         }
       }
 
-      setDutyState('ONLINE_AVAILABLE');
+      setDutyState('ONLINE');
       logAudit('DUTY_ONLINE', { vehicle: activeVehicle, filter: preferredTripFilter });
       openOnlineStreams();
 
     } else {
       if (token) {
         try {
-          await setDriverStatus(token, driverID, 'OFFLINE');
+          await setDriverDutyState(token, 'OFFLINE');
         } catch (err) {
-          console.warn('[DRIVER_STATUS] Offline status sync failed:', err);
+          console.warn('[DRIVER_STATUS] Offline duty state sync failed:', err);
         }
       }
 
@@ -420,7 +517,7 @@ export default function DriverTerminalPage() {
     const acceptedAt = new Date().toISOString();
     logAudit('OFFER_ACCEPTED', { orderId: incomingOffer.order_id, ts: acceptedAt });
     
-    setDutyState('EN_ROUTE_TO_PICKUP');
+    setDutyState('EN_ROUTE');
     setActiveTrip(incomingOffer);
     setIncomingOffer(null);
 
@@ -440,7 +537,7 @@ export default function DriverTerminalPage() {
     const oId = incomingOffer?.order_id;
     setIncomingOffer(null);
     setCountdownSeconds(15);
-    setDutyState('ONLINE_AVAILABLE');
+    setDutyState('ONLINE');
 
     if (oId) {
       try {
@@ -457,7 +554,7 @@ export default function DriverTerminalPage() {
 
   const handleArrivedAtPickup = async () => {
     logAudit('ARRIVED_AT_PICKUP_NODE', { orderId: activeTrip?.order_id, time: new Date().toISOString() });
-    setDutyState('ARRIVED_AT_PICKUP');
+    setDutyState('ARRIVED');
     setFreeWaitSeconds(300);
     setWaitingCharges(0);
 
@@ -524,38 +621,50 @@ export default function DriverTerminalPage() {
       otpEntered: otpVerificationCode
     });
 
-    if (/^\d{4}$/.test(otpVerificationCode)) {
-      setOtpError('');
+    if (activeTrip?.order_id && token) {
+      try {
+        const res = await verifyTripOTP(token, activeTrip.order_id, otpVerificationCode);
+        if (res.success) {
+          setOtpError('');
 
-      if (activeTrip?.order_id && token) {
-        // Phase 2: Submit START odometer checkpoint with retry before transitioning
-        const checkpoint: OdometerCheckpointPayload = {
-          checkpoint_type: 'START',
-          odometer_reading: parseInt(startOdometer, 10),
-          fuel_level: startFuel,
-          photo_url: startOdoPhoto || '',
-          timestamp: new Date().toISOString(),
-        };
+          // Phase 2: Submit START odometer checkpoint with retry before transitioning
+          const checkpoint: OdometerCheckpointPayload = {
+            checkpoint_type: 'START',
+            odometer_reading: parseInt(startOdometer, 10),
+            fuel_level: startFuel,
+            photo_url: startOdoPhoto || '',
+            timestamp: new Date().toISOString(),
+          };
 
-        const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
+          const synced = await submitCheckpointWithRetry(activeTrip.order_id, checkpoint);
 
-        if (!synced) {
-          // Offline queueing: store for later sync, proceed with local state transition
-          queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
-          // Fallback: still call the legacy startTrip endpoint
-          try {
-            await startTrip(token, activeTrip.order_id, driverID);
-          } catch (err) {
-            console.warn('Start trip fallback sync also failed:', err);
+          if (!synced) {
+            // Offline queueing: store for later sync, proceed with local state transition
+            queueOfflineCheckpoint(activeTrip.order_id, checkpoint);
+            // Fallback: still call the legacy startTrip endpoint
+            try {
+              await startTrip(token, activeTrip.order_id, driverID);
+            } catch (err) {
+              console.warn('Start trip fallback sync also failed:', err);
+            }
           }
-        }
-      }
 
-      logAudit('TRIP_STARTED', { orderId: activeTrip?.order_id });
-      setDutyState('DELIVERING');
+          logAudit('TRIP_STARTED', { orderId: activeTrip.order_id });
+          setDutyState('DELIVERING');
+        } else {
+          setOtpError('Authentication failed: Invalid OTP.');
+        }
+      } catch (err: any) {
+        setOtpError(err.message || 'OTP verification failed.');
+      }
     } else {
-      setOtpError('Authentication failed: Invalid OTP sequence pattern entered.');
-      logAudit('OTP_FAILED_ATTEMPT', { code: otpVerificationCode });
+      // Fallback fallback for static sandbox
+      if (otpVerificationCode === '1234') {
+        setOtpError('');
+        setDutyState('DELIVERING');
+      } else {
+        setOtpError('Invalid OTP.');
+      }
     }
   };
 
@@ -634,7 +743,7 @@ export default function DriverTerminalPage() {
     setTollCharges(0);
     setParkingCharges(0);
     setRiderCommentTags([]);
-    setDutyState('ONLINE_AVAILABLE');
+    setDutyState('ONLINE');
   };
 
   // Payout breakdown values
@@ -661,6 +770,65 @@ export default function DriverTerminalPage() {
       }
     });
   };
+  if (kycPending) {
+    return (
+      <div className="min-h-screen bg-black text-white p-6 sm:p-12 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
+        <header className="border-b border-zinc-900 pb-6 text-left">
+          <h1 className="text-xl font-bold tracking-tight text-white font-mono uppercase">DRIVERS-FOR-U</h1>
+        </header>
+
+        <main className="flex-grow flex flex-col items-center justify-center max-w-md mx-auto text-center space-y-6">
+          <div className="h-16 w-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xl animate-pulse">
+            ⏳
+          </div>
+          <div className="space-y-2">
+            <span className="bg-zinc-900 text-zinc-400 font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-zinc-850">
+              KYC Compliance Review
+            </span>
+            <h2 className="text-2xl font-extrabold tracking-tight text-white font-move">Application Pending Verification</h2>
+            <p className="text-zinc-500 text-xs leading-relaxed">
+              Your onboarding documents (Aadhaar, DL, Police Verification) are being validated by our regional compliance team. This normally takes 12-24 hours. You will receive a push notification once approved.
+            </p>
+          </div>
+
+          <div className="w-full space-y-2 pt-4">
+            <button
+              onClick={() => {
+                if (token) {
+                  getDriverProfile(token)
+                    .then((profile) => {
+                      if (profile.verification_status === 'VERIFIED') {
+                        setKycPending(false);
+                        window.location.reload();
+                      } else {
+                        alert("Your application is still under review. Please wait or contact support.");
+                      }
+                    })
+                    .catch(() => alert("Failed to check status. Try again later."));
+                }
+              }}
+              className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono"
+            >
+              🔄 Refresh Verification Status
+            </button>
+            <button
+              onClick={() => {
+                useAuthStore.getState().logout();
+                router.push('/login?role=driver');
+              }}
+              className="w-full bg-zinc-950 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-400 border border-zinc-900 font-bold py-3 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono"
+            >
+              🚪 Sign Out of Session
+            </button>
+          </div>
+        </main>
+
+        <footer className="text-center text-[8px] font-mono text-zinc-600 uppercase tracking-wider pt-6 border-t border-zinc-900">
+          Security Node ID: KYC_COMPLIANCE_PENDING_GATEWAY
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-x-hidden relative">
@@ -765,6 +933,7 @@ export default function DriverTerminalPage() {
               logAudit('SOS_CANCELLED', { driverID });
               setSosActive(false);
               setSosCountdown(5);
+              setDutyState('ONLINE');
             }}
             className="w-full max-w-md mx-auto bg-white hover:bg-zinc-200 text-black font-bold py-4 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95"
           >
@@ -811,16 +980,20 @@ export default function DriverTerminalPage() {
             </span>
           )}
 
-          {/* Emergency SOS red trigger */}
+          {/* Emergency SOS red trigger with 2-second hold confirmation */}
           <button
-            onClick={() => {
-              logAudit('SOS_PANIC_TRIGGERED', { state: dutyState });
-              setSosActive(true);
-              setSosCountdown(5);
-            }}
-            className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition-all cursor-pointer active:scale-95 flex items-center gap-1 border border-red-500"
+            onMouseDown={startSosHold}
+            onMouseUp={cancelSosHold}
+            onMouseLeave={cancelSosHold}
+            onTouchStart={startSosHold}
+            onTouchEnd={cancelSosHold}
+            className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition-all cursor-pointer active:scale-95 flex items-center gap-1 border border-red-500 relative overflow-hidden select-none"
+            style={{ minWidth: '85px' }}
           >
-            🚨 SOS
+            {sosHolding ? (
+              <span className="absolute inset-0 bg-red-800 transition-all duration-100" style={{ width: `${sosProgress}%`, opacity: 0.8 }} />
+            ) : null}
+            <span className="relative z-10">🚨 SOS {sosHolding ? `${Math.round(sosProgress)}%` : '(Hold)'}</span>
           </button>
         </div>
       </header>
@@ -828,9 +1001,9 @@ export default function DriverTerminalPage() {
       {/* CORE AREA: MAP LAYOUT AND VIEWS */}
       <main className="flex-1 flex flex-col relative min-h-[350px]">
         {/* Stylized background custom map simulation */}
-        <div className="absolute inset-0 bg-zinc-950 z-0 overflow-hidden flex items-center justify-center">
+        <div className="absolute inset-0 bg-zinc-950 z-0 overflow-hidden flex items-center justify-center" style={{ filter: dutyState === 'OFFLINE' ? 'grayscale(1)' : 'none' }}>
           {/* Simulated SVG grid network representing city map */}
-          <svg className="w-full h-full opacity-35" xmlns="http://www.w3.org/2000/svg">
+          <svg className="w-full h-full opacity-35 transition duration-500" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222" strokeWidth="1" />
@@ -870,7 +1043,7 @@ export default function DriverTerminalPage() {
             )}
 
             {/* Ambient Driver Pins */}
-            {dutyState === 'ONLINE_AVAILABLE' && (
+            {dutyState === 'ONLINE' && (
               <>
                 <circle cx="45%" cy="40%" r="4" fill="#a1a1aa" className="animate-pulse" />
                 <circle cx="50%" cy="55%" r="4" fill="#a1a1aa" />
@@ -879,7 +1052,7 @@ export default function DriverTerminalPage() {
             )}
 
             {/* Active Route Draw Matrix */}
-            {activeTrip && (dutyState === 'EN_ROUTE_TO_PICKUP' || dutyState === 'DELIVERING') && (
+            {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
               <>
                 {/* Route line */}
                 <line 
@@ -981,13 +1154,13 @@ export default function DriverTerminalPage() {
                 type="button"
                 className="w-full bg-white hover:bg-zinc-200 text-black py-4 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center"
               >
-                ⚡ Go On Duty (Connect)
+                Go Online
               </button>
             </div>
           )}
 
           {/* ONLINE / IDLE WAITING VIEW */}
-          {dutyState === 'ONLINE_AVAILABLE' && (
+          {dutyState === 'ONLINE' && (
             <div className="space-y-4 text-left">
               <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
                 <div>
@@ -1010,26 +1183,53 @@ export default function DriverTerminalPage() {
               <div className="grid grid-cols-4 gap-2 text-center text-zinc-400 font-mono text-[9px]">
                 <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-900">
                   <span className="text-zinc-500 block text-[7px] uppercase">TRIPS</span>
-                  <span className="text-white block mt-0.5 font-bold">4</span>
+                  <span className="text-white block mt-0.5 font-bold">{stats.trips_count}</span>
                 </div>
                 <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-900">
                   <span className="text-zinc-500 block text-[7px] uppercase">EARNINGS</span>
-                  <span className="text-white block mt-0.5 font-bold">₹2,840</span>
+                  <span className="text-white block mt-0.5 font-bold">₹{stats.earnings_rupees.toFixed(2)}</span>
                 </div>
                 <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-900">
                   <span className="text-zinc-500 block text-[7px] uppercase">HOURS</span>
-                  <span className="text-white block mt-0.5 font-bold">5.2h</span>
+                  <span className="text-white block mt-0.5 font-bold">{stats.online_hours}h</span>
                 </div>
                 <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-900">
                   <span className="text-zinc-500 block text-[7px] uppercase">ACCEPT</span>
-                  <span className="text-white block mt-0.5 font-bold">96%</span>
+                  <span className="text-white block mt-0.5 font-bold">{stats.acceptance_rate}%</span>
                 </div>
+              </div>
+
+              {/* Demo Match simulation trigger button */}
+              <div className="flex gap-2 pt-2 border-t border-zinc-900 mt-3">
+                <button
+                  onClick={() => {
+                    triggerIncomingMatchNotification(
+                      'ord-demo-' + Math.floor(Math.random() * 10000),
+                      {
+                        id: 'ord-demo-' + Math.floor(Math.random() * 10000),
+                        city_prefix: 'KOL',
+                        pickup_h3_cell: '883011833ffffff',
+                        pickup_lat: 22.5726,
+                        pickup_lng: 88.3639,
+                        dropoff_lat: 22.5855,
+                        dropoff_lng: 88.3411,
+                        base_fare_paise: 45000,
+                        surge_multiplier: 1.25,
+                        customer_id: 'cust-demo-123',
+                      },
+                      25
+                    );
+                  }}
+                  className="w-full bg-zinc-900 hover:bg-zinc-850 text-amber-500 border border-zinc-850 py-2.5 rounded-xl text-[9px] font-mono font-bold uppercase tracking-wider transition cursor-pointer text-center"
+                >
+                  🔔 Simulate Incoming Booking (Demo)
+                </button>
               </div>
             </div>
           )}
 
           {/* EN ROUTE TO PICKUP PANEL */}
-          {dutyState === 'EN_ROUTE_TO_PICKUP' && activeTrip && (
+          {dutyState === 'EN_ROUTE' && activeTrip && (
             <div className="space-y-4 text-left animate-fadeIn">
               <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
                 <div>
@@ -1040,11 +1240,11 @@ export default function DriverTerminalPage() {
                   ETA: 6 MINS
                 </div>
               </div>
-
+ 
               <div className="text-xs space-y-1 font-mono text-zinc-400 leading-normal">
                 <div>📍 <span className="text-zinc-500 font-bold">Pickup Address:</span> {activeTrip.pickup_address}</div>
               </div>
-
+ 
               {/* Route control button triggers */}
               <div className="grid grid-cols-3 gap-2">
                 <button
@@ -1069,7 +1269,7 @@ export default function DriverTerminalPage() {
                   🗺️ Navigate (Maps)
                 </button>
               </div>
-
+ 
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
@@ -1077,7 +1277,7 @@ export default function DriverTerminalPage() {
                     if (confirm('Cancel this allocation? Cancellation penalties may apply to this node.')) {
                       logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id });
                       setActiveTrip(null);
-                      setDutyState('ONLINE_AVAILABLE');
+                      setDutyState('ONLINE');
                     }
                   }}
                   className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-red-500 border border-zinc-800 py-3 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer"
@@ -1096,7 +1296,7 @@ export default function DriverTerminalPage() {
           )}
 
           {/* ARRIVED AT PICKUP OPTIONAL LOCK SCREEN */}
-          {dutyState === 'ARRIVED_AT_PICKUP' && activeTrip && (
+          {dutyState === 'ARRIVED' && activeTrip && (
             <div className="space-y-4 text-left animate-fadeIn">
               <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
                 <div>

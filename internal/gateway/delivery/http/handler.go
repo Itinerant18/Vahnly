@@ -485,6 +485,19 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Update driver duty state to EN_ROUTE
+	driverQuery := `
+		UPDATE drivers 
+		SET duty_state = 'EN_ROUTE'::driver_duty_state,
+		    current_state = 'ONLINE_EN_ROUTE'::driver_state_enum
+		WHERE id = $1::uuid;
+	`
+	_, err = tx.Exec(ctx, driverQuery, req.DriverID)
+	if err != nil {
+		http.Error(w, "driver_state_update_failed", http.StatusInternalServerError)
+		return
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		http.Error(w, "commit_failed", http.StatusInternalServerError)
 		return
@@ -656,13 +669,32 @@ func (h *GatewayHandler) HandleArriveAtPickup(w http.ResponseWriter, r *http.Req
 	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
 	defer cancel()
 
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
 	query := `
 		UPDATE orders SET status = 'ARRIVED_AT_PICKUP'::order_status_enum
 		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'EN_ROUTE_TO_PICKUP'::order_status_enum;
 	`
-	res, err := h.dbPool.Exec(ctx, query, req.OrderID, req.DriverID)
+	res, err := tx.Exec(ctx, query, req.OrderID, req.DriverID)
 	if err != nil || res.RowsAffected() == 0 {
 		http.Error(w, "failed_state_transition", http.StatusConflict)
+		return
+	}
+
+	// Update driver duty state to ARRIVED
+	_, err = tx.Exec(ctx, "UPDATE drivers SET duty_state = 'ARRIVED'::driver_duty_state WHERE id = $1::uuid", req.DriverID)
+	if err != nil {
+		http.Error(w, "failed_driver_state_transition", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -772,7 +804,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 
 	// 3. Promote relational status configurations safely
 	_, _ = tx.Exec(ctx, "UPDATE orders SET status = 'COMPLETED'::order_status_enum, completed_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.OrderID)
-	_, _ = tx.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.DriverID)
+	_, _ = tx.Exec(ctx, "UPDATE drivers SET current_state = 'ONLINE_AVAILABLE'::driver_state_enum, duty_state = 'ONLINE'::driver_duty_state, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", req.DriverID)
 
 	// 4. Calculate Double-Entry Financial Split Constraints (80% Driver Share / 20% Corporate Commission Fee)
 	platformCommissionPaise := (baseFarePaise * 20) / 100
@@ -1181,26 +1213,30 @@ func (h *GatewayHandler) HandleDriverGetProfile(w http.ResponseWriter, r *http.R
 	defer cancel()
 
 	var (
-		id               string
-		name             string
-		phone            sql.NullString
-		currentState     string
-		acceptanceRate   float64
-		cancellationRate float64
-		isVerified       bool
-		cityPrefix       string
-		createdAt        time.Time
+		id                 string
+		name               string
+		phone              sql.NullString
+		currentState       string
+		acceptanceRate     float64
+		cancellationRate   float64
+		isVerified         bool
+		cityPrefix         string
+		createdAt          time.Time
+		onboardingStep     int
+		verificationStatus string
 	)
 
 	query := `
 		SELECT id::text, name, phone, current_state::text, acceptance_rate::float8,
-		       cancellation_rate::float8, is_verified, city_prefix, created_at
+		       cancellation_rate::float8, is_verified, city_prefix, created_at,
+		       COALESCE(onboarding_step, 1), COALESCE(verification_status::text, 'ONBOARDING')
 		FROM drivers
 		WHERE id = $1::uuid;
 	`
 	if err := h.dbPool.QueryRow(ctx, query, driverID).Scan(
 		&id, &name, &phone, &currentState, &acceptanceRate,
 		&cancellationRate, &isVerified, &cityPrefix, &createdAt,
+		&onboardingStep, &verificationStatus,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "driver_not_found", http.StatusNotFound)
@@ -1224,16 +1260,18 @@ func (h *GatewayHandler) HandleDriverGetProfile(w http.ResponseWriter, r *http.R
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"id":                id,
-		"name":              name,
-		"phone":             nullableString(phone),
-		"current_state":     currentState,
-		"acceptance_rate":   acceptanceRate,
-		"cancellation_rate": cancellationRate,
-		"is_verified":       isVerified,
-		"city_prefix":       cityPrefix,
-		"created_at":        createdAt,
-		"total_trips":       totalTrips,
+		"id":                  id,
+		"name":                name,
+		"phone":               nullableString(phone),
+		"current_state":       currentState,
+		"acceptance_rate":     acceptanceRate,
+		"cancellation_rate":   cancellationRate,
+		"is_verified":         isVerified,
+		"city_prefix":         cityPrefix,
+		"created_at":          createdAt,
+		"total_trips":         totalTrips,
+		"onboarding_step":     onboardingStep,
+		"verification_status": verificationStatus,
 	})
 }
 

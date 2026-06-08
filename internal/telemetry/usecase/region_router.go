@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
@@ -68,6 +69,7 @@ func (rr *RegionRouter) DetectAndHandoff(ctx context.Context, loc domain.DriverL
 	if err != nil {
 		return err
 	}
+	observability.RegionHandoffsTotal.WithLabelValues("published", targetRegion).Inc()
 
 	// 5. Evict from local region's spatial index immediately to prevent ghost dispatching
 	rr.redisClient.ZRem(ctx, "driver:locations:"+rr.currentRegion, loc.DriverID)

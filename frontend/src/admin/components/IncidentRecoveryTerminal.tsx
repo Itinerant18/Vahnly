@@ -521,6 +521,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
   const filteredIncidents = incidents.filter(inc => {
     if (inc.incident_status === 'RESOLVED') return false;
+    if (inc.incident_type === 'SOS') return true;
     if (activeFilter === 'ALL') return true;
     return inc.incident_type === activeFilter;
   });
@@ -621,7 +622,9 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                     key={incident.order_id}
                     onClick={() => { setSelectedIncident(incident); setTerminalLog(null); }}
                     className={`relative p-4 rounded-lg border cursor-pointer transition text-left overflow-hidden ${
-                      isSelected
+                      incident.incident_type === 'SOS'
+                        ? 'border-rose-600 bg-rose-950/20 animate-pulse shadow-lg'
+                        : isSelected
                         ? 'bg-slate-900 border-slate-700 shadow-lg'
                         : 'bg-slate-950 border-slate-900 hover:bg-slate-900/30'
                     }`}
@@ -637,7 +640,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
                     <div className="pl-2.5">
                       <div className="flex justify-between items-start">
-                        <span className="text-xs font-bold text-slate-200">{incident.driver_name}</span>
+                        <span className={`text-xs font-bold ${incident.incident_type === 'SOS' ? 'text-rose-500 animate-pulse' : 'text-slate-200'}`}>{incident.driver_name}</span>
                         <span className="text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-800 px-1.5 py-0.5 rounded">
                           {incident.city_prefix}
                         </span>

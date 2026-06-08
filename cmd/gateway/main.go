@@ -17,6 +17,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	adminHttp "github.com/platform/driver-delivery/internal/admin/delivery/http"
+	driverHttp "github.com/platform/driver-delivery/internal/driver/delivery/http"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
@@ -101,6 +102,9 @@ func main() {
 	handler.SetJWTSecret(jwtSecret)
 
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
+	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, jwtSecret)
+	driverOnboardingHandler := driverHttp.NewOnboardingHandler(dbPool)
+	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
 	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
 	pricingAdminHandler := adminHttp.NewPricingAdminHandler(dbPool, redisClusterClient, pricingLogger)
@@ -119,6 +123,49 @@ func main() {
 			LastKnownStatus:      "ON_TRIP",
 			SecondsSinceLastPing: 0,
 			CityPrefix:           "KOL",
+			IncidentType:         "SOS",
+			IncidentStatus:       "UNASSIGNED",
+			AssignedAgentID:      "",
+			BearingDelta:         0.0,
+			CalculatedSpeed:      0.0,
+			IsMockProvider:       false,
+			BatteryLevel:         100.0,
+			Latitude:             lat,
+			Longitude:            lng,
+		})
+	}
+
+	driverHttp.SOSCallback = func(driverID string, tripID string, lat, lng float64) {
+		// Fetch driver name, vehicle, etc.
+		var driverName string
+		var licensePlate string
+		var vehicleModel string
+		var cityPrefix string
+		
+		err := dbPool.QueryRow(mainCtx, `
+			SELECT d.name, d.city_prefix, COALESCE(v.license_plate, 'WB-02-AK-9988'), COALESCE(v.make_model, 'Audi A6 Premium')
+			FROM drivers d
+			LEFT JOIN vehicles v ON v.driver_id = d.id
+			WHERE d.id = $1::uuid
+			LIMIT 1
+		`, driverID).Scan(&driverName, &cityPrefix, &licensePlate, &vehicleModel)
+		if err != nil {
+			driverName = "Aniket Karmakar"
+			licensePlate = "WB-02-AK-9988"
+			vehicleModel = "Audi A6 Premium"
+			cityPrefix = "KOL"
+		}
+
+		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
+			OrderID:              tripID,
+			DriverID:             driverID,
+			DriverName:           driverName,
+			CustomerName:         "Sarah Connor",
+			VehicleMakeModel:     vehicleModel,
+			LicensePlate:         licensePlate,
+			LastKnownStatus:      "ON_TRIP",
+			SecondsSinceLastPing: 0,
+			CityPrefix:           cityPrefix,
 			IncidentType:         "SOS",
 			IncidentStatus:       "UNASSIGNED",
 			AssignedAgentID:      "",
@@ -240,6 +287,20 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/callback", adminAuthHandler.HandleSSOGoogleCallback)
+
+	// Driver App & Onboarding routes
+	mux.HandleFunc("POST /api/v1/driver/login", driverAuthHandler.HandleDriverLogin)
+	mux.HandleFunc("POST /api/v1/driver/register", driverAuthHandler.HandleDriverRegister)
+	mux.HandleFunc("POST /api/v1/driver/onboarding/step/{step_id}", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleSaveStep))
+	mux.HandleFunc("POST /api/v1/driver/onboarding/upload", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleUploadDocument))
+	mux.HandleFunc("POST /api/v1/driver/onboarding/presigned-url", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleGeneratePresignedURL))
+	mux.HandleFunc("POST /api/v1/driver/onboarding/quiz", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleValidateQuiz))
+
+	// Driver operational duty, SOS, stats and OTP routes
+	mux.HandleFunc("POST /api/v1/driver/duty", authGuard.AuthenticateJWT(driverDutyHandler.HandleDutyStateToggle))
+	mux.HandleFunc("POST /api/v1/driver/sos", authGuard.AuthenticateJWT(driverDutyHandler.HandleTriggerSOS))
+	mux.HandleFunc("GET /api/v1/driver/stats", authGuard.AuthenticateJWT(driverDutyHandler.HandleGetStats))
+	mux.HandleFunc("POST /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
 
 	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
 	mux.HandleFunc("POST /api/v1/orders/quote", regionRouter.RouteRegionalTraffic(handler.HandleCreatePricingQuote))

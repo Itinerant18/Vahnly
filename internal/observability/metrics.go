@@ -65,4 +65,23 @@ var (
 		Help:      "Number of orders in each matching batch.",
 		Buckets:   []float64{1, 2, 5, 10, 25, 50, 100, 150},
 	})
+
+	// MigrationLatencySeconds tracks the wall-clock time from a driver crossing a
+	// region boundary (the CrossedAt stamp on the handoff event) to the destination
+	// shard hydrating that driver's state into its local spatial index.
+	MigrationLatencySeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "dispatch",
+		Name:      "migration_latency_seconds",
+		Help:      "Time from a cross-region boundary crossing to destination-shard state hydration.",
+		Buckets:   []float64{0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0},
+	}, []string{"origin_region", "target_region"})
+
+	// RegionHandoffsTotal counts cross-region handoff events by lifecycle phase:
+	// "published" (source emitted INIT), "hydrated" (destination committed), and
+	// "rejected_stale" (Last-Write-Wins discarded an out-of-order/duplicate claim).
+	RegionHandoffsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "dispatch",
+		Name:      "region_handoffs_total",
+		Help:      "Cross-region driver handoff events by phase and target region.",
+	}, []string{"phase", "target_region"})
 )

@@ -8,11 +8,35 @@ import (
 	"math"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"github.com/uber/h3-go/v3"
 )
+
+// lwwCASScript is the Last-Write-Wins gate. It compares the incoming handoff
+// timestamp (ARGV[1], unix-nanos) against the last-applied one stored at KEYS[1].
+// Returns 1 and stamps the new value only when the incoming claim is strictly
+// newer; returns 0 (reject) when an equal or newer claim already won. The check
+// and the write are atomic server-side, so two regions racing to claim the same
+// driver cannot both succeed.
+var lwwCASScript = redis.NewScript(`
+local cur = redis.call('GET', KEYS[1])
+if cur and tonumber(cur) >= tonumber(ARGV[1]) then
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
+return 1
+`)
+
+// lwwShouldApply is the pure decision the Lua script encodes: an incoming claim
+// supersedes the stored one only if it is strictly newer. Equal timestamps are
+// treated as already-applied so duplicate/retried handoffs are idempotent.
+func lwwShouldApply(incomingNanos, storedNanos int64) bool {
+	return storedNanos == 0 || incomingNanos > storedNanos
+}
 
 type HandoffConsumer struct {
 	reader        *kafka.Reader
@@ -57,7 +81,26 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 		// Only process if THIS cluster is the target region
 		if event.TargetRegion == hc.currentRegion {
-			log.Printf("[HANDOFF RECEIVED] Hydrating driver %s from %s to %s", 
+			// Last-Write-Wins gate: in an active-active topology a driver may be
+			// claimed by two regions during a transition, or events may arrive out
+			// of order. Discard any claim that is not strictly newer than the one
+			// already applied, so we never resurrect a stale location.
+			applied, lwwErr := hc.acquireLWW(ctx, event.DriverID, event.CrossedAt)
+			if lwwErr != nil {
+				// On a gate failure, fail open and hydrate — losing a driver from
+				// dispatch is worse than a rare duplicate. Log for observability.
+				log.Printf("[LWW] gate error for driver %s, hydrating anyway: %v", event.DriverID, lwwErr)
+			} else if !applied {
+				log.Printf("[LWW REJECT] Stale handoff for driver %s (crossed %s) ignored; newer state already won",
+					event.DriverID, event.CrossedAt.Format(time.RFC3339Nano))
+				observability.RegionHandoffsTotal.WithLabelValues("rejected_stale", event.TargetRegion).Inc()
+				if cErr := hc.reader.CommitMessages(ctx, m); cErr != nil {
+					log.Printf("Failed committing rejected handoff message: %v", cErr)
+				}
+				continue
+			}
+
+			log.Printf("[HANDOFF RECEIVED] Hydrating driver %s from %s to %s",
 				event.DriverID, event.OriginRegion, event.TargetRegion)
 
 			// 1. Hydrate into local Redis Spatial Index (Geo ZSET)
@@ -108,6 +151,13 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 				_, pErr := pipe.Exec(ctx)
 				if pErr != nil {
 					log.Printf("Failed hydrating spatial ZSET and status profiles for driver %s: %v", event.DriverID, pErr)
+				} else {
+					// Migration complete: record end-to-end latency from boundary
+					// crossing to local hydration, and count the committed handoff.
+					observability.MigrationLatencySeconds.
+						WithLabelValues(event.OriginRegion, event.TargetRegion).
+						Observe(time.Since(event.CrossedAt).Seconds())
+					observability.RegionHandoffsTotal.WithLabelValues("hydrated", event.TargetRegion).Inc()
 				}
 			} else {
 				log.Printf("Failed GeoAdd spatial hydration for driver %s: %v", event.DriverID, err)
@@ -119,6 +169,21 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 			log.Printf("Failed committing handoff message: %v", err)
 		}
 	}
+}
+
+// acquireLWW runs the Last-Write-Wins compare-and-set for a driver handoff.
+// Returns true if this claim is the newest seen and the local shard should
+// hydrate it; false if a newer (or equal) claim already won. The LWW key is
+// hash-tagged on the driver ID so all of a driver's claims hash to one slot.
+func (hc *HandoffConsumer) acquireLWW(ctx context.Context, driverID string, crossedAt time.Time) (bool, error) {
+	key := "driver:lww:{" + driverID + "}"
+	incoming := crossedAt.UnixNano()
+	ttlMs := (24 * time.Hour).Milliseconds()
+	res, err := lwwCASScript.Run(ctx, hc.redisClient, []string{key}, incoming, ttlMs).Int()
+	if err != nil {
+		return false, err
+	}
+	return res == 1, nil
 }
 
 func (hc *HandoffConsumer) Close() error {

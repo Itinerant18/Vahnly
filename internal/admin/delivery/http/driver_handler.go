@@ -646,6 +646,46 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.DocName != "" {
 			override.KYCDocuments[req.DocName] = req.Status
 			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_DOC_STATUS", fmt.Sprintf("Admin (%s) updated document '%s' to status '%s' for driver %s", adminRole, req.DocName, req.Status, id), ip)
+
+			// Resolve admin reviewer id from email
+			var adminReviewerID *string
+			_ = h.dbPool.QueryRow(ctx, "SELECT id::text FROM system_admins WHERE email = $1", adminEmail).Scan(&adminReviewerID)
+
+			// Map admin document status string to driver_verification_status enum
+			dbStatus := "PENDING"
+			if req.Status == "APPROVED" || req.Status == "VERIFIED" {
+				dbStatus = "VERIFIED"
+			} else if req.Status == "REJECTED" || req.Status == "REUPLOAD" {
+				dbStatus = "REJECTED"
+			}
+
+			// Update driver_documents table
+			updateQuery := `
+				UPDATE driver_documents
+				SET status = $1::driver_verification_status,
+				    admin_reviewer_id = $2::uuid,
+				    reviewed_at = NOW()
+				WHERE driver_id = $3::uuid AND document_type = $4
+			`
+			_, err = h.dbPool.Exec(ctx, updateQuery, dbStatus, adminReviewerID, id, req.DocName)
+
+			// Trigger notification_outbox entry if document is rejected
+			if dbStatus == "REJECTED" {
+				title := "KYC Document Rejected"
+				body := fmt.Sprintf("Your document '%s' has been rejected. Please upload a clear copy to continue onboarding.", req.DocName)
+				payloadMap := map[string]interface{}{
+					"event":         "kyc_doc_rejected",
+					"document_type": req.DocName,
+					"driver_id":     id,
+				}
+				payloadBytes, _ := json.Marshal(payloadMap)
+
+				insertOutboxQuery := `
+					INSERT INTO notification_outbox (user_id, title, body, payload, status)
+					VALUES ($1::uuid, $2, $3, $4::jsonb, 'PENDING')
+				`
+				_, _ = h.dbPool.Exec(ctx, insertOutboxQuery, id, title, body, string(payloadBytes))
+			}
 		}
 
 	case "onboarding-stage":

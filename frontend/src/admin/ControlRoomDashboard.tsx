@@ -62,6 +62,11 @@ export const ControlRoomDashboard: React.FC = () => {
   const [selectedCellToken, setSelectedCellToken] = useState<string | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [_isBalanced, setIsBalanced] = useState<boolean>(true);
+  const [activeSOSAlerts, setActiveSOSAlerts] = useState<any[]>([]);
+
+  const lastCenteredSosIdRef = useRef<string | null>(null);
+  const sosMarkersRef = useRef<google.maps.Marker[]>([]);
+  const sosCirclesRef = useRef<google.maps.Circle[]>([]);
 
   const adminRole = localStorage.getItem('admin_role') ?? 'ADMIN';
   const adminToken = localStorage.getItem('admin_jwt_token') ?? '';
@@ -165,12 +170,126 @@ export const ControlRoomDashboard: React.FC = () => {
     });
   }, [isMapSdkLoaded, adminToken]);
 
+  // Poll active SOS alerts every 5 seconds
+  useEffect(() => {
+    if (!adminToken) return;
+
+    const fetchActiveSOS = async () => {
+      try {
+        const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/sos?status=ACTIVE`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setActiveSOSAlerts(data || []);
+        }
+      } catch (err) {
+        console.error('Failed fetching active SOS alerts:', err);
+      }
+    };
+
+    fetchActiveSOS();
+    const interval = setInterval(fetchActiveSOS, 5000);
+    return () => clearInterval(interval);
+  }, [adminToken]);
+
+  // Manage map markers & pulsing circles for active SOS alerts
+  useEffect(() => {
+    // Clean up existing markers and circles
+    sosMarkersRef.current.forEach((m) => m.setMap(null));
+    sosMarkersRef.current = [];
+    sosCirclesRef.current.forEach((c) => c.setMap(null));
+    sosCirclesRef.current = [];
+
+    if (!mapInstanceRef.current || typeof google === 'undefined' || !google?.maps) return;
+
+    if (activeSOSAlerts.length === 0) {
+      lastCenteredSosIdRef.current = null;
+      return;
+    }
+
+    // Center and zoom on first active SOS, only if it is a new/different alert
+    const firstSos = activeSOSAlerts[0];
+    if (firstSos && firstSos.latitude != null && firstSos.longitude != null) {
+      if (lastCenteredSosIdRef.current !== firstSos.id) {
+        mapInstanceRef.current.setCenter({ lat: firstSos.latitude, lng: firstSos.longitude });
+        mapInstanceRef.current.setZoom(15);
+        lastCenteredSosIdRef.current = firstSos.id;
+      }
+    } else {
+      lastCenteredSosIdRef.current = null;
+    }
+
+    const markers: google.maps.Marker[] = [];
+    const circles: google.maps.Circle[] = [];
+
+    activeSOSAlerts.forEach((sos) => {
+      if (sos.latitude == null || sos.longitude == null) return;
+      const pos = { lat: sos.latitude, lng: sos.longitude };
+
+      const marker = new google.maps.Marker({
+        position: pos,
+        map: mapInstanceRef.current!,
+        title: `SOS Alert ${sos.id}`,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#FF0000',
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 2,
+          scale: 10,
+        },
+      });
+      markers.push(marker);
+
+      const circle = new google.maps.Circle({
+        center: pos,
+        map: mapInstanceRef.current!,
+        strokeColor: '#FF0000',
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: '#FF0000',
+        fillOpacity: 0.35,
+        radius: 100,
+      });
+      circles.push(circle);
+    });
+
+    sosMarkersRef.current = markers;
+    sosCirclesRef.current = circles;
+
+    let radiusDirection = 1;
+    const pulseInterval = setInterval(() => {
+      circles.forEach((circle) => {
+        const currentRadius = circle.getRadius();
+        let newRadius = currentRadius + radiusDirection * 15;
+        if (newRadius > 400) {
+          radiusDirection = -1;
+          newRadius = 400;
+        } else if (newRadius < 100) {
+          radiusDirection = 1;
+          newRadius = 100;
+        }
+        circle.setRadius(newRadius);
+      });
+    }, 100);
+
+    return () => {
+      clearInterval(pulseInterval);
+      markers.forEach((m) => m.setMap(null));
+      circles.forEach((c) => c.setMap(null));
+    };
+  }, [activeSOSAlerts, isMapSdkLoaded]);
+
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     if (typeof google === 'undefined' || !google?.maps) return;
 
     activePolygonsRef.current.forEach((poly) => poly.setMap(null));
     activePolygonsRef.current = [];
+
+    // Override heatmap layer if active SOS alerts are present
+    if (activeSOSAlerts.length > 0) return;
 
     Object.entries(spatialHeatmap).forEach(([cellIndex, driverCount]) => {
       const center = getH3CellCenterGeometry(cellIndex);
@@ -195,7 +314,7 @@ export const ControlRoomDashboard: React.FC = () => {
 
       activePolygonsRef.current.push(hexPolygon);
     });
-  }, [spatialHeatmap]);
+  }, [spatialHeatmap, activeSOSAlerts.length]);
 
   const fetchLedgerLogs = async (): Promise<void> => {
     const token = localStorage.getItem('admin_jwt_token');

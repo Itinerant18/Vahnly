@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDriverOnboardingStore } from '@/store/useDriverOnboardingStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { saveOnboardingStep, uploadDocument, validateQuiz, syncOfflineOnboarding } from '@/api/client';
 
 interface QuizQuestion {
   id: number;
@@ -12,56 +15,68 @@ interface QuizQuestion {
 
 export default function DriverOnboardingWizard() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(1);
+  const { token } = useAuthStore();
+  const { step: currentStep, data: onboardingStoreData, updateData, setStep, clearStore } = useDriverOnboardingStore();
+  
   const [logs, setLogs] = useState<string[]>([]);
-  const [onboardingData, setOnboardingData] = useState({
-    // Step 1: Personal
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [showScore, setShowScore] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+
+  // Hidden file input references for KYC document uploading
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeUploadField, setActiveUploadField] = useState<{ fieldName: string; docType: string } | null>(null);
+
+  const defaultData = {
     fullName: '',
     dob: '',
     gender: 'Male',
     profilePhoto: null as string | null,
     languages: [] as string[],
-    
-    // Step 2: Address
     permAddress: '',
     currAddress: '',
     city: 'Kolkata',
-
-    // Step 3: KYC Docs
     drivingLicense: null as string | null,
     aadhaarId: null as string | null,
     panCard: null as string | null,
     policeVerification: null as string | null,
     addressProof: null as string | null,
-
-    // Step 4: Vehicle Expertise
     manualExpertise: true,
     automaticExpertise: true,
     yearsOfExperience: '5',
-
-    // Step 5: Bank Details
     accountNo: '',
     ifscCode: '',
     holderName: '',
     upiId: '',
     cancelledCheque: null as string | null,
-
-    // Step 6: Emergency Contact
     emergencyName: '',
     emergencyRelation: '',
     emergencyPhone: '',
-
-    // Step 7: Agreement
     signatureName: '',
     agreedToTerms: false,
-
-    // Step 8: Training Quiz Answers
     quizAnswers: {} as Record<number, number>
-  });
+  };
 
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [showScore, setShowScore] = useState(false);
-  const [quizScore, setQuizScore] = useState(0);
+  const onboardingData = { ...defaultData, ...onboardingStoreData };
+
+  const setOnboardingData = (updater: any) => {
+    if (typeof updater === 'object' && updater !== null) {
+      updateData(updater);
+    } else if (typeof updater === 'function') {
+      updateData(updater(onboardingData));
+    }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      alert("Authentication token required to access driver onboarding pipeline.");
+      router.push('/login?role=driver');
+      return;
+    }
+
+    // Attempt to sync any cached offline payloads
+    void syncOfflineOnboarding();
+  }, [token, router]);
 
   // Safety Etiquette quiz data bank
   const quizQuestions: QuizQuestion[] = [
@@ -130,37 +145,129 @@ export default function DriverOnboardingWizard() {
     setLogs((prev) => [str, ...prev]);
   };
 
-  // Simulate file upload
-  const handleSimulatedUpload = (fieldName: string, docName: string) => {
-    logEvent('UPLOAD_START', { fieldName, docName });
-    setUploadProgress((prev) => ({ ...prev, [fieldName]: 10 }));
-    
-    let current = 10;
-    const interval = setInterval(() => {
-      current += 30;
-      if (current >= 100) {
-        clearInterval(interval);
-        setUploadProgress((prev) => ({ ...prev, [fieldName]: 100 }));
-        setOnboardingData((prev) => ({ ...prev, [fieldName]: `s3://driversforu-vault/docs/${fieldName}-${Date.now()}.png` }));
-        logEvent('UPLOAD_COMPLETE', { fieldName, docName, status: 'VERIFIED', reviewer: 'admin-auto-ocr-92' });
-      } else {
-        setUploadProgress((prev) => ({ ...prev, [fieldName]: current }));
-      }
-    }, 150);
+  const triggerUploadClick = (fieldName: string, docType: string) => {
+    setActiveUploadField({ fieldName, docType });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
   };
 
-  const nextStep = () => {
-    logEvent('STEP_TRANSITION', { from: currentStep, to: currentStep + 1 });
-    setCurrentStep((prev) => prev + 1);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeUploadField) return;
+    const { fieldName, docType } = activeUploadField;
+
+    if (!token) {
+      alert("Session expired. Please log in again.");
+      router.push('/login?role=driver');
+      return;
+    }
+
+    logEvent('UPLOAD_START', { fieldName, docType, fileName: file.name });
+    setUploadProgress((prev) => ({ ...prev, [fieldName]: 10 }));
+
+    try {
+      let currentProgress = 10;
+      const interval = setInterval(() => {
+        currentProgress = Math.min(currentProgress + 15, 90);
+        setUploadProgress((prev) => ({ ...prev, [fieldName]: currentProgress }));
+      }, 100);
+
+      const res = await uploadDocument(token, docType, file);
+      clearInterval(interval);
+      setUploadProgress((prev) => ({ ...prev, [fieldName]: 100 }));
+
+      updateData({ [fieldName]: res.storage_url });
+      logEvent('UPLOAD_COMPLETE', { fieldName, docType, storage_url: res.storage_url });
+    } catch (err) {
+      logEvent('UPLOAD_ERROR', { fieldName, docType, error: String(err) });
+      alert("Failed to upload document. Please try again.");
+      setUploadProgress((prev) => ({ ...prev, [fieldName]: 0 }));
+    }
+  };
+
+  const nextStep = async () => {
+    if (token) {
+      try {
+        // Collect partial step data payload to commit
+        let stepPayload: Record<string, any> = {};
+        if (currentStep === 1) {
+          stepPayload = {
+            fullName: onboardingData.fullName,
+            dob: onboardingData.dob,
+            gender: onboardingData.gender,
+            profilePhoto: onboardingData.profilePhoto,
+            languages: onboardingData.languages,
+          };
+        } else if (currentStep === 2) {
+          stepPayload = {
+            permAddress: onboardingData.permAddress,
+            currAddress: onboardingData.currAddress,
+            city: onboardingData.city,
+          };
+        } else if (currentStep === 3) {
+          stepPayload = {
+            drivingLicense: onboardingData.drivingLicense,
+            aadhaarId: onboardingData.aadhaarId,
+            panCard: onboardingData.panCard,
+            policeVerification: onboardingData.policeVerification,
+            addressProof: onboardingData.addressProof,
+          };
+        } else if (currentStep === 4) {
+          stepPayload = {
+            manualExpertise: onboardingData.manualExpertise,
+            automaticExpertise: onboardingData.automaticExpertise,
+            yearsOfExperience: onboardingData.yearsOfExperience,
+          };
+        } else if (currentStep === 5) {
+          stepPayload = {
+            accountNo: onboardingData.accountNo,
+            ifscCode: onboardingData.ifscCode,
+            holderName: onboardingData.holderName,
+            upiId: onboardingData.upiId,
+            cancelledCheque: onboardingData.cancelledCheque,
+          };
+        } else if (currentStep === 6) {
+          stepPayload = {
+            emergencyName: onboardingData.emergencyName,
+            emergencyRelation: onboardingData.emergencyRelation,
+            emergencyPhone: onboardingData.emergencyPhone,
+          };
+        } else if (currentStep === 7) {
+          stepPayload = {
+            signatureName: onboardingData.signatureName,
+            agreedToTerms: onboardingData.agreedToTerms,
+          };
+        }
+
+        await saveOnboardingStep(token, currentStep, stepPayload);
+        logEvent('STEP_SYNC_SUCCESS', { step: currentStep });
+      } catch (err) {
+        logEvent('STEP_SYNC_FAILED', { step: currentStep, error: String(err) });
+      }
+    }
+
+    const next = currentStep + 1;
+    setStep(next);
+    logEvent('STEP_TRANSITION', { from: currentStep, to: next });
   };
 
   const prevStep = () => {
-    logEvent('STEP_TRANSITION', { from: currentStep, to: currentStep - 1 });
-    setCurrentStep((prev) => prev - 1);
+    const prev = currentStep - 1;
+    setStep(prev);
+    logEvent('STEP_TRANSITION', { from: currentStep, to: prev });
   };
 
-  const saveAndExit = () => {
-    logEvent('SAVE_AND_EXIT', { step: currentStep, dataSnapshot: onboardingData });
+  const saveAndExit = async () => {
+    if (token) {
+      try {
+        await saveOnboardingStep(token, currentStep, onboardingData);
+        logEvent('SAVE_AND_EXIT_SYNC_SUCCESS', { step: currentStep });
+      } catch (err) {
+        logEvent('SAVE_AND_EXIT_SYNC_FAILED', { step: currentStep, error: String(err) });
+      }
+    }
     alert('Onboarding status saved successfully. You can resume this application session later.');
     router.push('/login?role=driver');
   };
@@ -173,44 +280,64 @@ export default function DriverOnboardingWizard() {
     } else {
       current.push(lang);
     }
-    setOnboardingData((prev) => ({ ...prev, languages: current }));
+    setOnboardingData({ languages: current });
     logEvent('LANGUAGE_PREFERENCE_UPDATED', { languages: current });
   };
 
   const handleQuizAnswer = (qId: number, optionIdx: number) => {
     const currentAnswers = { ...onboardingData.quizAnswers, [qId]: optionIdx };
-    setOnboardingData((prev) => ({ ...prev, quizAnswers: currentAnswers }));
+    setOnboardingData({ quizAnswers: currentAnswers });
     logEvent('QUIZ_ANSWER_SELECT', { questionId: qId, selectedOption: optionIdx });
   };
 
-  const evaluateQuizAndSubmit = () => {
-    let score = 0;
-    quizQuestions.forEach((q) => {
-      if (onboardingData.quizAnswers[q.id] === q.correctAnswer) {
-        score += 1;
-      }
+  const evaluateQuizAndSubmit = async () => {
+    if (!token) return;
+
+    // Format quizAnswers keys as strings for backend map matching
+    const formattedAnswers: Record<string, number> = {};
+    Object.entries(onboardingData.quizAnswers).forEach(([qId, val]) => {
+      formattedAnswers[qId] = val as number;
     });
 
-    setQuizScore(score);
-    setShowScore(true);
+    logEvent('QUIZ_SUBMIT_START', { answers: formattedAnswers });
 
-    const passed = score >= 4; // requires 80%+ to pass
-    logEvent('QUIZ_EVALUATION', { score, totalQuestions: quizQuestions.length, passed });
+    try {
+      const res = await validateQuiz(token, formattedAnswers);
+      setQuizScore(res.score);
+      setShowScore(true);
 
-    if (passed) {
-      logEvent('ONBOARDING_COMPLETED', {
-        driverName: onboardingData.fullName,
-        timestamp: new Date().toISOString()
-      });
-      alert('Verification Completed! Welcome to Drivers-For-U Fleet Engine.');
-      router.push('/login?role=driver');
-    } else {
-      alert('Safety & Etiquette Quiz score below standard thresholds (requires 4/5 correct answers). Please review safety details and retry the quiz.');
+      logEvent('QUIZ_SUBMIT_RESPONSE', { passed: res.passed, score: res.score });
+
+      if (res.passed) {
+        logEvent('ONBOARDING_COMPLETED', {
+          driverName: onboardingData.fullName,
+          timestamp: new Date().toISOString()
+        });
+        alert('Verification Completed! Welcome to Drivers-For-U Fleet Engine. Your application has been submitted for administrative KYC approval.');
+        
+        // Clear wizard store
+        clearStore();
+
+        router.push('/driver');
+      } else {
+        alert('Safety & Etiquette Quiz score below standard thresholds (requires 4/5 correct answers). Please review safety details and retry the quiz.');
+      }
+    } catch (err) {
+      logEvent('QUIZ_SUBMIT_ERROR', { error: String(err) });
+      alert("Failed to submit quiz results. Please check network connection.");
     }
   };
 
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
+      {/* Hidden file input for document uploading */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*,application/pdf"
+      />
       
       {/* Onboarding Header */}
       <header className="border-b border-zinc-800 pb-4 flex justify-between items-center w-full max-w-4xl mx-auto text-left">
@@ -315,7 +442,7 @@ export default function DriverOnboardingWizard() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleSimulatedUpload('profilePhoto', 'ProfilePicture_Scan')}
+                    onClick={() => triggerUploadClick('profilePhoto', 'PROFILE_PHOTO')}
                     className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
                   >
                     {uploadProgress.profilePhoto ? `Uploading ${uploadProgress.profilePhoto}%` : 'Upload Live Scan'}
@@ -373,11 +500,11 @@ export default function DriverOnboardingWizard() {
               <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 3 — KYC Verification Credentials</h2>
               <div className="space-y-4">
                 {[
-                  { field: 'drivingLicense', label: 'Driving License (Front & Back OCR Scan)' },
-                  { field: 'aadhaarId', label: 'Aadhaar Card (National ID)' },
-                  { field: 'panCard', label: 'Permanent Account Number (PAN Card)' },
-                  { field: 'policeVerification', label: 'Police Clearance Certificate (Last 6 Months)' },
-                  { field: 'addressProof', label: 'Address Proof Document (Utility Bill / Rent Agreement)' }
+                  { field: 'drivingLicense', label: 'Driving License (Front & Back OCR Scan)', type: 'DL_FRONT' },
+                  { field: 'aadhaarId', label: 'Aadhaar Card (National ID)', type: 'AADHAAR' },
+                  { field: 'panCard', label: 'Permanent Account Number (PAN Card)', type: 'PAN' },
+                  { field: 'policeVerification', label: 'Police Clearance Certificate (Last 6 Months)', type: 'POLICE_VERIFY' },
+                  { field: 'addressProof', label: 'Address Proof Document (Utility Bill / Rent Agreement)', type: 'ADDRESS_PROOF' }
                 ].map((doc) => (
                   <div key={doc.field} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl">
                     <div>
@@ -391,7 +518,7 @@ export default function DriverOnboardingWizard() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleSimulatedUpload(doc.field, doc.label)}
+                      onClick={() => triggerUploadClick(doc.field, doc.type)}
                       className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer font-mono shrink-0"
                     >
                       {uploadProgress[doc.field] ? `Uploading ${uploadProgress[doc.field]}%` : 'Upload Doc'}
@@ -504,7 +631,7 @@ export default function DriverOnboardingWizard() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleSimulatedUpload('cancelledCheque', 'Cancelled_Cheque_Scan')}
+                    onClick={() => triggerUploadClick('cancelledCheque', 'CANCELLED_CHEQUE')}
                     className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
                   >
                     {uploadProgress.cancelledCheque ? `Uploading ${uploadProgress.cancelledCheque}%` : 'Upload Cancelled Cheque'}
