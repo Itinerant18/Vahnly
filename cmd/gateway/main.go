@@ -100,6 +100,7 @@ func main() {
 
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
 	handler.SetJWTSecret(jwtSecret)
+	go handler.StartGPSWriteBehindWorker(mainCtx)
 
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
 	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, jwtSecret)
@@ -345,6 +346,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/sos", authGuard.AuthenticateJWT(driverDutyHandler.HandleTriggerSOS))
 	mux.HandleFunc("GET /api/v1/driver/stats", authGuard.AuthenticateJWT(driverDutyHandler.HandleGetStats))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
+	mux.HandleFunc("GET /api/v1/driver/orders/{id}", authGuard.AuthenticateJWT(handler.HandleDriverGetOrder))
 
 	mux.HandleFunc("GET /api/v1/pricing/quote", regionRouter.RouteRegionalTraffic(handler.HandleGetPricingQuote))
 	mux.HandleFunc("POST /api/v1/orders/quote", regionRouter.RouteRegionalTraffic(handler.HandleCreatePricingQuote))

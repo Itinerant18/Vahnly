@@ -14,8 +14,25 @@ export function startTelemetryStream(options: TelemetryStreamOptions): () => voi
 
   let isVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
 
-  const sendPosition = (lat: number, lng: number, bearing: number, speedKms: number) => {
+  const sendPosition = async (lat: number, lng: number, bearing: number, speedKms: number) => {
     if (!isVisible) return;
+
+    let batteryLevel = 100;
+    let networkType = 'unknown';
+
+    const nav = navigator as any;
+    if (nav.getBattery) {
+      try {
+        const battery = await nav.getBattery();
+        batteryLevel = Math.round(battery.level * 100);
+      } catch (e) {
+        // ignore
+      }
+    }
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    if (conn) {
+      networkType = conn.type || conn.effectiveType || 'unknown';
+    }
 
     void updateDriverLocation(
       options.token,
@@ -25,6 +42,8 @@ export function startTelemetryStream(options: TelemetryStreamOptions): () => voi
       lng,
       bearing,
       speedKms,
+      batteryLevel,
+      networkType,
     ).catch((err) => {
       console.error('[TELEMETRY_STREAM] Location update failed:', err);
     });

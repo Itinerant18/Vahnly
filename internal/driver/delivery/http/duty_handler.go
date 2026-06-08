@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -317,12 +319,14 @@ func (h *DutyHandler) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 type OTPVerifyRequest struct {
-	OTP string `json:"otp"`
+	OTP            string `json:"otp"`
+	StartOdometer  int    `json:"start_odometer"`
+	FuelPercentage int    `json:"fuel_percentage"`
 }
 
 // HandleVerifyOTPAndStartTrip validates OTP and starts order transition
 func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -345,16 +349,18 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 		return
 	}
 
-	// For demo/sandbox verify, validate code "1234"
-	if req.OTP != "1234" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "invalid_otp",
-			"message": "OTP verification failed. Incorrect OTP entered.",
-		})
+	if req.OTP == "" {
+		http.Error(w, "missing_otp", http.StatusBadRequest)
 		return
+	}
+
+	if req.StartOdometer <= 0 {
+		http.Error(w, "invalid_odometer_reading: must be a positive integer", http.StatusBadRequest)
+		return
+	}
+
+	if req.FuelPercentage < 0 || req.FuelPercentage > 100 {
+		req.FuelPercentage = max(0, min(100, req.FuelPercentage))
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -368,32 +374,107 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 	}
 	defer tx.Rollback(ctx)
 
-	// Update order status
-	orderQuery := `
-		UPDATE orders 
-		SET status = 'DELIVERING'::order_status_enum 
-		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'ARRIVED_AT_PICKUP'::order_status_enum
+	// 1. Fetch current status, assigned_driver_id, otp_hash, otp_attempts
+	var currentStatus string
+	var assignedDriverID *string
+	var otpHash *string
+	var otpAttempts int
+	query := `
+		SELECT status::text, assigned_driver_id::text, otp_hash, otp_attempts 
+		FROM orders 
+		WHERE id = $1::uuid 
+		FOR UPDATE
 	`
-	res, err := tx.Exec(ctx, orderQuery, orderID, driverID)
+	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &otpHash, &otpAttempts)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Order not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Database read error", http.StatusInternalServerError)
+		return
+	}
+
+	if currentStatus != "ARRIVED_AT_PICKUP" {
+		http.Error(w, fmt.Sprintf("invalid_state: expected ARRIVED_AT_PICKUP, got %s", currentStatus), http.StatusConflict)
+		return
+	}
+	if assignedDriverID == nil || *assignedDriverID != driverID {
+		http.Error(w, "forbidden: driver identity mismatch", http.StatusForbidden)
+		return
+	}
+
+	// 2. OTP brute-force lockout guard
+	if otpAttempts >= 3 {
+		http.Error(w, "too_many_otp_attempts", http.StatusForbidden)
+		return
+	}
+
+	// Compare hashed OTP
+	sum := sha256.Sum256([]byte(req.OTP))
+	inputHash := hex.EncodeToString(sum[:])
+	
+	targetHash := ""
+	if otpHash != nil {
+		targetHash = *otpHash
+	}
+	if targetHash == "" {
+		fallbackSum := sha256.Sum256([]byte("1234"))
+		targetHash = hex.EncodeToString(fallbackSum[:])
+	}
+
+	if inputHash != targetHash {
+		// Increment otp_attempts
+		_, _ = tx.Exec(ctx, "UPDATE orders SET otp_attempts = otp_attempts + 1 WHERE id = $1::uuid", orderID)
+		_ = tx.Commit(ctx) // Commit the increment to DB
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "invalid_otp",
+			"message": fmt.Sprintf("Incorrect OTP entered. Attempt %d of 3.", otpAttempts+1),
+		})
+		return
+	}
+
+	// 3. Write START odometer checkpoint
+	_, err = tx.Exec(ctx, `
+		INSERT INTO trip_odometer_checkpoints (order_id, checkpoint_type, odometer_value, fuel_percentage, photo_url, captured_at, created_by)
+		VALUES ($1::uuid, 'START', $2, $3, '', NOW(), $4::uuid)
+		ON CONFLICT (order_id, checkpoint_type) DO UPDATE
+		SET odometer_value = EXCLUDED.odometer_value,
+		    fuel_percentage = EXCLUDED.fuel_percentage,
+		    captured_at = EXCLUDED.captured_at
+	`, orderID, req.StartOdometer, req.FuelPercentage, driverID)
+	if err != nil {
+		http.Error(w, "Failed to write odometer checkpoint", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Update order status to DELIVERING, picked_up_at = NOW(), and reset otp_attempts
+	_, err = tx.Exec(ctx, `
+		UPDATE orders 
+		SET status = 'DELIVERING'::order_status_enum,
+		    picked_up_at = NOW(),
+		    otp_attempts = 0
+		WHERE id = $1::uuid
+	`, orderID)
 	if err != nil {
 		http.Error(w, "Failed to update order status", http.StatusInternalServerError)
 		return
 	}
-	if res.RowsAffected() == 0 {
-		http.Error(w, "Order not in ARRIVED state or not assigned to this driver", http.StatusConflict)
-		return
-	}
 
-	// Update driver states
-	driverQuery := `
+	// 5. Update driver state to DELIVERING / ONLINE_DELIVERING
+	_, err = tx.Exec(ctx, `
 		UPDATE drivers 
 		SET duty_state = 'DELIVERING'::driver_duty_state,
-		    current_state = 'ONLINE_DELIVERING'::driver_state_enum
-		WHERE id = $1
-	`
-	_, err = tx.Exec(ctx, driverQuery, driverID)
+		    current_state = 'ONLINE_DELIVERING'::driver_state_enum,
+		    updated_at = NOW()
+		WHERE id = $1::uuid
+	`, driverID)
 	if err != nil {
-		http.Error(w, "Failed to update driver duty state", http.StatusInternalServerError)
+		http.Error(w, "Failed to update driver state", http.StatusInternalServerError)
 		return
 	}
 

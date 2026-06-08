@@ -57,12 +57,12 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if req.EventType != "ADD_TOLL" && req.EventType != "ADD_STOP" && req.EventType != "toll_added" && req.EventType != "parking_added" && req.EventType != "waiting_added" {
-		http.Error(w, "invalid_event_type: must be ADD_TOLL, ADD_STOP, toll_added, parking_added, or waiting_added", http.StatusBadRequest)
+	if req.EventType != "ADD_TOLL" && req.EventType != "ADD_STOP" && req.EventType != "toll_added" && req.EventType != "parking_added" && req.EventType != "waiting_added" && req.EventType != "REPORT_ISSUE" {
+		http.Error(w, "invalid_event_type: must be ADD_TOLL, ADD_STOP, toll_added, parking_added, waiting_added, or REPORT_ISSUE", http.StatusBadRequest)
 		return
 	}
-	if req.AmountPaise <= 0 {
-		http.Error(w, "invalid_amount: must be greater than zero", http.StatusBadRequest)
+	if req.AmountPaise < 0 || (req.EventType != "REPORT_ISSUE" && req.AmountPaise <= 0) {
+		http.Error(w, "invalid_amount: must be greater than zero (or non-negative for REPORT_ISSUE)", http.StatusBadRequest)
 		return
 	}
 
@@ -119,17 +119,19 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// 2. Post unbalanced credit entry for the driver to trigger discrepancy alert
-	ledgerInsert := `
-		INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
-		VALUES ($1::uuid, $2, $2, 'DRIVER_EARNINGS', 'CREDIT', $3, $4, NOW())
-	`
-	desc := fmt.Sprintf("Mid-trip mutation: %s - %s", req.EventType, req.Description)
-	_, err = tx.Exec(ctx, ledgerInsert, orderID, cityPrefix, req.AmountPaise, desc)
-	if err != nil {
-		log.Printf("[ADD_ORDER_EVENT] Failed inserting ledger entry: %v", err)
-		http.Error(w, "failed_to_post_ledger", http.StatusInternalServerError)
-		return
+	// 2. Post unbalanced credit entry for the driver to trigger discrepancy alert (skip for REPORT_ISSUE)
+	if req.EventType != "REPORT_ISSUE" {
+		ledgerInsert := `
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
+			VALUES ($1::uuid, $2, $2, 'DRIVER_EARNINGS', 'CREDIT', $3, $4, NOW())
+		`
+		desc := fmt.Sprintf("Mid-trip mutation: %s - %s", req.EventType, req.Description)
+		_, err = tx.Exec(ctx, ledgerInsert, orderID, cityPrefix, req.AmountPaise, desc)
+		if err != nil {
+			log.Printf("[ADD_ORDER_EVENT] Failed inserting ledger entry: %v", err)
+			http.Error(w, "failed_to_post_ledger", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// 3. Compute updated total fare estimate
@@ -278,6 +280,17 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 		log.Printf("[END_TRIP] Failed inserting END checkpoint: %v", err)
 		http.Error(w, "checkpoint_write_failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Save dashboard photo to driver_documents if present
+	if req.PhotoURL != "" {
+		_, docErr := tx.Exec(ctx, `
+			INSERT INTO driver_documents (driver_id, document_type, storage_url, status)
+			VALUES ($1::uuid, 'TRIP_END_DASHBOARD_PHOTO', $2, 'VERIFIED')
+		`, driverID, req.PhotoURL)
+		if docErr != nil {
+			log.Printf("[END_TRIP] Failed saving dashboard photo to driver_documents: %v", docErr)
+		}
 	}
 
 	// 2. Finalize trip status

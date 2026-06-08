@@ -365,6 +365,8 @@ export async function updateDriverLocation(
   longitude: number,
   bearing: number,
   speedKms: number,
+  battery?: number,
+  networkType?: string,
 ): Promise<DriverLocationResponse> {
   return request<DriverLocationResponse>('/api/v1/driver/location', {
     method: 'POST',
@@ -376,6 +378,8 @@ export async function updateDriverLocation(
       longitude,
       bearing,
       speed_kms: speedKms,
+      battery,
+      network_type: networkType,
     },
   });
 }
@@ -623,11 +627,17 @@ export async function verifyTripOTP(
   token: string,
   orderId: string,
   otp: string,
+  startOdometer: number,
+  fuelPercentage: number,
 ): Promise<{ success: boolean; status: string }> {
   return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/verify-otp`, {
-    method: 'POST',
+    method: 'PATCH',
     token,
-    body: { otp },
+    body: {
+      otp,
+      start_odometer: startOdometer,
+      fuel_percentage: fuelPercentage,
+    },
   });
 }
 
@@ -687,7 +697,7 @@ export interface FinalBill {
 export async function addOrderEvent(
   token: string,
   orderId: string,
-  payload: { event_type: 'ADD_TOLL' | 'ADD_STOP'; amount_paise: number; description: string },
+  payload: { event_type: 'ADD_TOLL' | 'ADD_STOP' | 'REPORT_ISSUE'; amount_paise: number; description: string },
 ): Promise<{ success: boolean; message: string }> {
   return request<{ success: boolean; message: string }>(`/api/v1/driver/orders/${orderId}/events`, {
     method: 'POST',

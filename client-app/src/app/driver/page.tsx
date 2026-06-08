@@ -8,6 +8,7 @@ import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import { DriverTripManager } from '../../components/DriverTripManager';
+import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
 import {
   completeTrip,
   getDriverProfile,
@@ -164,6 +165,7 @@ export default function DriverTerminalPage() {
 
   // Live Audit Telemetry Log Vault
   const [auditLogs, setAuditLogs] = useState<string[]>([]);
+  const [mapDrivers, setMapDrivers] = useState<MapDriver[]>([]);
 
   // Core structural pointers
   const telemetryStopRef = useRef<(() => void) | null>(null);
@@ -301,16 +303,26 @@ export default function DriverTerminalPage() {
           if (next >= 100) {
             return 0; // loop back to simulate telemetry loop
           }
+          const currentLat = dutyState === 'EN_ROUTE'
+            ? 22.5487 + (next / 100) * (22.5726 - 22.5487)
+            : 22.5726 + (next / 100) * (22.5855 - 22.5726);
+          const currentLng = dutyState === 'EN_ROUTE'
+            ? 88.3561 + (next / 100) * (88.3639 - 88.3561)
+            : 88.3639 + (next / 100) * (88.3411 - 88.3639);
+
           // Log a sample coordinate ping every 5 seconds equivalent (progress splits)
           if (next % 10 === 0) {
-            const currentLat = dutyState === 'EN_ROUTE'
-              ? 22.5487 + (next / 100) * (22.5726 - 22.5487)
-              : 22.5726 + (next / 100) * (22.5855 - 22.5726);
-            const currentLng = dutyState === 'EN_ROUTE'
-              ? 88.3561 + (next / 100) * (88.3639 - 88.3561)
-              : 88.3639 + (next / 100) * (88.3411 - 88.3639);
             logAudit('GPS_PING', { lat: currentLat.toFixed(6), lng: currentLng.toFixed(6), speed_kmh: 42 + Math.floor(Math.random() * 15) });
           }
+
+          setMapDrivers([{
+            id: driverID,
+            latitude: currentLat,
+            longitude: currentLng,
+            bearing: dutyState === 'EN_ROUTE' ? 45 : 135,
+            speed: 42
+          }]);
+
           return next;
         });
       }, 300);
@@ -382,6 +394,13 @@ export default function DriverTerminalPage() {
               lng: frame.longitude,
               speed_kms: frame.speed_kms,
             });
+            setMapDrivers([{
+              id: frame.driver_id || driverID,
+              latitude: frame.latitude,
+              longitude: frame.longitude,
+              bearing: frame.bearing || 0,
+              speed: frame.speed_kms || 0
+            }]);
           },
           onClose: () => {
             setStreamStatus('DISCONNECTED');
@@ -689,6 +708,7 @@ export default function DriverTerminalPage() {
       parking: parkingCharges
     });
 
+    let finalBillData: any = null;
     if (activeTrip?.order_id && token) {
       try {
         const bill = await driverEndTrip(token, activeTrip.order_id, {
@@ -697,10 +717,11 @@ export default function DriverTerminalPage() {
           photo_url: endOdoPhoto || '',
         });
         setFinalBill(bill);
+        finalBillData = bill;
         logAudit('TRIP_END_SYNCED', { orderId: activeTrip.order_id, total: bill.total_fare_paise });
       } catch (err) {
         console.warn('End trip sync failed, using local fallback calculations:', err);
-        setFinalBill({
+        const fallbackBill = {
           order_id: activeTrip.order_id,
           base_fare_paise: activeTrip.quoted_fare_paise,
           distance_km: endNum - startNum,
@@ -714,11 +735,40 @@ export default function DriverTerminalPage() {
           night_surge_paise: 5000,
           care_surcharge_paise: 1500,
           total_fare_paise: calculateTotalBill() * 100,
-        });
+        };
+        setFinalBill(fallbackBill);
+        finalBillData = fallbackBill;
       }
+    } else if (activeTrip) {
+      const mockBill = {
+        order_id: activeTrip.order_id,
+        base_fare_paise: activeTrip.quoted_fare_paise,
+        distance_km: endNum - startNum,
+        distance_charge_paise: Math.max(0, (endNum - startNum) - 15) * 1800,
+        wait_minutes: Math.round(waitingCharges / 2),
+        wait_charge_paise: Math.round(waitingCharges) * 100,
+        overtime_minutes: 10,
+        overtime_charge_paise: 500,
+        tolls_paise: tollCharges * 100,
+        parking_charges_paise: parkingCharges * 100,
+        night_surge_paise: 5000,
+        care_surcharge_paise: 1500,
+        total_fare_paise: calculateTotalBill() * 100,
+      };
+      setFinalBill(mockBill);
+      finalBillData = mockBill;
     }
 
-    setDutyState('COMPLETED');
+    if (finalBillData && activeTrip) {
+      try {
+        sessionStorage.setItem(`final_bill_${activeTrip.order_id}`, JSON.stringify(finalBillData));
+        sessionStorage.setItem('current_final_bill', JSON.stringify(finalBillData));
+      } catch (e) {}
+      setDutyState('COMPLETED');
+      router.push(`/driver/trip/bill?order_id=${activeTrip.order_id}`);
+    } else {
+      setDutyState('COMPLETED');
+    }
   };
 
   const handlePaymentConfirmationSubmit = async (method: string) => {
@@ -838,6 +888,12 @@ export default function DriverTerminalPage() {
       </div>
     );
   }
+
+  const triggerSOS = () => {
+    setSosActive(true);
+    setSosCountdown(5);
+    logAudit('SOS_CRITICAL_TRIGGERED', { driverID, time: new Date().toISOString() });
+  };
 
   return (
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-x-hidden relative">
@@ -1069,87 +1125,26 @@ export default function DriverTerminalPage() {
       <main className="flex-1 flex flex-col relative min-h-[350px]">
         {/* Stylized background custom map simulation */}
         <div className="absolute inset-0 bg-zinc-950 z-0 overflow-hidden flex items-center justify-center" style={{ filter: dutyState === 'OFFLINE' ? 'grayscale(1)' : 'none' }}>
-          {/* Simulated SVG grid network representing city map */}
-          <svg className="w-full h-full opacity-35 transition duration-500" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-            
-            {/* Heatmap zones (Kolkata representation) */}
-            {showHeatmap && dutyState !== 'OFFLINE' && (
-              <>
-                {Object.entries(heatmapData?.cell_data ?? {})
-                  .sort(([, a], [, b]) => b - a)
-                  .slice(0, 24)
-                  .map(([cell, density]) => {
-                    const points = h3CellToSvgPoints(cell);
-                    if (!points) return null;
-                    const alpha = Math.min(0.55, 0.14 + density * 0.035);
-                    return (
-                      <polygon
-                        key={cell}
-                        points={points}
-                        fill={`rgba(239, 68, 68, ${alpha})`}
-                        stroke="rgba(255,255,255,0.22)"
-                        strokeWidth="0.6"
-                      />
-                    );
-                  })}
-                {!heatmapData && (
-                  <>
-                    <circle cx="65%" cy="35%" r="80" fill="rgba(239, 68, 68, 0.15)" filter="blur(10px)" />
-                    <circle cx="65%" cy="35%" r="40" fill="rgba(239, 68, 68, 0.25)" />
-                    <circle cx="35%" cy="65%" r="70" fill="rgba(245, 158, 11, 0.15)" filter="blur(10px)" />
-                    <circle cx="35%" cy="65%" r="30" fill="rgba(245, 158, 11, 0.25)" />
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Ambient Driver Pins */}
-            {dutyState === 'ONLINE' && (
-              <>
-                <circle cx="45%" cy="40%" r="4" fill="#a1a1aa" className="animate-pulse" />
-                <circle cx="50%" cy="55%" r="4" fill="#a1a1aa" />
-                <circle cx="62%" cy="48%" r="4" fill="#a1a1aa" />
-              </>
-            )}
-
-            {/* Active Route Draw Matrix */}
-            {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
-              <>
-                {/* Route line */}
-                <line 
-                  x1="35%" y1="65%" 
-                  x2="65%" y2="35%" 
-                  stroke="#3b82f6" 
-                  strokeWidth="3" 
-                  strokeDasharray="6,4" 
-                />
-                
-                {/* Pickup node pin */}
-                <circle cx="35%" cy="65%" r="8" fill="#10b981" />
-                <text x="35%" y="65%" fill="#fff" fontSize="8" fontFamily="monospace" textAnchor="middle" dy="3">P</text>
-                
-                {/* Dropoff node pin */}
-                <circle cx="65%" cy="35%" r="8" fill="#ef4444" />
-                <text x="65%" y="35%" fill="#fff" fontSize="8" fontFamily="monospace" textAnchor="middle" dy="3">D</text>
-
-                {/* Gliding Car Icon */}
-                <circle 
-                  cx={`${35 + (mapGlideProgress / 100) * (65 - 35)}%`} 
-                  cy={`${65 + (mapGlideProgress / 100) * (35 - 65)}%`} 
-                  r="6" 
-                  fill="#ffffff" 
-                  stroke="#1e3a8a" 
-                  strokeWidth="2" 
-                />
-              </>
-            )}
-          </svg>
+          {dutyState === 'OFFLINE' ? (
+            <svg className="w-full h-full opacity-35 transition duration-500" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+          ) : (
+            <div className="w-full h-full p-0 bg-black">
+              <MapInterpolated
+                drivers={mapDrivers}
+                pickup={activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : null}
+                destination={activeTrip ? { lat: activeTrip.dropoff_lat, lng: activeTrip.dropoff_lng } : null}
+                center={activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : { lat: 22.5726, lng: 88.3639 }}
+                theme="dark"
+              />
+            </div>
+          )}
 
           {/* Turn-by-Turn Navigation Floating Panel */}
           {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
@@ -1215,12 +1210,16 @@ export default function DriverTerminalPage() {
             setPreferredTripFilter={setPreferredTripFilter}
             handleToggleDutySwitch={handleToggleDutySwitch}
             logAudit={logAudit}
+            triggerSOS={triggerSOS}
             mapGlideProgress={mapGlideProgress}
             setShowCancelModal={setShowCancelModal}
             handleArrivedAtPickup={handleArrivedAtPickup}
             freeWaitSeconds={freeWaitSeconds}
+            setFreeWaitSeconds={setFreeWaitSeconds}
             waitingCharges={waitingCharges}
+            setWaitingCharges={setWaitingCharges}
             otpError={otpError}
+            setOtpError={setOtpError}
             startOdometer={startOdometer}
             setStartOdometer={setStartOdometer}
             startFuel={startFuel}
@@ -1229,7 +1228,6 @@ export default function DriverTerminalPage() {
             setStartOdoPhoto={setStartOdoPhoto}
             otpVerificationCode={otpVerificationCode}
             setOtpVerificationCode={setOtpVerificationCode}
-            handleVerifyOtpAndStart={handleVerifyOtpAndStart}
             setDutyState={setDutyState}
             setActiveTrip={setActiveTrip}
             tollCharges={tollCharges}

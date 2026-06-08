@@ -1,0 +1,5 @@
+ALTER TABLE orders_gps_trail 
+DROP COLUMN IF EXISTS speed,
+DROP COLUMN IF EXISTS heading,
+DROP COLUMN IF EXISTS battery,
+DROP COLUMN IF EXISTS network_type;

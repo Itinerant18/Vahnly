@@ -3,6 +3,8 @@ import { DutyState, useDriverDutyStore } from '../store/useDriverDutyStore';
 import { OfferPopup } from './OfferPopup';
 import { SlideToConfirm } from './SlideToConfirm';
 import { FinalBill } from '../api/client';
+import { ArrivedVerificationPane } from '../app/driver/trip/live/ArrivedVerificationPane';
+import { TripInProgressPane } from '../app/driver/trip/live/TripInProgressPane';
 
 interface DashboardHomeProps {
   dutyState: DutyState;
@@ -230,343 +232,8 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
   );
 };
 
-interface ArrivedVerificationPaneProps {
-  activeTrip: any;
-  freeWaitSeconds: number;
-  waitingCharges: number;
-  otpError: string;
-  startOdometer: string;
-  setStartOdometer: (o: string) => void;
-  startFuel: number;
-  setStartFuel: (f: number) => void;
-  startOdoPhoto: string | null;
-  setStartOdoPhoto: (p: string | null) => void;
-  otpVerificationCode: string;
-  setOtpVerificationCode: (c: string) => void;
-  handleVerifyOtpAndStart: (e: React.FormEvent) => Promise<void>;
-  logAudit: (e: string, m: any) => void;
-  setDutyState: (s: DutyState) => void;
-  setActiveTrip: (t: any) => void;
-}
 
-export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = ({
-  activeTrip,
-  freeWaitSeconds,
-  waitingCharges,
-  otpError,
-  startOdometer,
-  setStartOdometer,
-  startFuel,
-  setStartFuel,
-  startOdoPhoto,
-  setStartOdoPhoto,
-  otpVerificationCode,
-  setOtpVerificationCode,
-  handleVerifyOtpAndStart,
-  logAudit,
-  setDutyState,
-  setActiveTrip,
-}) => {
-  return (
-    <div className="space-y-4 text-left animate-fadeIn">
-      <div className="border-b border-zinc-900 pb-3">
-        <span className="bg-amber-950 text-amber-400 font-mono font-bold text-[8px] uppercase tracking-widest px-2.5 py-1 rounded border border-amber-900">
-          🔐 SECURE PICKUP CHECKPOINT PANEL
-        </span>
-        <div className="flex justify-between items-center mt-2.5">
-          <div>
-            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Client</span>
-            <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
-          </div>
-        </div>
-      </div>
 
-      {/* Wait charge accumulator */}
-      <div className="flex items-center gap-3 bg-zinc-900/40 border border-zinc-900 p-3 rounded-xl font-mono">
-        {freeWaitSeconds > 0 ? (
-          <>
-            <div className="h-8 w-8 rounded-full border-2 border-zinc-800 border-t-zinc-400 animate-spin flex items-center justify-center text-[10px] font-bold text-zinc-400">
-              ⏳
-            </div>
-            <div>
-              <span className="text-[8px] text-zinc-505 uppercase tracking-widest block">Free Waiting Period</span>
-              <span className="text-xs font-bold text-white font-mono">
-                {Math.floor(freeWaitSeconds / 60)}:{(freeWaitSeconds % 60).toString().padStart(2, '0')} Remaining
-              </span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="h-8 w-8 rounded-full bg-red-950 border border-red-800 flex items-center justify-center text-xs animate-pulse">
-              🚨
-            </div>
-            <div>
-              <span className="text-[8px] text-zinc-505 uppercase tracking-widest block text-red-400 font-bold">Waiting Charges Incurred</span>
-              <span className="text-xs font-bold text-amber-500 animate-pulse">
-                ₹{waitingCharges.toFixed(2)} (Accumulating at ₹2/min)
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Speedometer odometer captures & OTP verification lock */}
-      <form onSubmit={handleVerifyOtpAndStart} className="space-y-3 font-mono">
-        {otpError && (
-          <div className="bg-red-950 border border-red-900 text-red-200 text-[10px] p-2.5 rounded-xl font-bold uppercase">
-            ❌ {otpError}
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Start Odometer KM</label>
-            <input
-              type="number"
-              value={startOdometer}
-              onChange={(e) => setStartOdometer(e.target.value)}
-              placeholder="e.g. 23450"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-zinc-500 text-xs"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Fuel Gauge ({startFuel}%)</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={startFuel}
-              onChange={(e) => setStartFuel(parseInt(e.target.value))}
-              className="w-full h-8 cursor-pointer"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-505 uppercase tracking-wider mb-1">Dashboard Scan (Optional)</label>
-            <button
-              type="button"
-              onClick={() => {
-                setStartOdoPhoto(`s3://odometer-captures/start-${Date.now()}.png`);
-                logAudit('ODOMETER_PHOTO_UPLOADED', { stage: 'START' });
-              }}
-              className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-[9px] font-bold uppercase py-2.5 rounded-xl text-zinc-400 cursor-pointer"
-            >
-              {startOdoPhoto ? '✔️ Capture Ready' : '📷 Take Dash Photo'}
-            </button>
-          </div>
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Enter Ride OTP (from Rider)</label>
-            <input
-              type="text"
-              value={otpVerificationCode}
-              onChange={(e) => setOtpVerificationCode(e.target.value)}
-              placeholder="e.g. 1234"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-zinc-500 text-xs text-center font-bold tracking-widest"
-              maxLength={4}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 pt-2">
-          <button
-            type="submit"
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 text-center font-sans"
-          >
-            Verify OTP & Start Trip
-          </button>
-
-          <button
-            type="button"
-            disabled={freeWaitSeconds > 0}
-            onClick={() => {
-              if (confirm('Report rider no-show? This will cancel the booking with reason RIDER_NO_SHOW.')) {
-                logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id, reason: 'RIDER_NO_SHOW' });
-                setActiveTrip(null);
-                setDutyState('ONLINE');
-              }
-            }}
-            className={`w-full py-3 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer text-center ${
-              freeWaitSeconds > 0
-                ? 'bg-zinc-900 text-zinc-650 border border-zinc-950 cursor-not-allowed opacity-40'
-                : 'bg-zinc-900 hover:bg-zinc-850 text-red-500 border border-zinc-800'
-            }`}
-            title={freeWaitSeconds > 0 ? 'Disabled during free wait period' : 'Report no-show'}
-          >
-            Report Rider No-Show {freeWaitSeconds > 0 ? `(${Math.floor(freeWaitSeconds / 60)}:${(freeWaitSeconds % 60).toString().padStart(2, '0')})` : ''}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-interface TripInProgressPaneProps {
-  activeTrip: any;
-  tollCharges: number;
-  parkingCharges: number;
-  handleTollAddition: () => void;
-  handleParkingAddition: () => void;
-  endOdometer: string;
-  setEndOdometer: (o: string) => void;
-  endFuel: number;
-  setEndFuel: (f: number) => void;
-  startOdometer: string;
-  endOdoPhoto: string | null;
-  setEndOdoPhoto: (p: string | null) => void;
-  handleSlideToEndTrip: () => Promise<void>;
-}
-
-export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
-  activeTrip,
-  tollCharges,
-  parkingCharges,
-  handleTollAddition,
-  handleParkingAddition,
-  endOdometer,
-  setEndOdometer,
-  endFuel,
-  setEndFuel,
-  startOdometer,
-  endOdoPhoto,
-  setEndOdoPhoto,
-  handleSlideToEndTrip,
-}) => {
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
-  const currentTotalFare = (activeTrip.quoted_fare_paise / 100) + tollCharges + parkingCharges;
-
-  if (isCollapsed) {
-    return (
-      <div className="space-y-4 text-left animate-fadeIn">
-        <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
-          <div>
-            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Transit in Progress</span>
-            <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCollapsed(false)}
-              className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-900 rounded border border-zinc-800 cursor-pointer"
-            >
-              ▼ EXPAND
-            </button>
-            <div className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[8px] font-mono font-bold px-2 py-1 rounded animate-pulse">
-              DELIVERING
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-850 flex justify-between items-center font-mono">
-          <div>
-            <span className="text-zinc-500 text-[7px] uppercase block">Current Fare</span>
-            <span className="text-base font-bold text-white block mt-0.5">₹{currentTotalFare.toFixed(2)}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-zinc-500 text-[7px] uppercase block">Rider Name</span>
-            <span className="text-xs font-bold text-zinc-300 block mt-0.5">{activeTrip.customer_name}</span>
-          </div>
-        </div>
-
-        <SlideToConfirm
-          label="Slide to End Journey"
-          onConfirm={handleSlideToEndTrip}
-          color="red"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 text-left animate-fadeIn">
-      <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
-        <div>
-          <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Active Transit in Progress</span>
-          <h3 className="text-xs font-bold text-white mt-0.5">{activeTrip.customer_name}</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCollapsed(true)}
-            className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-900 rounded border border-zinc-800 cursor-pointer"
-          >
-            ▲ COLLAPSE
-          </button>
-          <div className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[8px] font-mono font-bold px-2 py-1 rounded animate-pulse">
-            DELIVERING
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 font-mono text-[9px] uppercase font-bold text-zinc-400 text-center">
-        <div className="bg-zinc-900 p-2.5 rounded-lg">
-          <span className="text-zinc-600 block text-[7px]">BASE FARE</span>
-          <span className="text-white block mt-0.5">₹{(activeTrip.quoted_fare_paise / 100).toFixed(0)}</span>
-        </div>
-        <div className="bg-zinc-900 p-2.5 rounded-lg">
-          <span className="text-zinc-600 block text-[7px]">TOLLS ADDED</span>
-          <span className="text-white block mt-0.5">₹{tollCharges}</span>
-        </div>
-        <div className="bg-zinc-900 p-2.5 rounded-lg">
-          <span className="text-zinc-600 block text-[7px]">PARKING FEES</span>
-          <span className="text-white block mt-0.5">₹{parkingCharges}</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={handleTollAddition}
-          className="bg-zinc-900 hover:bg-zinc-855 border border-zinc-850 text-[9px] font-mono font-bold uppercase py-2 rounded-xl text-zinc-300 cursor-pointer"
-        >
-          ➕ Add Toll (₹50)
-        </button>
-        <button
-          onClick={handleParkingAddition}
-          className="bg-zinc-900 hover:bg-zinc-855 border border-zinc-850 text-[9px] font-mono font-bold uppercase py-2 rounded-xl text-zinc-300 cursor-pointer"
-        >
-          ➕ Add Parking (₹30)
-        </button>
-      </div>
-
-      <div className="bg-zinc-900/50 p-4 border border-zinc-900 rounded-xl space-y-3 font-mono">
-        <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block border-b border-zinc-850 pb-1.5">
-          End Odometer Capture (Required to Slide Close)
-        </span>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-600 uppercase mb-1">End Odometer KM</label>
-            <input
-              type="number"
-              value={endOdometer}
-              onChange={(e) => setEndOdometer(e.target.value)}
-              placeholder={`>${startOdometer} KM`}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-zinc-500 text-xs"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[8px] font-bold text-zinc-600 uppercase mb-1">End Fuel ({endFuel}%)</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={endFuel}
-              onChange={(e) => setEndFuel(parseInt(e.target.value))}
-              className="w-full h-8 cursor-pointer animate-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      <SlideToConfirm
-        label="Slide to End Journey"
-        onConfirm={handleSlideToEndTrip}
-        color="red"
-      />
-    </div>
-  );
-};
 
 interface CompletedPaneProps {
   activeTrip: any;
@@ -731,8 +398,11 @@ interface DriverTripManagerProps {
 
   // Arrived props
   freeWaitSeconds: number;
+  setFreeWaitSeconds: (s: number) => void;
   waitingCharges: number;
+  setWaitingCharges: (c: number) => void;
   otpError: string;
+  setOtpError: (err: string) => void;
   startOdometer: string;
   setStartOdometer: (o: string) => void;
   startFuel: number;
@@ -741,7 +411,6 @@ interface DriverTripManagerProps {
   setStartOdoPhoto: (p: string | null) => void;
   otpVerificationCode: string;
   setOtpVerificationCode: (c: string) => void;
-  handleVerifyOtpAndStart: (e: React.FormEvent) => Promise<void>;
   setDutyState: (s: DutyState) => void;
   setActiveTrip: (t: any) => void;
 
@@ -757,6 +426,7 @@ interface DriverTripManagerProps {
   endOdoPhoto: string | null;
   setEndOdoPhoto: (p: string | null) => void;
   handleSlideToEndTrip: () => Promise<void>;
+  triggerSOS?: () => void;
 
   // Completed props
   riderRating: number;
@@ -790,8 +460,11 @@ export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
         <ArrivedVerificationPane
           activeTrip={props.activeTrip}
           freeWaitSeconds={props.freeWaitSeconds}
+          setFreeWaitSeconds={props.setFreeWaitSeconds}
           waitingCharges={props.waitingCharges}
+          setWaitingCharges={props.setWaitingCharges}
           otpError={props.otpError}
+          setOtpError={props.setOtpError}
           startOdometer={props.startOdometer}
           setStartOdometer={props.setStartOdometer}
           startFuel={props.startFuel}
@@ -800,7 +473,6 @@ export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
           setStartOdoPhoto={props.setStartOdoPhoto}
           otpVerificationCode={props.otpVerificationCode}
           setOtpVerificationCode={props.setOtpVerificationCode}
-          handleVerifyOtpAndStart={props.handleVerifyOtpAndStart}
           logAudit={props.logAudit}
           setDutyState={props.setDutyState}
           setActiveTrip={props.setActiveTrip}
@@ -823,6 +495,8 @@ export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
           endOdoPhoto={props.endOdoPhoto}
           setEndOdoPhoto={props.setEndOdoPhoto}
           handleSlideToEndTrip={props.handleSlideToEndTrip}
+          triggerSOS={props.triggerSOS}
+          logAudit={props.logAudit}
         />
       );
     case 'COMPLETED':

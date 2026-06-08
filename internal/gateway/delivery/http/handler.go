@@ -31,11 +31,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
+	domain "github.com/platform/driver-delivery/internal/domain"
 	"github.com/platform/driver-delivery/internal/events"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	. "github.com/platform/driver-delivery/pkg/api/v1"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 )
 
@@ -2013,6 +2015,78 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// HandleDriverGetOrder returns active order details for the driver (including waiting_started_at and last_odometer)
+// Path: GET /api/v1/driver/orders/{id}
+func (h *GatewayHandler) HandleDriverGetOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+	defer cancel()
+
+	var (
+		status           string
+		waitingStartedAt sql.NullTime
+	)
+
+	// Fetch order details
+	queryOrder := `
+		SELECT status::text, waiting_started_at 
+		FROM orders 
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid;
+	`
+	err := h.dbPool.QueryRow(ctx, queryOrder, orderID, driverID).Scan(&status, &waitingStartedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found", http.StatusNotFound)
+			return
+		}
+		log.Printf("[GET_DRIVER_ORDER] Database error querying order %s: %v", orderID, err)
+		http.Error(w, "database_error", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch last odometer reading for this driver/vehicle
+	var lastOdometer int
+	queryOdo := `
+		SELECT COALESCE(
+			(SELECT odometer_value 
+			 FROM trip_odometer_checkpoints toc
+			 JOIN orders ord ON ord.id = toc.order_id
+			 WHERE ord.assigned_driver_id = $1::uuid
+			 ORDER BY toc.captured_at DESC, toc.created_at DESC 
+			 LIMIT 1), 
+			0
+		);
+	`
+	err = h.dbPool.QueryRow(ctx, queryOdo, driverID).Scan(&lastOdometer)
+	if err != nil {
+		log.Printf("[GET_DRIVER_ORDER] Database error querying odometer for driver %s: %v", driverID, err)
+		lastOdometer = 0
+	}
+
+	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"id":                 orderID,
+		"status":             status,
+		"waiting_started_at": nullableTime(waitingStartedAt),
+		"last_odometer":      lastOdometer,
+	})
+}
+
+
 func (h *GatewayHandler) HandleDriverGetTrips(w http.ResponseWriter, r *http.Request) {
 	driverID, ok := requireDriverIdentity(w, r)
 	if !ok {
@@ -2213,12 +2287,15 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 	}
 
 	var req struct {
-		DriverID   string  `json:"driver_id"`
-		CityPrefix string  `json:"city_prefix"`
-		Latitude   float64 `json:"latitude"`
-		Longitude  float64 `json:"longitude"`
-		Bearing    float64 `json:"bearing"`
-		SpeedKms   float64 `json:"speed_kms"`
+		DriverID    string  `json:"driver_id"`
+		CityPrefix  string  `json:"city_prefix"`
+		Latitude    float64 `json:"latitude"`
+		Longitude   float64 `json:"longitude"`
+		Bearing     float64 `json:"bearing"`
+		SpeedKms    float64 `json:"speed_kms"`
+		Battery     *int    `json:"battery,omitempty"`
+		NetworkType string  `json:"network_type,omitempty"`
+		Network     string  `json:"network,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
@@ -2347,19 +2424,37 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 			_ = h.clusterClient.Del(ctx, fmt.Sprintf("driver:stopped:since:%s", req.DriverID)).Err()
 		}
 
-		// Flush GPS ping to orders_gps_trail table in a non-blocking goroutine
-		go func(oID string, lat, lng float64) {
-			dbCtx, dbCancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer dbCancel()
-			insertGPSQuery := `
-				INSERT INTO orders_gps_trail (order_id, latitude, longitude, captured_at)
-				VALUES ($1::uuid, $2, $3, NOW())
-			`
-			_, dbErr := h.dbPool.Exec(dbCtx, insertGPSQuery, oID, lat, lng)
-			if dbErr != nil {
-				log.Printf("[GPS_TRAIL_ERROR] Failed saving active order GPS ping for order %s: %v", oID, dbErr)
+		// Write-Behind: Buffer coordinates in Redis instead of writing immediately to DB.
+		batteryVal := 100
+		if req.Battery != nil {
+			batteryVal = *req.Battery
+		}
+		networkTypeVal := "unknown"
+		if req.Network != "" {
+			networkTypeVal = req.Network
+		} else if req.NetworkType != "" {
+			networkTypeVal = req.NetworkType
+		}
+
+		if orderUUID, uuidErr := uuid.Parse(orderID); uuidErr == nil {
+			ping := domain.GPSPing{
+				OrderID:     orderUUID,
+				Timestamp:   time.Now(),
+				Lat:         req.Latitude,
+				Lng:         req.Longitude,
+				Speed:       req.SpeedKms,
+				Heading:     req.Bearing,
+				Battery:     batteryVal,
+				NetworkType: networkTypeVal,
 			}
-		}(orderID, req.Latitude, req.Longitude)
+			if pingBytes, marshalErr := json.Marshal(ping); marshalErr == nil {
+				redisKey := fmt.Sprintf("orders:gps:buffer:%s", orderID)
+				pipeBuf := h.clusterClient.Pipeline()
+				pipeBuf.RPush(ctx, redisKey, string(pingBytes))
+				pipeBuf.SAdd(ctx, "orders:gps:active_buffers", orderID)
+				_, _ = pipeBuf.Exec(ctx)
+			}
+		}
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -2790,5 +2885,104 @@ func (h *GatewayHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request
 		"trip_id": req.TripID,
 	})
 }
+
+// StartGPSWriteBehindWorker starts a background loop to flush Redis-buffered GPS pings to SQL DB
+func (h *GatewayHandler) StartGPSWriteBehindWorker(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	log.Println("[GPS_WORKER] Started GPS Write-Behind Worker")
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[GPS_WORKER] Stopped GPS Write-Behind Worker")
+			return
+		case <-ticker.C:
+			h.flushGPSBuffers(ctx)
+		}
+	}
+}
+
+func (h *GatewayHandler) flushGPSBuffers(ctx context.Context) {
+	if h.clusterClient == nil || h.dbPool == nil {
+		return
+	}
+
+	// Fetch active buffered order IDs
+	orderIDs, err := h.clusterClient.SMembers(ctx, "orders:gps:active_buffers").Result()
+	if err != nil {
+		log.Printf("[GPS_WORKER] Failed to query active buffers: %v", err)
+		return
+	}
+
+	for _, orderID := range orderIDs {
+		redisKey := fmt.Sprintf("orders:gps:buffer:%s", orderID)
+
+		// Atomic read and deletion using a pipeline
+		pipe := h.clusterClient.Pipeline()
+		lrangeCmd := pipe.LRange(ctx, redisKey, 0, -1)
+		pipe.Del(ctx, redisKey)
+		pipe.SRem(ctx, "orders:gps:active_buffers", orderID)
+
+		_, execErr := pipe.Exec(ctx)
+		if execErr != nil {
+			log.Printf("[GPS_WORKER] Failed executing pipeline for order %s: %v", orderID, execErr)
+			continue
+		}
+
+		pingsJSON := lrangeCmd.Val()
+		if len(pingsJSON) == 0 {
+			continue
+		}
+
+		// Parse pings
+		var pings []domain.GPSPing
+		for _, pingStr := range pingsJSON {
+			var p domain.GPSPing
+			if err := json.Unmarshal([]byte(pingStr), &p); err == nil {
+				pings = append(pings, p)
+			}
+		}
+
+		if len(pings) == 0 {
+			continue
+		}
+
+		// Perform bulk insert
+		dbCtx, dbCancel := context.WithTimeout(ctx, 5*time.Second)
+		
+		query := `INSERT INTO orders_gps_trail (order_id, latitude, longitude, captured_at, speed, heading, battery, network_type) VALUES `
+		vals := []interface{}{}
+
+		for i, p := range pings {
+			n := i * 8
+			query += fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d),", n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8)
+			vals = append(vals, p.OrderID, p.Lat, p.Lng, p.Timestamp, p.Speed, p.Heading, p.Battery, p.NetworkType)
+		}
+
+		query = query[:len(query)-1] // Remove trailing comma
+
+		_, dbErr := h.dbPool.Exec(dbCtx, query, vals...)
+		dbCancel()
+
+		if dbErr != nil {
+			log.Printf("[GPS_WORKER] Failed bulk inserting %d GPS pings for order %s: %v. Re-buffering data.", len(pings), orderID, dbErr)
+			
+			// Put them back in Redis lists to prevent data loss
+			pipeBack := h.clusterClient.Pipeline()
+			for _, p := range pings {
+				if pBytes, marshalErr := json.Marshal(p); marshalErr == nil {
+					pipeBack.RPush(ctx, redisKey, string(pBytes))
+				}
+			}
+			pipeBack.SAdd(ctx, "orders:gps:active_buffers", orderID)
+			_, _ = pipeBack.Exec(ctx)
+		} else {
+			log.Printf("[GPS_WORKER] Successfully flushed %d GPS pings for order %s to SQL storage", len(pings), orderID)
+		}
+	}
+}
+
 
 

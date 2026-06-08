@@ -23,6 +23,7 @@ interface MapInterpolatedProps {
   destination?: { lat: number; lng: number } | null;
   center?: { lat: number; lng: number };
   zoom?: number;
+  theme?: 'light' | 'dark';
 }
 
 interface InterpolatedState {
@@ -43,6 +44,7 @@ export default function MapInterpolated({
   pickup = null,
   destination = null,
   center = { lat: 22.5726, lng: 88.3639 }, // Kolkata defaults
+  theme = 'dark',
 }: MapInterpolatedProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const driverStateRef = useRef<Record<string, InterpolatedState>>({});
@@ -115,12 +117,25 @@ export default function MapInterpolated({
 
       const now = Date.now();
 
-      // Clear with premium light-gray canvas background
-      ctx.fillStyle = '#f3f3f3'; // canvas-softer
+      const isDark = theme === 'dark';
+      const bgColor = isDark ? '#09090b' : '#f3f3f3';
+      const gridColor = isDark ? '#18181b' : '#e2e2e2';
+      const highwayColor = isDark ? '#27272a' : '#d4d4d4';
+      const routeColor = isDark ? '#3b82f6' : '#000000';
+      const pinOutlineColor = isDark ? '#ffffff' : '#000000';
+      const pinLabelColor = isDark ? '#ffffff' : '#000000';
+      const vehicleColor = isDark ? '#ffffff' : '#000000';
+      const vehicleOutlineColor = isDark ? '#000000' : '#ffffff';
+      const vehicleTailColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
+      const h3FillColor = isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(0, 0, 0, 0.04)';
+      const h3StrokeColor = isDark ? 'rgba(239, 68, 68, 0.22)' : 'rgba(0, 0, 0, 0.15)';
+      const h3LabelColor = isDark ? '#ef4444' : '#5e5e5e';
+
+      // Clear with background color
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Coordinate converter helper
-      // Converts lat/lng into screen pixel values based on center and zoom
       const toScreen = (lat: number, lng: number) => {
         const scale = Math.pow(2, zoomLevel) * 0.1;
         const x = canvas.width / 2 + (lng - mapCenter.lng) * scale * 1.5;
@@ -129,7 +144,7 @@ export default function MapInterpolated({
       };
 
       // 1. Draw elegant minimalist roads grid
-      ctx.strokeStyle = '#e2e2e2'; // canvas-soft hairline
+      ctx.strokeStyle = gridColor;
       ctx.lineWidth = 1.5;
       const gridSize = 80;
       for (let x = 0; x < canvas.width; x += gridSize) {
@@ -145,8 +160,8 @@ export default function MapInterpolated({
         ctx.stroke();
       }
 
-      // Draw stylized highways (primary arterial streets)
-      ctx.strokeStyle = '#d4d4d4';
+      // Draw stylized highways
+      ctx.strokeStyle = highwayColor;
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(0, canvas.height * 0.3);
@@ -160,11 +175,9 @@ export default function MapInterpolated({
 
       // 2. Draw H3 Hexagons Surge Heatmap Overlay
       h3Hexagons.forEach((hex) => {
-        // Resolve center of hexagonal grid cell
         let hLat = mapCenter.lat;
         let hLng = mapCenter.lng;
         
-        // Offset based on simulated index hash values
         if (hex.index === '88283082b9fffff') {
           hLat = 22.5726;
           hLng = 88.3639;
@@ -176,9 +189,8 @@ export default function MapInterpolated({
         const screenCenter = toScreen(hLat, hLng);
         const radius = 60 * (zoomLevel / 15);
 
-        // Styling hexagon: subtle gray surge fill or light amber line
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)'; // flat level-0 fill
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillStyle = h3FillColor;
+        ctx.strokeStyle = h3StrokeColor;
         ctx.lineWidth = 1;
 
         ctx.beginPath();
@@ -193,19 +205,18 @@ export default function MapInterpolated({
         ctx.fill();
         ctx.stroke();
 
-        // Print H3 label
-        ctx.fillStyle = '#5e5e5e';
+        ctx.fillStyle = h3LabelColor;
         ctx.font = 'bold 9px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText(`h3:${hex.index.substring(0, 7)}`, screenCenter.x, screenCenter.y + 3);
       });
 
-      // 3. Draw Route Path if pickup & destination exist (solid black line)
+      // 3. Draw Route Path if pickup & destination exist
       if (pickup && destination) {
         const pScreen = toScreen(pickup.lat, pickup.lng);
         const dScreen = toScreen(destination.lat, destination.lng);
 
-        ctx.strokeStyle = '#000000'; // black solid route duet
+        ctx.strokeStyle = routeColor;
         ctx.lineWidth = 3;
         ctx.lineJoin = 'round';
         ctx.beginPath();
@@ -221,68 +232,60 @@ export default function MapInterpolated({
         ctx.stroke();
       }
 
-      // 4. Draw Pickup & Destination pins (solid black indicators with small colored centers)
+      // 4. Draw Pickup & Destination pins
       if (pickup) {
         const screen = toScreen(pickup.lat, pickup.lng);
-        // Outer chassis circle
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = pinOutlineColor;
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
         ctx.fill();
-        // Inner pickup green dot
         ctx.fillStyle = '#22c55e';
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
         ctx.fill();
-        // Text label
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = pinLabelColor;
         ctx.font = 'bold 9px system-ui';
         ctx.fillText('pickup', screen.x, screen.y - 12);
       }
 
       if (destination) {
         const screen = toScreen(destination.lat, destination.lng);
-        // Outer chassis circle
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = pinOutlineColor;
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
         ctx.fill();
-        // Inner drop red dot
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
         ctx.fill();
-        // Text label
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = pinLabelColor;
         ctx.font = 'bold 9px system-ui';
         ctx.fillText('drop', screen.x, screen.y - 12);
       }
 
       // 5. Update Interpolated Positions and Draw Active Drivers
       Object.values(driverStateRef.current).forEach((state) => {
-        // Calculate interpolation progress (bounded over exactly 4000ms)
         const elapsed = now - state.startTime;
         const duration = 4000;
         const progress = Math.min(1.0, elapsed / duration);
 
-        // Linear interpolation formulas
         state.currentLat = state.startLat + (state.targetLat - state.startLat) * progress;
         state.currentLng = state.startLng + (state.targetLng - state.startLng) * progress;
 
         const screen = toScreen(state.currentLat, state.currentLng);
 
         // A. Draw vehicle path tail shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+        ctx.fillStyle = vehicleTailColor;
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 12, 0, Math.PI * 2);
         ctx.fill();
 
-        // B. Draw vehicle body (solid black triangle indicating direction/bearing)
+        // B. Draw vehicle body (triangle indicating direction/bearing)
         ctx.save();
         ctx.translate(screen.x, screen.y);
         ctx.rotate((state.bearing * Math.PI) / 180);
 
-        ctx.fillStyle = '#000000'; // solid black vehicle marker
+        ctx.fillStyle = vehicleColor;
         ctx.beginPath();
         ctx.moveTo(0, -8);
         ctx.lineTo(-5, 6);
@@ -290,14 +293,14 @@ export default function MapInterpolated({
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = vehicleOutlineColor;
         ctx.lineWidth = 1;
         ctx.stroke();
 
         ctx.restore();
 
         // C. Tag label for driver ID
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = pinLabelColor;
         ctx.font = 'bold 8px monospace';
         ctx.fillText(state.id.substring(0, 5), screen.x, screen.y + 16);
       });
@@ -310,7 +313,7 @@ export default function MapInterpolated({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination]);
+  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination, theme]);
 
   // Handle Dragging / Map Panning
   const handleMouseDown = (e: React.MouseEvent) => {
