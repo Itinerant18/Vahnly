@@ -26,7 +26,7 @@ import (
 // ═══════════════════════════════════════════════════════════════════════
 
 const (
-	gatewayBase = "http://127.0.0.1:8080"
+	gatewayBase = "http://127.0.0.1:8085"
 )
 
 // AuditScenario describes a single trip lifecycle scenario for validation.
@@ -122,7 +122,6 @@ func runAuditScenarios(ctx context.Context, scenarios []AuditScenario) (int, int
 func executeScenario(ctx context.Context, sc AuditScenario, driverToken, adminToken string) (string, error) {
 	// Generate a unique order ID for this scenario run
 	orderID := fmt.Sprintf("00000000-0000-0000-aaaa-%012d", time.Now().UnixNano()%1000000000000)
-	driverID := "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01" // Reuse first sim driver
 
 	// Compute pickup/dropoff geometry to produce the desired route_km via ST_Distance.
 	// ST_Distance at equatorial latitudes: ~0.001° ≈ 111m. We place dropoff east of pickup
@@ -156,6 +155,22 @@ func executeScenario(ctx context.Context, sc AuditScenario, driverToken, adminTo
 
 	// Allow dispatch to process the order
 	time.Sleep(2 * time.Second)
+
+	// Fetch dynamic assigned driver ID
+	var assignedDriverID string
+	var fetchErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		assignedDriverID, fetchErr = fetchAssignedDriverID(orderID, adminToken)
+		if fetchErr == nil {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if fetchErr != nil {
+		return "", fmt.Errorf("fetch assigned driver ID: %w", fetchErr)
+	}
+	driverID := assignedDriverID
+	log.Printf("  🚗 Order matched to driver: %s", driverID)
 
 	// Step 2: Accept the order (assign driver)
 	acceptBody := map[string]interface{}{
@@ -413,4 +428,46 @@ func ptrFloat(v *float64) float64 {
 		return 0.0
 	}
 	return *v
+}
+
+func fetchAssignedDriverID(orderID, adminToken string) (string, error) {
+	endpoint := fmt.Sprintf("%s/api/v1/admin/orders/%s", gatewayBase, orderID)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.Header.Set("X-Region-Prefix", cityPrefix)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("admin order detail returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var parsed struct {
+		Trip struct {
+			AssignedDriverID *string `json:"assigned_driver_id"`
+		} `json:"trip"`
+	}
+
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", err
+	}
+
+	if parsed.Trip.AssignedDriverID == nil || *parsed.Trip.AssignedDriverID == "" {
+		return "", fmt.Errorf("order not assigned yet (assigned_driver_id is nil/empty)")
+	}
+
+	return *parsed.Trip.AssignedDriverID, nil
 }

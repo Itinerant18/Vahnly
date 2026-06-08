@@ -216,8 +216,8 @@ func main() {
 
 	// Instantiate edge protection layers
 	authGuard := middleware.NewAuthMiddleware(jwtSecret)
-	// Rate Limit parameters: Allow maximum 5 requests per 1 minute rolling window
-	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 5, 1*time.Minute)
+	// Rate Limit parameters: Allow maximum 1000 requests per 1 minute rolling window
+	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 1000, 1*time.Minute)
 
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
 	rawSupportedRegions := getEnv("SUPPORTED_REGIONS_MATRIX", "KOL,BLR") // Declare active shards

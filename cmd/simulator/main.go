@@ -103,6 +103,9 @@ func main() {
 		log.Println("[WAVE 3 OK] Split-state conditions injected. Reconciler daemon will repair logs within 15 seconds.")
 	}
 
+	log.Println("Sleeping 10s to let previous waves of bookings drain...")
+	time.Sleep(10 * time.Second)
+
 	// ─── WAVE 4: TRIP PLAYER — ODOMETER AUDIT SCENARIO ENGINE ────────
 	log.Println("\n═══════════════════════════════════════════════════════════════")
 	log.Println("  WAVE 4: TRIP PLAYER — INJECTING ODOMETER AUDIT SCENARIOS   ")
