@@ -79,7 +79,7 @@ func (h *LedgerAdminHandler) HandleGetLedgerDiscrepancies(w http.ResponseWriter,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"discrepancies": discrepancies,
 	})
 }

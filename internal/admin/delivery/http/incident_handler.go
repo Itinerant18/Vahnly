@@ -161,7 +161,7 @@ func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *h
 	defer h.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": h.incidents})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"incidents": h.incidents})
 }
 
 // HandleClaimIncident handles claiming of an active incident by a support agent

@@ -953,7 +953,6 @@ func (h *SupportHandler) HandleGetLostFoundItems(w http.ResponseWriter, r *http.
 	if search != "" {
 		query += fmt.Sprintf(" AND (item_description ILIKE $%d OR notes ILIKE $%d)", argIdx, argIdx)
 		args = append(args, "%"+search+"%")
-		argIdx++
 	}
 
 	query += " ORDER BY created_at DESC"

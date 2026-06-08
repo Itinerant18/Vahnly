@@ -435,7 +435,6 @@ func (h *ConfigHandler) HandleUpdateIntegration(w http.ResponseWriter, r *http.R
 	if req.ConfigJSON != "" {
 		query += fmt.Sprintf(", config_json = $%d::JSONB", idx)
 		args = append(args, req.ConfigJSON)
-		idx++
 	}
 	query += " WHERE integration_key = $1"
 	_, _ = h.dbPool.Exec(ctx, query, args...)
@@ -513,7 +512,6 @@ func (h *ConfigHandler) HandleGetTemplates(w http.ResponseWriter, r *http.Reques
 	if lang != "" {
 		query += fmt.Sprintf(" AND language_code = $%d", idx)
 		args = append(args, lang)
-		idx++
 	}
 	query += " ORDER BY channel, name"
 

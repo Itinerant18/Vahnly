@@ -352,7 +352,6 @@ func (h *CMSHandler) HandleGetI18NStrings(w http.ResponseWriter, r *http.Request
 	if search != "" {
 		query += fmt.Sprintf(" AND (key_name ILIKE $%d OR value ILIKE $%d)", idx, idx)
 		args = append(args, "%"+search+"%")
-		idx++
 	}
 
 	var total int64
@@ -461,7 +460,6 @@ func (h *CMSHandler) HandleGetAssets(w http.ResponseWriter, r *http.Request) {
 	if platform != "" {
 		query += fmt.Sprintf(" AND platform = $%d", idx)
 		args = append(args, platform)
-		idx++
 	}
 	query += " ORDER BY asset_type, display_order"
 

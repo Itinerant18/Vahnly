@@ -311,6 +311,7 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
+		adminEmail = "admin@example.com"
 	}
 
 	var req struct {
@@ -389,7 +390,7 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Create refund record
 	insertRefund := `
@@ -452,7 +453,7 @@ func (h *FinanceHandler) HandleApproveRefund(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var refundStatus string
 	var amountPaise int64
@@ -819,7 +820,7 @@ func (h *FinanceHandler) HandlePostWalletAdjustment(w http.ResponseWriter, r *ht
 		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var walletID string
 	var currentBalance int64

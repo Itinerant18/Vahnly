@@ -190,7 +190,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	isSSOLogin := req.SSOProvider != ""
 	if isSSOLogin {
 		// SSO Authentication
-			if !strings.EqualFold(dbSSOProvider, req.SSOProvider) || dbSSOID != req.SSOID {
+		if !strings.EqualFold(dbSSOProvider, req.SSOProvider) || dbSSOID != req.SSOID {
 			// If SSO info is not linked yet, but request claims SSO, we link it for demo/testing or reject. Let's register SSO details on first match.
 			if dbSSOProvider == "" {
 				_, _ = h.dbPool.Exec(ctx, "UPDATE system_admins SET sso_provider = $1, sso_id = $2 WHERE id = $3", req.SSOProvider, req.SSOID, dbUserID)
