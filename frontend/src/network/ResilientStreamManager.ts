@@ -98,11 +98,37 @@ export class ResilientStreamManager {
     this.wsBaseUrl = (config.wsBaseUrl ?? WS_GATEWAY_BASE_URL).replace(/\/$/, '');
   }
 
+  // isTokenUsable decodes the JWT payload and rejects a missing/expired token.
+  // The browser cannot read the 401 body of a failed WS handshake, so without
+  // this guard an expired admin session reconnects forever, flooding the console.
+  private isTokenUsable(token: string): boolean {
+    if (!token) return false;
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (typeof payload.exp !== 'number') return true; // no exp claim: let the server decide
+      // 5s skew tolerance; exp is in seconds, Date.now() in ms.
+      return payload.exp * 1000 > Date.now() - 5000;
+    } catch {
+      return false;
+    }
+  }
+
   public connect(): void {
     this.isPurposelyClosed = false;
     const token = (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function')
       ? (localStorage.getItem('admin_jwt_token') || localStorage.getItem('jwt_token') || '')
       : '';
+
+    // Pre-flight: halt instead of spin-retrying when the session token is dead.
+    if (!this.isTokenUsable(token)) {
+      this.isPurposelyClosed = true;
+      console.error('[STREAM_MANAGER] Admin session token missing or expired — stream halted. Please re-authenticate.');
+      this.config.onStatusChange('DISCONNECTED');
+      return;
+    }
+
     const url = `${this.wsBaseUrl}/api/v1/dispatch/stream?order_id=${encodeURIComponent(
       this.config.orderID,
     )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}&jwt=${encodeURIComponent(token)}`;
