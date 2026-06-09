@@ -108,6 +108,7 @@ func main() {
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
+	offlineSyncHandler := gatewayHttp.NewOfflineSyncHandler(dbPool)
 	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
 	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
 	pricingAdminHandler := adminHttp.NewPricingAdminHandler(dbPool, redisClusterClient, pricingLogger)
@@ -381,6 +382,9 @@ func main() {
 	// Driver Safety & Emergency Protocol (Feature 11)
 	mux.HandleFunc("POST /api/v1/driver/safety/sos", authGuard.AuthenticateJWT(driverSafetyHandler.TriggerSOSAlert))
 	mux.HandleFunc("GET /api/v1/driver/safety/fatigue-check", authGuard.AuthenticateJWT(driverSafetyHandler.AssessFatigueLimits))
+
+	// Driver Offline mode caching & Sync Buffers (Feature 12)
+	mux.HandleFunc("POST /api/v1/driver/sync/offline-payload", authGuard.AuthenticateJWT(offlineSyncHandler.BulkReconcileOfflineData))
 
 	// Driver Account, Payouts & Notifications (Features 8 & 9)
 	mux.HandleFunc("GET /api/v1/driver-account/earnings", authGuard.AuthenticateJWT(driverAccountHandler.GetEarningsSummary))

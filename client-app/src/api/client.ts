@@ -767,5 +767,23 @@ export async function driverConfirmPayment(
   });
 }
 
+export interface OfflineCachedPacket {
+  type: "TELEMETRY" | "TRIP_EVENT" | "CHECKPOINT";
+  payload: any;
+  captured_at: string;
+}
+
+export async function syncOfflinePayload(
+  token: string,
+  payload: { order_id: string; device_fingerprint: string; packets: OfflineCachedPacket[] },
+): Promise<{ status: string; reconciled_packets: number }> {
+  return request<{ status: string; reconciled_packets: number }>('/api/v1/driver/sync/offline-payload', {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
+
 
 
