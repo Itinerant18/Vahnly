@@ -3,12 +3,125 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getTripById } from '../tripData';
+import { useAuthStore } from '@/store/useAuthStore';
+
+interface AuditTrailProps {
+  auditData: {
+    offer_timestamps: { received_ts: string; responded_ts: string; response_latency: number };
+    odometer_inputs: { start_km: number; end_km: number; otp_attempts: number };
+    route_metrics: { wait_time_minutes: number; route_deviations_m: number };
+    hardware_state: { device_model: string; network_type: string; battery_pct_drain: number };
+  };
+}
+
+export const TripAuditTrailPanel: React.FC<AuditTrailProps> = ({ auditData }) => {
+  return (
+    <div className="bg-zinc-950 text-zinc-100 p-6 rounded-2xl border border-zinc-900 space-y-6 max-w-xl mx-auto font-mono text-xs text-left">
+      <div className="border-b border-zinc-900 pb-3 flex justify-between items-center">
+        <span className="font-black text-amber-500 tracking-wider">🔒 FORENSIC AUDIT TRAIL</span>
+        <span className="bg-zinc-900 text-zinc-500 px-2 py-0.5 rounded text-[8px]">SECURE_LOG</span>
+      </div>
+
+      {/* Lifecycle Vectors */}
+      <div className="space-y-2">
+        <h4 className="text-zinc-400 font-bold uppercase tracking-wide text-[9px] text-blue-500">1. Offer Execution Metrics</h4>
+        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-zinc-900">
+          <div>Received: <span className="text-zinc-300">{new Date(auditData.offer_timestamps.received_ts).toLocaleTimeString()}</span></div>
+          <div>Latency: <span className="text-emerald-400">{auditData.offer_timestamps.response_latency}ms</span></div>
+        </div>
+      </div>
+
+      {/* Physics Validation Checks */}
+      <div className="space-y-2">
+        <h4 className="text-zinc-400 font-bold uppercase tracking-wide text-[9px] text-purple-500">2. Physical Asset Checkpoints</h4>
+        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-zinc-900">
+          <div>Start Odo: <span className="text-zinc-300">{auditData.odometer_inputs.start_km} KM</span></div>
+          <div>End Odo: <span className="text-zinc-300">{auditData.odometer_inputs.end_km} KM</span></div>
+          <div>OTP Attempts: <span className="text-zinc-300">{auditData.odometer_inputs.otp_attempts}</span></div>
+          <div>Deviations: <span className="text-red-400">{auditData.route_metrics.route_deviations_m}m</span></div>
+        </div>
+      </div>
+
+      {/* Hardware Diagnostics Log */}
+      <div className="space-y-2">
+        <h4 className="text-zinc-400 font-bold uppercase tracking-wide text-[9px] text-amber-500">3. Hardware Diagnostics Envelope</h4>
+        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-zinc-900">
+          <div>Terminal: <span className="text-zinc-300 truncate block">{auditData.hardware_state.device_model}</span></div>
+          <div>Network Mode: <span className="text-zinc-300">{auditData.hardware_state.network_type}</span></div>
+          <div className="col-span-2">Battery Draw Over Route: <span className="text-amber-400">-{auditData.hardware_state.battery_pct_drain}%</span></div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 export default function TripDetailClient({ tripId }: { tripId: string }) {
   const trip = getTripById(tripId);
 
+  const { token } = useAuthStore();
   const [replayProgress, setReplayProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
+
+  const [auditData, setAuditData] = useState<any>({
+    offer_timestamps: {
+      received_ts: new Date(Date.now() - 3600000).toISOString(),
+      responded_ts: new Date(Date.now() - 3540000).toISOString(),
+      response_latency: 850
+    },
+    odometer_inputs: {
+      start_km: 14500,
+      end_km: 14525,
+      otp_attempts: 1
+    },
+    route_metrics: {
+      wait_time_minutes: 4,
+      route_deviations_m: 120
+    },
+    hardware_state: {
+      device_model: "SM-G998B (Galaxy S21 Ultra)",
+      network_type: "5G_SA",
+      battery_pct_drain: 4
+    }
+  });
+
+  useEffect(() => {
+    if (!tripId) return;
+    const fetchAudit = async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`/api/v1/admin/orders/${tripId}/forensic-audit`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setAuditData({
+            offer_timestamps: {
+              received_ts: data.offer_timestamps?.received_ts || new Date(Date.now() - 3600000).toISOString(),
+              responded_ts: data.offer_timestamps?.responded_ts || new Date(Date.now() - 3540000).toISOString(),
+              response_latency: data.offer_timestamps?.response_latency || 0,
+            },
+            odometer_inputs: {
+              start_km: data.odometer_inputs?.start_km || 0,
+              end_km: data.odometer_inputs?.end_km || 0,
+              otp_attempts: data.odometer_inputs?.otp_attempts || 0,
+            },
+            route_metrics: {
+              wait_time_minutes: data.route_metrics?.wait_time_minutes || 0,
+              route_deviations_m: data.route_metrics?.route_deviations_m || 0,
+            },
+            hardware_state: {
+              device_model: data.hardware_state?.device_model || "Unknown",
+              network_type: data.hardware_state?.network_type || "Unknown",
+              battery_pct_drain: data.hardware_state?.battery_pct_drain || 0,
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch forensic audit trail:', err);
+      }
+    };
+    fetchAudit();
+  }, [tripId, token]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -207,6 +320,9 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
           </div>
         </div>
       </div>
+
+      {/* Forensic Audit Panel */}
+      <TripAuditTrailPanel auditData={auditData} />
     </div>
   );
 }
