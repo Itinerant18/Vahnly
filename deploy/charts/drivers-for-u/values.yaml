@@ -1,92 +1,139 @@
 # =============================================================================
-# GLOBAL PRODUCTION MATRIX PROFILE CONFIGURATIONS
+# DEFAULT CHART VALUES
+# Production overrides live in deploy/production-values.yaml.
+# Deploy into a single namespace so the service-DNS below resolves:
+#   helm install drivers-for-u ./deploy/charts/drivers-for-u -n dispatch
 # =============================================================================
 global:
   environment: production
+  region: KOL
   regionMatrix: ["KOL", "BLR"]
   logLevel: warn
   metricsEnabled: true
 
-# =============================================================================
-# PUBLIC API GATEWAY & BFF LAYER (SERVICE NODE INTERFACES)
-# =============================================================================
-public-gateway:
+  # In-cluster connection strings. Every data-tier service is assumed to live in
+  # the same namespace (dispatch). Keep kafkaBrokers consistent with the KEDA
+  # ScaledObject bootstrapServers under dispatch.autoscaling.kafka below.
+  env:
+    # sslmode=require encrypts without CA verification. Use verify-full only once
+    # a CA bundle is mounted into the pods, otherwise the TLS handshake fails.
+    databaseUrl: "postgresql://app_gateway:HardenedProdPassword@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=require"
+    kafkaBrokers: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
+    redisClusterNodes: "redis-cluster.dispatch.svc.cluster.local:6379"
+    tritonServerUrl: "triton-inference-service.dispatch.svc.cluster.local:8001"
+
+# Single multi-target image. The compiled binary is service-specific (built with
+# --build-arg TARGET_SERVICE=<svc>); publish one tag per service or override
+# image.repository per environment. TARGET_SERVICE is still passed for clarity.
+image:
+  repository: drivers-for-u/platform
+  tag: v1.2.0
+  pullPolicy: IfNotPresent
+
+# Auth/crypto material. PLACEHOLDERS — override with a SealedSecret or external
+# secret operator. NEVER commit real values here.
+secrets:
+  jwtSigningKey: "REPLACE_ME_VIA_SEALED_SECRET"
+  fieldEncryptionKey: "REPLACE_ME_VIA_SEALED_SECRET"
+
+# -----------------------------------------------------------------------------
+# Public API gateway — the only externally reachable service.
+# -----------------------------------------------------------------------------
+gateway:
   replicaCount: 4
-  terminationGracePeriodSeconds: 15 # Protects Milestone 16 & 31 binary connection draining loops
-
-  image:
-    repository: drivers-for-u/public-gateway
-    tag: v1.2.0
-    pullPolicy: IfNotPresent
-
+  httpPort: 8080
+  supportedRegions: "KOL,BLR"
+  terminationGracePeriodSeconds: 15
   resources:
-    limits:
-      cpu: "1000m"
-      memory: "512Mi"
-    requests:
-      cpu: "500m"
-      memory: "256Mi"
+    limits: { cpu: "1000m", memory: "512Mi" }
+    requests: { cpu: "500m", memory: "256Mi" }
 
-  env:
-    PORT: "8080"
-    KAFKA_BROKERS: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
-    REDIS_CLUSTER_ADDRS: "redis-cluster.dispatch.svc.cluster.local:6379"
-    DATABASE_URL: "postgresql://app_gateway:HardenedProdPassword@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=verify-full"
-
-  # Real-time infrastructure health checking configurations
-  livenessProbe:
-    httpGet:
-      path: /health
-      port: 8080
-    initialDelaySeconds: 10
-    periodSeconds: 15
-    timeoutSeconds: 3
-    failureThreshold: 3
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: 8080
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    timeoutSeconds: 2
-
-  # Prevent scheduling multiples of this service on the same node to avoid shared failures
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - key: app
-                operator: In
-                values:
-                  - public-gateway
-          topologyKey: "kubernetes.io/hostname"
-
-# =============================================================================
-# KUHN-MUNKRES MATCHING ENGINE (COMPUTATIONAL MATCH CORES)
-# =============================================================================
-matching-engine:
+# -----------------------------------------------------------------------------
+# Kuhn-Munkres (Hungarian) matching engine.
+# -----------------------------------------------------------------------------
+dispatch:
   replicaCount: 2
-  
+  algorithmStrategy: "HUNGARIAN"
   resources:
-    limits:
-      cpu: "4000m" # High compute allocation to handle intense combinatorial optimization load spikes
-      memory: "2Gi"
-    requests:
-      cpu: "2000m"
-      memory: "1Gi"
-
-  env:
-    ALGORITHM_STRATEGY: "HUNGARIAN"
-    TRITON_SERVER_URL: "triton-inference-service.intelligence.svc.cluster.local:8001"
-    METRICS_PORT: "8080"
-
+    limits: { cpu: "4000m", memory: "2Gi" }
+    requests: { cpu: "2000m", memory: "1Gi" }
   autoscaling:
     enabled: true
-    minReplicas: 2
-    maxReplicas: 8
-    # Powered by KEDA: scale up based directly on pending Kafka broker lag sizes
-    kafkaTrigger:
+    minReplicas: 4
+    maxReplicas: 40
+    cooldownPeriod: 120
+    kafka:
+      # If Kafka runs in another namespace, set the FQDN here accordingly.
+      bootstrapServers: "kafka-cluster-kafka-bootstrap.dispatch.svc:9092"
       topic: "order.created"
-      consumerGroup: "matching-engine-group"
-      lagThreshold: "20"
+      # MUST match the consumer group used in cmd/dispatch/main.go.
+      consumerGroup: "dispatch-matching-group"
+      lagThreshold: "1000"
+
+ingestion:
+  replicaCount: 2
+  resources:
+    limits: { cpu: "1000m", memory: "512Mi" }
+    requests: { cpu: "500m", memory: "256Mi" }
+
+pricing:
+  replicaCount: 2
+  groupID: "pricing-service-consumer-group"
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "250m", memory: "128Mi" }
+
+pruner:
+  replicaCount: 1
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+reconciler:
+  replicaCount: 1
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+surge:
+  replicaCount: 1
+  trackedCells: "88754cb247fffff,88283473fffffff"
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "250m", memory: "128Mi" }
+
+notification:
+  replicaCount: 1
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+expiry:
+  replicaCount: 1
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+analytics:
+  replicaCount: 1
+  port: 8089
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "250m", memory: "128Mi" }
+
+rebalancer:
+  replicaCount: 1
+  httpAddr: ":8090"
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+# Triton is GPU-heavy and off by default. Enable only on GPU node pools, or point
+# global.env.tritonServerUrl at an externally managed Triton instance.
+triton:
+  enabled: false
+  image: nvcr.io/nvidia/tritonserver:24.01-py3
+  modelRepository: "/models"
+  resources:
+    limits: { cpu: "2000m", memory: "4Gi" }
+    requests: { cpu: "1000m", memory: "2Gi" }

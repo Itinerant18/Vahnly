@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-notification
+  labels:
+    app: notification
+spec:
+  replicas: {{ .Values.notification.replicaCount }}
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      containers:
+        - name: notification
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "notification"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "drivers-for-u.name" . }}-db-credentials
+                  key: database-url
+          resources:
+            {{- toYaml .Values.notification.resources | nindent 12 }}

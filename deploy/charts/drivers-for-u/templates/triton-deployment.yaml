@@ -1,0 +1,43 @@
+{{- if .Values.triton.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-triton
+  labels:
+    app: triton
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton
+  template:
+    metadata:
+      labels:
+        app: triton
+    spec:
+      containers:
+        - name: triton
+          image: {{ .Values.triton.image | quote }}
+          args: ["tritonserver", "--model-repository={{ .Values.triton.modelRepository }}"]
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8001
+              name: grpc
+            - containerPort: 8002
+              name: metrics
+          livenessProbe:
+            httpGet:
+              path: /v2/health/live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /v2/health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.triton.resources | nindent 12 }}
+{{- end }}

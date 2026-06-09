@@ -1,0 +1,12 @@
+-- Revoke privileges and drop the application role.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM app_gateway;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE USAGE, SELECT ON SEQUENCES FROM app_gateway;
+
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM app_gateway;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM app_gateway;
+REVOKE USAGE ON SCHEMA public FROM app_gateway;
+REVOKE CONNECT ON DATABASE delivery_platform FROM app_gateway;
+
+DROP ROLE IF EXISTS app_gateway;

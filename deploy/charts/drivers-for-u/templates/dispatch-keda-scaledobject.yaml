@@ -1,0 +1,36 @@
+{{- if .Values.dispatch.autoscaling.enabled }}
+# Single source of truth for matching-engine autoscaling. Tracks consumer-group
+# lag on the order.created topic. consumerGroup MUST match the group the dispatch
+# service actually commits with (cmd/dispatch/main.go), or lag reads as ~0 and the
+# deployment never scales.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-dispatch-scaler
+  labels:
+    app: dispatch
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "drivers-for-u.name" . }}-dispatch
+  minReplicaCount: {{ .Values.dispatch.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.dispatch.autoscaling.maxReplicas }}
+  cooldownPeriod: {{ .Values.dispatch.autoscaling.cooldownPeriod | default 120 }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.dispatch.autoscaling.kafka.bootstrapServers | quote }}
+        topic: {{ .Values.dispatch.autoscaling.kafka.topic | quote }}
+        consumerGroup: {{ .Values.dispatch.autoscaling.kafka.consumerGroup | quote }}
+        lagThreshold: {{ .Values.dispatch.autoscaling.kafka.lagThreshold | quote }}
+{{- end }}
