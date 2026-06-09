@@ -23,6 +23,7 @@ import (
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	"github.com/platform/driver-delivery/internal/storage/objectstore"
 )
 
 func main() {
@@ -40,8 +41,16 @@ func main() {
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
-	jwtSecret := getEnv("JWT_SECRET_SIGNING_KEY", "kolkata_marketplace_backbone_secret_token_string")
-	fieldEncKey := getEnv("FIELD_ENCRYPTION_KEY", "kolkata_field_encryption_dev_key_change_in_prod")
+	// Fail closed on auth/crypto material. Booting with a repo-known default key is a
+	// full auth/PII bypass, so refuse to start rather than silently using a fallback.
+	jwtSecret := firstEnv("JWT_SECRET_SIGNING_KEY", "JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("FATAL: JWT signing key not configured — set JWT_SECRET_SIGNING_KEY (or JWT_SECRET). Refusing to boot with a default key.")
+	}
+	fieldEncKey := os.Getenv("FIELD_ENCRYPTION_KEY")
+	if fieldEncKey == "" {
+		log.Fatal("FATAL: FIELD_ENCRYPTION_KEY not configured. Refusing to boot — driver bank PII would be encrypted with a guessable key.")
+	}
 
 	log.Printf("Bootstrapping Coordinated API Gateway on Port: %s", httpPort)
 
@@ -111,6 +120,15 @@ func main() {
 		log.Fatalf("Field encryption cipher setup failed: %v", err)
 	} else {
 		driverOnboardingHandler.SetFieldCipher(fieldCipher)
+	}
+	// Durable document storage for KYC uploads. When unconfigured the onboarding
+	// handler falls back to local disk (dev only, not durable across replicas).
+	objStore := objectstore.NewFromEnv()
+	if objStore.Enabled() {
+		driverOnboardingHandler.SetObjectStore(objStore)
+		log.Printf("Driver document object storage enabled: bucket=%s region=%s", objStore.Bucket(), objStore.Region())
+	} else {
+		log.Printf("WARNING: object storage not configured (set S3_BUCKET + AWS creds) — KYC documents fall back to ephemeral local disk")
 	}
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverTripHandler := driverHttp.NewDriverTripHandler(dbPool, redisClusterClient)
@@ -333,13 +351,19 @@ func main() {
 	supportedRegions := strings.Split(rawSupportedRegions, ",")
 	regionRouter := middleware.NewRegionRouterMiddleware(supportedRegions)
 
+	// Single-use WebSocket tickets — replaces the leaky ?jwt= query param on WS upgrades.
+	wsTicket := middleware.NewWSTicketMiddleware(redisClusterClient, authGuard)
+
 	mux := http.NewServeMux()
 
 	// Authentication / Access routes
 	mux.HandleFunc("POST /api/v1/auth/rider/login", handler.HandleRiderLogin)
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
 	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
-	mux.HandleFunc("POST /api/v1/admin/auth/register", adminAuthHandler.HandleAdminRegister)
+	// Admin creation must be an authenticated SUPER_ADMIN action. Leaving this public
+	// let anyone self-register an account with an arbitrary role (incl. SUPER_ADMIN),
+	// a full authentication bypass. New admins are provisioned via /admin/team/invite.
+	mux.HandleFunc("POST /api/v1/admin/auth/register", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleAdminRegister))
 	// TOTP self-enrolment (JWT-protected) + Google Workspace SSO (public entry points).
 	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
@@ -369,7 +393,9 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/orders/{order_id}/route", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleUpdateOrderRoute)))
 	mux.HandleFunc("GET /api/v1/telemetry/supply/near", regionRouter.RouteRegionalTraffic(handler.HandleGetTelemetrySupplyNear))
 	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
-	mux.HandleFunc("GET /api/v1/dispatch/stream", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
+	// WS ticket mint (header-authenticated) + ticket-authenticated stream upgrade.
+	mux.HandleFunc("POST /api/v1/ws/ticket", authGuard.AuthenticateJWT(wsTicket.IssueTicket))
+	mux.HandleFunc("GET /api/v1/dispatch/stream", wsTicket.Authenticate(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
 	mux.HandleFunc("POST /api/v1/dispatch/accept", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleAcceptOrder)))
 	mux.HandleFunc("POST /api/v1/dispatch/decline", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleDeclineOrder)))
 	mux.HandleFunc("POST /api/v1/trip/arrive", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleArriveAtPickup))))
@@ -861,4 +887,15 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// firstEnv returns the first non-empty value among the given env var names, or ""
+// when none are set. Used to accept both the canonical and legacy secret var names.
+func firstEnv(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }

@@ -49,6 +49,17 @@ groups:
           summary: "Rapid driver starvation detected in localized hexagons"
           description: "Ride orders are failing matching sweeps due to zero driver availability at a rate of {{ $value }} orders/sec. Local surge multipliers may need re-calibration."
 
+      # 6. CRITICAL: Double-Entry Ledger Imbalance (financial integrity)
+      - alert: LedgerDoubleEntryImbalance
+        expr: max(reconciler_ledger_imbalanced_orders) by (city) > 0
+        for: 5m
+        labels:
+          severity: critical
+          tier: finance
+        annotations:
+          summary: "Unbalanced double-entry ledger orders detected in {{ $labels.city }}"
+          description: "{{ $value }} order(s) in {{ $labels.city }} have debit != credit sums (sustained 5m). This is the non-blocking balance assertion — investigate via /api/v1/admin/ledger/discrepancies before payouts settle."
+
       # 5. WARNING: Relational Data Mutation Inefficiencies
       - alert: PostgresCommitLatencySpike
         expr: histogram_quantile(0.99, sum(rate(dispatch_db_transaction_duration_seconds_bucket[1m])) by (le, status)) > 0.150

@@ -19,6 +19,7 @@ import (
 	"github.com/platform/driver-delivery/internal/crypto"
 	"github.com/platform/driver-delivery/internal/domain"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
+	"github.com/platform/driver-delivery/internal/storage/objectstore"
 )
 
 type QuizRequest struct {
@@ -33,6 +34,7 @@ type QuizResponse struct {
 type OnboardingHandler struct {
 	dbPool *pgxpool.Pool
 	cipher *crypto.FieldCipher
+	store  *objectstore.S3Store
 }
 
 func NewOnboardingHandler(dbPool *pgxpool.Pool) *OnboardingHandler {
@@ -46,6 +48,12 @@ func NewOnboardingHandler(dbPool *pgxpool.Pool) *OnboardingHandler {
 // stored in plaintext.
 func (h *OnboardingHandler) SetFieldCipher(c *crypto.FieldCipher) {
 	h.cipher = c
+}
+
+// SetObjectStore injects the durable document store. When unset/disabled, uploads
+// fall back to local disk (dev only, not durable across replicas).
+func (h *OnboardingHandler) SetObjectStore(s *objectstore.S3Store) {
+	h.store = s
 }
 
 // HandleSaveStep stores step-specific form payload atomically inside driver_data JSONB and advances the step index
@@ -234,30 +242,50 @@ func (h *OnboardingHandler) HandleUploadDocument(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Create local upload folder if not exist (mock S3 storage)
-	uploadDir := "public/uploads"
-	_ = os.MkdirAll(uploadDir, os.ModePerm)
-
 	fileUUID := uuid.New().String()
-	ext := filepath.Ext(header.Filename)
-	safeFilename := fmt.Sprintf("%s-%s%s", fileUUID, strings.ReplaceAll(header.Filename, " ", "_"), ext)
-	filePath := filepath.Join(uploadDir, safeFilename)
+	// filepath.Base strips any directory components a malicious client embeds in the
+	// upload filename (e.g. "../../etc/cron.d/x"); without it the path/key below can
+	// be walked outside the intended prefix, yielding an arbitrary write.
+	baseName := filepath.Base(strings.ReplaceAll(header.Filename, "\\", "/"))
+	safeFilename := fmt.Sprintf("%s-%s", fileUUID, strings.ReplaceAll(baseName, " ", "_"))
 
-	out, err := os.Create(filePath)
-	if err != nil {
-		http.Error(w, "Failed to save file to system", http.StatusInternalServerError)
-		return
+	var storageURL string
+	if h.store != nil && h.store.Enabled() {
+		// Durable object storage: stream the file into memory (capped at 10MB by
+		// ParseMultipartForm above) and PUT it to the bucket. Survives pod restarts and
+		// is readable by the admin compliance service on any replica.
+		data, readErr := io.ReadAll(file)
+		if readErr != nil {
+			http.Error(w, "Failed reading uploaded file", http.StatusInternalServerError)
+			return
+		}
+		objectKey := fmt.Sprintf("driver-docs/%s/%s", driverID, safeFilename)
+		putCtx, putCancel := context.WithTimeout(r.Context(), 20*time.Second)
+		publicURL, putErr := h.store.PutObject(putCtx, objectKey, data, header.Header.Get("Content-Type"))
+		putCancel()
+		if putErr != nil {
+			http.Error(w, "Failed to persist document to object storage", http.StatusBadGateway)
+			return
+		}
+		storageURL = publicURL
+	} else {
+		// Local-disk fallback (dev only; not durable across replicas/restarts).
+		uploadDir := "public/uploads"
+		_ = os.MkdirAll(uploadDir, os.ModePerm)
+		filePath := filepath.Join(uploadDir, safeFilename)
+		out, createErr := os.Create(filePath)
+		if createErr != nil {
+			http.Error(w, "Failed to save file to system", http.StatusInternalServerError)
+			return
+		}
+		if _, copyErr := io.Copy(out, file); copyErr != nil {
+			_ = out.Close()
+			http.Error(w, "Failed streaming file contents", http.StatusInternalServerError)
+			return
+		}
+		_ = out.Close()
+		storageURL = fmt.Sprintf("/uploads/%s", safeFilename)
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, file)
-	if err != nil {
-		http.Error(w, "Failed streaming file contents", http.StatusInternalServerError)
-		return
-	}
-
-	// Create storage mock url
-	storageURL := fmt.Sprintf("/uploads/%s", safeFilename)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -307,8 +335,22 @@ func (h *OnboardingHandler) HandleGeneratePresignedURL(w http.ResponseWriter, r 
 	}
 
 	fileUUID := uuid.New().String()
-	storageURL := fmt.Sprintf("https://driversforu-vault.s3.amazonaws.com/docs/%s/%s-%s", driverID, fileUUID, req.Filename)
-	uploadURL := fmt.Sprintf("%s?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=mock-key&X-Amz-Signature=mock-sig", storageURL)
+	baseName := filepath.Base(strings.ReplaceAll(req.Filename, "\\", "/"))
+	objectKey := fmt.Sprintf("driver-docs/%s/%s-%s", driverID, fileUUID, strings.ReplaceAll(baseName, " ", "_"))
+
+	var uploadURL, storageURL string
+	if h.store != nil && h.store.Enabled() {
+		up, pub, presErr := h.store.PresignPut(objectKey, 15*time.Minute)
+		if presErr != nil {
+			http.Error(w, "Failed generating upload URL", http.StatusInternalServerError)
+			return
+		}
+		uploadURL, storageURL = up, pub
+	} else {
+		// Mock fallback (dev only) — no real bucket configured.
+		storageURL = fmt.Sprintf("https://driversforu-vault.s3.amazonaws.com/%s", objectKey)
+		uploadURL = storageURL + "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=mock-key&X-Amz-Signature=mock-sig"
+	}
 
 	// Pre-insert a pending driver document record linked to this URL
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)

@@ -38,7 +38,33 @@ func (u *telemetryUseCase) SetRegionRouter(rr *RegionRouter) {
 	u.regionRouter = rr
 }
 
+// isPlausibleCoordinate rejects GPS fixes that would poison the spatial index:
+// out-of-WGS84-range values, the (0,0) "null island" fix-failure sentinel, and
+// coordinates outside the India operating envelope (covers KOL + BLR with margin),
+// which blocks out-of-country spoofs from gaming proximity matching.
+func isPlausibleCoordinate(lat, lng float64) bool {
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return false
+	}
+	if lat == 0 && lng == 0 {
+		return false
+	}
+	if lat < 6.0 || lat > 38.0 || lng < 68.0 || lng > 98.0 {
+		return false
+	}
+	return true
+}
+
 func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domain.DriverLocation) error {
+	// 0. Validate coordinates. Drop the frame (return nil) rather than erroring — the
+	// gRPC ingestion handler treats a returned error as stream-fatal, so a single bad
+	// GPS fix would otherwise tear down the driver's whole telemetry connection.
+	if !isPlausibleCoordinate(loc.Latitude, loc.Longitude) {
+		fmt.Printf("[TELEMETRY] dropped implausible coordinate for driver %s: lat=%.6f lng=%.6f\n",
+			loc.DriverID, loc.Latitude, loc.Longitude)
+		return nil
+	}
+
 	// 1. Check for Cross-Region boundaries FIRST
 	if u.regionRouter != nil {
 		err := u.regionRouter.DetectAndHandoff(ctx, *loc)

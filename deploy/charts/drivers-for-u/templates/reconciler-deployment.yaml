@@ -18,6 +18,8 @@ spec:
         - name: reconciler
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
           command: ["/entrypoint"]
           env:
             - name: DATABASE_URL
@@ -29,5 +31,25 @@ spec:
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: CITY_PREFIX
               value: {{ .Values.global.region | quote }}
+            - name: RECONCILER_METRICS_PORT
+              value: "8091"
+          ports:
+            - containerPort: 8091
+              name: metrics
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
           resources:
             {{- toYaml .Values.reconciler.resources | nindent 12 }}

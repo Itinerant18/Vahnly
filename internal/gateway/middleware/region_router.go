@@ -43,10 +43,32 @@ func (m *RegionRouterMiddleware) RouteRegionalTraffic(next http.HandlerFunc) htt
 			return
 		}
 
+		// Cross-check against the caller's token scope when authenticated. This closes
+		// the cross-region replay where a KOL-scoped token sets X-Region-Prefix: BLR.
+		// Public routes (no auth middleware) carry no scope and are validated only
+		// against the supported-regions set above.
+		if scope, ok := GetCityScopeFromContext(r.Context()); ok && scope != "" {
+			if !scopeContainsRegion(scope, region) {
+				http.Error(w, "region_outside_token_city_scope", http.StatusForbidden)
+				return
+			}
+		}
+
 		// Inject the validated region code down into the request context pipeline
 		ctx := context.WithValue(r.Context(), RegionPrefixContextKey, region)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
+}
+
+// scopeContainsRegion reports whether the comma-separated city_scope claim
+// (e.g. "KOL,BLR") authorizes the already-uppercased target region.
+func scopeContainsRegion(scope, region string) bool {
+	for _, s := range strings.Split(scope, ",") {
+		if strings.ToUpper(strings.TrimSpace(s)) == region {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *RegionRouterMiddleware) getJoinedRegions() string {

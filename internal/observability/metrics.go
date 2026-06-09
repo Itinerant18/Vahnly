@@ -76,6 +76,24 @@ var (
 		Buckets:   []float64{0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0},
 	}, []string{"origin_region", "target_region"})
 
+	// LedgerImbalancedOrders is the number of orders whose double-entry ledger does
+	// not net to zero, as observed by the most recent reconciler sweep. This is the
+	// non-blocking, safe form of a hard DB balance constraint (which would reject the
+	// platform's intentional unbalanced writes). Any sustained non-zero value is a
+	// financial-integrity alert; reconcile via /api/v1/admin/ledger/discrepancies.
+	LedgerImbalancedOrders = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "reconciler",
+		Name:      "ledger_imbalanced_orders",
+		Help:      "Orders with a non-zero debit/credit balance at the last reconciler sweep.",
+	}, []string{"city"})
+
+	// LedgerImbalanceSweepsTotal counts balance-assertion sweeps by result.
+	LedgerImbalanceSweepsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "reconciler",
+		Name:      "ledger_imbalance_sweeps_total",
+		Help:      "Ledger-balance assertion sweeps run, by result (clean|imbalanced|error).",
+	}, []string{"result"})
+
 	// RegionHandoffsTotal counts cross-region handoff events by lifecycle phase:
 	// "published" (source emitted INIT), "hydrated" (destination committed), and
 	// "rejected_stale" (Last-Write-Wins discarded an out-of-order/duplicate claim).

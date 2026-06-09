@@ -1,0 +1,64 @@
+# Baseline NetworkPolicies. These assume a CNI that enforces NetworkPolicy
+# (Calico/Cilium). The data tier (Postgres/Redis/Kafka) is not managed by this
+# chart, so egress is allowed by port; tighten the `to` selectors to the actual
+# datastore pod labels once known.
+{{- if .Values.networkPolicy.enabled }}
+---
+# 1. Default-deny all ingress in the namespace. Every service that needs to be
+#    reached must be explicitly allowed below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+# 2. The gateway is the only externally reachable service. Allow ingress to it on
+#    the HTTP port (from the ingress controller / load balancer).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-gateway-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.gateway.httpPort }}
+---
+# 3. Allow all app pods egress to DNS and to the data-tier ports only. This blocks
+#    a compromised pod from reaching arbitrary external endpoints.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-app-egress
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    # DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL, Redis, Kafka, Triton (gRPC)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 8001
+    # In-cluster pod-to-pod (gateway <-> internal services) on app ports
+    - to:
+        - podSelector: {}
+{{- end }}

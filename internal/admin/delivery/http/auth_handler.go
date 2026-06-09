@@ -229,10 +229,43 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		_, _ = h.dbPool.Exec(ctx, "UPDATE system_admins SET login_attempts = 0, locked_until = NULL WHERE id = $1", dbUserID)
 	}
 
-	// 4. Two-Factor Authentication Check (RFC 6238 TOTP).
-	// Enforced only once a secret has actually been enrolled — accounts flagged
-	// 2FA-enabled but not yet enrolled (empty secret) pass through so they can
-	// reach the enrolment endpoint. SSO logins are externally verified, skip TOTP.
+	// 4a. 2FA enabled but no secret enrolled yet (freshly invited, or post-reset).
+	// Do NOT grant a full-access token — that let invited/reset admins in with a
+	// password only. Issue a short-lived enrolment-scoped token that the RBAC guards
+	// reject for everything except /2fa/enroll. SSO logins are externally verified.
+	if dbTwoFactorEnabled && dbTwoFactorSecret == "" && !isSSOLogin {
+		enrolExp := time.Now().Add(15 * time.Minute)
+		enrolClaims := &middleware.CustomClaims{
+			UserID:           dbUserID,
+			Role:             dbRole,
+			CityScope:        dbCityScope,
+			TwoFactorPending: true,
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject:   dbUserID,
+				ExpiresAt: jwt.NewNumericDate(enrolExp),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				Issuer:    "drivers-for-u-auth",
+			},
+		}
+		enrolToken, signErr := jwt.NewWithClaims(jwt.SigningMethodHS256, enrolClaims).SignedString(h.jwtSecret)
+		if signErr != nil {
+			http.Error(w, "internal_server_error", http.StatusInternalServerError)
+			return
+		}
+		h.recordAuditLog(ctx, dbUserID, req.Email, "2FA_ENROLMENT_REQUIRED", "Login issued enrolment-scoped token (no TOTP secret on file)", ip)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AuthResponse{
+			Token:       enrolToken,
+			ExpiresAt:   enrolExp,
+			Role:        dbRole,
+			MFARequired: true,
+			Message:     "Two-factor enrolment required before access. Enroll a TOTP secret, then log in with a 6-digit code.",
+		})
+		return
+	}
+
+	// 4b. Two-Factor Authentication Check (RFC 6238 TOTP).
+	// SSO logins are externally verified, skip TOTP.
 	if dbTwoFactorEnabled && dbTwoFactorSecret != "" && !isSSOLogin {
 		if req.TwoFactorCode == "" {
 			// Signal to frontend that MFA verification layer is required

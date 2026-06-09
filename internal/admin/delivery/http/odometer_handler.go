@@ -231,7 +231,36 @@ func (h *OdometerHandler) HandlePatchOdometerAudit(w http.ResponseWriter, r *htt
 // review hold was triggered.
 func (h *OdometerHandler) reconcileFinancials(ctx context.Context, orderID string, audit *odoAudit) bool {
 	if !audit.IsFlagged {
-		_, _ = h.db.Exec(ctx, `UPDATE orders SET financial_status = 'CLEARED' WHERE id = $1`, orderID)
+		// Auto-reconciled (variance now within tolerance): clear the order AND release
+		// the payout hold this order's variance placed — atomically, in one tx. The
+		// hold was previously never released anywhere in the codebase, so a corrected
+		// driver stayed frozen indefinitely. Scope the release to holds carrying this
+		// order's marker so we don't lift a hold another unresolved order still enforces.
+		tx, err := h.db.Begin(ctx)
+		if err != nil {
+			h.logger.Printf("[FARE_HOOK] clear tx begin failed for order %s: %v", orderID, err)
+			return false
+		}
+		defer tx.Rollback(ctx)
+
+		if _, err := tx.Exec(ctx, `UPDATE orders SET financial_status = 'CLEARED' WHERE id = $1`, orderID); err != nil {
+			h.logger.Printf("[FARE_HOOK] clear status update failed for order %s: %v", orderID, err)
+			return false
+		}
+		holdMarker := fmt.Sprintf("%%(order %s)", orderID)
+		if _, err := tx.Exec(ctx,
+			`UPDATE drivers d SET payout_hold = false, payout_hold_reason = NULL
+			   FROM orders o
+			  WHERE o.id = $1 AND d.id = o.assigned_driver_id
+			    AND d.payout_hold = true AND d.payout_hold_reason LIKE $2`,
+			orderID, holdMarker); err != nil {
+			h.logger.Printf("[FARE_HOOK] payout hold release failed for order %s: %v", orderID, err)
+			return false
+		}
+		if err := tx.Commit(ctx); err != nil {
+			h.logger.Printf("[FARE_HOOK] clear commit failed for order %s: %v", orderID, err)
+			return false
+		}
 		return false
 	}
 
@@ -262,13 +291,40 @@ func (h *OdometerHandler) reconcileFinancials(ctx context.Context, orderID strin
 		return false
 	}
 
-	// Balanced compensating pair: extra fare provisionally owed customer -> driver.
-	desc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT PENDING_REVIEW] mileage variance %.1f%% (%.1f km delta) on order %s",
-		*audit.VariancePct, deltaKm, orderID)
 	// regional_settlement_zone is NOT NULL (migration 000032); mirror the city_prefix
 	// backfill convention ($2 -> both columns) used by the rest of the ledger writers.
 	insert := `INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
 	           VALUES ($1, $2, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5)`
+
+	// Supersede any prior provisional corrective entries for this order so repeated
+	// PATCHes don't stack duplicate adjustments (the previous behavior double-posted on
+	// every call). The ledger is append-only, so we post equal-and-opposite reversing
+	// rows that net the prior corrective gross back to zero, then post the fresh pair.
+	var priorDebit, priorCredit int64
+	_ = tx.QueryRow(ctx, `SELECT
+		COALESCE(SUM(amount_paise) FILTER (WHERE entry_type = 'DEBIT'), 0),
+		COALESCE(SUM(amount_paise) FILTER (WHERE entry_type = 'CREDIT'), 0)
+		FROM financial_ledger_entries
+		WHERE order_id = $1 AND account_type = 'CORRECTIVE_ADJUSTMENT'`, orderID).Scan(&priorDebit, &priorCredit)
+	if priorDebit > 0 || priorCredit > 0 {
+		revDesc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT REVERSAL] superseding prior provisional adjustments on order %s", orderID)
+		if priorDebit > 0 {
+			if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "CREDIT", priorDebit, revDesc); err != nil {
+				h.logger.Printf("[FARE_HOOK] reversal credit failed for order %s: %v", orderID, err)
+				return false
+			}
+		}
+		if priorCredit > 0 {
+			if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "DEBIT", priorCredit, revDesc); err != nil {
+				h.logger.Printf("[FARE_HOOK] reversal debit failed for order %s: %v", orderID, err)
+				return false
+			}
+		}
+	}
+
+	// Balanced compensating pair: extra fare provisionally owed customer -> driver.
+	desc := fmt.Sprintf("[CORRECTIVE_ADJUSTMENT PENDING_REVIEW] mileage variance %.1f%% (%.1f km delta) on order %s",
+		*audit.VariancePct, deltaKm, orderID)
 	if _, err := tx.Exec(ctx, insert, orderID, cityPrefix, "DEBIT", correctivePaise, desc); err != nil {
 		h.logger.Printf("[FARE_HOOK] debit insert failed for order %s: %v", orderID, err)
 		return false

@@ -149,6 +149,20 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 	}
 	_ = h.clusterClient.Set(ctx, fmt.Sprintf("cooldown:driver:%s", req.DriverID), "1", 30*time.Minute).Err()
 
+	// Notify the driver app in real time. The gateway bridges this channel
+	// ("gateway:assignments:broadcast", see gateway/delivery/http.RedisPubSubChannel)
+	// to the driver's WebSocket; without it a force-matched driver only discovers the
+	// assignment by polling, and never receives a push for the new order.
+	assignmentEvent := map[string]interface{}{
+		"order_id":    req.OrderID,
+		"driver_id":   req.DriverID,
+		"city_prefix": cityPrefix,
+		"status":      "ASSIGNED",
+	}
+	if payload, mErr := json.Marshal(assignmentEvent); mErr == nil {
+		_ = h.clusterClient.Publish(ctx, "gateway:assignments:broadcast", string(payload)).Err()
+	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))
 }

@@ -1433,7 +1433,14 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 	// Fetch webhook decryption signing secrets mapped from environment variables
 	webhookSecret := []byte(os.Getenv("PAYMENT_WEBHOOK_SIGNING_SECRET"))
 	if len(webhookSecret) == 0 {
-		webhookSecret = []byte("kolkata_gateway_fiat_fallback_cryptographic_signing_token")
+		webhookSecret = []byte(os.Getenv("PAYMENT_WEBHOOK_SECRET"))
+	}
+	if len(webhookSecret) == 0 {
+		// Fail closed: a repo-known fallback key would let anyone forge
+		// payment_intent.succeeded events and post ledger entries against them.
+		log.Printf("[PAYMENT_WEBHOOK] rejected: PAYMENT_WEBHOOK_SIGNING_SECRET not configured")
+		http.Error(w, "payment_webhook_not_configured", http.StatusServiceUnavailable)
+		return
 	}
 
 	// Compute expected HMAC SHA256 checksum across the raw body string to prevent payload tampering

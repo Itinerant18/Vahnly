@@ -96,25 +96,27 @@ func TestAuthMiddleware_AuthenticateJWT(t *testing.T) {
 		})
 	}
 
-	t.Run("Query Parameter Fallback", func(t *testing.T) {
+	t.Run("Query Parameter JWT Is Rejected", func(t *testing.T) {
+		// HIGH-009: the ?jwt= query fallback was removed (tokens leak via URLs/logs).
+		// Header-based routes must now reject a query-string token. WebSocket upgrades
+		// authenticate via single-use tickets (see ws_ticket.go) instead.
 		tokenStr := generateToken("user-query", "rider", time.Minute, []byte(secret))
 		req := httptest.NewRequest("POST", "/api/v1/dispatch/stream?jwt="+tokenStr, nil)
 		w := httptest.NewRecorder()
 
-		var capturedUserID string
+		handlerRan := false
 		dummyHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			capturedUserID, _ = middleware.GetUserIDFromContext(r.Context())
+			handlerRan = true
 			rw.WriteHeader(http.StatusOK)
 		})
 
-		handlerToTest := authGuard.AuthenticateJWT(dummyHandler)
-		handlerToTest.ServeHTTP(w, req)
+		authGuard.AuthenticateJWT(dummyHandler).ServeHTTP(w, req)
 
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
+		if handlerRan {
+			t.Error("handler must not run for a query-string token")
 		}
-		if capturedUserID != "user-query" {
-			t.Errorf("expected user ID user-query, got %s", capturedUserID)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", w.Code)
 		}
 	})
 }

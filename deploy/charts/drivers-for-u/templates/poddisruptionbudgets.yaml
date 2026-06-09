@@ -1,0 +1,20 @@
+# PodDisruptionBudgets keep a minimum number of pods serving during voluntary
+# disruptions (node drains, rolling updates). Only defined for services that run
+# >= 2 replicas; single-replica workers (pruner/expiry/notification/rebalancer)
+# must first be scaled to 2 before a PDB is meaningful (a PDB on a 1-replica
+# Deployment would block all node drains).
+{{- $svcs := list "gateway" "dispatch" "ingestion" "pricing" }}
+{{- range $svc := $svcs }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "drivers-for-u.name" $ }}-{{ $svc }}-pdb
+  labels:
+    app: {{ $svc }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ $svc }}
+{{- end }}

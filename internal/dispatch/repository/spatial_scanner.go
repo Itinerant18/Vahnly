@@ -30,9 +30,6 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		return nil, fmt.Errorf("redis_cluster_client_unavailable")
 	}
 
-	// Fetch k-ring index array (Target cell + 6 immediate neighbors)
-	spatialRing := h3.KRing(targetCell, 1)
-
 	now := time.Now().Unix()
 	staleThreshold := now - 30 // 30-second stale sliding window threshold
 
@@ -45,45 +42,59 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		demandCmd    *redis.IntCmd
 	}
 
-	surgePipe := s.clusterClient.Pipeline()
-	cellCmds := make(map[string]cellSurgeCommands, len(spatialRing))
+	// Surge counts accumulate across whatever rings we end up scanning.
+	cellSupplyCount := make(map[string]int64)
+	cellDemandCount := make(map[string]int64)
 
-	for _, cell := range spatialRing {
-		cellStr := h3.ToString(cell)
-		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cellStr)
-		supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, cellStr)
-		demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, cellStr)
+	// Progressive ring expansion: start at the immediate k=1 neighborhood and widen
+	// until candidates are found or maxRingExpansion is reached. Previously the scan
+	// stopped at k=1 and returned no driver when that ring was empty, silently failing
+	// bookings in sparse cells even when supply sat one or two rings out.
+	const maxRingExpansion = 3
+	for k := 1; k <= maxRingExpansion; k++ {
+		spatialRing := h3.KRing(targetCell, k)
 
-		cellCmds[cellStr] = cellSurgeCommands{
-			driverIDsCmd: surgePipe.ZRevRangeByScore(ctx, zsetKey, &redis.ZRangeBy{
-				Max: fmt.Sprintf("%d", now),
-				Min: fmt.Sprintf("%d", staleThreshold),
-			}),
-			supplyCmd: surgePipe.ZCard(ctx, supplyKey),
-			demandCmd: surgePipe.ZCard(ctx, demandKey),
-		}
-	}
+		surgePipe := s.clusterClient.Pipeline()
+		cellCmds := make(map[string]cellSurgeCommands, len(spatialRing))
 
-	if _, err := surgePipe.Exec(ctx); err != nil && err != redis.Nil {
-		log.Printf("[SPATIAL_SCANNER] surge pipeline exec error: %v", err)
-	}
+		for _, cell := range spatialRing {
+			cellStr := h3.ToString(cell)
+			zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cellStr)
+			supplyKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, cellStr)
+			demandKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, cellStr)
 
-	// Unpack driver IDs and per-cell surge counts
-	cellSupplyCount := make(map[string]int64, len(spatialRing))
-	cellDemandCount := make(map[string]int64, len(spatialRing))
-
-	for cellStr, cmds := range cellCmds {
-		cellSupplyCount[cellStr] = cmds.supplyCmd.Val()
-		cellDemandCount[cellStr] = cmds.demandCmd.Val()
-
-		driverIDs, err := cmds.driverIDsCmd.Result()
-		if err != nil && err != redis.Nil {
-			continue
-		}
-		for _, driverID := range driverIDs {
-			if _, exists := discoveredDriverCells[driverID]; !exists {
-				discoveredDriverCells[driverID] = cellStr
+			cellCmds[cellStr] = cellSurgeCommands{
+				driverIDsCmd: surgePipe.ZRevRangeByScore(ctx, zsetKey, &redis.ZRangeBy{
+					Max: fmt.Sprintf("%d", now),
+					Min: fmt.Sprintf("%d", staleThreshold),
+				}),
+				supplyCmd: surgePipe.ZCard(ctx, supplyKey),
+				demandCmd: surgePipe.ZCard(ctx, demandKey),
 			}
+		}
+
+		if _, err := surgePipe.Exec(ctx); err != nil && err != redis.Nil {
+			log.Printf("[SPATIAL_SCANNER] surge pipeline exec error (k=%d): %v", k, err)
+		}
+
+		// Unpack driver IDs and per-cell surge counts for this ring.
+		for cellStr, cmds := range cellCmds {
+			cellSupplyCount[cellStr] = cmds.supplyCmd.Val()
+			cellDemandCount[cellStr] = cmds.demandCmd.Val()
+
+			driverIDs, err := cmds.driverIDsCmd.Result()
+			if err != nil && err != redis.Nil {
+				continue
+			}
+			for _, driverID := range driverIDs {
+				if _, exists := discoveredDriverCells[driverID]; !exists {
+					discoveredDriverCells[driverID] = cellStr
+				}
+			}
+		}
+
+		if len(discoveredDriverCells) > 0 {
+			break
 		}
 	}
 

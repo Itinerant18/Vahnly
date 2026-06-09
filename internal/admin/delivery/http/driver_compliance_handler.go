@@ -255,6 +255,15 @@ func (h *DriverComplianceHandler) HandleVerifyDriver(w http.ResponseWriter, r *h
 			http.Error(w, "driver_not_found_or_already_verified", http.StatusNotFound)
 			return
 		}
+
+		// Notify the driver so their app reflects approval without a re-login. The
+		// driver notifications screen (GET /api/v1/driver-account/notifications) reads
+		// driver_notifications; this row surfaces the status change on the next poll.
+		_, _ = h.dbPool.Exec(ctx, `
+			INSERT INTO driver_notifications (driver_id, category, title, body)
+			VALUES ($1::uuid, 'SYSTEM', $2, $3)
+		`, req.DriverID, "You're verified!",
+			"Your KYC has been approved. You can now go online and start accepting trips.")
 	} else {
 		// Rejection: Delete row
 		query := "DELETE FROM drivers WHERE id = $1::uuid AND is_verified = false;"

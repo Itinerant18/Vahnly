@@ -5,7 +5,8 @@
       "Bash(Select-Object Name, Mode)",
       "Bash(Format-Table -AutoSize)",
       "Bash(node -e \"const d=require\\('./package.json'\\); console.log\\(JSON.stringify\\({deps:d.dependencies,dev:d.devDependencies},null,1\\)\\)\")",
-      "Bash(timeout 110 go run ./cmd/simulator)"
+      "Bash(timeout 110 go run ./cmd/simulator)",
+      "Bash(go build *)"
     ]
   },
   "enabledPlugins": {

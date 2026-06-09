@@ -1,4 +1,4 @@
-import { WS_BASE_URL } from '../api/client';
+import { BASE_URL, WS_BASE_URL } from '../api/client';
 import {
   AssignmentFrame,
   FrameType,
@@ -12,10 +12,25 @@ export interface DispatchStreamCallbacks {
   onClose: () => void;
 }
 
-function buildStreamUrl(orderId: string, token: string, cityPrefix: string): string {
+// Mint a single-use WebSocket ticket. The long-lived JWT is sent in the
+// Authorization header (never in a URL), and the short-lived ticket is what
+// travels in the ?ticket= query — so the JWT no longer leaks into logs/history.
+async function fetchWsTicket(token: string): Promise<string> {
+  const res = await fetch(`${BASE_URL.replace(/\/$/, '')}/api/v1/ws/ticket`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`ws_ticket_request_failed_${res.status}`);
+  }
+  const data = (await res.json()) as { ticket: string };
+  return data.ticket;
+}
+
+function buildStreamUrl(orderId: string, ticket: string, cityPrefix: string): string {
   const query = new URLSearchParams({
     order_id: orderId,
-    jwt: token,
+    ticket,
     city_prefix: cityPrefix,
   });
 
@@ -32,8 +47,22 @@ export function connectDispatchStream(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let closedByClient = false;
 
-  const connect = () => {
-    ws = new WebSocket(buildStreamUrl(orderId, token, cityPrefix));
+  const connect = async () => {
+    // Tickets are single-use, so fetch a fresh one for every (re)connect.
+    let ticket: string;
+    try {
+      ticket = await fetchWsTicket(token);
+    } catch {
+      if (!closedByClient) {
+        reconnectTimer = setTimeout(() => void connect(), 2000);
+      }
+      return;
+    }
+    if (closedByClient) {
+      return;
+    }
+
+    ws = new WebSocket(buildStreamUrl(orderId, ticket, cityPrefix));
     ws.binaryType = 'arraybuffer';
 
     ws.onmessage = (event: MessageEvent) => {
@@ -56,7 +85,7 @@ export function connectDispatchStream(
       }
 
       if (event.code === 1001) {
-        reconnectTimer = setTimeout(connect, 2000);
+        reconnectTimer = setTimeout(() => void connect(), 2000);
         return;
       }
 
@@ -64,7 +93,7 @@ export function connectDispatchStream(
     };
   };
 
-  connect();
+  void connect();
 
   return () => {
     closedByClient = true;

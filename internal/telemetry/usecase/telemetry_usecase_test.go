@@ -33,6 +33,41 @@ func (m *mockKafkaProducer) PublishLocationUpdate(ctx context.Context, loc *doma
 	return nil
 }
 
+func TestProcessLocationUpdate_DropsImplausibleCoordinates(t *testing.T) {
+	cases := []struct {
+		name     string
+		lat, lng float64
+	}{
+		{"null_island", 0, 0},
+		{"out_of_wgs84", 95.0, 200.0},
+		{"outside_india", 40.7128, -74.0060}, // New York
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			repo := &mockRedisRepo{
+				SetLocationFunc: func(ctx context.Context, loc *domain.DriverLocation, ttl time.Duration) error {
+					called = true
+					return nil
+				},
+			}
+			uc := usecase.NewTelemetryUseCase(repo, &mockKafkaProducer{}, nil, nil)
+
+			err := uc.ProcessLocationUpdate(context.Background(), &domain.DriverLocation{
+				DriverID: "driver-1", CityPrefix: "KOL",
+				Latitude: tc.lat, Longitude: tc.lng, Timestamp: time.Now(),
+			})
+			// Frame is dropped, not errored (errors are stream-fatal in the gRPC handler).
+			if err != nil {
+				t.Fatalf("expected nil (dropped frame), got error: %v", err)
+			}
+			if called {
+				t.Errorf("implausible coordinate (%.4f,%.4f) was written to the spatial index", tc.lat, tc.lng)
+			}
+		})
+	}
+}
+
 func TestProcessLocationUpdate_RadianConversion(t *testing.T) {
 	// 1. Setup mock repository and producer
 	var savedLocation *domain.DriverLocation

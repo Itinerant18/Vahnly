@@ -11,13 +11,20 @@ global:
   logLevel: warn
   metricsEnabled: true
 
+# Toggle baseline NetworkPolicies (default-deny ingress + scoped egress). Requires
+# a NetworkPolicy-enforcing CNI (Calico/Cilium).
+networkPolicy:
+  enabled: true
+
   # In-cluster connection strings. Every data-tier service is assumed to live in
   # the same namespace (dispatch). Keep kafkaBrokers consistent with the KEDA
   # ScaledObject bootstrapServers under dispatch.autoscaling.kafka below.
   env:
     # sslmode=require encrypts without CA verification. Use verify-full only once
     # a CA bundle is mounted into the pods, otherwise the TLS handshake fails.
-    databaseUrl: "postgresql://app_gateway:HardenedProdPassword@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=require"
+    # PLACEHOLDER — the password must be injected via SealedSecret/external-secret,
+    # never committed here. Rotate any password that was previously in git history.
+    databaseUrl: "postgresql://app_gateway:REPLACE_ME_VIA_SEALED_SECRET@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=require"
     kafkaBrokers: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
     redisClusterNodes: "redis-cluster.dispatch.svc.cluster.local:6379"
     tritonServerUrl: "triton-inference-service.dispatch.svc.cluster.local:8001"
@@ -35,6 +42,17 @@ image:
 secrets:
   jwtSigningKey: "REPLACE_ME_VIA_SEALED_SECRET"
   fieldEncryptionKey: "REPLACE_ME_VIA_SEALED_SECRET"
+  paymentWebhookSigningSecret: "REPLACE_ME_VIA_SEALED_SECRET"
+  awsAccessKeyId: "REPLACE_ME_VIA_SEALED_SECRET"
+  awsSecretAccessKey: "REPLACE_ME_VIA_SEALED_SECRET"
+
+# Durable object storage for driver KYC documents. Leave bucket empty to fall back
+# to ephemeral local disk (NOT for production). endpoint is for S3-compatible
+# services (MinIO/Supabase); leave empty for AWS S3.
+objectStorage:
+  bucket: "driversforu-kyc-vault"
+  region: "ap-south-1"
+  endpoint: ""
 
 # -----------------------------------------------------------------------------
 # Public API gateway — the only externally reachable service.
@@ -96,7 +114,7 @@ reconciler:
     requests: { cpu: "100m", memory: "128Mi" }
 
 surge:
-  replicaCount: 1
+  replicaCount: 2 # >=2: surge is traffic-sensitive and was a single point of failure
   trackedCells: "88754cb247fffff,88283473fffffff"
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
