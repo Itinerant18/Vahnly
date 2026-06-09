@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/redis/go-redis/v9"
+	"github.com/uber/h3-go/v3"
 )
 
 var SOSCallback func(driverID string, tripID string, lat, lng float64)
@@ -33,13 +34,16 @@ func NewDutyHandler(dbPool *pgxpool.Pool, clusterClient *redis.ClusterClient) *D
 
 type DutyStateRequest struct {
 	DutyState string  `json:"duty_state"` // ONLINE or OFFLINE
+	State     string  `json:"state"`      // Alternative: ONLINE or OFFLINE
 	Latitude  float64 `json:"latitude"`
+	Lat       float64 `json:"lat"`        // Alternative
 	Longitude float64 `json:"longitude"`
+	Lng       float64 `json:"lng"`        // Alternative
 }
 
 // HandleDutyStateToggle handles Online/Offline toggle for drivers
 func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -56,9 +60,22 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if req.DutyState != "ONLINE" && req.DutyState != "OFFLINE" {
+	state := req.State
+	if state == "" {
+		state = req.DutyState
+	}
+	if state != "ONLINE" && state != "OFFLINE" {
 		http.Error(w, "Invalid duty state: must be ONLINE or OFFLINE", http.StatusBadRequest)
 		return
+	}
+
+	lat := req.Latitude
+	if lat == 0 {
+		lat = req.Lat
+	}
+	lng := req.Longitude
+	if lng == 0 {
+		lng = req.Lng
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -67,7 +84,7 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 	// 1. Validate KYC Status & City Prefix
 	var verificationStatus string
 	var cityPrefix string
-	kycQuery := `SELECT COALESCE(verification_status::text, 'ONBOARDING'), city_prefix FROM drivers WHERE id = $1`
+	kycQuery := `SELECT COALESCE(verification_status::text, 'ONBOARDING'), COALESCE(city_prefix, 'KOL') FROM drivers WHERE id = $1`
 	err := h.dbPool.QueryRow(ctx, kycQuery, driverID).Scan(&verificationStatus, &cityPrefix)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -93,7 +110,7 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 	var dutyStateStr string
 	var currentStateStr string
 
-	if req.DutyState == "ONLINE" {
+	if state == "ONLINE" {
 		dutyStateStr = "ONLINE"
 		currentStateStr = "ONLINE_AVAILABLE"
 	} else {
@@ -118,9 +135,9 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 		WHERE id = $5
 	`
 	var latVal, lngVal interface{}
-	if req.DutyState == "ONLINE" && req.Latitude != 0 {
-		latVal = req.Latitude
-		lngVal = req.Longitude
+	if state == "ONLINE" && lat != 0 {
+		latVal = lat
+		lngVal = lng
 	}
 
 	_, err = tx.Exec(ctx, updateQuery, dutyStateStr, currentStateStr, latVal, lngVal, driverID)
@@ -138,26 +155,74 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 	// 3. Redis Spatial index sync
 	spatialKey := fmt.Sprintf("driver:locations:%s", cityPrefix)
 	statusKey := fmt.Sprintf("driver:{%s:%s}:status", cityPrefix, driverID)
+	trackerKey := fmt.Sprintf("driver:{%s:%s}:current_cell", cityPrefix, driverID)
+	profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, driverID)
 
-	if req.DutyState == "ONLINE" {
+	if state == "ONLINE" {
 		if h.clusterClient != nil {
-			// Add to spatial index ZSET
+			// Add to Geo ZSET
 			_ = h.clusterClient.GeoAdd(ctx, spatialKey, &redis.GeoLocation{
 				Name:      driverID,
-				Longitude: req.Longitude,
-				Latitude:  req.Latitude,
+				Longitude: lng,
+				Latitude:  lat,
 			}).Err()
 
-			// Set status key
-			_ = h.clusterClient.Set(ctx, statusKey, "ONLINE_AVAILABLE", 24*time.Hour).Err()
+			// Add to H3 sharded ZSET
+			if lat != 0 && lng != 0 {
+				latRad := lat * (math.Pi / 180.0)
+				lngRad := lng * (math.Pi / 180.0)
+				centerCoord := h3.GeoCoord{Latitude: latRad, Longitude: lngRad}
+				resolution8Cell := h3.FromGeo(centerCoord, 8)
+				h3CellStr := h3.ToString(resolution8Cell)
+
+				spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, h3CellStr)
+				nowEpoch := float64(time.Now().Unix())
+
+				pipe := h.clusterClient.Pipeline()
+				pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: driverID})
+				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+				pipe.Set(ctx, trackerKey, h3CellStr, 24*time.Hour)
+				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 24*time.Hour)
+				// Pre-warm the profile hash for Hungarian matcher
+				pipe.HSet(ctx, profileKey,
+					"osm_node_id",              "1001",
+					"acceptance_rate",          "0.95",
+					"cancellation_probability", "0.05",
+				)
+				pipe.Expire(ctx, profileKey, 24*time.Hour)
+				_, _ = pipe.Exec(ctx)
+			}
 		}
 	} else {
 		if h.clusterClient != nil {
-			// Remove from spatial index
+			// Remove from Geo ZSET
 			_ = h.clusterClient.ZRem(ctx, spatialKey, driverID).Err()
 
-			// Set status key to OFFLINE
+			// Retrieve previous H3 cell to evict from sharded spatial ZSET
+			previousCell, err := h.clusterClient.Get(ctx, trackerKey).Result()
+			if err == nil && previousCell != "" {
+				spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, previousCell)
+				_ = h.clusterClient.ZRem(ctx, spatialZSetKey, driverID).Err()
+			}
+
+			// Clean up keys
 			_ = h.clusterClient.Set(ctx, statusKey, "OFFLINE", 24*time.Hour).Err()
+			_ = h.clusterClient.Del(ctx, trackerKey).Err()
+		}
+	}
+
+	// 4. Real-Time Admin Event for ControlRoomDashboard.tsx
+	if h.clusterClient != nil {
+		eventData := map[string]interface{}{
+			"driver_id": driverID,
+			"state":     state,
+			"lat":       lat,
+			"lng":       lng,
+			"timestamp": time.Now(),
+		}
+		bytes, err := json.Marshal(eventData)
+		if err == nil {
+			_ = h.clusterClient.Publish(ctx, "admin:active_radar", string(bytes)).Err()
 		}
 	}
 

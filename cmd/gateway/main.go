@@ -113,6 +113,7 @@ func main() {
 		driverOnboardingHandler.SetFieldCipher(fieldCipher)
 	}
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
+	driverTripHandler := driverHttp.NewDriverTripHandler(dbPool, redisClusterClient)
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
 	offlineSyncHandler := gatewayHttp.NewOfflineSyncHandler(dbPool)
@@ -354,6 +355,9 @@ func main() {
 
 	// Driver operational duty, SOS, stats and OTP routes
 	mux.HandleFunc("POST /api/v1/driver/duty", authGuard.AuthenticateJWT(driverDutyHandler.HandleDutyStateToggle))
+	mux.HandleFunc("PATCH /api/v1/driver/duty/toggle", authGuard.AuthenticateJWT(driverDutyHandler.HandleDutyStateToggle))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/arrived", authGuard.AuthenticateJWT(driverTripHandler.MarkArrived))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/verify-start", authGuard.AuthenticateJWT(driverTripHandler.VerifyAndStartTrip))
 	mux.HandleFunc("POST /api/v1/driver/sos", authGuard.AuthenticateJWT(driverDutyHandler.HandleTriggerSOS))
 	mux.HandleFunc("GET /api/v1/driver/stats", authGuard.AuthenticateJWT(driverDutyHandler.HandleGetStats))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
@@ -375,7 +379,10 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/status", authGuard.AuthenticateJWT(handler.HandleDriverSetStatus))
 	mux.HandleFunc("GET /api/v1/driver/offer", authGuard.AuthenticateJWT(handler.HandleDriverGetOffer))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/offer-response", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleOfferResponse))))
-	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/arrived", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverArrived))))
+	// NOTE: PATCH /api/v1/driver/orders/{id}/arrived is registered above (line ~359) via
+	// driverTripHandler.MarkArrived — the handler the client (useTripStore) pairs with
+	// /verify-start. Re-registering it here panicked the ServeMux at startup, so the
+	// duplicate gateway HandleDriverArrived route is intentionally omitted.
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/start", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverStartTrip))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/events", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverAddOrderEvent))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/end", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverEndTrip))))
@@ -765,6 +772,22 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/team/suspend", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleSuspendAdmin))
 	mux.HandleFunc("POST /api/v1/admin/team/reset-2fa", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleReset2FA))
 	mux.HandleFunc("GET /api/v1/admin/team/audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleGetAuditLogs))
+
+	// Kubernetes liveness/readiness probes (see Helm gateway-deployment).
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := dbPool.Ping(ctx); err != nil {
+			http.Error(w, "db_unreachable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready"))
+	})
 
 	corsMiddleware := middleware.NewCORSMiddleware()
 

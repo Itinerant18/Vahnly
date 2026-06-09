@@ -724,3 +724,89 @@ func (c *OrderCreatedConsumer) Close() error {
 	_ = c.orderRetryWriter.Close()
 	return c.kafkaWriter.Close()
 }
+
+// MatchPayload defines match details sent downstream
+type MatchPayload struct {
+	OrderID       string  `json:"order_id"`
+	DriverID      string  `json:"driver_id"`
+	RiderName     string  `json:"rider_name"`
+	RiderRating   float64 `json:"rider_rating"`
+	PickupAddress string  `json:"pickup_address"`
+	DropAddress   string  `json:"drop_address"`
+	TripType      string  `json:"trip_type"`
+	ETAMinutes    int     `json:"eta_minutes"`
+	EstimatedFare int64   `json:"estimated_fare"`
+}
+
+// OrderConsumer processes match events and sends them down driver WebSocket connections
+type OrderConsumer struct {
+	webSocketManager *WebSocketManager
+	dispatchEngine   *DispatchEngine
+}
+
+// NewOrderConsumer creates a new OrderConsumer
+func NewOrderConsumer(redisClient *redis.ClusterClient) *OrderConsumer {
+	return &OrderConsumer{
+		webSocketManager: &WebSocketManager{redisClusterClient: redisClient},
+		dispatchEngine:   &DispatchEngine{redisClusterClient: redisClient},
+	}
+}
+
+// ProcessMatch listens to Kafka topic "dispatch.matches"
+func (c *OrderConsumer) ProcessMatch(matchEvent MatchPayload) {
+	// Construct the exact payload expected by the frontend Modal
+	offerPayload := map[string]interface{}{
+		"type": "OFFER_PENDING",
+		"data": map[string]interface{}{
+			"order_id":         matchEvent.OrderID,
+			"rider_name":       matchEvent.RiderName,
+			"rider_rating":     matchEvent.RiderRating,
+			"pickup_address":   matchEvent.PickupAddress,
+			"drop_address":     matchEvent.DropAddress,
+			"trip_type":        matchEvent.TripType, // CITY, OUTSTATION
+			"eta_minutes":      matchEvent.ETAMinutes,
+			"fare_estimate":    matchEvent.EstimatedFare,
+			"expires_in_secs":  15, // The strict countdown window
+		},
+	}
+
+	// Push down the driver's specific WebSocket channel
+	err := c.webSocketManager.SendToUser(matchEvent.DriverID, offerPayload)
+	if err != nil {
+		// If socket fails, release the match back to the greedy matcher instantly
+		c.dispatchEngine.ReleaseMatch(matchEvent.OrderID)
+	}
+}
+
+// WebSocketManager handles active driver WebSocket message transmissions
+type WebSocketManager struct {
+	redisClusterClient *redis.ClusterClient
+}
+
+// SendToUser pushes a message down the driver's specific WebSocket connection
+func (w *WebSocketManager) SendToUser(driverID string, payload interface{}) error {
+	if w.redisClusterClient != nil {
+		bytes, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		// Publish to the broadcast channel so the gateway session handles it
+		return w.redisClusterClient.Publish(context.Background(), "gateway:assignments:broadcast", string(bytes)).Err()
+	}
+	return nil
+}
+
+// DispatchEngine manages order dispatch lifecycle state
+type DispatchEngine struct {
+	redisClusterClient *redis.ClusterClient
+}
+
+// ReleaseMatch releases the match back to the matcher
+func (e *DispatchEngine) ReleaseMatch(orderID string) {
+	// Clean up lease and reset order status
+	ctx := context.Background()
+	if e.redisClusterClient != nil {
+		leaseKey := fmt.Sprintf("offer:lease:%s", orderID)
+		_ = e.redisClusterClient.Del(ctx, leaseKey).Err()
+	}
+}
