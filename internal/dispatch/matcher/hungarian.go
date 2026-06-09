@@ -90,12 +90,12 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 			supplyDensity,
 			float32(driver.IdleSeconds),
 		}
-		
+
 		// Query the secondary classification tree model on Triton
 		riskProb, riskErr := etaCorrector.ComputeCancellationRisk(routingCtx, riskFeatures)
 		if riskErr == nil {
 			cancellationRiskScore = riskProb
-			
+
 			// FENCE VALUE EXCLUSION: Prune high-risk drivers from matching eligibility entirely
 			if cancellationRiskScore >= 0.75 {
 				return 1e7, estimatedEtaSeconds
@@ -265,13 +265,16 @@ func SolveKuhnMunkres(matrix [][]float64) map[int]int {
 	p := make([]int, n+1)
 	way := make([]int, n+1)
 
+	// Pre-allocate to avoid allocations in the main loop
+	minv := make([]float64, n+1)
+	used := make([]bool, n+1)
+
 	for i := 1; i <= n; i++ {
 		p[0] = i
-		minv := make([]float64, n+1)
 		for j := range minv {
 			minv[j] = math.MaxFloat64
+			used[j] = false
 		}
-		used := make([]bool, n+1)
 		j0 := 0
 
 		for {

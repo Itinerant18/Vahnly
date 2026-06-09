@@ -1,0 +1,3 @@
+## 2024-05-18 - Avoid unnecessary slice allocations
+**Learning:** Initializing empty slices using `make([]Type, 0)` is less efficient than using zero values (`var slice []Type`) and then returning nil for empty JSON arrays if acceptable, or using a fast path to return early without allocations if rows.Next() is false. However, standard Go practice to return empty arrays in JSON instead of `null` uses `make([]Type, 0)` or `[]Type{}`.
+**Action:** Replace `make([]Type, 0)` with `[]Type{}` which can be marginally faster / standard, or pre-allocate with capacity if length is known (`make([]Type, 0, capacity)`). Let's look for loops in the backend where slices are grown, or frontend re-renders.
