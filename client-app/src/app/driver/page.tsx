@@ -9,6 +9,9 @@ import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import { DriverTripManager } from '../../components/DriverTripManager';
 import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
+import { DriverDrawer } from '../../components/DriverDrawer';
+import { SosModal } from '../../components/SosModal';
+import { useSafetyStore } from '../../store/useSafetyStore';
 import {
   completeTrip,
   getDriverProfile,
@@ -121,10 +124,6 @@ export default function DriverTerminalPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(3);
   
-  // SOS overlay controls
-  const [sosActive, setSosActive] = useState(false);
-  const [sosCountdown, setSosCountdown] = useState(5);
-  
 
   
   // En-Route and Arrived timer trackers
@@ -174,7 +173,7 @@ export default function DriverTerminalPage() {
   const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startSosHold = () => {
-    if (sosActive) return;
+    if (useSafetyStore.getState().isEmergencyActive) return;
     setSosHolding(true);
     setSosProgress(0);
 
@@ -191,8 +190,10 @@ export default function DriverTerminalPage() {
         sosHoldTimerRef.current = null;
         setSosHolding(false);
         setSosProgress(0);
-        setSosActive(true);
-        setSosCountdown(5);
+        const lat = 22.5726;
+        const lng = 88.3639;
+        const orderId = activeTrip?.order_id || "";
+        useSafetyStore.getState().triggerSOS(lat, lng, orderId);
       }
     }, 50);
   };
@@ -331,27 +332,6 @@ export default function DriverTerminalPage() {
       if (interval) clearInterval(interval);
     };
   }, [dutyState]);
-
-  // SOS auto-trigger timer rules
-  useEffect(() => {
-    if (sosActive && sosCountdown > 0) {
-      sosTimerRef.current = setTimeout(() => {
-        setSosCountdown((prev) => prev - 1);
-      }, 1000);
-    } else if (sosActive && sosCountdown === 0) {
-      logAudit('SOS_CRITICAL_ALERT_FIRED', {
-        driverID,
-        coordinates: { lat: 22.5726, lng: 88.3639 },
-        tripId: activeTrip?.order_id || 'IDLE_DUTY'
-      });
-      alert('🚨 EMERGENCY BROADCAST: Location coordinates shared with nearest response vehicle nodes & central command. Automated 112 hotline dialed.');
-      setSosActive(false);
-      setSosCountdown(5);
-    }
-    return () => {
-      if (sosTimerRef.current) clearTimeout(sosTimerRef.current);
-    };
-  }, [sosActive, sosCountdown]);
 
   const openOnlineStreams = () => {
     if (!token) return;
@@ -890,8 +870,10 @@ export default function DriverTerminalPage() {
   }
 
   const triggerSOS = () => {
-    setSosActive(true);
-    setSosCountdown(5);
+    const lat = 22.5726;
+    const lng = 88.3639;
+    const orderId = activeTrip?.order_id || "";
+    useSafetyStore.getState().triggerSOS(lat, lng, orderId);
     logAudit('SOS_CRITICAL_TRIGGERED', { driverID, time: new Date().toISOString() });
   };
 
@@ -899,113 +881,18 @@ export default function DriverTerminalPage() {
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-x-hidden relative">
       
       {/* 1. HAMBURGER SLIDE DRAWER MENU OVERLAY */}
-      {isDrawerOpen && (
-        <div className="fixed inset-0 z-[99999] flex bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="w-80 bg-zinc-950 border-r border-zinc-800 h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
-            <div>
-              {/* Header profile info */}
-              <div className="flex items-center gap-3 border-b border-zinc-900 pb-6 mb-6">
-                <div className="h-12 w-12 rounded-xl bg-zinc-850 border border-zinc-800 flex items-center justify-center text-sm font-bold text-white uppercase overflow-hidden">
-                  👤
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold tracking-tight text-white">{driverName}</h4>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-amber-500 font-mono">★ 4.92</span>
-                    <span className="bg-zinc-900 text-zinc-500 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
-                      PRO PARTNER
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Navigation lists */}
-              <nav className="space-y-1">
-                {[
-                  { label: 'Dashboard Home', href: '/driver', icon: '📱' },
-                  { label: 'My Profile', href: '/driver-account/profile', icon: '👤' },
-                  { label: 'Earnings Summary', href: '/driver-account/earnings', icon: '₹' },
-                  { label: 'Instant Payouts', href: '/driver-account/payouts', icon: '💳' },
-                  { label: 'Trip History', href: '/driver-account/trip-history', icon: '📁' },
-                  { label: 'Incentives & Quests', href: '/driver-account/incentives', icon: '🏆' },
-                  { label: 'Vehicle Records', href: '/driver-account/vehicles', icon: '🚗' },
-                  { label: 'Performance Analytics', href: '/driver-account/performance', icon: '📊' },
-                  { label: 'Platform Wallet', href: '/driver-account/wallet', icon: '💼' },
-                  { label: 'Notifications Center', href: '/driver-account/notifications', icon: '🔔' },
-                  { label: 'Training Academy', href: '/driver-account/training', icon: '🎓' },
-                  { label: 'Refer a Friend', href: '/driver-account/refer', icon: '🎁' },
-                  { label: 'System Settings', href: '/driver-account/settings', icon: '⚙️' },
-                  { label: 'Support & FAQs', href: '/driver-account/support', icon: '💬' }
-                ].map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    onClick={() => setIsDrawerOpen(false)}
-                    className="flex items-center gap-3 py-2 px-3 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all font-mono uppercase tracking-wider"
-                  >
-                    <span>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
-              </nav>
-            </div>
-
-            {/* Logout actions */}
-            <div className="border-t border-zinc-900 pt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  logAudit('LOGOUT_TRIGGERED', { driverID });
-                  useAuthStore.getState().logout();
-                  window.location.href = '/login';
-                }}
-                className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl py-3 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono border border-zinc-800"
-              >
-                🚪 Terminate Session & Logout
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 cursor-pointer" onClick={() => setIsDrawerOpen(false)} />
-        </div>
-      )}
+      <DriverDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        driverProfile={{
+          name: driverName || "Driver Partner",
+          photo: "",
+          rating: 4.92,
+        }}
+      />
 
       {/* 2. SOS EMERGENCY PULSE TRIGGER MODAL */}
-      {sosActive && (
-        <div className="fixed inset-0 z-[999999] bg-red-950/90 backdrop-blur-md flex flex-col justify-between p-6 sm:p-12 text-left animate-fadeIn">
-          <div className="space-y-4">
-            <span className="bg-red-900 text-white font-mono font-bold text-[9px] uppercase tracking-widest px-2.5 py-1 rounded">
-              ⚠️ CRITICAL SAFETY DIRECTIVE
-            </span>
-            <h2 className="text-4xl font-extrabold tracking-tight text-white font-move">SOS Trigger Activated</h2>
-            <p className="text-red-200 text-sm max-w-md leading-relaxed font-sans">
-              Central support emergency nodes and local police (112 dispatcher dispatch coordinates) are being triggered automatically. Live GPS sharing is enabled on this endpoint.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center justify-center flex-grow py-8">
-            <div className="h-32 w-32 rounded-full bg-red-500/25 border-4 border-red-500 flex items-center justify-center relative animate-pulse">
-              <span className="text-5xl font-mono font-bold text-white">{sosCountdown}</span>
-              <div className="absolute inset-0 rounded-full border-4 border-white animate-ping opacity-25"></div>
-            </div>
-            <span className="text-[10px] font-mono uppercase text-red-300 font-bold tracking-widest mt-4">
-              Broadcasting distress signals in {sosCountdown} seconds
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              logAudit('SOS_CANCELLED', { driverID });
-              setSosActive(false);
-              setSosCountdown(5);
-              setDutyState('ONLINE');
-            }}
-            className="w-full max-w-md mx-auto bg-white hover:bg-zinc-200 text-black font-bold py-4 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95"
-          >
-            ❌ Cancel Safety Alert Broadcast
-          </button>
-        </div>
-      )}
+      <SosModal />
 
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
       <OfferPopup />

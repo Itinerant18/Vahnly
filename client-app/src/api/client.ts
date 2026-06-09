@@ -345,6 +345,43 @@ export async function getEarnings(
   return request<EarningsResponse>(`/api/v1/driver/earnings?${query}`, { method: 'GET', token });
 }
 
+export interface DriverAccountEarnings {
+  gross_earnings: number;
+  trips_count: number;
+  incentives: number;
+  deductions: number;
+  net_payout: number;
+  time_series: Array<{ label: string; amount: number }>;
+}
+
+export interface DriverNotification {
+  id: string;
+  category: 'ALL' | 'TRIPS' | 'EARNINGS' | 'PROMOTIONS' | 'SYSTEM';
+  title: string;
+  body: string;
+  is_read: boolean;
+  timestamp: string;
+}
+
+export async function getDriverAccountEarnings(
+  token: string,
+  range: 'TODAY' | 'WEEK' | 'MONTH',
+): Promise<DriverAccountEarnings> {
+  return request<DriverAccountEarnings>(`/api/v1/driver-account/earnings?range=${range}`, { method: 'GET', token });
+}
+
+export async function triggerDriverWithdrawal(
+  token: string,
+): Promise<{ status: string; payout_id: string }> {
+  return request<{ status: string; payout_id: string }>('/api/v1/driver-account/payouts/withdraw', { method: 'POST', token });
+}
+
+export async function getDriverNotifications(
+  token: string,
+): Promise<DriverNotification[]> {
+  return request<DriverNotification[]>('/api/v1/driver-account/notifications', { method: 'GET', token });
+}
+
 export async function registerDeviceToken(
   token: string,
   deviceToken: string,

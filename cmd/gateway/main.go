@@ -106,6 +106,8 @@ func main() {
 	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, jwtSecret)
 	driverOnboardingHandler := driverHttp.NewOnboardingHandler(dbPool)
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
+	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
+	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
 	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
 	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
 	pricingAdminHandler := adminHttp.NewPricingAdminHandler(dbPool, redisClusterClient, pricingLogger)
@@ -375,6 +377,15 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
 	mux.HandleFunc("POST /api/v1/sos/trigger", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleTriggerSOS)))
+
+	// Driver Safety & Emergency Protocol (Feature 11)
+	mux.HandleFunc("POST /api/v1/driver/safety/sos", authGuard.AuthenticateJWT(driverSafetyHandler.TriggerSOSAlert))
+	mux.HandleFunc("GET /api/v1/driver/safety/fatigue-check", authGuard.AuthenticateJWT(driverSafetyHandler.AssessFatigueLimits))
+
+	// Driver Account, Payouts & Notifications (Features 8 & 9)
+	mux.HandleFunc("GET /api/v1/driver-account/earnings", authGuard.AuthenticateJWT(driverAccountHandler.GetEarningsSummary))
+	mux.HandleFunc("POST /api/v1/driver-account/payouts/withdraw", authGuard.AuthenticateJWT(driverAccountHandler.TriggerInstantPayout))
+	mux.HandleFunc("GET /api/v1/driver-account/notifications", authGuard.AuthenticateJWT(driverAccountHandler.GetNotifications))
 
 	// Driver odometer ingestion endpoint (Phase 2: The Odometer Writer)
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))
