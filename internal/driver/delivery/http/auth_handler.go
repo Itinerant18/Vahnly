@@ -74,6 +74,30 @@ func getClientIP(r *http.Request) string {
 	return strings.TrimSpace(ip)
 }
 
+// loginFailureThreshold is the number of failed attempts from a single IP
+// within the last 15 minutes that triggers login throttling.
+const loginFailureThreshold = 10
+
+// recentLoginFailures counts failed login events recorded for an IP in the last
+// 15 minutes. It fails open (returns 0) on query error so a metering failure
+// never locks legitimate drivers out.
+func (h *DriverAuthHandler) recentLoginFailures(ctx context.Context, ip string) int {
+	if ip == "" {
+		return 0
+	}
+	const query = `
+		SELECT COUNT(*) FROM audit_logs
+		WHERE ip_address = $1
+		  AND action LIKE 'LOGIN_FAILURE%'
+		  AND created_at > NOW() - INTERVAL '15 minutes'
+	`
+	var count int
+	if err := h.dbPool.QueryRow(ctx, query, ip).Scan(&count); err != nil {
+		return 0
+	}
+	return count
+}
+
 func (h *DriverAuthHandler) recordAuditLog(ctx context.Context, driverID string, action string, deviceID string, ip string, appVersion string, geoLocation string) {
 	query := `
 		INSERT INTO audit_logs (driver_id, action, device_id, ip_address, app_version, geo_location)
@@ -179,6 +203,15 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	// Throttle brute-force: too many recent failed attempts from this IP get a
+	// 429 before any credential check is performed.
+	if h.recentLoginFailures(ctx, ip) >= loginFailureThreshold {
+		h.recordAuditLog(ctx, "", "LOGIN_THROTTLED", deviceID, ip, appVersion, geoLocation)
+		w.Header().Set("Retry-After", "900")
+		http.Error(w, "Too many failed login attempts; try again later", http.StatusTooManyRequests)
+		return
+	}
 
 	var dbDriverID string
 	var dbName string

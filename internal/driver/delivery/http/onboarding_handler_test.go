@@ -39,6 +39,33 @@ func TestOnboardingHandler_ValidateQuiz(t *testing.T) {
 	}
 }
 
+func TestMissingRequiredField(t *testing.T) {
+	cases := []struct {
+		name        string
+		step        int
+		data        map[string]interface{}
+		wantMissing string
+	}{
+		{"step1 complete", 1, map[string]interface{}{"fullName": "A", "dob": "2000-01-01", "gender": "M"}, ""},
+		{"step1 blank name", 1, map[string]interface{}{"fullName": "  ", "dob": "x", "gender": "M"}, "fullName"},
+		{"step1 missing gender", 1, map[string]interface{}{"fullName": "A", "dob": "x"}, "gender"},
+		{"step5 complete", 5, map[string]interface{}{"accountNo": "123", "ifscCode": "IFSC", "holderName": "A"}, ""},
+		{"step5 missing account", 5, map[string]interface{}{"ifscCode": "IFSC", "holderName": "A"}, "accountNo"},
+		{"step4 has years", 4, map[string]interface{}{"yearsOfExperience": float64(0)}, ""},
+		{"step4 missing years", 4, map[string]interface{}{}, "yearsOfExperience"},
+		{"step7 agreed", 7, map[string]interface{}{"signatureName": "A", "agreedToTerms": true}, ""},
+		{"step7 not agreed", 7, map[string]interface{}{"signatureName": "A", "agreedToTerms": false}, "agreedToTerms"},
+		{"step7 missing signature", 7, map[string]interface{}{"agreedToTerms": true}, "signatureName"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := missingRequiredField(tc.step, tc.data); got != tc.wantMissing {
+				t.Errorf("missingRequiredField(%d) = %q, want %q", tc.step, got, tc.wantMissing)
+			}
+		})
+	}
+}
+
 func TestOnboardingHandler_HandleSaveStep_Unauthorized(t *testing.T) {
 	handler := NewOnboardingHandler(nil)
 

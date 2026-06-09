@@ -75,6 +75,13 @@ func (h *OnboardingHandler) HandleSaveStep(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Enforce per-step completeness server-side so a client cannot advance the
+	// onboarding step counter by posting an empty or partial payload.
+	if missing := missingRequiredField(stepID, partialData); missing != "" {
+		http.Error(w, "Missing required field: "+missing, http.StatusBadRequest)
+		return
+	}
+
 	// Bank details (step 5) are persisted to the encrypted driver_bank_details
 	// table below, never to the onboarding_data JSONB blob. Strip them here so
 	// no account number or holder name is ever written in plaintext.
@@ -383,6 +390,38 @@ func (h *OnboardingHandler) HandleValidateQuiz(w http.ResponseWriter, r *http.Re
 		Passed: passed,
 		Score:  score,
 	})
+}
+
+// requiredStringFields lists the non-empty string fields each onboarding step
+// must carry before the step counter is allowed to advance.
+var requiredStringFields = map[int][]string{
+	1: {"fullName", "dob", "gender"},
+	2: {"permAddress", "currAddress", "city"},
+	3: {"drivingLicense", "aadhaarId", "panCard"},
+	5: {"accountNo", "ifscCode", "holderName"},
+	6: {"emergencyName", "emergencyPhone"},
+	7: {"signatureName"},
+}
+
+// missingRequiredField returns the name of the first required field absent or
+// blank for the given step, or "" when the payload satisfies the step.
+func missingRequiredField(stepID int, d map[string]interface{}) string {
+	for _, f := range requiredStringFields[stepID] {
+		if strings.TrimSpace(strField(d, f)) == "" {
+			return f
+		}
+	}
+	switch stepID {
+	case 4:
+		if _, ok := d["yearsOfExperience"]; !ok {
+			return "yearsOfExperience"
+		}
+	case 7:
+		if v, ok := d["agreedToTerms"].(bool); !ok || !v {
+			return "agreedToTerms"
+		}
+	}
+	return ""
 }
 
 // strField safely extracts a string value from a decoded JSON map.
