@@ -234,6 +234,7 @@ func (h *DriverComplianceHandler) HandleVerifyDriver(w http.ResponseWriter, r *h
 		query := `
 			UPDATE drivers
 			SET is_verified = true,
+			    verification_status = 'VERIFIED',
 			    has_manual_certification = $1,
 			    has_automatic_certification = $2,
 			    is_luxury_qualified = $3,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -82,7 +83,11 @@ func (h *DriverAuthHandler) recordAuditLog(ctx context.Context, driverID string,
 	if driverID != "" {
 		driverUUID = driverID
 	}
-	_, _ = h.dbPool.Exec(ctx, query, driverUUID, action, deviceID, ip, appVersion, geoLocation)
+	if _, err := h.dbPool.Exec(ctx, query, driverUUID, action, deviceID, ip, appVersion, geoLocation); err != nil {
+		// Audit logging is best-effort and must not block auth, but a silent
+		// failure leaves a hole in the security trail — surface it.
+		log.Printf("[AUDIT] failed to record driver auth event action=%s driver=%q: %v", action, driverID, err)
+	}
 }
 
 // HandleDriverRegister creates a new driver record with default ONBOARDING status

@@ -615,7 +615,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 
 	switch action {
 	case "verify-kyc":
-		sqlQuery := "UPDATE drivers SET is_verified = true, background_check_status = 'CLEARED' WHERE id = $1::uuid"
+		sqlQuery := "UPDATE drivers SET is_verified = true, verification_status = 'VERIFIED', background_check_status = 'CLEARED' WHERE id = $1::uuid"
 		_, err = h.dbPool.Exec(ctx, sqlQuery, id)
 		if err != nil {
 			http.Error(w, "kyc_update_failed", http.StatusInternalServerError)
@@ -631,7 +631,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		}
 		var req ReasonRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		sqlQuery := "UPDATE drivers SET is_verified = false, background_check_status = 'REJECTED' WHERE id = $1::uuid"
+		sqlQuery := "UPDATE drivers SET is_verified = false, verification_status = 'REJECTED', background_check_status = 'REJECTED' WHERE id = $1::uuid"
 		_, _ = h.dbPool.Exec(ctx, sqlQuery, id)
 		override.Status = "PENDING_KYC"
 		override.OnboardingStage = "APPLIED"

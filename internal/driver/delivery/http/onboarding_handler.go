@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/platform/driver-delivery/internal/crypto"
 	"github.com/platform/driver-delivery/internal/domain"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
@@ -30,12 +32,20 @@ type QuizResponse struct {
 
 type OnboardingHandler struct {
 	dbPool *pgxpool.Pool
+	cipher *crypto.FieldCipher
 }
 
 func NewOnboardingHandler(dbPool *pgxpool.Pool) *OnboardingHandler {
 	return &OnboardingHandler{
 		dbPool: dbPool,
 	}
+}
+
+// SetFieldCipher injects the at-rest cipher used to encrypt sensitive bank
+// fields (step 5). Without it, bank-detail persistence is rejected rather than
+// stored in plaintext.
+func (h *OnboardingHandler) SetFieldCipher(c *crypto.FieldCipher) {
+	h.cipher = c
 }
 
 // HandleSaveStep stores step-specific form payload atomically inside driver_data JSONB and advances the step index
@@ -65,7 +75,23 @@ func (h *OnboardingHandler) HandleSaveStep(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	jsonData, err := json.Marshal(partialData)
+	// Bank details (step 5) are persisted to the encrypted driver_bank_details
+	// table below, never to the onboarding_data JSONB blob. Strip them here so
+	// no account number or holder name is ever written in plaintext.
+	jsonSource := partialData
+	if stepID == 5 {
+		jsonSource = map[string]interface{}{}
+		for k, v := range partialData {
+			switch k {
+			case "accountNo", "ifscCode", "holderName", "upiId", "cancelledCheque":
+				// routed to driver_bank_details (account_number encrypted)
+			default:
+				jsonSource[k] = v
+			}
+		}
+	}
+
+	jsonData, err := json.Marshal(jsonSource)
 	if err != nil {
 		http.Error(w, "Failed to encode data payload", http.StatusInternalServerError)
 		return
@@ -138,6 +164,21 @@ func (h *OnboardingHandler) HandleSaveStep(w http.ResponseWriter, r *http.Reques
 	if queryErr != nil {
 		http.Error(w, "Failed to commit onboarding step", http.StatusInternalServerError)
 		return
+	}
+
+	// Route normalized/sensitive step payloads to their dedicated tables in the
+	// same transaction so a partial write rolls back with the step update.
+	switch stepID {
+	case 3:
+		if err := h.upsertKYCDocuments(ctx, tx, driverID, partialData); err != nil {
+			http.Error(w, "Failed to persist KYC documents", http.StatusInternalServerError)
+			return
+		}
+	case 5:
+		if err := h.upsertBankDetails(ctx, tx, driverID, partialData); err != nil {
+			http.Error(w, "Failed to persist bank details", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = tx.Commit(ctx)
@@ -323,13 +364,18 @@ func (h *OnboardingHandler) HandleValidateQuiz(w http.ResponseWriter, r *http.Re
 	if passed {
 		// Update driver verification status to PENDING (onboarding complete, awaiting admin approval)
 		query := `
-			UPDATE drivers 
+			UPDATE drivers
 			SET verification_status = 'PENDING',
 			    onboarding_step = 8,
 			    updated_at = NOW()
 			WHERE id = $1
 		`
-		_, _ = h.dbPool.Exec(ctx, query, driverID)
+		if _, err := h.dbPool.Exec(ctx, query, driverID); err != nil {
+			// Must not report a pass the system failed to record, or the driver
+			// is stranded: client shows "complete" while status never advances.
+			http.Error(w, "Failed to record quiz completion", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -337,4 +383,78 @@ func (h *OnboardingHandler) HandleValidateQuiz(w http.ResponseWriter, r *http.Re
 		Passed: passed,
 		Score:  score,
 	})
+}
+
+// strField safely extracts a string value from a decoded JSON map.
+func strField(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// upsertKYCDocuments writes the step-3 identity document URLs into the
+// normalized driver_kyc_documents vault, resetting review status to PENDING.
+func (h *OnboardingHandler) upsertKYCDocuments(ctx context.Context, tx pgx.Tx, driverID string, d map[string]interface{}) error {
+	const q = `
+		INSERT INTO driver_kyc_documents
+			(driver_id, dl_front_url, aadhaar_url, pan_url, police_verification_url, verification_status, updated_at)
+		VALUES ($1, $2, $3, $4, $5, 'PENDING', NOW())
+		ON CONFLICT (driver_id) DO UPDATE SET
+			dl_front_url = EXCLUDED.dl_front_url,
+			aadhaar_url = EXCLUDED.aadhaar_url,
+			pan_url = EXCLUDED.pan_url,
+			police_verification_url = EXCLUDED.police_verification_url,
+			verification_status = 'PENDING',
+			updated_at = NOW()
+	`
+	_, err := tx.Exec(ctx, q,
+		driverID,
+		strField(d, "drivingLicense"),
+		strField(d, "aadhaarId"),
+		strField(d, "panCard"),
+		strField(d, "policeVerification"),
+	)
+	return err
+}
+
+// upsertBankDetails writes the step-5 payout details into the normalized
+// driver_bank_details table with the account number encrypted at rest.
+func (h *OnboardingHandler) upsertBankDetails(ctx context.Context, tx pgx.Tx, driverID string, d map[string]interface{}) error {
+	encAccount := ""
+	if account := strField(d, "accountNo"); account != "" {
+		if h.cipher == nil {
+			return fmt.Errorf("field cipher not configured; refusing to store bank account in plaintext")
+		}
+		enc, err := h.cipher.Encrypt(account)
+		if err != nil {
+			return err
+		}
+		encAccount = enc
+	}
+
+	const q = `
+		INSERT INTO driver_bank_details
+			(driver_id, account_number, ifsc_code, holder_name, upi_id, cancelled_cheque_url, verified, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
+		ON CONFLICT (driver_id) DO UPDATE SET
+			account_number = EXCLUDED.account_number,
+			ifsc_code = EXCLUDED.ifsc_code,
+			holder_name = EXCLUDED.holder_name,
+			upi_id = EXCLUDED.upi_id,
+			cancelled_cheque_url = EXCLUDED.cancelled_cheque_url,
+			verified = false,
+			updated_at = NOW()
+	`
+	_, err := tx.Exec(ctx, q,
+		driverID,
+		encAccount,
+		strField(d, "ifscCode"),
+		strField(d, "holderName"),
+		strField(d, "upiId"),
+		strField(d, "cancelledCheque"),
+	)
+	return err
 }

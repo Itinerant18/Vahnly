@@ -19,6 +19,7 @@ import (
 	adminHttp "github.com/platform/driver-delivery/internal/admin/delivery/http"
 	driverHttp "github.com/platform/driver-delivery/internal/driver/delivery/http"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
+	"github.com/platform/driver-delivery/internal/crypto"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
@@ -40,6 +41,7 @@ func main() {
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:6379")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:19092")
 	jwtSecret := getEnv("JWT_SECRET_SIGNING_KEY", "kolkata_marketplace_backbone_secret_token_string")
+	fieldEncKey := getEnv("FIELD_ENCRYPTION_KEY", "kolkata_field_encryption_dev_key_change_in_prod")
 
 	log.Printf("Bootstrapping Coordinated API Gateway on Port: %s", httpPort)
 
@@ -105,6 +107,11 @@ func main() {
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
 	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, jwtSecret)
 	driverOnboardingHandler := driverHttp.NewOnboardingHandler(dbPool)
+	if fieldCipher, err := crypto.NewFieldCipher(fieldEncKey); err != nil {
+		log.Fatalf("Field encryption cipher setup failed: %v", err)
+	} else {
+		driverOnboardingHandler.SetFieldCipher(fieldCipher)
+	}
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
