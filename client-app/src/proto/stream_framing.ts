@@ -108,15 +108,24 @@ class ProtoReader {
       return;
     }
     if (wireType === 1) {
+      if (this.offset + 8 > this.bytes.length) {
+        throw new Error('protobuf_skip_truncated');
+      }
       this.offset += 8;
       return;
     }
     if (wireType === 2) {
       const length = this.readVarint();
+      if (this.offset + length > this.bytes.length) {
+        throw new Error('protobuf_skip_truncated');
+      }
       this.offset += length;
       return;
     }
     if (wireType === 5) {
+      if (this.offset + 4 > this.bytes.length) {
+        throw new Error('protobuf_skip_truncated');
+      }
       this.offset += 4;
       return;
     }

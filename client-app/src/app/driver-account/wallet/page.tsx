@@ -1,36 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getDriverWallet, DriverWalletTxn } from '@/api/client';
 
 export default function DriverWalletPage() {
-  const [balance, setBalance] = useState(850.00);
+  const { token } = useAuthStore();
+  const [balance, setBalance] = useState(0.0);
   const [addVal, setAddVal] = useState('');
-  const [history, setHistory] = useState([
-    { id: 'TXN-902', date: '2026-06-03', label: 'Fuel card purchase - HPCL', amount: -500.00, type: 'DEBIT' },
-    { id: 'TXN-881', date: '2026-06-02', label: 'Toll auto-payment NH-6', amount: -80.00, type: 'DEBIT' },
-    { id: 'TXN-860', date: '2026-06-01', label: 'Added money via UPI', amount: 1000.00, type: 'CREDIT' }
-  ]);
+  const [history, setHistory] = useState<DriverWalletTxn[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    getDriverWallet(token)
+      .then((res) => {
+        setBalance(res.balance_paise / 100);
+        setHistory(res.transactions);
+      })
+      .catch((err) => console.warn('Failed to load wallet:', err));
+  }, [token]);
 
   const handleAddMoney = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseFloat(addVal);
-    if (isNaN(val) || val <= 0) {
-      alert('Provide a valid top-up amount.');
-      return;
-    }
-
-    const newTxn = {
-      id: `TXN-${Math.floor(Math.random() * 900 + 100)}`,
-      date: new Date().toISOString().split('T')[0],
-      label: 'Added money via UPI (Secure Gateway)',
-      amount: val,
-      type: 'CREDIT' as const
-    };
-
-    setBalance((prev) => prev + val);
-    setHistory((prev) => [newTxn, ...prev]);
-    setAddVal('');
-    alert(`₹${val.toFixed(2)} added successfully to wallet.`);
+    // Balance/history are real (GetWallet), but top-up needs a payment provider (Stripe/
+    // Razorpay) which is not yet wired. Do not fake a credit.
+    alert('Wallet top-up is not available yet — payment provider integration pending. Your earnings are paid out via the Payouts screen.');
   };
 
   return (
@@ -98,14 +92,17 @@ export default function DriverWalletPage() {
         </h4>
 
         <div className="divide-y divide-zinc-900">
+          {history.length === 0 && (
+            <p className="py-3 text-[10px] font-mono text-zinc-600 text-center">No wallet transactions yet.</p>
+          )}
           {history.map((txn) => (
             <div key={txn.id} className="py-3 flex justify-between items-center text-xs font-mono">
               <div>
-                <span className="text-white block font-sans font-medium">{txn.label}</span>
-                <span className="text-zinc-500 text-[8px] block mt-0.5">{txn.date} • ID: {txn.id}</span>
+                <span className="text-white block font-sans font-medium">{txn.description}</span>
+                <span className="text-zinc-500 text-[8px] block mt-0.5">{new Date(txn.created_at).toLocaleDateString()} • ID: {txn.id.slice(0, 8)}</span>
               </div>
-              <span className={`font-bold ${txn.type === 'CREDIT' ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                {txn.type === 'CREDIT' ? '+' : ''}₹{txn.amount.toFixed(2)}
+              <span className={`font-bold ${txn.entry_type === 'CREDIT' ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                {txn.entry_type === 'CREDIT' ? '+' : '-'}₹{(txn.amount_paise / 100).toFixed(2)}
               </span>
             </div>
           ))}

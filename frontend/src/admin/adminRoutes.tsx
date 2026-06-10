@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router-dom';
 
 // Eagerly loaded — these are the two primary views
 import { ControlRoomDashboard } from './ControlRoomDashboard';
+import { RequireRole } from './components/RequireRole';
 
 // Lazy-loaded pages (code-split at the route boundary)
 const DashboardHome = lazy(() =>
@@ -162,15 +163,18 @@ export const adminRoutes: RouteObject[] = [
   { path: 'audit', element: <LazyWrap><AuditLogsDashboard /></LazyWrap> },
   { path: 'api', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
   { path: 'dev', element: <LazyWrap><DeveloperDashboard /></LazyWrap> },
-  { path: 'corporate', element: <LazyWrap><CorporateDashboard /></LazyWrap> },
-  { path: 'notifications', element: <LazyWrap><NotificationsDashboard /></LazyWrap> },
-  { path: 'ai-intelligence', element: <LazyWrap><AIIntelligenceDashboard /></LazyWrap> },
-  { path: 'driver-ops', element: <LazyWrap><DriverOpsDashboard /></LazyWrap> },
-  { path: 'platform', element: <LazyWrap><PlatformDashboard /></LazyWrap> },
-  { path: 'esg', element: <LazyWrap><ESGDashboard /></LazyWrap> },
-  { path: 'franchise', element: <LazyWrap><FranchiseDashboard /></LazyWrap> },
-  { path: 'admin-tools', element: <LazyWrap><AdminToolsDashboard /></LazyWrap> },
-  { path: 'team', element: <AdminTeamManagement /> },
+  // Role-restricted modules — guarded at the route boundary so direct URL navigation
+  // cannot load a privileged page. allowedRoles mirror navItems below. SUPER_ADMIN is
+  // implicitly allowed inside RequireRole.
+  { path: 'corporate', element: <RequireRole allowed={['OPERATIONS_MANAGER', 'FINANCE']}><LazyWrap><CorporateDashboard /></LazyWrap></RequireRole> },
+  { path: 'notifications', element: <RequireRole allowed={['OPERATIONS_MANAGER', 'SUPPORT_LEAD', 'SAFETY', 'FINANCE']}><LazyWrap><NotificationsDashboard /></LazyWrap></RequireRole> },
+  { path: 'ai-intelligence', element: <RequireRole allowed={['OPERATIONS_MANAGER', 'COMPLIANCE', 'ANALYTICS']}><LazyWrap><AIIntelligenceDashboard /></LazyWrap></RequireRole> },
+  { path: 'driver-ops', element: <RequireRole allowed={['OPERATIONS_MANAGER', 'FLEET_MANAGER']}><LazyWrap><DriverOpsDashboard /></LazyWrap></RequireRole> },
+  { path: 'platform', element: <RequireRole allowed={['OPERATIONS_MANAGER']}><LazyWrap><PlatformDashboard /></LazyWrap></RequireRole> },
+  { path: 'esg', element: <RequireRole allowed={['COMPLIANCE', 'ANALYTICS']}><LazyWrap><ESGDashboard /></LazyWrap></RequireRole> },
+  { path: 'franchise', element: <RequireRole allowed={[]}><LazyWrap><FranchiseDashboard /></LazyWrap></RequireRole> },
+  { path: 'admin-tools', element: <RequireRole allowed={['OPERATIONS_MANAGER']}><LazyWrap><AdminToolsDashboard /></LazyWrap></RequireRole> },
+  { path: 'team', element: <RequireRole allowed={[]}><AdminTeamManagement /></RequireRole> },
 ];
 
 // Navigation item metadata — drives the sidebar rendering

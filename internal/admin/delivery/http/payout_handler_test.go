@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -91,5 +92,31 @@ func TestHandleReleasePayout_MethodValidation(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405 method not allowed, got %d", rec.Code)
+	}
+}
+
+func TestHandleSettlePayout_MethodValidation(t *testing.T) {
+	handler := &PayoutHandler{}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/finance/payouts/po_123/settle", nil)
+	rec := httptest.NewRecorder()
+
+	handler.HandleSettlePayout(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 method not allowed, got %d", rec.Code)
+	}
+}
+
+func TestHandleSettlePayout_RejectsInvalidStatus(t *testing.T) {
+	handler := &PayoutHandler{}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/finance/payouts/po_123/settle",
+		strings.NewReader(`{"status":"BOGUS"}`))
+	req.SetPathValue("id", "po_123")
+	rec := httptest.NewRecorder()
+
+	handler.HandleSettlePayout(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid settlement status, got %d", rec.Code)
 	}
 }

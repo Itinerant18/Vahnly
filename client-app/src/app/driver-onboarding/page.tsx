@@ -10,7 +10,6 @@ interface QuizQuestion {
   id: number;
   text: string;
   options: string[];
-  correctAnswer: number;
 }
 
 export default function DriverOnboardingWizard() {
@@ -80,6 +79,7 @@ export default function DriverOnboardingWizard() {
   }, [token, router]);
 
   // Safety Etiquette quiz data bank
+  // Answer keys are NOT shipped to the client — grading is server-side (validateQuiz).
   const quizQuestions: QuizQuestion[] = [
     {
       id: 1,
@@ -89,8 +89,7 @@ export default function DriverOnboardingWizard() {
         "Verify the customer's identity, input the start Odometer reading, and verify the 4-digit OTP",
         "Wait inside the car and listen to music",
         "Ask the customer to transfer funds to your personal account first"
-      ],
-      correctAnswer: 1
+      ]
     },
     {
       id: 2,
@@ -100,8 +99,7 @@ export default function DriverOnboardingWizard() {
         "Politely explain the situation to the customer, navigate via standard safe routes, and update ETA",
         "Cancel the trip immediately and drop the customer off on the highway",
         "Speed up past local speed limit thresholds to make up for lost time"
-      ],
-      correctAnswer: 1
+      ]
     },
     {
       id: 3,
@@ -111,8 +109,7 @@ export default function DriverOnboardingWizard() {
         "Rider has premium support coverage, and driver must follow priority safety protocols",
         "The driver is allowed to drive faster than usual",
         "Both A and B are correct"
-      ],
-      correctAnswer: 3
+      ]
     },
     {
       id: 4,
@@ -122,8 +119,7 @@ export default function DriverOnboardingWizard() {
         "10 continuous duty hours",
         "16 continuous duty hours",
         "24 continuous duty hours"
-      ],
-      correctAnswer: 1
+      ]
     },
     {
       id: 5,
@@ -133,8 +129,7 @@ export default function DriverOnboardingWizard() {
         "Try to resolve the dispute yourself on the road",
         "Continue driving to the destination ignoring the issue",
         "Turn off your phone to avoid distractions"
-      ],
-      correctAnswer: 0
+      ]
     }
   ];
 

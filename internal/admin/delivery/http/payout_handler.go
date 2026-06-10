@@ -24,6 +24,11 @@ func NewPayoutHandler(dbPool *pgxpool.Pool, logger *log.Logger) *PayoutHandler {
 	return &PayoutHandler{dbPool: dbPool, logger: logger}
 }
 
+// payoutBatchLockKey is a fixed advisory-lock key that serializes batch payout
+// mutations (bulk-approve, export) across concurrent admin requests so two runs
+// cannot double-process the same drivers. The xact lock auto-releases on commit.
+const payoutBatchLockKey int64 = 0x5041594F5554 // "PAYOUT"
+
 type PayoutListItem struct {
 	ID                   string    `json:"id"`
 	DriverID             string    `json:"driver_id"`
@@ -245,6 +250,12 @@ func (h *PayoutHandler) HandleBulkApprovePayouts(w http.ResponseWriter, r *http.
 	}
 	defer tx.Rollback(ctx)
 
+	// Serialize batch payout mutations so two concurrent runs cannot double-process.
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", payoutBatchLockKey); err != nil {
+		http.Error(w, "payout_lock_failed", http.StatusServiceUnavailable)
+		return
+	}
+
 	approvedCount := 0
 	skippedCount := 0
 	skippedDetails := make([]map[string]string, 0)
@@ -354,6 +365,13 @@ func (h *PayoutHandler) HandleExportPayoutBatch(w http.ResponseWriter, r *http.R
 		return
 	}
 	defer tx.Rollback(ctx)
+
+	// Serialize batch payout mutations so two concurrent exports cannot both emit a
+	// batch for the same APPROVED rows.
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", payoutBatchLockKey); err != nil {
+		http.Error(w, "payout_lock_failed", http.StatusServiceUnavailable)
+		return
+	}
 
 	// Fetch all APPROVED payouts
 	query := `
@@ -613,4 +631,101 @@ func (h *PayoutHandler) HandleReleasePayout(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"PENDING"}`))
+}
+
+// HandleSettlePayout records the bank result for a PROCESSING payout, closing the
+// settlement state machine: PROCESSING -> PAID (with a bank reference) or
+// PROCESSING -> FAILED (with a failure reason, after which it can be retried).
+// Without this, a bank/NEFT failure left a payout stuck in PROCESSING forever —
+// invisible to retry (which only handles FAILED) and to eligibility re-checks.
+func (h *PayoutHandler) HandleSettlePayout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "missing_payout_id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Status        string `json:"status"` // PAID | FAILED
+		BankReference string `json:"bank_reference"`
+		FailureReason string `json:"failure_reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid_settlement_payload", http.StatusBadRequest)
+		return
+	}
+
+	newStatus := strings.ToUpper(strings.TrimSpace(req.Status))
+	switch newStatus {
+	case "PAID":
+		if strings.TrimSpace(req.BankReference) == "" {
+			http.Error(w, "bank_reference_required_for_paid", http.StatusBadRequest)
+			return
+		}
+	case "FAILED":
+		if strings.TrimSpace(req.FailureReason) == "" {
+			http.Error(w, "failure_reason_required", http.StatusBadRequest)
+			return
+		}
+	default:
+		http.Error(w, "invalid_settlement_status", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_init_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	err = tx.QueryRow(ctx, "SELECT status FROM payout_requests WHERE id = $1 FOR UPDATE", id).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "payout_not_found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "database_query_error", http.StatusInternalServerError)
+		return
+	}
+
+	// Only a PROCESSING (exported-to-bank) payout can be settled. This also makes the
+	// endpoint idempotent: a duplicate PAID/FAILED callback finds a non-PROCESSING row
+	// and is rejected instead of double-applying.
+	if status != "PROCESSING" {
+		http.Error(w, "payout_not_processing", http.StatusConflict)
+		return
+	}
+
+	if newStatus == "PAID" {
+		_, err = tx.Exec(ctx,
+			"UPDATE payout_requests SET status = 'PAID', bank_reference = $2, failure_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+			id, strings.TrimSpace(req.BankReference))
+	} else {
+		_, err = tx.Exec(ctx,
+			"UPDATE payout_requests SET status = 'FAILED', failure_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+			id, strings.TrimSpace(req.FailureReason))
+	}
+	if err != nil {
+		http.Error(w, "database_update_failed", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "transaction_commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(w, `{"status":%q}`, newStatus)
 }

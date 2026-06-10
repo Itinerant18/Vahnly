@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { apiFetch } from '@/network/ClientCoreEngine';
-import { driverLogin } from '@/api/client';
+import { driverLogin, driverRegister } from '@/api/client';
 import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -20,6 +20,12 @@ function UnifiedLoginContent() {
   const [password, setPassword] = useState(''); // Pin fallback for Driver or custom riders
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  
+  // Driver registration states
+  const [isDriverRegister, setIsDriverRegister] = useState<boolean>(false);
+  const [driverName, setDriverName] = useState<string>('');
+  const [driverEmail, setDriverEmail] = useState<string>('');
+  const [driverCityPrefix, setDriverCityPrefix] = useState<string>('KOL');
   
   // OTP states
   const [authStep, setAuthStep] = useState<'IDLE' | 'AWAITING_OTP' | 'COOL_DOWN_LOCKOUT'>('IDLE');
@@ -158,7 +164,10 @@ function UnifiedLoginContent() {
       if (role === 'DRIVER') {
         // Driver login uses postgres lookup via password
         const cleanPhone = phone.replace(/\s/g, '');
-        const res = await driverLogin(cleanPhone, password || 'password123');
+        if (!password) {
+        throw new Error('Password is required.');
+      }
+      const res = await driverLogin(cleanPhone, password);
         login(res.token, {
           id: res.user.id,
           role: res.user.role,
@@ -204,6 +213,52 @@ function UnifiedLoginContent() {
       console.warn('[UnifiedAuth] Authentication failed against gateway.', err);
       setAuthError('Authentication failed. Check your credentials and try again.');
       addAuditLog('LOGIN_FAILED', { role, phone: fullPhone, reason: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleDriverRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setAuthError(null);
+
+    const cleanPhone = phone.replace(/\s/g, '');
+    const payload = {
+      name: driverName.trim(),
+      phone: cleanPhone,
+      email: driverEmail.trim() || undefined,
+      password: password,
+      city_prefix: driverCityPrefix,
+    };
+
+    addAuditLog('REGISTER_ATTEMPT', { phone: cleanPhone, city: driverCityPrefix });
+
+    try {
+      // Register new driver account
+      await driverRegister(payload);
+      addAuditLog('REGISTER_SUCCESS', { phone: cleanPhone });
+
+      // Automatically authenticate session following successful registration
+      if (!password) {
+        throw new Error('Password is required.');
+      }
+      const res = await driverLogin(cleanPhone, password);
+      login(res.token, {
+        id: res.user.id,
+        role: res.user.role,
+        name: res.user.name,
+        phone: cleanPhone,
+      });
+
+      addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role: 'DRIVER' });
+      
+      // Dispatch browser routing to onboarding wizard
+      router.push('/driver-onboarding');
+    } catch (err: any) {
+      console.warn('[UnifiedAuth] Driver registration failed.', err);
+      setAuthError(err.message || 'Registration failed. Phone or email may already be registered.');
+      addAuditLog('REGISTER_FAILED', { phone: cleanPhone, error: String(err) });
     } finally {
       setLoading(false);
     }
@@ -385,6 +440,101 @@ function UnifiedLoginContent() {
               </form>
             )}
           </div>
+        ) : isDriverRegister ? (
+          /* DRIVER REGISTRATION FLOW */
+          <form onSubmit={handleDriverRegisterSubmit} className="space-y-4 text-left font-mono text-xs">
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                Full Legal Name
+              </label>
+              <input
+                type="text"
+                value={driverName}
+                onChange={(e) => setDriverName(e.target.value)}
+                className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono transition-all"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                Driver Phone Number
+              </label>
+              <div className="flex gap-2">
+                <span className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white text-xs flex items-center">
+                  +91
+                </span>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  className="flex-1 bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-all"
+                  placeholder="99999 88888"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                Email Address (Optional)
+              </label>
+              <input
+                type="email"
+                value={driverEmail}
+                onChange={(e) => setDriverEmail(e.target.value)}
+                className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-white text-sm placeholder-zinc-650 focus:outline-none focus:border-zinc-500 font-mono transition-all"
+                placeholder="john.doe@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                Secure PIN / Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-all"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 font-mono">
+                Hub Region City prefix
+              </label>
+              <select
+                value={driverCityPrefix}
+                onChange={(e) => setDriverCityPrefix(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white text-xs focus:outline-none focus:border-zinc-500 font-mono cursor-pointer"
+              >
+                <option value="KOL">KOL (Kolkata)</option>
+                <option value="BLR">BLR (Bengaluru)</option>
+              </select>
+            </div>
+
+            <div className="pt-2 space-y-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-white hover:bg-zinc-200 text-black rounded-xl py-3.5 text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.98] cursor-pointer shadow-md"
+              >
+                {loading ? 'Creating Partner Profile...' : 'Register & Start Onboarding'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDriverRegister(false)}
+                className="w-full bg-transparent hover:bg-zinc-900/40 text-zinc-400 hover:text-white border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-3 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer mt-2"
+              >
+                Already have an account? Log in
+              </button>
+            </div>
+          </form>
         ) : (
           /* DRIVER FLOW: Standard login with password/pin input */
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-left font-mono text-xs">
@@ -434,7 +584,7 @@ function UnifiedLoginContent() {
                 type="button"
                 onClick={() => {
                   addAuditLog('ONBOARDING_ROUTE_CLICKED', { timestamp: new Date().toISOString() });
-                  router.push('/driver-onboarding');
+                  setIsDriverRegister(true);
                 }}
                 className="w-full bg-transparent hover:bg-zinc-900/40 text-zinc-400 hover:text-white border border-dashed border-zinc-800 hover:border-zinc-700 rounded-xl py-3 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer mt-2"
               >

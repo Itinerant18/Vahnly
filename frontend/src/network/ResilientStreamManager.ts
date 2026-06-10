@@ -1,4 +1,4 @@
-import { WS_GATEWAY_BASE_URL } from '../config';
+import { WS_GATEWAY_BASE_URL, API_GATEWAY_BASE_URL } from '../config';
 
 export interface StreamConfig {
   orderID: string;
@@ -10,75 +10,111 @@ export interface StreamConfig {
 
 // MILESTONE 31: Lightweight client-side Protobuf decoder mapping binary stream arrays 
 // directly back to standard platform data envelopes to prevent dependency bloating.
+// Bounds-checked decoder. Every read validates against the buffer length before
+// consuming bytes, so a malformed or hostile frame throws a contained error
+// (caught by onmessage) instead of reading past the ArrayBuffer or spinning in an
+// unterminated varint loop.
 function decodeBinaryWebSocketEnvelope(buffer: ArrayBuffer): unknown {
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
-  
-  // Custom precise byte un-packing adhering strictly to W3C binary array allocations
   let offset = 0;
-  
-  // Read wire field tags to extract message properties sequentially
+
+  const ensure = (n: number): void => {
+    if (n < 0 || offset + n > bytes.length) {
+      throw new Error('protobuf_frame_truncated');
+    }
+  };
+
+  const readVarint = (): number => {
+    let result = 0;
+    let multiplier = 1;
+    for (let i = 0; i < 10; i++) {
+      ensure(1);
+      const b = bytes[offset++];
+      result += (b & 0x7f) * multiplier;
+      if ((b & 0x80) === 0) return result;
+      multiplier *= 128;
+    }
+    throw new Error('protobuf_varint_overflow');
+  };
+
+  const readString = (len: number): string => {
+    ensure(len);
+    const s = new TextDecoder().decode(bytes.subarray(offset, offset + len));
+    offset += len;
+    return s;
+  };
+
+  const skipField = (wireType: number): void => {
+    if (wireType === 0) { readVarint(); return; }
+    if (wireType === 1) { ensure(8); offset += 8; return; }
+    if (wireType === 2) { const l = readVarint(); ensure(l); offset += l; return; }
+    if (wireType === 5) { ensure(4); offset += 4; return; }
+    throw new Error('protobuf_unsupported_wire_type_' + wireType);
+  };
+
   let frameType = 0;
   const assignmentData: any = {};
   const telemetryData: any = {};
 
   while (offset < bytes.length) {
-    const key = bytes[offset++];
+    const key = readVarint();
     const fieldNumber = key >> 3;
+    const wireType = key & 0x7;
 
-    if (fieldNumber === 1) { // FrameType enum
-      frameType = bytes[offset++];
-    } else if (fieldNumber === 2) { // Embedded Assignment Message block
-      const subLen = bytes[offset++];
+    if (fieldNumber === 1 && wireType === 0) { // FrameType enum
+      frameType = readVarint();
+    } else if (fieldNumber === 2 && wireType === 2) { // Embedded Assignment block
+      const subLen = readVarint();
+      ensure(subLen);
       const end = offset + subLen;
       while (offset < end) {
-        const subKey = bytes[offset++];
+        const subKey = readVarint();
         const subNum = subKey >> 3;
-        const subLenStr = bytes[offset++];
-        const strBytes = bytes.subarray(offset, offset + subLenStr);
-        offset += subLenStr;
-        const val = new TextDecoder().decode(strBytes);
-        if (subNum === 1) assignmentData.order_id = val;
-        if (subNum === 2) assignmentData.driver_id = val;
-        if (subNum === 3) assignmentData.city_prefix = val;
-        if (subNum === 4) assignmentData.status = val;
+        const subWire = subKey & 0x7;
+        if (subWire === 2) {
+          const val = readString(readVarint());
+          if (subNum === 1) assignmentData.order_id = val;
+          else if (subNum === 2) assignmentData.driver_id = val;
+          else if (subNum === 3) assignmentData.city_prefix = val;
+          else if (subNum === 4) assignmentData.status = val;
+        } else {
+          skipField(subWire);
+        }
       }
-    } else if (fieldNumber === 3) { // Embedded Telemetry Message block
-      const subLen = bytes[offset++];
+    } else if (fieldNumber === 3 && wireType === 2) { // Embedded Telemetry block
+      const subLen = readVarint();
+      ensure(subLen);
       const end = offset + subLen;
       while (offset < end) {
-        const subKey = bytes[offset++];
+        const subKey = readVarint();
         const subNum = subKey >> 3;
-        if (subNum === 1 || subNum === 2) { // String values
-          const len = bytes[offset++];
-          const str = new TextDecoder().decode(bytes.subarray(offset, offset + len));
-          offset += len;
-          if (subNum === 1) telemetryData.order_id = str;
-          if (subNum === 2) telemetryData.driver_id = str;
-        } else if (subNum >= 3 && subNum <= 6) { // Float64 (8 bytes precision keys)
+        const subWire = subKey & 0x7;
+        if (subWire === 2) { // String values
+          const val = readString(readVarint());
+          if (subNum === 1) telemetryData.order_id = val;
+          else if (subNum === 2) telemetryData.driver_id = val;
+        } else if (subWire === 1) { // Float64 (fixed 8 bytes)
+          ensure(8);
           const val = view.getFloat64(offset, true);
           offset += 8;
           if (subNum === 3) telemetryData.latitude = val;
-          if (subNum === 4) telemetryData.longitude = val;
-          if (subNum === 5) telemetryData.bearing = val;
-          if (subNum === 6) telemetryData.speed_kms = val;
-        } else if (subNum === 7) { // Int64 timestamp (Varint allocation)
-          let shift = 0, val = 0;
-          while (true) {
-            const b = bytes[offset++];
-            val |= (b & 0x7f) << shift;
-            if (!(b & 0x80)) break;
-            shift += 7;
-          }
-          telemetryData.timestamp_utc = val;
+          else if (subNum === 4) telemetryData.longitude = val;
+          else if (subNum === 5) telemetryData.bearing = val;
+          else if (subNum === 6) telemetryData.speed_kms = val;
+        } else if (subWire === 0) { // Varint timestamp
+          const val = readVarint();
+          if (subNum === 7) telemetryData.timestamp_utc = val;
+        } else {
+          skipField(subWire);
         }
       }
     } else {
-      offset++; // Safe advance fallback for un-mapped custom payload frames
+      skipField(wireType);
     }
   }
 
-  return frameType === 1 
+  return frameType === 1
     ? { channel: 'assignment', ...assignmentData }
     : { channel: 'telemetry', ...telemetryData };
 }
@@ -98,40 +134,39 @@ export class ResilientStreamManager {
     this.wsBaseUrl = (config.wsBaseUrl ?? WS_GATEWAY_BASE_URL).replace(/\/$/, '');
   }
 
-  // isTokenUsable decodes the JWT payload and rejects a missing/expired token.
-  // The browser cannot read the 401 body of a failed WS handshake, so without
-  // this guard an expired admin session reconnects forever, flooding the console.
-  private isTokenUsable(token: string): boolean {
-    if (!token) return false;
-    const parts = token.split('.');
-    if (parts.length !== 3) return false;
+  // Mint a single-use WS ticket using the HttpOnly session cookie (credentials:'include').
+  // The JWT is never read by JS or placed in the WS URL. A 401 means the session is dead;
+  // mintTicket returns null and connect() backs off instead of spinning.
+  private async mintTicket(): Promise<string | null> {
     try {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (typeof payload.exp !== 'number') return true; // no exp claim: let the server decide
-      // 5s skew tolerance; exp is in seconds, Date.now() in ms.
-      return payload.exp * 1000 > Date.now() - 5000;
+      const res = await fetch(`${API_GATEWAY_BASE_URL.replace(/\/$/, '')}/api/v1/ws/ticket`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { ticket?: string };
+      return data.ticket ?? null;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  public connect(): void {
+  public async connect(): Promise<void> {
     this.isPurposelyClosed = false;
-    const token = (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function')
-      ? (localStorage.getItem('admin_jwt_token') || localStorage.getItem('jwt_token') || '')
-      : '';
 
-    // Pre-flight: halt instead of spin-retrying when the session token is dead.
-    if (!this.isTokenUsable(token)) {
-      this.isPurposelyClosed = true;
-      console.error('[STREAM_MANAGER] Admin session token missing or expired — stream halted. Please re-authenticate.');
+    const ticket = await this.mintTicket();
+    if (this.isPurposelyClosed) {
+      return;
+    }
+    if (!ticket) {
       this.config.onStatusChange('DISCONNECTED');
+      this.executeJitteredReconnection();
       return;
     }
 
     const url = `${this.wsBaseUrl}/api/v1/dispatch/stream?order_id=${encodeURIComponent(
       this.config.orderID,
-    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}&jwt=${encodeURIComponent(token)}`;
+    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}&ticket=${encodeURIComponent(ticket)}`;
 
     this.ws = new WebSocket(url);
     
@@ -139,11 +174,15 @@ export class ResilientStreamManager {
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
-      this.currentRetryAttempt = 0;
       this.config.onStatusChange('CONNECTED');
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
+      // Reset backoff only once the connection proves healthy (first frame received),
+      // not on bare onopen — a pod that accepts the upgrade then immediately drops would
+      // otherwise reset the counter every cycle and stampede the gateway at the floor delay.
+      this.currentRetryAttempt = 0;
+
       try {
         if (event.data instanceof ArrayBuffer) {
           const parsedPayload = decodeBinaryWebSocketEnvelope(event.data);

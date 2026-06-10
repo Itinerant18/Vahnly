@@ -35,13 +35,15 @@ export const useOfflineCacheStore = create<OfflineCacheState>()(
         console.log(`[Network Online] Reconnect detected. Flushing ${queue.length} cached packets...`);
 
         const token = useAuthStore.getState().token;
+        if (!token) {
+          console.warn("[Network Sync] No authenticated session; holding cache until login.");
+          return;
+        }
+        // Driver identity is derived server-side from this JWT. Do not send X-Driver-ID.
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          "X-Driver-ID": "00000000-0000-0000-0000-000000000001",
+          Authorization: `Bearer ${token}`,
         };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
 
         try {
           const response = await fetch("/api/v1/driver/sync/offline-payload", {

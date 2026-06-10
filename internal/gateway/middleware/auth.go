@@ -4,10 +4,48 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// adminSessionCookie holds the admin JWT as an HttpOnly cookie so it is never readable by
+// JavaScript — this closes the localStorage XSS exposure (CRIT-004). The admin SPA is
+// served same-origin, so the cookie is sent automatically on every API/WS request.
+const adminSessionCookie = "admin_session"
+
+// adminCookieSecure controls the Secure flag. Default true (production HTTPS); set
+// ADMIN_COOKIE_SECURE=false for local http development so the cookie is still stored.
+func adminCookieSecure() bool {
+	return os.Getenv("ADMIN_COOKIE_SECURE") != "false"
+}
+
+// SetSessionCookie writes the admin session JWT as an HttpOnly, SameSite=Lax cookie.
+func SetSessionCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     adminSessionCookie,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   adminCookieSecure(),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   12 * 60 * 60, // 12h, matches the admin token TTL
+	})
+}
+
+// ClearSessionCookie expires the admin session cookie on logout.
+func ClearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     adminSessionCookie,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   adminCookieSecure(),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+}
 
 type ContextKey string
 const UserIDContextKey ContextKey = "userID"
@@ -19,6 +57,7 @@ type AuthMiddleware struct {
 type CustomClaims struct {
 	UserID    string `json:"user_id"`
 	Role      string `json:"role"`
+	Email     string `json:"email,omitempty"`
 	CityScope string `json:"city_scope,omitempty"`
 	// TwoFactorPending marks an enrolment-scoped token issued when an admin has 2FA
 	// enabled but no TOTP secret on file. The RBAC guards reject it for everything
@@ -32,18 +71,27 @@ func NewAuthMiddleware(secret string) *AuthMiddleware {
 }
 
 func extractToken(r *http.Request) (string, string, bool) {
-	// Bearer header only. The ?jwt= query fallback was removed: tokens in URLs leak
-	// into access/proxy logs, history, and Referer headers. WebSocket upgrades (which
-	// cannot set headers) now authenticate via single-use tickets — see ws_ticket.go.
+	// Prefer a valid Bearer header (driver app / API clients). The ?jwt= query fallback was
+	// removed: tokens in URLs leak into logs/history/Referer. WebSocket upgrades authenticate
+	// via single-use tickets — see ws_ticket.go.
 	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" && parts[1] != "" && parts[1] != "null" {
+			return parts[1], "", true
+		}
+	}
+
+	// Fall back to the HttpOnly admin session cookie. Same-origin requests send it
+	// automatically, so the admin SPA never keeps the JWT in JS-readable storage.
+	if ck, err := r.Cookie(adminSessionCookie); err == nil && ck.Value != "" {
+		return ck.Value, "", true
+	}
+
 	if authHeader == "" {
 		return "", "missing_authorization_header", false
 	}
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-		return "", "invalid_authorization_format", false
-	}
-	return parts[1], "", true
+	return "", "invalid_authorization_format", false
 }
 
 // ValidateToken parses and verifies an HS256 token, returning its claims if valid.
@@ -68,6 +116,7 @@ func InjectClaims(ctx context.Context, c *CustomClaims) context.Context {
 	ctx = context.WithValue(ctx, UserIDContextKey, c.UserID)
 	ctx = context.WithValue(ctx, UserRoleContextKey, c.Role)
 	ctx = context.WithValue(ctx, CityScopeContextKey, c.CityScope)
+	ctx = context.WithValue(ctx, TwoFactorPendingContextKey, c.TwoFactorPending)
 	return ctx
 }
 
@@ -98,6 +147,7 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 		ctx := context.WithValue(r.Context(), UserIDContextKey, claims.UserID)
 		ctx = context.WithValue(ctx, UserRoleContextKey, claims.Role)
 		ctx = context.WithValue(ctx, CityScopeContextKey, claims.CityScope)
+		ctx = context.WithValue(ctx, TwoFactorPendingContextKey, claims.TwoFactorPending)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
@@ -116,6 +166,15 @@ func GetUserRoleFromContext(ctx context.Context) (string, bool) {
 }
 
 const CityScopeContextKey ContextKey = "cityScope"
+
+const TwoFactorPendingContextKey ContextKey = "twoFactorPending"
+
+// GetTwoFactorPendingFromContext reports whether the session is an enrolment-scoped token
+// (2FA enabled, no TOTP secret on file). Such a session may only reach /2fa/enroll.
+func GetTwoFactorPendingFromContext(ctx context.Context) bool {
+	v, _ := ctx.Value(TwoFactorPendingContextKey).(bool)
+	return v
+}
 
 // GetCityScopeFromContext returns the raw city_scope claim (e.g. "KOL" or "KOL,BLR").
 func GetCityScopeFromContext(ctx context.Context) (string, bool) {
@@ -152,10 +211,19 @@ func (m *AuthMiddleware) RequireRole(targetRole string, next http.HandlerFunc) h
 				return
 			}
 
-			r.Header.Set("X-Admin-Role", claims.Role)
+			setVerifiedAdminHeaders(r, claims)
 			next.ServeHTTP(w, r)
 		})(w, r)
 	}
+}
+
+// setVerifiedAdminHeaders overwrites the actor-identity headers with values taken
+// from the cryptographically verified JWT claims. Using Set (not Add) replaces any
+// client-supplied X-Admin-* header, so handlers can never be fed a forged actor.
+func setVerifiedAdminHeaders(r *http.Request, claims *CustomClaims) {
+	r.Header.Set("X-Admin-Role", claims.Role)
+	r.Header.Set("X-Admin-ID", claims.UserID)
+	r.Header.Set("X-Admin-Email", claims.Email)
 }
 
 // RequireAnyRole guards administrative routes against non-authorized client access for a list of permitted roles
@@ -180,7 +248,7 @@ func (m *AuthMiddleware) RequireAnyRole(allowedRoles []string, next http.Handler
 
 			claimsRole := strings.ToUpper(claims.Role)
 			if claimsRole == "SUPER_ADMIN" {
-				r.Header.Set("X-Admin-Role", claims.Role)
+				setVerifiedAdminHeaders(r, claims)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -198,7 +266,7 @@ func (m *AuthMiddleware) RequireAnyRole(allowedRoles []string, next http.Handler
 				return
 			}
 
-			r.Header.Set("X-Admin-Role", claims.Role)
+			setVerifiedAdminHeaders(r, claims)
 			next.ServeHTTP(w, r)
 		})(w, r)
 	}

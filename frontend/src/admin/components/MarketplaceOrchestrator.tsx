@@ -181,6 +181,13 @@ export const MarketplaceOrchestrator: React.FC = () => {
   const submitManualOverrideMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!overrideOrderID || !overrideDriverID) return;
+    if (!window.confirm(
+      `Force-match order ${overrideOrderID.trim()} to driver ${overrideDriverID.trim()}?\n\n` +
+      `This bypasses the matching algorithm and the 15s offer window, and binds the driver ` +
+      `immediately. The driver must be ONLINE_AVAILABLE or the server will reject it.`
+    )) {
+      return;
+    }
     setIsLoading(true);
     setLogResponse(null);
 
@@ -207,6 +214,12 @@ export const MarketplaceOrchestrator: React.FC = () => {
   };
 
   const executeFraudLockoutAction = async (driverId: string, action: 'SUSPEND' | 'UNBAN') => {
+    if (!window.confirm(
+      `${action === 'SUSPEND' ? 'Suspend' : 'Reinstate'} driver ${driverId}?\n\n` +
+      `${action === 'SUSPEND' ? 'This immediately terminates their session and removes them from dispatch.' : 'This restores the driver to the active pool.'}`
+    )) {
+      return;
+    }
     try {
       const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/fraud-lockout`, {

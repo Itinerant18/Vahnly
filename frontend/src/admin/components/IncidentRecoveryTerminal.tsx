@@ -35,6 +35,11 @@ export const IncidentRecoveryTerminal: React.FC = () => {
   
   // Global SOS Modal Takeover
   const [takeoverIncident, setTakeoverIncident] = useState<StalledTripIncident | null>(null);
+  // Order ids manually acknowledged (deferred) so the takeover alarm does not re-pop for them.
+  const bypassedSOSRef = useRef<Set<string>>(new Set());
+  // Live gateway-stream connection health, reflected in the header indicator so the
+  // operator can tell when the incident feed is down rather than seeing a fixed green.
+  const [wsLive, setWsLive] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -81,13 +86,39 @@ export const IncidentRecoveryTerminal: React.FC = () => {
   // Connect WebSocket to live gateway stream
   useEffect(() => {
     let ws: WebSocket | null = null;
-    const token = localStorage.getItem('admin_jwt_token') ?? '';
-    
-    const connectWS = () => {
+    let closed = false;
+
+    // Mint a single-use WS ticket using the HttpOnly session cookie — the JWT never
+    // travels in the URL and is never read by JS.
+    const mintTicket = async (): Promise<string | null> => {
       try {
-        const wsUrl = `${WS_GATEWAY_BASE_URL}/api/v1/dispatch/stream?order_id=global-sos&city_prefix=KOL&jwt=${encodeURIComponent(token)}`;
+        const res = await fetch(`${API_GATEWAY_BASE_URL.replace(/\/$/, '')}/api/v1/ws/ticket`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!res.ok) return null;
+        const data = (await res.json()) as { ticket?: string };
+        return data.ticket ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    const connectWS = async () => {
+      if (closed) return;
+      const ticket = await mintTicket();
+      if (closed) return;
+      if (!ticket) {
+        setWsLive(false);
+        setTimeout(connectWS, 6000);
+        return;
+      }
+      try {
+        const wsUrl = `${WS_GATEWAY_BASE_URL}/api/v1/dispatch/stream?order_id=global-sos&city_prefix=KOL&ticket=${encodeURIComponent(ticket)}`;
         ws = new WebSocket(wsUrl);
-        
+
+        ws.onopen = () => setWsLive(true);
+
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -130,22 +161,30 @@ export const IncidentRecoveryTerminal: React.FC = () => {
         };
 
         ws.onclose = () => {
-          setTimeout(connectWS, 6000);
+          setWsLive(false);
+          if (!closed) setTimeout(connectWS, 6000);
         };
+
+        ws.onerror = () => setWsLive(false);
       } catch (err) {
         console.warn('Incident WebSocket connect failed, retrying in 6s:', err);
+        setWsLive(false);
+        if (!closed) setTimeout(connectWS, 6000);
       }
     };
 
-    connectWS();
+    void connectWS();
     return () => {
+      closed = true;
       if (ws) ws.close();
     };
   }, []);
 
   // Monitor unassigned SOS alarms inside the active incident queue
   useEffect(() => {
-    const unassignedSOS = incidents.find(i => i.incident_type === 'SOS' && i.incident_status === 'UNASSIGNED');
+    const unassignedSOS = incidents.find(
+      (i) => i.incident_type === 'SOS' && i.incident_status === 'UNASSIGNED' && !bypassedSOSRef.current.has(i.order_id),
+    );
     if (unassignedSOS) {
       if (!takeoverIncident || takeoverIncident.order_id !== unassignedSOS.order_id) {
         setTakeoverIncident(unassignedSOS);
@@ -154,6 +193,18 @@ export const IncidentRecoveryTerminal: React.FC = () => {
       setTakeoverIncident(null);
     }
   }, [incidents]);
+
+  // Manually acknowledge (defer) a takeover SOS without claiming it: record the action so
+  // it is auditable, and snooze the alarm for this order so it does not immediately re-pop.
+  const handleBypassTakeover = () => {
+    if (!takeoverIncident) return;
+    if (!window.confirm('Manually acknowledge this SOS without claiming it? It stays UNASSIGNED in the queue for another agent.')) {
+      return;
+    }
+    bypassedSOSRef.current.add(takeoverIncident.order_id);
+    setTerminalLog(`MANUAL ACK: SOS ${takeoverIncident.order_id} acknowledged without claim — left UNASSIGNED in queue.`);
+    setTakeoverIncident(null);
+  };
 
   const fetchStalledTelemetryIncidents = async () => {
     try {
@@ -174,8 +225,9 @@ export const IncidentRecoveryTerminal: React.FC = () => {
             setSelectedIncident(updated);
           }
         }
-      } else {
-        // High fidelity fallback seeding for local offline testing
+      } else if (import.meta.env.DEV) {
+        // Dev-only fallback seeding for local offline testing — never fabricate SOS/incident
+        // records in production, where they would trip the live full-screen takeover alarm.
         setIncidents([
           {
             order_id: 'ord-9011-cb72',
@@ -238,6 +290,8 @@ export const IncidentRecoveryTerminal: React.FC = () => {
             longitude: 88.3512,
           },
         ]);
+      } else {
+        setIncidents([]);
       }
     } catch (err) {
       console.error('Failed syncing stalled incident vectors:', err);
@@ -569,17 +623,26 @@ export const IncidentRecoveryTerminal: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <button 
-            onClick={triggerSandboxSOSAlert}
-            className="px-3 py-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded hover:bg-slate-800 transition active:scale-95"
-          >
-            Trigger Sandbox SOS
-          </button>
+          {import.meta.env.DEV && (
+            <button
+              onClick={triggerSandboxSOSAlert}
+              className="px-3 py-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded hover:bg-slate-800 transition active:scale-95"
+            >
+              Trigger Sandbox SOS
+            </button>
+          )}
           <span className="text-slate-700 font-bold select-none">•</span>
-          <span className="text-emerald-500 font-bold tracking-wider flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            GATEWAY LINK ACTIVE
-          </span>
+          {wsLive ? (
+            <span className="text-emerald-500 font-bold tracking-wider flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              GATEWAY LINK ACTIVE
+            </span>
+          ) : (
+            <span className="text-amber-500 font-bold tracking-wider flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+              GATEWAY LINK DOWN — RECONNECTING
+            </span>
+          )}
         </div>
       </div>
 
@@ -890,7 +953,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={() => setTakeoverIncident(null)}
+                  onClick={handleBypassTakeover}
                   className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-white py-2 rounded-lg text-[10px] uppercase tracking-wider transition duration-150 cursor-pointer select-none"
                 >
                   Bypass Notification (Acknowledge Manually)

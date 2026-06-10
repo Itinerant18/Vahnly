@@ -138,9 +138,10 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
   const handleDispute = () => {
     if (!trip) return;
     const reason = prompt('Enter the reason for disputing this trip fare:');
-    if (reason) {
-      alert(`Dispute ticket registered successfully for Trip ${trip.id}. Central dispatcher agents will verify GPS trail maps and odometer uploads.`);
-    }
+    if (!reason) return;
+    // No driver-facing dispute endpoint exists yet — do not claim a ticket was registered
+    // when nothing was persisted.
+    alert('Fare dispute submission is not available yet. Please contact support to raise a dispute.');
   };
 
   // Deep-link to an unknown trip id — surface a clean recoverable state.

@@ -234,6 +234,13 @@ export const SafetyDashboard: React.FC = () => {
 
 	const handleSosAction = async (action: string) => {
 		if (!selectedSos) return;
+		const confirmMsgs: Record<string, string> = {
+			DISPATCH_AUTHORITIES: 'Dispatch police/authorities for this SOS? This escalates to emergency services.',
+			NOTIFY_CONTACTS: "Notify the user's emergency contacts about this incident?",
+		};
+		if (confirmMsgs[action] && !window.confirm(confirmMsgs[action])) {
+			return;
+		}
 		if (action === 'DIAL_RIDER' || action === 'DIAL_DRIVER') {
 			setDialLabel(action === 'DIAL_RIDER' ? 'Rider Emergency Contact' : 'Driver Partner Line');
 			setIsDialing(true);
@@ -334,6 +341,11 @@ export const SafetyDashboard: React.FC = () => {
 
 	const handleAddBlacklist = async (e: React.FormEvent) => {
 		e.preventDefault();
+		if (!window.confirm(
+			`Deploy a ${newBlockForm.block_type} block on ${newBlockForm.user_type} ${newBlockForm.user_id}?\n\nThis blocks the user from the platform.`
+		)) {
+			return;
+		}
 		try {
 			const payload: any = {
 				user_id: newBlockForm.user_id,
@@ -472,23 +484,25 @@ export const SafetyDashboard: React.FC = () => {
 					</nav>
 				</div>
 
-				<div className="flex items-center gap-2">
-					<span className="text-[10px] uppercase font-bold text-mute mr-1 font-mono">Simulation Tools:</span>
-					<button
-						onClick={triggerSimulateSos}
-						disabled={simulating}
-						className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 text-[10px] font-bold px-3 py-1.5 rounded-md transition disabled:opacity-50"
-					>
-						Trigger Simulated SOS
-					</button>
-					<button
-						onClick={triggerSimulateIncident}
-						disabled={simulating}
-						className="bg-canvas-soft hover:bg-canvas-softer border border-canvas-soft text-[10px] font-bold px-3 py-1.5 rounded-md transition disabled:opacity-50"
-					>
-						File Post-Trip Incident
-					</button>
-				</div>
+				{import.meta.env.DEV && (
+					<div className="flex items-center gap-2">
+						<span className="text-[10px] uppercase font-bold text-mute mr-1 font-mono">Simulation Tools:</span>
+						<button
+							onClick={triggerSimulateSos}
+							disabled={simulating}
+							className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 text-[10px] font-bold px-3 py-1.5 rounded-md transition disabled:opacity-50"
+						>
+							Trigger Simulated SOS
+						</button>
+						<button
+							onClick={triggerSimulateIncident}
+							disabled={simulating}
+							className="bg-canvas-soft hover:bg-canvas-softer border border-canvas-soft text-[10px] font-bold px-3 py-1.5 rounded-md transition disabled:opacity-50"
+						>
+							File Post-Trip Incident
+						</button>
+					</div>
+				)}
 			</header>
 
 			{/* ---- Tab Panels ---- */}

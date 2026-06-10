@@ -59,6 +59,15 @@ export const DriverOnboardingQueue: React.FC = () => {
 
 	const handleAction = async (actionSlug: string, body?: any) => {
 		if (!selectedApplicant) return;
+		// Confirm the irreversible onboarding decisions; status-only refreshes pass through.
+		const confirmMsgs: Record<string, string> = {
+			'verify-kyc': `Approve KYC and verify driver ${selectedApplicant.driver_id}? This activates them for dispatch.`,
+			'reject-kyc': `Reject this applicant's KYC? They will be unable to onboard without resubmitting.`,
+			'mark-bg-clear': `Mark background check as cleared for ${selectedApplicant.driver_id}?`,
+		};
+		if (confirmMsgs[actionSlug] && !window.confirm(confirmMsgs[actionSlug])) {
+			return;
+		}
 		setActionLoading(true);
 		try {
 			const token = localStorage.getItem('admin_jwt_token') || '';

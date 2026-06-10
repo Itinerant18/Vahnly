@@ -1,9 +1,10 @@
 import { StartTripPayload } from '../types/trip';
+import { useAuthStore } from '../store/useAuthStore';
 
 export type DriverStatus = 'ONLINE_AVAILABLE' | 'OFFLINE';
 export type DevicePlatform = 'ANDROID_FCM' | 'IOS_APNS';
 
-type HttpMethod = 'GET' | 'POST' | 'PATCH';
+type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 function readEnv(key: string): string | undefined {
   if (typeof process !== 'undefined' && process.env?.[key]) {
@@ -16,7 +17,7 @@ export const BASE_URL =
   readEnv('VITE_API_BASE_URL') ||
   readEnv('NEXT_PUBLIC_API_GATEWAY') ||
   readEnv('API_GATEWAY_URL') ||
-  'http://localhost:8080';
+  'http://localhost:8085';
 
 export const GRPC_URL =
   readEnv('VITE_GRPC_URL') ||
@@ -26,7 +27,7 @@ export const GRPC_URL =
 export const GRPC_WEB_URL =
   readEnv('VITE_GRPC_WEB_URL') ||
   readEnv('NEXT_PUBLIC_GRPC_WEB_URL') ||
-  'http://localhost:8080';
+  'http://localhost:8085';
 
 export const SSE_URL =
   readEnv('VITE_ANALYTICS_URL') ||
@@ -252,6 +253,24 @@ export async function getPendingOffer(token: string): Promise<PendingOfferRespon
   return request<PendingOfferResponse>('/api/v1/driver/offer', { method: 'GET', token });
 }
 
+export interface DriverOrderDetail {
+  id: string;
+  status: string;
+  waiting_started_at: string | null;
+  last_odometer: number;
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  base_fare_paise: number;
+  surge_multiplier: number;
+  customer_id: string;
+}
+
+export async function getDriverOrder(token: string, orderId: string): Promise<DriverOrderDetail> {
+  return request<DriverOrderDetail>(`/api/v1/driver/orders/${orderId}`, { method: 'GET', token });
+}
+
 export async function acceptOffer(
   token: string,
   orderId: string,
@@ -374,6 +393,71 @@ export async function triggerDriverWithdrawal(
   token: string,
 ): Promise<{ status: string; payout_id: string }> {
   return request<{ status: string; payout_id: string }>('/api/v1/driver-account/payouts/withdraw', { method: 'POST', token });
+}
+
+// ─── Driver-account features (FEAT-002: vehicles / wallet / training) ──────────
+
+export interface DriverVehicle {
+  id: string;
+  make: string;
+  model: string;
+  license_plate: string;
+  transmission: string;
+  rc_status: string;
+  insurance_status: string;
+  puc_status: string;
+}
+
+export async function getDriverVehicles(token: string): Promise<{ vehicles: DriverVehicle[] }> {
+  return request<{ vehicles: DriverVehicle[] }>('/api/v1/driver-account/vehicles', { method: 'GET', token });
+}
+
+export async function addDriverVehicle(
+  token: string,
+  body: { make: string; model: string; license_plate: string; transmission?: string },
+): Promise<{ id: string; status: string }> {
+  return request<{ id: string; status: string }>('/api/v1/driver-account/vehicles', { method: 'POST', token, body });
+}
+
+export async function deleteDriverVehicle(token: string, id: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver-account/vehicles/${id}`, { method: 'DELETE', token });
+}
+
+export interface DriverWalletTxn {
+  id: string;
+  amount_paise: number;
+  entry_type: 'CREDIT' | 'DEBIT';
+  description: string;
+  created_at: string;
+}
+
+export async function getDriverWallet(token: string): Promise<{ balance_paise: number; transactions: DriverWalletTxn[] }> {
+  return request<{ balance_paise: number; transactions: DriverWalletTxn[] }>('/api/v1/driver-account/wallet', { method: 'GET', token });
+}
+
+export interface TrainingModule {
+  id: string;
+  title: string;
+  duration_label: string;
+  module_type: string;
+  status: string;
+  score: number | null;
+}
+
+export async function getDriverTraining(token: string): Promise<{ modules: TrainingModule[] }> {
+  return request<{ modules: TrainingModule[] }>('/api/v1/driver-account/training', { method: 'GET', token });
+}
+
+export async function submitTrainingQuiz(
+  token: string,
+  moduleId: string,
+  score: number,
+): Promise<{ status: string; score: number }> {
+  return request<{ status: string; score: number }>(`/api/v1/driver-account/training/${moduleId}/submit`, {
+    method: 'POST',
+    token,
+    body: { score },
+  });
 }
 
 export async function getDriverNotifications(
@@ -500,7 +584,7 @@ export async function saveOnboardingStep(
   
   // Check if browser is offline
   if (typeof window !== 'undefined' && !navigator.onLine) {
-    queueOfflinePayload(token, stepId, data);
+    queueOfflinePayload(stepId, data);
     return { success: true, onboarding_step: stepId };
   }
 
@@ -513,19 +597,21 @@ export async function saveOnboardingStep(
   } catch (error) {
     // If it's a network error (e.g. failure to fetch), queue it offline
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      queueOfflinePayload(token, stepId, data);
+      queueOfflinePayload(stepId, data);
       return { success: true, onboarding_step: stepId };
     }
     throw error;
   }
 }
 
-// queueOfflinePayload writes failed payloads to localStorage queue
-function queueOfflinePayload(token: string, stepId: number, data: Record<string, any>) {
+// queueOfflinePayload writes failed payloads to the localStorage queue. The JWT is
+// deliberately NOT persisted — it is re-read from the live session at sync time, so
+// a stale token never lingers in localStorage where XSS or a shared device could read it.
+function queueOfflinePayload(stepId: number, data: Record<string, any>) {
   if (typeof window === 'undefined') return;
   try {
     const queue = JSON.parse(localStorage.getItem('onboarding-offline-queue') || '[]');
-    queue.push({ token, stepId, data, timestamp: new Date().toISOString() });
+    queue.push({ stepId, data, timestamp: new Date().toISOString() });
     localStorage.setItem('onboarding-offline-queue', JSON.stringify(queue));
     console.log(`[OFFLINE] Queued onboarding step ${stepId} for sync`);
   } catch (e) {
@@ -533,23 +619,26 @@ function queueOfflinePayload(token: string, stepId: number, data: Record<string,
   }
 }
 
-// syncOfflineOnboarding tries to upload all queued payloads sequentially
+// syncOfflineOnboarding tries to upload all queued payloads sequentially using the
+// current session token. With no active session the queue is held for next login.
 export async function syncOfflineOnboarding(): Promise<void> {
   if (typeof window === 'undefined' || !navigator.onLine) return;
+  const token = useAuthStore.getState().token;
+  if (!token) return;
   try {
     const queueRaw = localStorage.getItem('onboarding-offline-queue');
     if (!queueRaw) return;
-    const queue = JSON.parse(queueRaw) as Array<{ token: string; stepId: number; data: Record<string, any> }>;
+    const queue = JSON.parse(queueRaw) as Array<{ stepId: number; data: Record<string, any> }>;
     if (queue.length === 0) return;
 
     console.log(`[OFFLINE] Syncing ${queue.length} queued onboarding payloads...`);
     const remaining: typeof queue = [];
-    
+
     for (const item of queue) {
       try {
         await request<OnboardingStepResponse>(`/api/v1/driver/onboarding/step/${item.stepId}`, {
           method: 'POST',
-          token: item.token,
+          token,
           body: item.data,
         });
       } catch (err) {
@@ -729,6 +818,7 @@ export interface FinalBill {
   night_surge_paise: number;
   care_surcharge_paise: number;
   total_fare_paise: number;
+  driver_payout_paise: number;
 }
 
 export async function addOrderEvent(

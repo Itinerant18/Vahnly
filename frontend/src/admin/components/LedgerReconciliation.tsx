@@ -41,8 +41,9 @@ export const LedgerReconciliation: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setDiscrepancies(data.discrepancies || []);
-      } else {
-        // Fallback sample: simulates a partial ledger write from a checkout failure
+      } else if (import.meta.env.DEV) {
+        // Dev-only sample: simulates a partial ledger write from a checkout failure.
+        // Production must never inject a fake financial discrepancy as a real task.
         setDiscrepancies([
           {
             order_id: 'ord-3312-aa59-ff11',
@@ -51,6 +52,8 @@ export const LedgerReconciliation: React.FC = () => {
             entry_count: 3,
           },
         ]);
+      } else {
+        setDiscrepancies([]);
       }
     } catch (err) {
       console.error('Failed syncing financial balance sheet states:', err);
@@ -71,6 +74,12 @@ export const LedgerReconciliation: React.FC = () => {
   const executeManualCorrectionEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRecord || adjustmentPaise <= 0) return;
+    if (!window.confirm(
+      `Post ${entryType} of ₹${(adjustmentPaise / 100).toFixed(2)} to ${accountType} for order ${selectedRecord.order_id}?\n\n` +
+      `This writes a money-moving entry to the immutable financial ledger.`
+    )) {
+      return;
+    }
     setIsLoading(true);
     setAuditLog(null);
 

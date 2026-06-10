@@ -102,6 +102,12 @@ export const AdminTeamManagement: React.FC = () => {
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!window.confirm(
+      `Invite ${inviteEmail.trim()} as ${inviteRole}?` +
+      (inviteRole === 'SUPER_ADMIN' ? '\n\n⚠ SUPER_ADMIN grants full platform control.' : '')
+    )) {
+      return;
+    }
     setIsLoading(true);
     setStatusMsg(null);
     try {
@@ -142,6 +148,12 @@ export const AdminTeamManagement: React.FC = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editAdminUser) return;
+    if (!window.confirm(
+      `Change ${editAdminUser.email}'s role to ${editRole}?` +
+      (editRole === 'SUPER_ADMIN' ? '\n\n⚠ SUPER_ADMIN grants full platform control.' : '')
+    )) {
+      return;
+    }
     setIsLoading(true);
     setStatusMsg(null);
     try {

@@ -33,6 +33,9 @@ export const ActiveTripRadar: React.FC = () => {
   // stream may still read CONNECTED but has stopped reporting position ("phantom").
   const STAGNANT_THRESHOLD_MS = 45000;
   const lastSeenRef = useRef<Map<string, number>>(new Map());
+  // Last applied telemetry timestamp per order — guards against stale/out-of-order frames
+  // (e.g. replays or reordering after a reconnect) overwriting a fresher position.
+  const lastTelemetryTsRef = useRef<Map<string, number>>(new Map());
   const [stagnantOrders, setStagnantOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -53,6 +56,7 @@ export const ActiveTripRadar: React.FC = () => {
         activeStreamsRef.current[orderId].disconnect();
         delete activeStreamsRef.current[orderId];
         lastSeenRef.current.delete(orderId);
+        lastTelemetryTsRef.current.delete(orderId);
         setStreamStatuses(prev => {
           const next = { ...prev };
           delete next[orderId];
@@ -71,13 +75,25 @@ export const ActiveTripRadar: React.FC = () => {
           cityPrefix: order.city_prefix,
           onMessage: (data: any) => {
             if (!data) return;
-            // Heartbeat: any packet means the asset is still reporting in.
+            // Heartbeat: any packet means the asset is still reporting in (connection alive),
+            // even if its payload is stale.
             lastSeenRef.current.set(order.id, Date.now());
+
+            // Drop stale/out-of-order telemetry: only apply a frame strictly newer than the
+            // last one we rendered for this order, so a replayed/reordered packet after a
+            // reconnect cannot move the dot backwards or show an old position as live.
+            if (data.channel === 'telemetry' && typeof data.timestamp_utc === 'number') {
+              const lastTs = lastTelemetryTsRef.current.get(order.id) ?? 0;
+              if (data.timestamp_utc <= lastTs) {
+                return;
+              }
+              lastTelemetryTsRef.current.set(order.id, data.timestamp_utc);
+            }
 
             setOrders(prevOrders => {
               return prevOrders.map(o => {
                 if (o.id !== order.id) return o;
-                
+
                 if (data.channel === 'telemetry') {
                   // Live update coordinates dynamically inside state as they arrive from WebSocket stream
                   return {
@@ -158,8 +174,9 @@ export const ActiveTripRadar: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setOrders(data || []);
-      } else {
-        // Hydrate beautiful mock fallback orders for offline validation & loopback testing
+      } else if (import.meta.env.DEV) {
+        // Dev-only mock fallback for offline/loopback testing — production shows an empty
+        // radar on failure rather than fabricated "live" trips.
         setOrders([
           {
             id: 'ord-a0ee-bc99-9c0b',
@@ -210,6 +227,8 @@ export const ActiveTripRadar: React.FC = () => {
             assigned_at: new Date(Date.now() - 580000).toISOString(),
           }
         ]);
+      } else {
+        setOrders([]);
       }
     } catch (err) {
       console.error('Failed communicating with dispatch radar endpoints:', err);
@@ -217,6 +236,12 @@ export const ActiveTripRadar: React.FC = () => {
   };
 
   const handleForceCancelOrder = async (orderId: string) => {
+    if (!window.confirm(
+      `Force-cancel live trip ${orderId.slice(0, 8)}…?\n\n` +
+      `This terminates an in-progress customer trip and releases the driver. This cannot be undone.`
+    )) {
+      return;
+    }
     setIsLoading(true);
     setMessage(null);
 

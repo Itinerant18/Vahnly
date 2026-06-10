@@ -1,5 +1,6 @@
 import { WS_GATEWAY_BASE_URL } from '../config';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchWsTicket } from '../services/dispatchStream';
 
 export interface StreamConfig {
   orderID: string;
@@ -27,23 +28,48 @@ export class ResilientStreamManager {
   }
 
   /** Establish a persistent connection to the public gateway stream handler. */
-  public connect(): void {
+  public async connect(): Promise<void> {
     this.isPurposelyClosed = false;
     const token = useAuthStore.getState().token;
+    if (!token) {
+      this.config.onStatusChange('DISCONNECTED');
+      return;
+    }
+
+    // Mint a single-use ticket over HTTPS (JWT travels in the Authorization header)
+    // and connect with ?ticket= — the long-lived JWT never enters the WebSocket URL.
+    let ticket: string;
+    try {
+      ticket = await fetchWsTicket(token);
+    } catch {
+      this.config.onStatusChange('DISCONNECTED');
+      if (!this.isPurposelyClosed) {
+        this.executeJitteredReconnection();
+      }
+      return;
+    }
+    if (this.isPurposelyClosed) {
+      return;
+    }
+
     const url = `${this.wsBaseUrl}/api/v1/dispatch/stream?order_id=${encodeURIComponent(
       this.config.orderID,
-    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}${token ? `&jwt=${encodeURIComponent(token)}` : ''}`;
+    )}&city_prefix=${encodeURIComponent(this.config.cityPrefix)}&ticket=${encodeURIComponent(ticket)}`;
 
     this.ws = new WebSocket(url);
     // Gateway emits compressed Protobuf allocation frames; receive them as raw buffers.
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
-      this.currentRetryAttempt = 0;
       this.config.onStatusChange('CONNECTED');
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
+      // Reset backoff only once the connection proves healthy (first frame received),
+      // not on bare onopen — a pod that accepts the upgrade then immediately drops would
+      // otherwise reset the counter every cycle and reconnect at the floor in a tight loop.
+      this.currentRetryAttempt = 0;
+
       // Binary frames pass through untouched so consumers can decode the envelope;
       // text frames are JSON-parsed as a fallback control channel.
       if (event.data instanceof ArrayBuffer) {

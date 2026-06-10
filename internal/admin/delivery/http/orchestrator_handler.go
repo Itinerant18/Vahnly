@@ -108,6 +108,39 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 		return
 	}
 
+	// Lock the driver row and verify they are actually free. The FOR UPDATE serializes
+	// concurrent force-matches (and the live matcher), and rejecting a non-available
+	// driver prevents binding the same driver to two orders.
+	var driverState string
+	err = tx.QueryRow(ctx,
+		"SELECT current_state::text FROM drivers WHERE id = $1::uuid FOR UPDATE",
+		req.DriverID).Scan(&driverState)
+	if err != nil {
+		http.Error(w, "driver_not_found", http.StatusNotFound)
+		return
+	}
+	if driverState != "ONLINE_AVAILABLE" {
+		http.Error(w, "driver_not_available_for_force_match", http.StatusConflict)
+		return
+	}
+
+	// Cancel any other order currently held as a pending offer for this driver so the
+	// force-match cannot leave them double-assigned. Released orders return to the
+	// matchable pool as CREATED.
+	_, err = tx.Exec(ctx, `
+		UPDATE orders
+		SET status = 'CREATED'::order_status_enum,
+		    assigned_driver_id = NULL,
+		    assigned_at = NULL
+		WHERE assigned_driver_id = $1::uuid
+		  AND status = 'ASSIGNED'::order_status_enum
+		  AND id <> $2::uuid`,
+		req.DriverID, req.OrderID)
+	if err != nil {
+		http.Error(w, "existing_offer_cancel_failed", http.StatusInternalServerError)
+		return
+	}
+
 	res, err := tx.Exec(ctx, `
 		UPDATE orders
 		SET status = 'ASSIGNED'::order_status_enum,
@@ -148,6 +181,10 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 		_ = h.clusterClient.ZRem(ctx, spatialKey, req.DriverID).Err()
 	}
 	_ = h.clusterClient.Set(ctx, fmt.Sprintf("cooldown:driver:%s", req.DriverID), "1", 30*time.Minute).Err()
+
+	// Mark this as an admin force-match so the offer-timeout janitor does not treat the
+	// ASSIGNED order as an unaccepted 15s offer and roll it back to CREATED.
+	_ = h.clusterClient.Set(ctx, fmt.Sprintf("offer:forcematch:%s", req.OrderID), "1", 6*time.Hour).Err()
 
 	// Notify the driver app in real time. The gateway bridges this channel
 	// ("gateway:assignments:broadcast", see gateway/delivery/http.RedisPubSubChannel)

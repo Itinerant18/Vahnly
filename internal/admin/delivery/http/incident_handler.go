@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
+
+// incidentsActiveKey is the Redis hash (field = order_id, value = JSON incident) backing
+// the live incident/SOS queue. Redis-backed so the queue is shared across all gateway
+// replicas and survives a restart — an in-process slice was pod-sticky and lost on crash.
+const incidentsActiveKey = "incidents:active"
 
 type TripRecoveryRequest struct {
 	OrderID        string `json:"order_id"`
@@ -52,8 +56,6 @@ type IncidentAdminHandler struct {
 	clusterClient *redis.ClusterClient
 	kafkaWriter   *kafka.Writer
 	logger        *log.Logger
-	mu            sync.RWMutex
-	incidents     []StalledTripIncident
 }
 
 func NewIncidentAdminHandler(
@@ -68,84 +70,48 @@ func NewIncidentAdminHandler(
 		Balancer: &kafka.LeastBytes{},
 	}
 
-	h := &IncidentAdminHandler{
+	return &IncidentAdminHandler{
 		dbPool:        dbPool,
 		clusterClient: clusterClient,
 		kafkaWriter:   writer,
 		logger:        logger,
 	}
-
-	h.incidents = []StalledTripIncident{
-		{
-			OrderID:              "ord-9011-cb72",
-			DriverID:             "drv-4451-aa89",
-			DriverName:           "Manish Malhotra",
-			CustomerName:         "Sourav Ganguly",
-			VehicleMakeModel:     "Audi A6 Premium",
-			LicensePlate:         "WB-02-AL-0011",
-			LastKnownStatus:      "ON_TRIP",
-			SecondsSinceLastPing: 58,
-			CityPrefix:           "KOL",
-			IncidentType:         "SILENCE",
-			IncidentStatus:       "UNASSIGNED",
-			AssignedAgentID:      "",
-			BearingDelta:         4.5,
-			CalculatedSpeed:      22.4,
-			IsMockProvider:       false,
-			BatteryLevel:         68.0,
-			Latitude:             22.5726,
-			Longitude:            88.3639,
-		},
-		{
-			OrderID:              "ord-8831-bb01",
-			DriverID:             "drv-9902-aa11",
-			DriverName:           "Amit Mishra",
-			CustomerName:         "Priyanka Sen",
-			VehicleMakeModel:     "Swift Dzire",
-			LicensePlate:         "WB-04-BC-1234",
-			LastKnownStatus:      "ON_TRIP",
-			SecondsSinceLastPing: 2,
-			CityPrefix:           "KOL",
-			IncidentType:         "SOS",
-			IncidentStatus:       "UNASSIGNED",
-			AssignedAgentID:      "",
-			BearingDelta:         12.8,
-			CalculatedSpeed:      45.0,
-			IsMockProvider:       false,
-			BatteryLevel:         82.0,
-			Latitude:             22.5832,
-			Longitude:            88.3678,
-		},
-		{
-			OrderID:              "ord-7711-ac90",
-			DriverID:             "drv-7711-22aa",
-			DriverName:           "Debashis Roy",
-			CustomerName:         "Ayan Mukherji",
-			VehicleMakeModel:     "Hyundai i20",
-			LicensePlate:         "WB-06-DF-5678",
-			LastKnownStatus:      "ON_TRIP",
-			SecondsSinceLastPing: 12,
-			CityPrefix:           "KOL",
-			IncidentType:         "FRAUD",
-			IncidentStatus:       "UNASSIGNED",
-			AssignedAgentID:      "",
-			BearingDelta:         0.0,
-			CalculatedSpeed:      240.0,
-			IsMockProvider:       true,
-			BatteryLevel:         50.0,
-			Latitude:             22.5901,
-			Longitude:            88.3512,
-		},
-	}
-
-	return h
 }
 
-// AddIncident appends a new incident to the active monitoring queue in a thread-safe manner
+// AddIncident persists a new incident to the shared Redis-backed queue so it is visible
+// across all gateway replicas and survives a restart.
 func (h *IncidentAdminHandler) AddIncident(incident StalledTripIncident) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.incidents = append(h.incidents, incident)
+	if h.clusterClient == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	payload, err := json.Marshal(incident)
+	if err != nil {
+		return
+	}
+	if err := h.clusterClient.HSet(ctx, incidentsActiveKey, incident.OrderID, payload).Err(); err != nil {
+		h.logger.Printf("[INCIDENT_QUEUE] Failed to persist incident %s: %v", incident.OrderID, err)
+	}
+}
+
+// loadIncidents returns every incident currently in the Redis-backed queue.
+func (h *IncidentAdminHandler) loadIncidents(ctx context.Context) ([]StalledTripIncident, error) {
+	out := make([]StalledTripIncident, 0)
+	if h.clusterClient == nil {
+		return out, nil
+	}
+	vals, err := h.clusterClient.HVals(ctx, incidentsActiveKey).Result()
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range vals {
+		var inc StalledTripIncident
+		if json.Unmarshal([]byte(v), &inc) == nil {
+			out = append(out, inc)
+		}
+	}
+	return out, nil
 }
 
 // HandleGetStalledTrips retrieves trips that have stalled telemetry streams
@@ -157,11 +123,17 @@ func (h *IncidentAdminHandler) HandleGetStalledTrips(w http.ResponseWriter, r *h
 		return
 	}
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	incidents, err := h.loadIncidents(ctx)
+	if err != nil {
+		http.Error(w, "incident_store_unavailable", http.StatusServiceUnavailable)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": h.incidents})
+	json.NewEncoder(w).Encode(map[string]interface{}{"incidents": incidents})
 }
 
 // HandleClaimIncident handles claiming of an active incident by a support agent
@@ -189,21 +161,29 @@ func (h *IncidentAdminHandler) HandleClaimIncident(w http.ResponseWriter, r *htt
 		return
 	}
 
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	found := false
-	for i, incident := range h.incidents {
-		if incident.OrderID == req.OrderID {
-			h.incidents[i].IncidentStatus = "INVESTIGATING"
-			h.incidents[i].AssignedAgentID = req.AgentID
-			found = true
-			break
-		}
+	if h.clusterClient == nil {
+		http.Error(w, "incident_not_found", http.StatusNotFound)
+		return
 	}
 
-	if !found {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	raw, err := h.clusterClient.HGet(ctx, incidentsActiveKey, req.OrderID).Result()
+	if err != nil {
 		http.Error(w, "incident_not_found", http.StatusNotFound)
+		return
+	}
+	var incident StalledTripIncident
+	if json.Unmarshal([]byte(raw), &incident) != nil {
+		http.Error(w, "incident_not_found", http.StatusNotFound)
+		return
+	}
+	incident.IncidentStatus = "INVESTIGATING"
+	incident.AssignedAgentID = req.AgentID
+	payload, _ := json.Marshal(incident)
+	if err := h.clusterClient.HSet(ctx, incidentsActiveKey, req.OrderID, payload).Err(); err != nil {
+		http.Error(w, "incident_store_unavailable", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -321,25 +301,23 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 		return
 	}
 
-	h.mu.Lock()
-	for i, incident := range h.incidents {
-		if incident.OrderID == req.OrderID {
-			h.incidents[i].IncidentStatus = "RESOLVED"
-			break
-		}
+	// Remove the now-handled incident from the shared active queue.
+	if h.clusterClient != nil {
+		_ = h.clusterClient.HDel(ctx, incidentsActiveKey, req.OrderID).Err()
 	}
-	h.mu.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
 }
 
-// GetIncidents returns a copy of the active incidents
+// GetIncidents returns the active incidents from the shared Redis-backed queue.
 func (h *IncidentAdminHandler) GetIncidents() []StalledTripIncident {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	copied := make([]StalledTripIncident, len(h.incidents))
-	copy(copied, h.incidents)
-	return copied
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	incidents, err := h.loadIncidents(ctx)
+	if err != nil {
+		return []StalledTripIncident{}
+	}
+	return incidents
 }
 

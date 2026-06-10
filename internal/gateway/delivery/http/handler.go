@@ -30,6 +30,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/google/uuid"
 	dispatchDomain "github.com/platform/driver-delivery/internal/dispatch/domain"
 	domain "github.com/platform/driver-delivery/internal/domain"
 	"github.com/platform/driver-delivery/internal/events"
@@ -37,7 +38,6 @@ import (
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	. "github.com/platform/driver-delivery/pkg/api/v1"
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 )
 
@@ -1193,7 +1193,7 @@ func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Re
 	// Compare hashed OTP
 	sum := sha256.Sum256([]byte(req.OTP))
 	inputHash := hex.EncodeToString(sum[:])
-	
+
 	targetHash := ""
 	if otpHash != nil {
 		targetHash = *otpHash
@@ -1208,7 +1208,7 @@ func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Re
 		// Increment otp_attempts
 		_, _ = tx.Exec(ctx, "UPDATE orders SET otp_attempts = otp_attempts + 1 WHERE id = $1::uuid", orderID)
 		_ = tx.Commit(ctx) // Commit the increment to DB
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1985,16 +1985,16 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 	if strings.Contains(strings.ToLower(cityPrefix), "out") {
 		tripType = "OUTSTATION"
 	}
-	
+
 	notes := "Rider has heavy luggage bags, request trunk clearance."
 	carTypeRequested := "PREMIUM_SUV"
 	transmissionRequired := "AUTOMATIC"
 	d4mCareOptIn := true
 
 	offer := OrderOffer{
-		OrderID:      orderID,
-		RiderName:    "Rahul Sharma",
-		RiderRating:  riderRating,
+		OrderID:     orderID,
+		RiderName:   "Rahul Sharma",
+		RiderRating: riderRating,
 		Pickup: LocationDetails{
 			Address: fmt.Sprintf("Pickup Near Cell %s (%f, %f)", pickupH3Cell, pickupLat, pickupLng),
 			Lat:     pickupLat,
@@ -2045,17 +2045,30 @@ func (h *GatewayHandler) HandleDriverGetOrder(w http.ResponseWriter, r *http.Req
 	defer cancel()
 
 	var (
-		status           string
-		waitingStartedAt sql.NullTime
+		status                 string
+		waitingStartedAt       sql.NullTime
+		pickupLat, pickupLng   float64
+		dropoffLat, dropoffLng float64
+		baseFarePaise          int64
+		surgeMultiplier        float64
+		customerID             string
 	)
 
-	// Fetch order details
+	// Fetch order details, including pickup/dropoff coordinates and fare, so the driver
+	// app can hydrate a trip it did not explicitly accept (e.g. an admin force-match).
 	queryOrder := `
-		SELECT status::text, waiting_started_at 
-		FROM orders 
+		SELECT status::text, waiting_started_at,
+		       ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry),
+		       ST_Y(dropoff_location::geometry), ST_X(dropoff_location::geometry),
+		       base_fare_paise, surge_multiplier::float8, customer_id::text
+		FROM orders
 		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid;
 	`
-	err := h.dbPool.QueryRow(ctx, queryOrder, orderID, driverID).Scan(&status, &waitingStartedAt)
+	err := h.dbPool.QueryRow(ctx, queryOrder, orderID, driverID).Scan(
+		&status, &waitingStartedAt,
+		&pickupLat, &pickupLng, &dropoffLat, &dropoffLng,
+		&baseFarePaise, &surgeMultiplier, &customerID,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "order_not_found", http.StatusNotFound)
@@ -2090,9 +2103,15 @@ func (h *GatewayHandler) HandleDriverGetOrder(w http.ResponseWriter, r *http.Req
 		"status":             status,
 		"waiting_started_at": nullableTime(waitingStartedAt),
 		"last_odometer":      lastOdometer,
+		"pickup_lat":         pickupLat,
+		"pickup_lng":         pickupLng,
+		"dropoff_lat":        dropoffLat,
+		"dropoff_lng":        dropoffLng,
+		"base_fare_paise":    baseFarePaise,
+		"surge_multiplier":   surgeMultiplier,
+		"customer_id":        customerID,
 	})
 }
-
 
 func (h *GatewayHandler) HandleDriverGetTrips(w http.ResponseWriter, r *http.Request) {
 	driverID, ok := requireDriverIdentity(w, r)
@@ -2827,12 +2846,12 @@ func (h *GatewayHandler) HandleUpdateOrderRoute(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":               true,
-		"order_id":              orderID,
-		"dropoff_lat":           req.DropoffLat,
-		"dropoff_lng":           req.DropoffLng,
-		"stops":                 req.Stops,
-		"calculated_fare_paise": updatedFarePaise,
+		"success":                 true,
+		"order_id":                orderID,
+		"dropoff_lat":             req.DropoffLat,
+		"dropoff_lng":             req.DropoffLng,
+		"stops":                   req.Stops,
+		"calculated_fare_paise":   updatedFarePaise,
 		"active_surge_multiplier": 1.0,
 	})
 }
@@ -2958,7 +2977,7 @@ func (h *GatewayHandler) flushGPSBuffers(ctx context.Context) {
 
 		// Perform bulk insert
 		dbCtx, dbCancel := context.WithTimeout(ctx, 5*time.Second)
-		
+
 		query := `INSERT INTO orders_gps_trail (order_id, latitude, longitude, captured_at, speed, heading, battery, network_type) VALUES `
 		vals := []interface{}{}
 
@@ -2975,7 +2994,7 @@ func (h *GatewayHandler) flushGPSBuffers(ctx context.Context) {
 
 		if dbErr != nil {
 			log.Printf("[GPS_WORKER] Failed bulk inserting %d GPS pings for order %s: %v. Re-buffering data.", len(pings), orderID, dbErr)
-			
+
 			// Put them back in Redis lists to prevent data loss
 			pipeBack := h.clusterClient.Pipeline()
 			for _, p := range pings {
@@ -2990,6 +3009,3 @@ func (h *GatewayHandler) flushGPSBuffers(ctx context.Context) {
 		}
 	}
 }
-
-
-

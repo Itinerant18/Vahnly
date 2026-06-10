@@ -22,15 +22,10 @@ func NewDriverAccountHandler(dbPool *pgxpool.Pool) *DriverAccountHandler {
 
 // GET /api/v1/driver-account/earnings
 func (h *DriverAccountHandler) GetEarningsSummary(w http.ResponseWriter, r *http.Request) {
-	driverIDStr := r.Header.Get("X-Driver-ID")
-	var driverID string
-	var ok bool
-	if driverIDStr != "" {
-		driverID = driverIDStr
-		ok = true
-	} else {
-		driverID, ok = requireDriverIdentity(w, r)
-	}
+	// Driver identity is taken only from the verified JWT — never from a client header.
+	// Trusting X-Driver-ID let an authenticated driver act as (and withdraw earnings for)
+	// any other driver by spoofing the header.
+	driverID, ok := requireDriverIdentity(w, r)
 	if !ok {
 		return
 	}
@@ -85,15 +80,10 @@ func (h *DriverAccountHandler) GetEarningsSummary(w http.ResponseWriter, r *http
 
 // POST /api/v1/driver-account/payouts/withdraw
 func (h *DriverAccountHandler) TriggerInstantPayout(w http.ResponseWriter, r *http.Request) {
-	driverIDStr := r.Header.Get("X-Driver-ID")
-	var driverID string
-	var ok bool
-	if driverIDStr != "" {
-		driverID = driverIDStr
-		ok = true
-	} else {
-		driverID, ok = requireDriverIdentity(w, r)
-	}
+	// Driver identity is taken only from the verified JWT — never from a client header.
+	// Trusting X-Driver-ID let an authenticated driver act as (and withdraw earnings for)
+	// any other driver by spoofing the header.
+	driverID, ok := requireDriverIdentity(w, r)
 	if !ok {
 		return
 	}
@@ -132,15 +122,10 @@ func (h *DriverAccountHandler) TriggerInstantPayout(w http.ResponseWriter, r *ht
 
 // GET /api/v1/driver-account/notifications
 func (h *DriverAccountHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	driverIDStr := r.Header.Get("X-Driver-ID")
-	var driverID string
-	var ok bool
-	if driverIDStr != "" {
-		driverID = driverIDStr
-		ok = true
-	} else {
-		driverID, ok = requireDriverIdentity(w, r)
-	}
+	// Driver identity is taken only from the verified JWT — never from a client header.
+	// Trusting X-Driver-ID let an authenticated driver act as (and withdraw earnings for)
+	// any other driver by spoofing the header.
+	driverID, ok := requireDriverIdentity(w, r)
 	if !ok {
 		return
 	}

@@ -50,6 +50,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
   const [waitingStartedAt, setWaitingStartedAt] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [failedAttempts, setFailedAttempts] = useState<number>(0);
 
   const orderId = activeTrip?.order_id;
 
@@ -143,40 +144,47 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
       otpEntered: otpVerificationCode,
     });
 
-    if (orderId && token) {
-      setIsSubmitting(true);
-      try {
-        const res = await verifyTripOTP(token, orderId, otpVerificationCode, odoValue, startFuel);
-        if (res.success) {
-          logAudit('TRIP_STARTED', { orderId });
-          setDutyState('DELIVERING');
-        }
-      } catch (err: any) {
-        if (err instanceof ApiClientError) {
+    if (failedAttempts >= 3) {
+      setOtpError('OTP locked: too many failed attempts. Restart the trip flow.');
+      return;
+    }
+
+    // The trip can only start on a server-verified OTP. There is no client-side bypass:
+    // without an authenticated session we force re-auth rather than advancing state.
+    if (!orderId || !token) {
+      setOtpError('Session expired. Please re-authenticate before starting the trip.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await verifyTripOTP(token, orderId, otpVerificationCode, odoValue, startFuel);
+      if (res.success) {
+        logAudit('TRIP_STARTED', { orderId });
+        setDutyState('DELIVERING');
+      }
+    } catch (err: any) {
+      if (err instanceof ApiClientError) {
+        // Count genuine OTP rejections toward the local lockout (mirrors the server's
+        // 3-attempt lock); a server-side lock (403) caps it immediately.
+        if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
+          setFailedAttempts(3);
+          setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
+        } else {
+          setFailedAttempts((n) => n + 1);
           try {
             const errorJson = JSON.parse(err.body);
             setOtpError(errorJson.message || errorJson.error || 'OTP verification failed.');
           } catch {
-            if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
-              setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
-            } else {
-              setOtpError(err.body || 'OTP verification failed.');
-            }
+            setOtpError(err.body || 'OTP verification failed.');
           }
-        } else {
-          setOtpError(err.message || 'OTP verification failed.');
         }
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else {
-      // Fallback for static sandbox demo
-      if (otpVerificationCode === '1234') {
-        logAudit('TRIP_STARTED_SANDBOX', { orderId });
-        setDutyState('DELIVERING');
       } else {
-        setOtpError('Invalid OTP.');
+        // Network/transport error — do not count toward the lockout.
+        setOtpError(err.message || 'OTP verification failed. Check your connection.');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -316,14 +324,14 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
         <div className="flex flex-col gap-2 pt-2">
           <button
             type="submit"
-            disabled={otpVerificationCode.length !== 4 || isSubmitting}
+            disabled={otpVerificationCode.length !== 4 || isSubmitting || failedAttempts >= 3}
             className={`w-full py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 text-center font-sans ${
-              otpVerificationCode.length !== 4 || isSubmitting
+              otpVerificationCode.length !== 4 || isSubmitting || failedAttempts >= 3
                 ? 'bg-zinc-800 text-zinc-550 border border-zinc-900 cursor-not-allowed opacity-50'
                 : 'bg-emerald-500 hover:bg-emerald-600 text-white'
             }`}
           >
-            {isSubmitting ? 'Verifying...' : 'Verify OTP & Start Trip'}
+            {failedAttempts >= 3 ? 'OTP Locked' : isSubmitting ? 'Verifying...' : 'Verify OTP & Start Trip'}
           </button>
 
           <button

@@ -85,6 +85,13 @@ func (j *OfferTimeoutJanitor) SweepExpiredOffers(ctx context.Context, cityPrefix
 	log.Printf("[JANITOR_DAEMON] Detected %d expired driver offers. Executing cascading rollbacks...", len(expiredList))
 
 	for _, offer := range expiredList {
+		// Skip admin force-matched assignments. These are deliberate commits (set via the
+		// orchestrator's force-match), not unaccepted 15s offers, and must not be rolled back.
+		if exists, _ := j.clusterClient.Exists(ctx, fmt.Sprintf("offer:forcematch:%s", offer.OrderID)).Result(); exists > 0 {
+			log.Printf("[JANITOR_SKIP] Order %s is an admin force-match; leaving assignment intact.", offer.OrderID)
+			continue
+		}
+
 		// Invoke the rollback module to reset the order to CREATED and put the driver on a match cooldown
 		err := j.gatewayHandler.RollbackAssignmentToCreated(ctx, offer.OrderID, offer.DriverID, cityPrefix)
 		if err != nil {

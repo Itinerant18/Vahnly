@@ -220,6 +220,9 @@ export const PromotionsDashboard: React.FC = () => {
 
 	// State toggle (Pause/Resume/Expire)
 	const handleUpdatePromoState = async (code: string, newStatus: string) => {
+		if (newStatus === 'EXPIRED' && !window.confirm(`Expire promo ${code}? This permanently deactivates a live promotion.`)) {
+			return;
+		}
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos/${code}/state`, {
 				method: 'POST',
@@ -241,6 +244,30 @@ export const PromotionsDashboard: React.FC = () => {
 	const handleCreatePromo = async () => {
 		if (!newPromo.code || !newPromo.promo_type) {
 			alert('Please fill out code identifier and promotion category.');
+			return;
+		}
+		// Reject "discount forever" / unlimited promos before they reach the server.
+		const validFrom = newPromo.valid_from ? new Date(newPromo.valid_from) : new Date();
+		const validTo = newPromo.valid_to ? new Date(newPromo.valid_to) : null;
+		if (!validTo || isNaN(validTo.getTime()) || validTo.getTime() <= Date.now()) {
+			alert('Set a valid expiry date in the future.');
+			return;
+		}
+		if (validTo.getTime() <= validFrom.getTime()) {
+			alert('Expiry must be after the start date.');
+			return;
+		}
+		if (!newPromo.value || newPromo.value <= 0) {
+			alert('Discount value must be greater than zero.');
+			return;
+		}
+		if (!newPromo.usage_cap_total || newPromo.usage_cap_total <= 0) {
+			alert('Set a total usage cap — unlimited promos are not allowed.');
+			return;
+		}
+		if (!window.confirm(
+			`Create promo ${newPromo.code} (${newPromo.promo_type}) valid until ${validTo.toLocaleString()}, total cap ${newPromo.usage_cap_total}?`
+		)) {
 			return;
 		}
 		try {

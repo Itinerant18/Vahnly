@@ -149,15 +149,15 @@ func (h *DocumentsHandler) HandleGetDocumentDetail(w http.ResponseWriter, r *htt
 	}
 	d.ExpiryDate = expiry
 
-	// Record VIEW access
+	// Record VIEW access synchronously so the compliance audit entry for a sensitive KYC
+	// document view is not lost if the pod shuts down mid-request (the previous fire-and-
+	// forget goroutine could be killed before the insert committed).
 	adminEmail := r.Header.Get("X-Admin-Email")
-	go func() {
-		gCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		_, _ = h.dbPool.Exec(gCtx,
-			`INSERT INTO documents_access_log (document_id, accessed_by_email, access_type, ip_address) VALUES ($1::uuid, $2, 'VIEW', $3)`,
-			id, adminEmail, r.RemoteAddr)
-	}()
+	if _, logErr := h.dbPool.Exec(ctx,
+		`INSERT INTO documents_access_log (document_id, accessed_by_email, access_type, ip_address) VALUES ($1::uuid, $2, 'VIEW', $3)`,
+		id, adminEmail, r.RemoteAddr); logErr != nil {
+		h.logger.Printf("[DOC_ACCESS_LOG] failed recording VIEW for doc %s: %v", id, logErr)
+	}
 
 	// Fetch access log
 	rows, err := h.dbPool.Query(ctx,

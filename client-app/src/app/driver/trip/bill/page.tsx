@@ -48,6 +48,7 @@ export default function FinalBillPage() {
         night_surge_paise: 5000,
         care_surcharge_paise: 1500,
         total_fare_paise: 62110,
+        driver_payout_paise: 49688,
       });
     }
   }, [orderID]);

@@ -28,6 +28,7 @@ import {
   driverEndTrip,
   driverConfirmPayment,
   FinalBill,
+  getDriverOrder,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -84,7 +85,7 @@ export default function DriverTerminalPage() {
   const driverName = user?.name || 'Aniket Karmakar';
   const cityPrefix = 'KOL'; // Regional Hub KOL
 
-  const { dutyState, setDutyState } = useDriverDutyStore();
+  const { dutyState, setDutyState, forceMatched } = useDriverDutyStore();
   const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
   
   // Resilient WebSocket hook for monitoring real-time dispatch streams
@@ -333,6 +334,41 @@ export default function DriverTerminalPage() {
     };
   }, [dutyState]);
 
+  // hydrateForceMatch pulls a directly-assigned (force-matched) order, builds the active
+  // trip from it, and pushes the driver into EN_ROUTE with a banner. Coordinates and fare
+  // come from the order endpoint; rider name/address text is not stored server-side.
+  const hydrateForceMatch = async (orderId: string) => {
+    if (!token) return;
+    if (useDriverDutyStore.getState().dutyState === 'EN_ROUTE' && activeTrip?.order_id === orderId) {
+      return; // already handling this assignment
+    }
+    try {
+      const order = await getDriverOrder(token, orderId);
+      setActiveTrip({
+        order_id: order.id,
+        customer_name: 'Assigned Rider',
+        customer_phone: 'Unavailable',
+        customer_rating: 5,
+        pickup_address: `Pickup (${order.pickup_lat.toFixed(4)}, ${order.pickup_lng.toFixed(4)})`,
+        pickup_lat: order.pickup_lat,
+        pickup_lng: order.pickup_lng,
+        dropoff_address: `Drop (${order.dropoff_lat.toFixed(4)}, ${order.dropoff_lng.toFixed(4)})`,
+        dropoff_lat: order.dropoff_lat,
+        dropoff_lng: order.dropoff_lng,
+        quoted_fare_paise: order.base_fare_paise,
+        vehicle_tier: activeVehicle,
+        transmission: 'ANY',
+        trip_type: 'CITY',
+        special_notes: 'Assigned by dispatch (force-match)',
+      });
+      useDriverDutyStore.getState().setForceMatched(true);
+      setDutyState('EN_ROUTE');
+      logAudit('FORCE_MATCH_RECEIVED', { orderId });
+    } catch (err) {
+      console.warn('[FORCE_MATCH] Failed to hydrate force-matched order:', err);
+    }
+  };
+
   const openOnlineStreams = () => {
     if (!token) return;
 
@@ -347,22 +383,22 @@ export default function DriverTerminalPage() {
         token,
         {
           onAssignment: (frame) => {
-            const currentDutyState = useDriverDutyStore.getState().dutyState;
-            if (currentDutyState !== 'ONLINE') {
-              console.warn('[DRIVER_OFFER] Ignoring assignment frame since duty state is:', currentDutyState);
-              return;
-            }
             void getPendingOffer(token)
               .then((pendingOffer) => {
                 if (pendingOffer.order) {
-                  const checkState = useDriverDutyStore.getState().dutyState;
-                  if (checkState !== 'ONLINE') {
-                    console.warn('[DRIVER_OFFER] Ignoring hydration response since state is:', checkState);
-                    return;
+                  // Normal flow: a pending 15s offer exists. Only surface it while ONLINE.
+                  if (useDriverDutyStore.getState().dutyState === 'ONLINE') {
+                    useOfferStore.getState().setOffer(pendingOffer.order, pendingOffer.offer_expires_in_seconds);
+                    useDriverDutyStore.getState().setDutyState('OFFER_PENDING');
+                    logAudit('INCOMING_OFFER_RECEIVED', { orderId: pendingOffer.order.orderId, source: 'WEBSOCKET' });
                   }
-                  useOfferStore.getState().setOffer(pendingOffer.order);
-                  useDriverDutyStore.getState().setDutyState('OFFER_PENDING');
-                  logAudit('INCOMING_OFFER_RECEIVED', { orderId: pendingOffer.order.orderId, source: 'WEBSOCKET' });
+                  return;
+                }
+                // No pending offer but an ASSIGNED frame arrived: this is an admin
+                // force-match (a direct assignment, not a 15s offer). Hydrate it and push
+                // the driver into the trip with a banner — never silently drop it.
+                if (frame.status === 'ASSIGNED' && frame.order_id) {
+                  void hydrateForceMatch(frame.order_id);
                 }
               })
               .catch((err) => console.warn('[DRIVER_OFFER] Assignment hydration failed:', err));
@@ -621,13 +657,9 @@ export default function DriverTerminalPage() {
         }
       }
     } else {
-      // Fallback fallback for static sandbox
-      if (otpVerificationCode === '1234') {
-        setOtpError('');
-        setDutyState('DELIVERING');
-      } else {
-        setOtpError('Invalid OTP.');
-      }
+      // No client-side OTP bypass: the trip can only start on a server-verified OTP.
+      // Without an authenticated session, force re-auth rather than advancing state.
+      setOtpError('Session expired. Please re-authenticate before starting the trip.');
     }
   };
 
@@ -715,6 +747,14 @@ export default function DriverTerminalPage() {
           night_surge_paise: 5000,
           care_surcharge_paise: 1500,
           total_fare_paise: calculateTotalBill() * 100,
+          // Local offline estimate at the base take rate; the backend returns the
+          // authoritative tiered payout on the real /end response.
+          driver_payout_paise: Math.max(
+            0,
+            Math.round((calculateTotalBill() * 100 - tollCharges * 100 - parkingCharges * 100) * 0.8) +
+              tollCharges * 100 +
+              parkingCharges * 100,
+          ),
         };
         setFinalBill(fallbackBill);
         finalBillData = fallbackBill;
@@ -734,6 +774,14 @@ export default function DriverTerminalPage() {
         night_surge_paise: 5000,
         care_surcharge_paise: 1500,
         total_fare_paise: calculateTotalBill() * 100,
+        // Local offline estimate at the base take rate; the backend returns the
+        // authoritative tiered payout on the real /end response.
+        driver_payout_paise: Math.max(
+          0,
+          Math.round((calculateTotalBill() * 100 - tollCharges * 100 - parkingCharges * 100) * 0.8) +
+            tollCharges * 100 +
+            parkingCharges * 100,
+        ),
       };
       setFinalBill(mockBill);
       finalBillData = mockBill;
@@ -893,6 +941,14 @@ export default function DriverTerminalPage() {
 
       {/* 2. SOS EMERGENCY PULSE TRIGGER MODAL */}
       <SosModal />
+
+      {/* FORCE-MATCH BANNER: a trip was assigned by dispatch (not accepted from an offer) */}
+      {forceMatched && dutyState !== 'ONLINE' && dutyState !== 'OFFLINE' && (
+        <div className="fixed top-0 inset-x-0 z-[100001] bg-amber-500 text-black px-4 py-2.5 flex items-center justify-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider shadow-lg">
+          <span className="animate-pulse">●</span>
+          Assigned by dispatch — proceed to pickup. This trip was force-matched to you.
+        </div>
+      )}
 
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
       <OfferPopup />

@@ -204,6 +204,13 @@ export const DispatchDashboard: React.FC = () => {
 			alert('Zone Name is required');
 			return;
 		}
+		if (!window.confirm(
+			zonePolicy === 'BLACKLIST_BLOCK'
+				? `Create a BLACKLIST_BLOCK geofence "${zoneName}"?\n\nThis halts all dispatch inside the polygon.`
+				: `Save geofence "${zoneName}" (${zonePolicy})?`
+		)) {
+			return;
+		}
 
 		const coords: [number, number][] = [];
 		try {
@@ -257,6 +264,9 @@ export const DispatchDashboard: React.FC = () => {
 	// Save Dispatch Rules Config
 	const handleSaveRules = async () => {
 		if (!rules) return;
+		if (!window.confirm(`Commit dispatch rule changes for ${selectedRulesCity}? This affects matching radius/eligibility city-wide.`)) {
+			return;
+		}
 		try {
 			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';

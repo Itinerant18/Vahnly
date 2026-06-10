@@ -1,8 +1,24 @@
 import React, { useState } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 
+// Stable per-browser device id, generated once and persisted. Not derived from the email
+// (which made it predictable and trivially forgeable) — it is a random, opaque value used
+// only as a soft device-trust signal.
+function getDeviceFingerprint(): string {
+  if (typeof localStorage === 'undefined') return 'fp-web-cr-ephemeral';
+  let fp = localStorage.getItem('admin_device_fp');
+  if (!fp) {
+    const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID().replace(/-/g, '')
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    fp = 'fp-web-cr-' + rand.slice(0, 16);
+    localStorage.setItem('admin_device_fp', fp);
+  }
+  return fp;
+}
+
 interface AdminAuthGatewayProps {
-  onAuthSuccess: (token: string) => void;
+  onAuthSuccess: () => void;
 }
 
 export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSuccess }) => {
@@ -11,8 +27,8 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   const [statusMessage, setStatusMessage] = useState<{ type: 'SUCCESS' | 'ERROR'; text: string } | null>(null);
 
   // Sign In inputs
-  const [loginEmail, setLoginEmail] = useState<string>('aniketkarmakar018@gmail.com');
-  const [loginPassword, setLoginPassword] = useState<string>('Aniket018');
+  const [loginEmail, setLoginEmail] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
   
   // 2FA state management
   const [twoFactorRequired, setTwoFactorRequired] = useState<boolean>(false);
@@ -32,7 +48,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   const [signupCityScope, setSignupCityScope] = useState<string>('KOL'); 
 
   // Client device fingerprint audit parameters
-  const deviceFingerprint = 'fp-web-cr-' + btoa(loginEmail).substring(0, 10).toLowerCase();
+  const deviceFingerprint = getDeviceFingerprint();
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,9 +74,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
           setTwoFactorRequired(true);
           setMfaMessage(data.message || 'Multi-Factor Authenticator is active.');
         } else {
-          localStorage.setItem('admin_jwt_token', data.token);
+          // The server set the HttpOnly session cookie. Store only the non-sensitive role
+          // for nav/RBAC gating — never the JWT.
           localStorage.setItem('admin_role', data.role || 'ADMIN');
-          onAuthSuccess(data.token);
+          onAuthSuccess();
         }
       } else {
         const errText = data.message || 'Authentication rejected: Invalid corporate credentials.';
@@ -85,42 +102,14 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
       return;
     }
 
-    const mockSSOId = 'sso-' + provider.toLowerCase() + '-' + Math.random().toString(36).substring(2, 9);
-    try {
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: loginEmail.trim(),
-          sso_provider: provider,
-          sso_id: mockSSOId,
-          two_factor_code: twoFactorCode,
-          device_fingerprint: deviceFingerprint
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (data.mfa_required) {
-          setTwoFactorRequired(true);
-          setMfaMessage(data.message || `SSO verification complete. 2FA is active.`);
-        } else {
-          localStorage.setItem('admin_jwt_token', data.token);
-          localStorage.setItem('admin_role', data.role || 'ADMIN');
-          onAuthSuccess(data.token);
-        }
-      } else {
-        setStatusMessage({ 
-          type: 'ERROR', 
-          text: data.message || `Federated ${provider} authentication failed. Is your email registered?` 
-        });
-      }
-    } catch {
-      setStatusMessage({ type: 'ERROR', text: 'Network error connecting to SSO provider.' });
-    } finally {
-      setIsLoading(false);
-    }
+    // Only Google Workspace SSO is wired to a real identity provider. Other
+    // providers must never fabricate a client-side sso_id — a backend that trusted
+    // it would let anyone claim any federated account without an IdP assertion.
+    setStatusMessage({
+      type: 'ERROR',
+      text: `${provider} SSO is not configured. Use Google Workspace or password sign-in.`,
+    });
+    setIsLoading(false);
   };
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
@@ -149,7 +138,8 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
           text: 'Account created successfully! Switching to login layer...' 
         });
         setLoginEmail(signupEmail);
-        setLoginPassword(signupPassword);
+        // Do not prefill the password — keeping the plaintext in component state extends its
+        // lifetime in memory / React DevTools. The user re-enters it on the login screen.
         setTimeout(() => setActiveTab('LOGIN'), 1500);
       } else {
         setStatusMessage({ type: 'ERROR', text: 'Registration rejected. Profile credentials may already exist.' });
@@ -206,7 +196,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         {twoFactorRequired ? (
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
             <div className="bg-canvas-soft border border-canvas-soft p-4 rounded-xl text-xs text-body leading-relaxed">
-              <strong>Mandatory MFA Gate</strong>: {mfaMessage}. Use mock authentication code <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-canvas-soft text-ink font-bold">123456</code> to bypass.
+              <strong>Mandatory MFA Gate</strong>: {mfaMessage}. Enter the 6-digit code from your authenticator app.
             </div>
 
             <div>

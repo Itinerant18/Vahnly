@@ -62,7 +62,6 @@ export const ManualBooking: React.FC = () => {
 
       if (res.ok) {
         const data = await res.json();
-        // Fallback/Mock verified online drivers
         const list = (data || []).map((d: any) => ({
           id: d.id,
           name: d.name || 'Driver',
@@ -71,16 +70,24 @@ export const ManualBooking: React.FC = () => {
           city_prefix: d.city_prefix || 'KOL',
         }));
         setAvailableDrivers(list);
+      } else {
+        setAvailableDrivers([]);
       }
     } catch (err) {
       console.error(err);
+      // Dev-only seed so the booking flow is testable without a live driver pool. In
+      // production a fetch failure shows an empty list, never fabricated drivers — never
+      // overwrite a successful fetch.
+      if (import.meta.env.DEV) {
+        setAvailableDrivers([
+          { id: '5b1a5239-ab20-42d7-b50a-ea77419a84fb', name: 'Aniket Karmakar', phone: '+91 7602676448', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
+          { id: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', name: 'Rajesh Das', phone: '+91 9876543210', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
+          { id: '7f8e9d0c-1b2a-3c4d-5e6f-7a8b9c0d1e2f', name: 'Sunil Sen', phone: '+91 9001100220', current_state: 'ONLINE_AVAILABLE', city_prefix: 'BLR' },
+        ]);
+      } else {
+        setAvailableDrivers([]);
+      }
     } finally {
-      // Seed some realistic fallback drivers in case database is empty or fetch fails
-      setAvailableDrivers([
-        { id: '5b1a5239-ab20-42d7-b50a-ea77419a84fb', name: 'Aniket Karmakar', phone: '+91 7602676448', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
-        { id: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', name: 'Rajesh Das', phone: '+91 9876543210', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
-        { id: '7f8e9d0c-1b2a-3c4d-5e6f-7a8b9c0d1e2f', name: 'Sunil Sen', phone: '+91 9001100220', current_state: 'ONLINE_AVAILABLE', city_prefix: 'BLR' },
-      ]);
       setDriversLoading(false);
     }
   };

@@ -15,7 +15,7 @@ export interface DispatchStreamCallbacks {
 // Mint a single-use WebSocket ticket. The long-lived JWT is sent in the
 // Authorization header (never in a URL), and the short-lived ticket is what
 // travels in the ?ticket= query — so the JWT no longer leaks into logs/history.
-async function fetchWsTicket(token: string): Promise<string> {
+export async function fetchWsTicket(token: string): Promise<string> {
   const res = await fetch(`${BASE_URL.replace(/\/$/, '')}/api/v1/ws/ticket`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },

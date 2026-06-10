@@ -23,7 +23,17 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       login: (token, user) => set({ token, user, isAuthenticated: true }),
-      logout: () => set({ token: null, user: null, isAuthenticated: false }),
+      logout: () => {
+        // Purge any session-scoped caches that may hold tokens or PII.
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('onboarding-offline-queue');
+          } catch {
+            // ignore storage errors
+          }
+        }
+        set({ token: null, user: null, isAuthenticated: false });
+      },
     }),
     {
       name: 'platform-auth-storage', // Persists to localStorage automatically

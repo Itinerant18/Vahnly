@@ -25,7 +25,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('admin_jwt_token', data.token);
+        // The server sets the HttpOnly session cookie; never store the JWT in localStorage.
+        if (data.role) localStorage.setItem('admin_role', data.role);
         onLoginSuccess(data.token);
       } else if (response.status === 401) {
         setErrorMessage('Authentication Failed: Invalid email or password confirmation.');

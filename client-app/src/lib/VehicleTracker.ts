@@ -101,13 +101,23 @@ export class VehicleTracker {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const { latitude, longitude, heading, speed } = pos.coords;
+
+        // Drop packets without a usable fix rather than substituting fabricated
+        // coordinates/speed, which would inject fake movement into telemetry and billing.
+        // Only the exact null-island (0,0) is rejected; a real lat or lng of 0 is kept.
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
+          console.warn('[VEHICLE_TRACKER] Dropped telemetry packet: no valid GPS fix.');
+          return;
+        }
+
         const telemetryPacket: GPSCoordinatePacket = {
           driver_id: this.driverID,
           city_prefix: this.cityPrefix,
-          latitude: pos.coords.latitude || 22.5726,
-          longitude: pos.coords.longitude || 88.3639,
-          bearing: pos.coords.heading || 0.0,
-          speed_kms: (pos.coords.speed ? pos.coords.speed * 3.6 : 28.5), // Converts meters/sec to km/h values
+          latitude,
+          longitude,
+          bearing: Number.isFinite(heading as number) ? (heading as number) : 0.0,
+          speed_kms: Number.isFinite(speed as number) && (speed as number) > 0 ? (speed as number) * 3.6 : 0,
           timestamp_utc: Date.now(),
         };
 

@@ -18,8 +18,15 @@ function readEnv(key: string, fallback: string): string {
 // same origin must supply absolute hosts via these env vars (or the ClientCoreEngine
 // constructor's apiBaseUrl argument).
 
-// REST + WebSocket public API gateway (Milestones 14, 15, 20, 25, 27).
-export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', 'http://localhost:8085');
+// REST API gateway. Default is EMPTY (same-origin) so every admin request is RELATIVE and
+// routes through the Vite dev proxy / production reverse proxy. This is required for the
+// HttpOnly session cookie (CRIT-004) to be sent automatically — a cross-origin absolute
+// base would drop the cookie unless every call opted into credentials+CORS. Override with
+// API_GATEWAY_URL only for a same-origin-incapable setup (then set ADMIN_FRONTEND_URL on
+// the gateway and send credentials on requests).
+export const API_GATEWAY_BASE_URL = readEnv('API_GATEWAY_URL', '');
+// WebSocket base stays absolute: WS authenticates via a single-use ticket (minted over the
+// cookie-authenticated HTTP channel), so it never needs the cookie on the upgrade itself.
 export const WS_GATEWAY_BASE_URL = readEnv('WS_GATEWAY_URL', 'ws://localhost:8085');
 
 // Standalone spatial analytics SSE service (Milestone 19).

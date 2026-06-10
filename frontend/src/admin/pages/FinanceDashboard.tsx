@@ -315,6 +315,9 @@ export const FinanceDashboard: React.FC = () => {
 	};
 
 	const handleProcessRefundAction = async (id: string, action: 'approve' | 'reject') => {
+		if (!window.confirm(`${action === 'approve' ? 'Approve' : 'Reject'} refund ${id}?${action === 'approve' ? ' This disburses money to the customer.' : ''}`)) {
+			return;
+		}
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/refunds/${id}/${action}`, {
 				method: 'POST',
@@ -333,6 +336,11 @@ export const FinanceDashboard: React.FC = () => {
 	const handleAdjustWallet = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!selectedWallet) return;
+		if (!window.confirm(
+			`${adjustType} ₹${adjustAmount || '0'} to wallet ${selectedWallet.id}?\n\nThis moves real money in/out of the user's wallet and is audited.`
+		)) {
+			return;
+		}
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/wallets/${selectedWallet.id}/adjust`, {
 				method: 'POST',

@@ -195,6 +195,29 @@ func (h *PromoHandler) HandlePostPromo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reject "discount forever" / unlimited promos. A promo must have a future expiry,
+	// a coherent validity window, a positive value, and a total usage cap.
+	now := time.Now()
+	if req.ValidFrom.IsZero() {
+		req.ValidFrom = now
+	}
+	if req.ValidTo.IsZero() || !req.ValidTo.After(now) {
+		http.Error(w, "promo_valid_to_must_be_in_future", http.StatusUnprocessableEntity)
+		return
+	}
+	if !req.ValidTo.After(req.ValidFrom) {
+		http.Error(w, "promo_valid_to_must_be_after_valid_from", http.StatusUnprocessableEntity)
+		return
+	}
+	if req.Value <= 0 {
+		http.Error(w, "promo_value_must_be_positive", http.StatusUnprocessableEntity)
+		return
+	}
+	if req.UsageCapTotal <= 0 {
+		http.Error(w, "promo_usage_cap_total_required", http.StatusUnprocessableEntity)
+		return
+	}
+
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
 		adminEmail = "admin@platform.com"
@@ -215,8 +238,11 @@ func (h *PromoHandler) HandlePostPromo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Expire the cached promo at valid_to so it physically drops after its window even
+	// before fare-time enforcement is wired (see FEAT: promo enforcement).
 	key := "promo:code:" + req.Code
-	err = h.redisClient.Set(ctx, key, payloadBytes, 0).Err()
+	promoTTL := time.Until(req.ValidTo)
+	err = h.redisClient.Set(ctx, key, payloadBytes, promoTTL).Err()
 	if err != nil {
 		http.Error(w, "redis_write_failed", http.StatusInternalServerError)
 		return

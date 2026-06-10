@@ -4,6 +4,7 @@ import { useAppState } from '@/lib/store/useAppState';
 import { VehicleTracker } from '@/lib/VehicleTracker';
 import { WS_GATEWAY_BASE_URL } from '@/config';
 import { useAuthStore } from '@/store/useAuthStore';
+import { fetchWsTicket } from '@/services/dispatchStream';
 
 interface WebSocketContextType {
   vehicleTracker: VehicleTracker | null;
@@ -35,8 +36,23 @@ export function ResilientWebSocketProvider({
 
       const wsUrl = process.env.NEXT_PUBLIC_WS_GATEWAY || WS_GATEWAY_BASE_URL;
       const jwtToken = useAuthStore.getState().token;
+      if (!jwtToken) {
+        setReconnecting(false);
+        setConnected(false);
+        return;
+      }
 
-      const ws = new WebSocket(`${wsUrl}/api/v1/dispatch/stream?jwt=${jwtToken}`);
+      // Mint a single-use ticket (JWT in the Authorization header) and connect with
+      // ?ticket= so the long-lived token never lands in the WebSocket URL or logs.
+      let ticket: string;
+      try {
+        ticket = await fetchWsTicket(jwtToken);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+
+      const ws = new WebSocket(`${wsUrl}/api/v1/dispatch/stream?ticket=${encodeURIComponent(ticket)}`);
 
       ws.onopen = () => {
         console.log('WebSocket connected');

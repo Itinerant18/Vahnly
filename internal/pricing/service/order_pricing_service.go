@@ -149,6 +149,30 @@ func (s *OrderPricingService) StartSurgeMatrixSyncLoop(ctx context.Context) {
 	}
 }
 
+// applyFreezeCap clamps a live surge multiplier to an admin-set freeze cap when one is
+// active for the cell. The freeze lives at its own key (surge:freeze:<city>:<cell>),
+// separate from the live surge:matrix key the Kafka sync writes, so the cap is never
+// overwritten by the next surge event and only ever lowers price (min of live, cap).
+// Best-effort: any read error leaves the live multiplier unchanged.
+func (s *OrderPricingService) applyFreezeCap(ctx context.Context, city, h3Cell string, multiplier float64) float64 {
+	if city == "" || h3Cell == "" {
+		return multiplier
+	}
+	freezeKey := fmt.Sprintf("surge:freeze:%s:%s", city, h3Cell)
+	capVal, err := s.clusterClient.Get(ctx, freezeKey).Result()
+	if err != nil {
+		return multiplier
+	}
+	capMult, parseErr := strconv.ParseFloat(capVal, 64)
+	if parseErr != nil || capMult <= 0 {
+		return multiplier
+	}
+	if multiplier > capMult {
+		return capMult
+	}
+	return multiplier
+}
+
 // CalculateFare joins base operational metrics with live multipliers via high-velocity Redis reads
 func (s *OrderPricingService) CalculateFare(ctx context.Context, cityPrefix string, pickupH3Cell string, baseFarePaise int64) (int64, float64, error) {
 	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", cityPrefix, pickupH3Cell)
@@ -168,6 +192,9 @@ func (s *OrderPricingService) CalculateFare(ctx context.Context, cityPrefix stri
 		// Log the error but maintain fallback baseline calculation execution
 		s.logger.Printf("[PRICING_CACHE_READ_ERROR] Fallback triggered for key %s: %v", matrixKey, err)
 	}
+
+	// Clamp to any active admin freeze cap before pricing.
+	multiplier = s.applyFreezeCap(readCtx, cityPrefix, pickupH3Cell, multiplier)
 
 	// Calculate final pricing allocation mapping using integer paise bounds to prevent data loss
 	finalFarePaise := int64(float64(baseFarePaise) * multiplier)
@@ -222,6 +249,9 @@ func (s *OrderPricingService) GetFareQuote(ctx context.Context, city string, h3C
 	} else if !errors.Is(err, redis.Nil) {
 		s.logger.Printf("Degraded Operations Warning: Redis cluster read error, falling back to 1.0 multiplier: %v", err)
 	}
+
+	// Clamp to any active admin freeze cap before pricing.
+	multiplier = s.applyFreezeCap(ctx, city, h3Cell, multiplier)
 
 	// Calculate base operational costs before applying multiplier modifiers
 	distanceCost := float64(s.perMeterPaise) * distanceMeters

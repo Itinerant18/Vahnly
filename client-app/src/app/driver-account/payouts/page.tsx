@@ -1,43 +1,86 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getDriverAccountEarnings, triggerDriverWithdrawal } from '@/api/client';
+
+interface PayoutHistoryItem {
+  id: string;
+  date: string;
+  amount: number;
+  status: string;
+  channel: string;
+}
 
 export default function DriverPayoutsPage() {
-  const [balance, setBalance] = useState(2860.00);
+  const { token } = useAuthStore();
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [withdrawVal, setWithdrawVal] = useState('');
-  const [bankDetails, setBankDetails] = useState({ account: '•••• •••• 9876', holder: 'Aniket Karmakar', upi: 'aniket.k@okaxis' });
+  const [bankDetails, setBankDetails] = useState({ account: '•••• •••• ••••', holder: '', upi: '' });
   const [isEditingBank, setIsEditingBank] = useState(false);
   const [autoPayout, setAutoPayout] = useState(true);
-  const [history, setHistory] = useState([
-    { id: 'PAY-8821', date: '2026-06-01', amount: 4500.00, status: 'Settled', channel: 'UPI' },
-    { id: 'PAY-8755', date: '2026-05-25', amount: 8200.00, status: 'Settled', channel: 'Bank Transfer' },
-    { id: 'PAY-8610', date: '2026-05-18', amount: 5600.00, status: 'Settled', channel: 'UPI' }
-  ]);
+  // Withdrawals made this session. A driver-facing payout-history endpoint does not yet
+  // exist, so we surface confirmed withdrawals (with real payout refs) rather than
+  // fabricating a settled history.
+  const [history, setHistory] = useState<PayoutHistoryItem[]>([]);
+
+  const loadBalance = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const earnings = await getDriverAccountEarnings(token, 'MONTH');
+      setBalance(earnings.net_payout);
+    } catch (err) {
+      console.warn('Failed to load payout balance:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadBalance();
+  }, [loadBalance]);
 
   const handleWithdrawAll = () => {
     setWithdrawVal(balance.toString());
   };
 
-  const handleRequestPayout = (e: React.FormEvent) => {
+  const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseFloat(withdrawVal);
-    if (isNaN(val) || val <= 0 || val > balance) {
-      alert('Provide a valid withdraw amount within your available balance limit.');
+    if (!token) {
+      alert('Please sign in to withdraw.');
       return;
     }
-
-    const newPayment = {
-      id: `PAY-${Math.floor(Math.random() * 9000 + 1000)}`,
-      date: new Date().toISOString().split('T')[0],
-      amount: val,
-      status: 'Processing',
-      channel: 'UPI Instant'
-    };
-
-    setBalance((prev) => prev - val);
-    setHistory((prev) => [newPayment, ...prev]);
-    setWithdrawVal('');
-    alert(`Payout request of ₹${val.toFixed(2)} submitted! Funds will settle to ${bankDetails.upi} instantly.`);
+    if (balance <= 0) {
+      alert('No withdrawable balance available.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Instant payout settles the full available balance server-side.
+      const res = await triggerDriverWithdrawal(token);
+      setHistory((prev) => [
+        {
+          id: res.payout_id,
+          date: new Date().toISOString().split('T')[0],
+          amount: balance,
+          status: res.status || 'Processing',
+          channel: 'UPI Instant',
+        },
+        ...prev,
+      ]);
+      setWithdrawVal('');
+      alert(`Instant payout initiated (ref ${res.payout_id}). Your available balance is settling to the linked account.`);
+      await loadBalance();
+    } catch (err: any) {
+      alert(err?.message || 'Withdrawal failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -57,7 +100,7 @@ export default function DriverPayoutsPage() {
           <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex justify-between items-center relative overflow-hidden">
             <div className="space-y-1">
               <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">Withdrawable Balance</span>
-              <h3 className="text-3xl font-mono font-bold text-emerald-400">₹{balance.toFixed(2)}</h3>
+              <h3 className="text-3xl font-mono font-bold text-emerald-400">{loading ? '₹—' : `₹${balance.toFixed(2)}`}</h3>
               <span className="text-[8px] font-mono text-zinc-600 block pt-0.5">Clears immediately to linked UPI node</span>
             </div>
             
@@ -106,10 +149,12 @@ export default function DriverPayoutsPage() {
 
             <button
               type="submit"
-              className="w-full bg-white hover:bg-zinc-200 text-black py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 font-sans"
+              disabled={submitting || loading || balance <= 0}
+              className="w-full bg-white hover:bg-zinc-200 text-black py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Request Instant Withdrawal
+              {submitting ? 'Processing…' : 'Request Instant Withdrawal'}
             </button>
+            <p className="text-[8px] font-mono text-zinc-600 text-center -mt-1">Instant payout settles your full available balance.</p>
           </form>
 
         </div>
@@ -186,6 +231,9 @@ export default function DriverPayoutsPage() {
         </h4>
 
         <div className="divide-y divide-zinc-900">
+          {history.length === 0 && (
+            <p className="py-3 text-[10px] font-mono text-zinc-600 text-center">No withdrawals yet this session.</p>
+          )}
           {history.map((item) => (
             <div key={item.id} className="py-3 flex justify-between items-center text-xs font-mono">
               <div>

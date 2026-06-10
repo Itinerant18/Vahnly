@@ -19,8 +19,12 @@ interface DriverDutyStore {
   state: DutyState;     // Matches user's exact specification
   activeOrder: Order | null;
   currentOffer: any | null;
+  // True when the current assignment was pushed by admin dispatch (force-match) rather
+  // than accepted from a 15s offer — drives a non-dismissable "assigned by dispatch" banner.
+  forceMatched: boolean;
   setDutyState: (state: DutyState) => void;
   setActiveOrder: (order: Order | null) => void;
+  setForceMatched: (v: boolean) => void;
   toggleOnlineStatus: (lat: number, lng: number) => Promise<void>;
   receiveOffer: (offerData: any) => void;
   respondToOffer: (orderId: string, response: 'ACCEPT' | 'DECLINE', reason?: string) => Promise<void>;
@@ -28,7 +32,9 @@ interface DriverDutyStore {
 
 const validTransitions: Record<DutyState, DutyState[]> = {
   OFFLINE: ['ONLINE'],
-  ONLINE: ['OFFLINE', 'OFFER_PENDING'],
+  // ONLINE -> EN_ROUTE is reachable via an admin force-match (assignment pushed without a
+  // 15s offer); without it the force-match would be silently dropped by the state machine.
+  ONLINE: ['OFFLINE', 'OFFER_PENDING', 'EN_ROUTE'],
   OFFER_PENDING: ['ONLINE', 'EN_ROUTE'],
   EN_ROUTE: ['ARRIVED', 'ONLINE'], // ONLINE if cancelled
   ARRIVED: ['DELIVERING', 'ONLINE'], // ONLINE if cancelled/no-show
@@ -52,17 +58,25 @@ export const useDriverDutyStore = create<DriverDutyStore>()(
       state: 'OFFLINE',
       activeOrder: null,
       currentOffer: null,
+      forceMatched: false,
 
       setDutyState: (dutyState) => {
         const current = get().state;
         if (isTransitionValid(current, dutyState)) {
-          set({ dutyState, state: dutyState });
+          // Leaving the active trip clears the force-match banner.
+          const patch: Partial<DriverDutyStore> = { dutyState, state: dutyState };
+          if (dutyState === 'ONLINE' || dutyState === 'OFFLINE') {
+            patch.forceMatched = false;
+          }
+          set(patch);
         } else {
           console.warn(`[STATE_MACHINE] Illegal transition from ${current} to ${dutyState}`);
         }
       },
 
       setActiveOrder: (activeOrder) => set({ activeOrder }),
+
+      setForceMatched: (forceMatched) => set({ forceMatched }),
 
       toggleOnlineStatus: async (lat, lng) => {
         const token = useAuthStore.getState().token;

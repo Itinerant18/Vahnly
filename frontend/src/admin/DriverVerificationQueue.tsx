@@ -93,6 +93,12 @@ export const DriverVerificationQueue: React.FC = () => {
 
   const submitVerificationDecision = async (approve: boolean) => {
     if (!selectedDriver) return;
+    if (!window.confirm(
+      `${approve ? 'Approve & activate' : 'Reject'} driver ${selectedDriver.name ?? selectedDriver.id}?` +
+      (approve ? '\n\nThis activates the driver for live dispatch.' : '')
+    )) {
+      return;
+    }
     setIsLoading(true);
     setMessage(null);
 

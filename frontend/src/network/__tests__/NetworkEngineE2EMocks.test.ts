@@ -105,8 +105,24 @@ describe('Milestone 32 — Full-Stack Network Integration & Mocking Suite', () =
   describe('ResilientStreamManager Verification', () => {
     let mockWebSocketInstance: any;
     let originalWebSocket: any;
+    let store: Record<string, string>;
 
     beforeEach(() => {
+      // The node test environment lacks the browser globals the stream manager uses
+      // (localStorage for the session token, atob/btoa for the JWT exp pre-flight).
+      store = {};
+      (globalThis as any).localStorage = {
+        getItem: (k: string) => (k in store ? store[k] : null),
+        setItem: (k: string, v: string) => { store[k] = v; },
+        removeItem: (k: string) => { delete store[k]; },
+      };
+      if (typeof (globalThis as any).atob !== 'function') {
+        (globalThis as any).atob = (s: string) => Buffer.from(s, 'base64').toString('binary');
+      }
+      if (typeof (globalThis as any).btoa !== 'function') {
+        (globalThis as any).btoa = (s: string) => Buffer.from(s, 'binary').toString('base64');
+      }
+
       originalWebSocket = globalThis.WebSocket;
       mockWebSocketInstance = {
         close: jest.fn(),
@@ -121,9 +137,20 @@ describe('Milestone 32 — Full-Stack Network Integration & Mocking Suite', () =
 
     afterEach(() => {
       globalThis.WebSocket = originalWebSocket;
+      delete (globalThis as any).localStorage;
     });
 
     it('should capture 1001 CloseGoingAway frames and smoothly execute jittered re-homing', async () => {
+      // The stream now mints a single-use WS ticket over HTTP before connecting (the JWT
+      // travels in the Authorization header, never in the URL), so the socket is opened
+      // asynchronously. Seed a usable session token and stub the ticket endpoint.
+      const sessionToken = 'h.' + btoa(JSON.stringify({ role: 'ADMIN' })) + '.s';
+      localStorage.setItem('admin_jwt_token', sessionToken);
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ ticket: 'tkt-test-1' }),
+      } as Response);
+
       const statusChanges: string[] = [];
       const config: StreamConfig = {
         orderID: 'test-order-999',
@@ -134,7 +161,7 @@ describe('Milestone 32 — Full-Stack Network Integration & Mocking Suite', () =
       };
 
       const manager = new ResilientStreamManager(config);
-      manager.connect();
+      await manager.connect();
 
       // Simulate a clean socket open confirmation loop
       if (mockWebSocketInstance.onopen) mockWebSocketInstance.onopen();
@@ -151,8 +178,9 @@ describe('Milestone 32 — Full-Stack Network Integration & Mocking Suite', () =
       // Fast forward the backoff clocks to trigger the second connect configuration pass
       await jest.advanceTimersByTimeAsync(8000);
       expect(globalThis.WebSocket).toHaveBeenCalledTimes(2);
-      
+
       manager.disconnect();
+      localStorage.removeItem('admin_jwt_token');
     });
   });
 

@@ -36,15 +36,10 @@ func NewOfflineSyncHandler(dbPool *pgxpool.Pool) *OfflineSyncHandler {
 
 // POST /api/v1/driver/sync/offline-payload
 func (h *OfflineSyncHandler) BulkReconcileOfflineData(w http.ResponseWriter, r *http.Request) {
-	driverIDStr := r.Header.Get("X-Driver-ID")
-	var driverID string
-	var ok bool
-	if driverIDStr != "" {
-		driverID = driverIDStr
-		ok = true
-	} else {
-		driverID, ok = requireDriverIdentity(w, r)
-	}
+	// Driver identity is taken only from the verified JWT — never from a client
+	// header. Trusting X-Driver-ID let any caller replay/forge telemetry under an
+	// arbitrary driver id and inflate billable distance.
+	driverID, ok := requireDriverIdentity(w, r)
 	if !ok {
 		return
 	}
@@ -82,6 +77,12 @@ func (h *OfflineSyncHandler) BulkReconcileOfflineData(w http.ResponseWriter, r *
 		if packet.Type == "TELEMETRY" {
 			lat, lng, parseErr := parseTelemetryPayload(packet.Payload)
 			if parseErr != nil {
+				continue
+			}
+
+			// Reject out-of-range coordinates and the null-island (0,0) sentinel so a
+			// client cannot inject fabricated fixes into the billable GPS trail.
+			if lat < -90 || lat > 90 || lng < -180 || lng > 180 || (lat == 0 && lng == 0) {
 				continue
 			}
 

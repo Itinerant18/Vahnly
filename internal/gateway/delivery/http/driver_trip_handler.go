@@ -27,6 +27,7 @@ type FinalBill struct {
 	NightSurgePaise     int64   `json:"night_surge_paise"`
 	CareSurchargePaise  int64   `json:"care_surcharge_paise"`
 	TotalFarePaise      int64   `json:"total_fare_paise"`
+	DriverPayoutPaise   int64   `json:"driver_payout_paise"`
 }
 
 // HandleDriverAddOrderEvent handles POST /api/v1/driver/orders/{id}/events
@@ -359,7 +360,17 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 	nightSurgePaise := int64(5000) // flat night surge ₹50
 	careSurchargePaise := int64(1500) // flat care surcharge ₹15
 
-	totalFarePaise := baseFarePaise + distanceChargePaise + waitChargePaise + overtimeChargePaise + tollsPaise + parkingPaise + nightSurgePaise + careSurchargePaise
+	nonTollFarePaise := baseFarePaise + distanceChargePaise + waitChargePaise + overtimeChargePaise + nightSurgePaise + careSurchargePaise
+	totalFarePaise := nonTollFarePaise + tollsPaise + parkingPaise
+
+	// Driver's net payout for this trip: tiered commission applied to the non-toll fare,
+	// plus full toll/parking reimbursement. This is what the driver actually earns — the
+	// bill above (totalFarePaise) is what the rider pays.
+	takeRatePct := h.resolveDriverTakeRatePct(ctx, tx, driverID)
+	driverPayoutPaise := (nonTollFarePaise - (nonTollFarePaise*takeRatePct)/100) + tollsPaise + parkingPaise
+	if driverPayoutPaise < 0 {
+		driverPayoutPaise = 0
+	}
 
 	// 5. Run Odometer Variance Audit
 	var straightKm float64
@@ -417,6 +428,7 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 		NightSurgePaise:     nightSurgePaise,
 		CareSurchargePaise:  careSurchargePaise,
 		TotalFarePaise:      totalFarePaise,
+		DriverPayoutPaise:   driverPayoutPaise,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -582,9 +594,20 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// 2. Post double-entry financial ledger splits
-	platformCommissionPaise := (nonTollFarePaise * 20) / 100
-	driverEarningsPaise := nonTollFarePaise - platformCommissionPaise
+	// 2. Post double-entry financial ledger splits.
+	//
+	// Commission is applied only to the non-toll fare; tolls + parking are reimbursed to
+	// the driver in full (pass-through). This keeps the ledger balanced — the rider debit
+	// (totalFare) equals the driver credit (net share + tolls + parking) plus the platform
+	// commission credit. Previously tolls/parking were debited from the rider but credited
+	// to no account, so the double-entry did not balance and the driver was not reimbursed.
+	takeRatePct := h.resolveDriverTakeRatePct(ctx, tx, driverID)
+	platformCommissionPaise := (nonTollFarePaise * takeRatePct) / 100
+	netDriverSharePaise := nonTollFarePaise - platformCommissionPaise
+	driverEarningsPaise := netDriverSharePaise + tollsPaise + parkingPaise
+	if driverEarningsPaise < 0 {
+		driverEarningsPaise = 0
+	}
 
 	ledgerInsertQuery := `
 		INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
@@ -599,8 +622,9 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Leg B: Net Driver Share Credit
-	_, err = tx.Exec(ctx, ledgerInsertQuery, orderID, cityPrefix, "DRIVER_EARNINGS", "CREDIT", driverEarningsPaise, "Driver partner transaction payout share allocation (80% of fare splits)")
+	// Leg B: Net Driver Share Credit (fare share + full toll/parking reimbursement)
+	_, err = tx.Exec(ctx, ledgerInsertQuery, orderID, cityPrefix, "DRIVER_EARNINGS", "CREDIT", driverEarningsPaise,
+		fmt.Sprintf("Driver payout: %d%% fare share + toll/parking reimbursement", 100-takeRatePct))
 	if err != nil {
 		log.Printf("[CONFIRM_PAYMENT] Leg B failed: %v", err)
 		http.Error(w, "ledger_write_failed", http.StatusInternalServerError)
@@ -608,7 +632,8 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 	}
 
 	// Leg C: Corporate Commission Take-Rate Credit
-	_, err = tx.Exec(ctx, ledgerInsertQuery, orderID, cityPrefix, "PLATFORM_COMMISSION", "CREDIT", platformCommissionPaise, "Platform take-rate corporate matches commission fee (20%)")
+	_, err = tx.Exec(ctx, ledgerInsertQuery, orderID, cityPrefix, "PLATFORM_COMMISSION", "CREDIT", platformCommissionPaise,
+		fmt.Sprintf("Platform take-rate commission (%d%% of non-toll fare)", takeRatePct))
 	if err != nil {
 		log.Printf("[CONFIRM_PAYMENT] Leg C failed: %v", err)
 		http.Error(w, "ledger_write_failed", http.StatusInternalServerError)
@@ -634,7 +659,33 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 	_ = h.clusterClient.Set(ctx, idempotencyKey, "SUCCESS", 24*time.Hour)
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "Payment confirmed and financial ledger splits posted",
+		"success":                   true,
+		"message":                   "Payment confirmed and financial ledger splits posted",
+		"driver_payout_paise":       driverEarningsPaise,
+		"platform_commission_paise": platformCommissionPaise,
+		"total_fare_paise":          totalFarePaise,
 	})
+}
+
+// resolveDriverTakeRatePct returns the platform take-rate percent for a driver based on
+// their completed-trip tier (more trips -> lower take rate), matching the default tiered
+// commission model (0-15: 20%, 16-50: 15%, 51+: 12%). It replaces the previous flat 20%.
+// NOTE: admin-customized per-city/car-type commission tiers are not yet honoured here —
+// orders carry no car_type to resolve the pricing:commission:<city>:<carType> config.
+func (h *GatewayHandler) resolveDriverTakeRatePct(ctx context.Context, tx pgx.Tx, driverID string) int64 {
+	var completed int64
+	err := tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM orders WHERE assigned_driver_id = $1::uuid AND status = 'COMPLETED'::order_status_enum`,
+		driverID).Scan(&completed)
+	if err != nil {
+		return 20 // safe default on lookup failure
+	}
+	switch {
+	case completed <= 15:
+		return 20
+	case completed <= 50:
+		return 15
+	default:
+		return 12
+	}
 }

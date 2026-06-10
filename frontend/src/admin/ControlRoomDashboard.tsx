@@ -69,6 +69,9 @@ export const ControlRoomDashboard: React.FC = () => {
   const sosCirclesRef = useRef<google.maps.Circle[]>([]);
 
   const adminRole = localStorage.getItem('admin_role') ?? 'ADMIN';
+  // Post-cookie-migration the JWT is no longer in localStorage; effects gate on the session
+  // (admin_role, set by /session) instead of a token. Requests authenticate via the cookie.
+  const isAuthed = !!localStorage.getItem('admin_role');
   const adminToken = localStorage.getItem('admin_jwt_token') ?? '';
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -77,6 +80,10 @@ export const ControlRoomDashboard: React.FC = () => {
   // Buffers the latest heatmap frame between throttled flushes — see SSE effect.
   const pendingHeatmapRef = useRef<Record<string, number> | null>(null);
   const [isMapSdkLoaded, setIsMapSdkLoaded] = useState<boolean>(false);
+  const [fleetKpis, setFleetKpis] = useState<{ online: number; total: number; trips: number; revenue: number } | null>(null);
+  // Live-heatmap connection health. When the SSE drops, the map keeps its last frame —
+  // surface that explicitly so an operator never mistakes stale supply density for live.
+  const [heatmapLive, setHeatmapLive] = useState<boolean>(true);
 
   const [bottomTab, setBottomTab] = useState<'orders' | 'drivers' | 'vehicles' | 'incidents' | 'ledger' | 'orchestrator'>('orders');
 
@@ -104,16 +111,19 @@ export const ControlRoomDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!adminToken) return;
+    if (!isAuthed) return;
 
     let eventSource: EventSource | null = null;
     let flushTimer: ReturnType<typeof setInterval> | null = null;
     if (adminRole === 'SUPER_ADMIN' || adminRole === 'FLEET_MANAGER') {
       eventSource = new EventSource(`${ANALYTICS_SSE_BASE_URL}/api/v1/analytics/heatmap`);
 
+      eventSource.onopen = () => setHeatmapLive(true);
+
       // Stream packets only update a ref; the map repaints on a fixed cadence so
       // a high-frequency feed cannot thrash polygon re-rendering or the DOM.
       eventSource.onmessage = (event: MessageEvent) => {
+        setHeatmapLive(true);
         try {
           const payload = JSON.parse(event.data as string);
           if (payload.cell_data) {
@@ -123,6 +133,9 @@ export const ControlRoomDashboard: React.FC = () => {
           console.error('Failed processing heatmap stream packet:', err);
         }
       };
+
+      // EventSource auto-reconnects, but until it does the rendered density is stale.
+      eventSource.onerror = () => setHeatmapLive(false);
 
       flushTimer = setInterval(() => {
         if (pendingHeatmapRef.current) {
@@ -148,7 +161,7 @@ export const ControlRoomDashboard: React.FC = () => {
 
   useEffect(() => {
     if (adminRole === 'FINANCIAL_AUDITOR') return;
-    if (!isMapSdkLoaded || !mapContainerRef.current || mapInstanceRef.current || !adminToken) return;
+    if (!isMapSdkLoaded || !mapContainerRef.current || mapInstanceRef.current || !isAuthed) return;
     if (typeof google === 'undefined' || !google?.maps) return;
 
     // Minimalist light map — black/white/grayscale only, no accent leakage
@@ -172,7 +185,7 @@ export const ControlRoomDashboard: React.FC = () => {
 
   // Poll active SOS alerts every 5 seconds
   useEffect(() => {
-    if (!adminToken) return;
+    if (!isAuthed) return;
 
     const fetchActiveSOS = async () => {
       try {
@@ -192,6 +205,33 @@ export const ControlRoomDashboard: React.FC = () => {
     const interval = setInterval(fetchActiveSOS, 5000);
     return () => clearInterval(interval);
   }, [adminToken]);
+
+  // Live fleet KPIs for the sidebar (previously hardcoded literals).
+  useEffect(() => {
+    if (!isAuthed) return;
+    let active = true;
+    const loadKpis = () => {
+      fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/dashboard/kpis?range=today`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && active) {
+            setFleetKpis({
+              online: d.online_drivers ?? 0,
+              total: d.total_drivers ?? 0,
+              trips: d.total_trips ?? 0,
+              revenue: d.gross_revenue ?? 0,
+            });
+          }
+        })
+        .catch(() => {});
+    };
+    loadKpis();
+    const interval = setInterval(loadKpis, 30000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isAuthed]);
 
   // Manage map markers & pulsing circles for active SOS alerts
   useEffect(() => {
@@ -377,18 +417,20 @@ export const ControlRoomDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 gap-3">
                   <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
                     <div className="text-xs font-medium text-body mb-1">Fleet online</div>
-                    <div className="text-2xl font-bold text-ink">47 / 60</div>
-                    <div className="text-xs text-mute mt-1 font-mono">78% utilization</div>
+                    <div className="text-2xl font-bold text-ink">{fleetKpis ? `${fleetKpis.online} / ${fleetKpis.total}` : '—'}</div>
+                    <div className="text-xs text-mute mt-1 font-mono">
+                      {fleetKpis && fleetKpis.total > 0 ? `${Math.round((fleetKpis.online / fleetKpis.total) * 100)}% utilization` : '—'}
+                    </div>
                   </div>
                   <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
                     <div className="text-xs font-medium text-body mb-1">Orders today</div>
-                    <div className="text-2xl font-bold text-ink">312</div>
-                    <div className="text-xs text-mute mt-1 font-mono">+12 this hour</div>
+                    <div className="text-2xl font-bold text-ink">{fleetKpis ? fleetKpis.trips.toLocaleString('en-IN') : '—'}</div>
+                    <div className="text-xs text-mute mt-1 font-mono">Today</div>
                   </div>
                   <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
                     <div className="text-xs font-medium text-body mb-1">Revenue today</div>
-                    <div className="text-2xl font-bold text-ink">$4,240</div>
-                    <div className="text-xs text-mute mt-1 font-mono">+$340 vs 2pm</div>
+                    <div className="text-2xl font-bold text-ink">{fleetKpis ? `₹${fleetKpis.revenue.toLocaleString('en-IN')}` : '—'}</div>
+                    <div className="text-xs text-mute mt-1 font-mono">Today</div>
                   </div>
                 </div>
 
@@ -410,6 +452,12 @@ export const ControlRoomDashboard: React.FC = () => {
 
         {/* MAP */}
         <main className="flex-1 relative bg-canvas-soft overflow-hidden">
+          {canFleet && !heatmapLive && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-black px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+              <span className="animate-pulse">●</span>
+              Live heatmap disconnected — supply density may be stale
+            </div>
+          )}
           {canFleet ? (
             <div ref={mapContainerRef} className="w-full h-full">
               {!isMapSdkLoaded && (

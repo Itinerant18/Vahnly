@@ -133,6 +133,7 @@ func main() {
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverTripHandler := driverHttp.NewDriverTripHandler(dbPool, redisClusterClient)
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
+	driverFeaturesHandler := gatewayHttp.NewDriverFeaturesHandler(dbPool)
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
 	offlineSyncHandler := gatewayHttp.NewOfflineSyncHandler(dbPool)
 	tripAuditHandler := gatewayHttp.NewTripAuditHandler(dbPool)
@@ -368,6 +369,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/callback", adminAuthHandler.HandleSSOGoogleCallback)
+	// Session introspection (cookie- or bearer-authenticated) + cookie-clearing logout.
+	mux.HandleFunc("GET /api/v1/admin/auth/session", authGuard.AuthenticateJWT(adminAuthHandler.HandleAuthSession))
+	mux.HandleFunc("POST /api/v1/admin/auth/logout", adminAuthHandler.HandleAuthLogout)
 
 	// Driver App & Onboarding routes
 	mux.HandleFunc("POST /api/v1/driver/login", driverAuthHandler.HandleDriverLogin)
@@ -431,6 +435,13 @@ func main() {
 	mux.HandleFunc("GET /api/v1/driver-account/earnings", authGuard.AuthenticateJWT(driverAccountHandler.GetEarningsSummary))
 	mux.HandleFunc("POST /api/v1/driver-account/payouts/withdraw", authGuard.AuthenticateJWT(driverAccountHandler.TriggerInstantPayout))
 	mux.HandleFunc("GET /api/v1/driver-account/notifications", authGuard.AuthenticateJWT(driverAccountHandler.GetNotifications))
+	// FEAT-002 driver-account features (vehicles / wallet / training).
+	mux.HandleFunc("GET /api/v1/driver-account/vehicles", authGuard.AuthenticateJWT(driverFeaturesHandler.ListVehicles))
+	mux.HandleFunc("POST /api/v1/driver-account/vehicles", authGuard.AuthenticateJWT(driverFeaturesHandler.AddVehicle))
+	mux.HandleFunc("DELETE /api/v1/driver-account/vehicles/{id}", authGuard.AuthenticateJWT(driverFeaturesHandler.DeleteVehicle))
+	mux.HandleFunc("GET /api/v1/driver-account/wallet", authGuard.AuthenticateJWT(driverFeaturesHandler.GetWallet))
+	mux.HandleFunc("GET /api/v1/driver-account/training", authGuard.AuthenticateJWT(driverFeaturesHandler.ListTraining))
+	mux.HandleFunc("POST /api/v1/driver-account/training/{id}/submit", authGuard.AuthenticateJWT(driverFeaturesHandler.SubmitTrainingQuiz))
 
 	// Driver odometer ingestion endpoint (Phase 2: The Odometer Writer)
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))
@@ -540,6 +551,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/retry", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleRetryPayout))
 	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/hold", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleHoldPayout))
 	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/release", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleReleasePayout))
+	mux.HandleFunc("POST /api/v1/admin/finance/payouts/{id}/settle", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, payoutHandler.HandleSettlePayout))
 
 	// Support & Ticket control endpoints
 	supportRoles := []string{"SUPER_ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD", "SAFETY", "FINANCE"}

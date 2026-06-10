@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { adminRoutes, navItems, navGroups } from './adminRoutes';
+import { API_GATEWAY_BASE_URL } from '../config';
 import { AdminAuthGateway } from './components/AdminAuthGateway';
 import { SsoCallback } from './components/SsoCallback';
 import {
@@ -45,8 +46,9 @@ const quickActions = [
 const cityOptions = ['KOL', 'DEL', 'MUM', 'BLR', 'CHN', 'HYD'];
 
 export const AdminShell: React.FC = () => {
-  const [adminToken, setAdminToken] = useState(localStorage.getItem('admin_jwt_token') ?? '');
-  const [adminRole] = useState(localStorage.getItem('admin_role') ?? 'ADMIN');
+  // Auth is gated on the server session (HttpOnly cookie), not a JS-readable token.
+  const [sessionState, setSessionState] = useState<'LOADING' | 'AUTHED' | 'ANON'>('LOADING');
+  const [adminRole, setAdminRole] = useState<string>(localStorage.getItem('admin_role') ?? 'ADMIN');
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,14 +79,53 @@ export const AdminShell: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleLoginSuccess = useCallback((token: string) => {
-    setAdminToken(token);
+  // Verify the session against the server (cookie-authenticated) and read the role.
+  const checkSession = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/session`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated) {
+          const role = data.role || 'ADMIN';
+          setAdminRole(role);
+          localStorage.setItem('admin_role', role); // non-sensitive; drives nav/RBAC gating
+          setSessionState('AUTHED');
+        } else {
+          // 2FA enrolment pending — not permitted into the dashboard.
+          setSessionState('ANON');
+        }
+      } else {
+        setSessionState('ANON');
+      }
+    } catch {
+      setSessionState('ANON');
+    }
   }, []);
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('admin_jwt_token');
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  const handleLoginSuccess = useCallback(() => {
+    // The server set the HttpOnly session cookie; re-verify to enter the dashboard.
+    setSessionState('LOADING');
+    checkSession();
+  }, [checkSession]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // ignore network errors; clearing local state below still logs the operator out
+    }
     localStorage.removeItem('admin_role');
-    setAdminToken('');
+    localStorage.removeItem('admin_jwt_token'); // purge any legacy token
+    setSessionState('ANON');
   }, []);
 
   const toggleCity = (city: string) => {
@@ -105,8 +146,16 @@ export const AdminShell: React.FC = () => {
     return <SsoCallback />;
   }
 
-  // Auth gate
-  if (!adminToken) {
+  if (sessionState === 'LOADING') {
+    return (
+      <div className="h-screen bg-canvas flex items-center justify-center">
+        <div className="text-sm text-mute animate-pulse">Verifying session…</div>
+      </div>
+    );
+  }
+
+  // Auth gate — no valid server session.
+  if (sessionState === 'ANON') {
     return <AdminAuthGateway onAuthSuccess={handleLoginSuccess} />;
   }
 

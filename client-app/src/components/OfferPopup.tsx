@@ -77,41 +77,51 @@ function SlideToAccept({ onAccept }: SlideToAcceptProps) {
 
 export function OfferPopup() {
   const { token, user } = useAuthStore();
-  const { currentOffer, status, acceptOffer, declineOffer } = useOfferStore();
+  const { currentOffer, status, offerExpiresAt, acceptOffer, declineOffer, reconcilePendingOffer } = useOfferStore();
   const [remaining, setRemaining] = useState(15);
   const [showDeclinePicker, setShowDeclinePicker] = useState(false);
   const expiredRef = useRef(false);
 
   const driverID = user?.id || 'drv-aniket-7602';
 
+  // On a fresh offer (incl. a remount after WS reconnect), reconcile against the server
+  // so a stale OFFER_PENDING left by a dropped connection is cleared, not hung.
   useEffect(() => {
     if (status === 'OFFER_PENDING') {
-      setRemaining(15);
       expiredRef.current = false;
       setShowDeclinePicker(false);
+      if (token) {
+        reconcilePendingOffer(token);
+      }
     }
-  }, [currentOffer?.orderId, status]);
+  }, [currentOffer?.orderId, status, token, reconcilePendingOffer]);
 
+  // Clock-based countdown: each tick derives the remaining time from the absolute expiry,
+  // so backgrounding the tab (which throttles timers) or a remount cannot stall the
+  // auto-decline — on resume the next tick sees time has elapsed and fires TIMEOUT.
   useEffect(() => {
     if (status !== 'OFFER_PENDING') return;
 
-    if (remaining <= 0) {
-      if (!expiredRef.current) {
+    const tick = () => {
+      const expiry = offerExpiresAt ?? Date.now() + 15000;
+      const secs = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
+      setRemaining(secs);
+      if (secs <= 0 && !expiredRef.current) {
         expiredRef.current = true;
         if (token) {
           declineOffer(token, driverID, 'TIMEOUT');
         }
       }
-      return;
-    }
+    };
 
-    const timer = window.setTimeout(() => setRemaining((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearTimeout(timer);
-  }, [remaining, status, token, declineOffer, driverID]);
+    tick();
+    const interval = window.setInterval(tick, 500);
+    return () => window.clearInterval(interval);
+  }, [status, offerExpiresAt, token, declineOffer, driverID]);
 
   if (status !== 'OFFER_PENDING' || !currentOffer) return null;
 
-  const progress = Math.max(0, remaining / 15);
+  const progress = Math.max(0, Math.min(1, remaining / 15));
   const ringStyle = {
     background: `conic-gradient(#ffffff ${progress * 360}deg, #27272a 0deg)`,
   };

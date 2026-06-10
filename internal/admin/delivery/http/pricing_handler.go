@@ -117,19 +117,23 @@ func (h *PricingAdminHandler) HandleEnforcePriceCap(w http.ResponseWriter, r *ht
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", req.CityPrefix, req.H3Cell)
+	// Write the cap to a DEDICATED freeze key, NOT the live surge:matrix key. The Kafka
+	// surge sync owns surge:matrix and would overwrite a freeze written there within
+	// ~60s. The fare engine reads this freeze key and applies min(live, cap), so the cap
+	// holds for its full admin-set duration and can only ever lower price, never raise it.
+	freezeKey := fmt.Sprintf("surge:freeze:%s:%s", req.CityPrefix, req.H3Cell)
 	multiplierValue := strconv.FormatFloat(req.MaxMultiplier, 'f', 4, 64)
 	overrideDuration := time.Duration(req.DurationMins) * time.Minute
 
-	err := h.clusterClient.Set(ctx, matrixKey, multiplierValue, overrideDuration).Err()
+	err := h.clusterClient.Set(ctx, freezeKey, multiplierValue, overrideDuration).Err()
 	if err != nil {
 		h.logger.Printf("[CLUSTER_LOCK_EXCEPTION] Failed to write emergency freeze to Redis node: %v", err)
 		http.Error(w, "cache_synchronization_failure", http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin overridden key %s set to %s for %d minutes", 
-		matrixKey, multiplierValue, req.DurationMins)
+	h.logger.Printf("[PRICE_VALVE_ACTIVATED] Admin freeze cap key %s set to %s for %d minutes",
+		freezeKey, multiplierValue, req.DurationMins)
 
 	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", "admin@platform.com", "PRICING_SURGE_FREEZE", 
 		fmt.Sprintf("Enforced emergency surge freeze multiplier cap %f on cell %s in city %s", req.MaxMultiplier, req.H3Cell, req.CityPrefix), getClientIP(r))

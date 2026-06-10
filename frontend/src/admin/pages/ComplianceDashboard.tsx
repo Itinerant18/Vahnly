@@ -90,6 +90,10 @@ export const ComplianceDashboard: React.FC = () => {
   };
 
   const doVerify = async (driverID: string, action: 'APPROVE' | 'REJECT', reason?: string) => {
+    // REJECT already goes through a required-reason flow; gate the one-click APPROVE.
+    if (action === 'APPROVE' && !window.confirm(`Approve KYC for driver ${driverID}? This activates them for live dispatch.`)) {
+      return;
+    }
     setActionMsg(null);
     try {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/verify`, {

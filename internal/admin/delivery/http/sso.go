@@ -153,6 +153,7 @@ func (h *AdminAuthHandler) HandleSSOGoogleCallback(w http.ResponseWriter, r *htt
 	claims := &middleware.CustomClaims{
 		UserID: dbUserID,
 		Role:   dbRole,
+		Email:  info.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -168,10 +169,10 @@ func (h *AdminAuthHandler) HandleSSOGoogleCallback(w http.ResponseWriter, r *htt
 
 	h.recordAuditLog(ctx, dbUserID, info.Email, "SSO_LOGIN_SUCCESS", "Google Workspace SSO authenticated", ip)
 
-	// Hand the token to the SPA via a fragment so it never lands in server logs.
-	redirect := fmt.Sprintf("%s/admin/sso-callback#token=%s&role=%s",
-		frontendURL(), url.QueryEscape(tokenString), url.QueryEscape(dbRole))
-	http.Redirect(w, r, redirect, http.StatusFound)
+	// Set the session as an HttpOnly cookie and redirect to a clean URL. The token is no
+	// longer placed in the URL fragment — that left it in browser history (CRIT-005).
+	middleware.SetSessionCookie(w, tokenString)
+	http.Redirect(w, r, frontendURL()+"/admin", http.StatusFound)
 }
 
 func exchangeGoogleCode(ctx context.Context, clientID, clientSecret, redirectURL, code string) (*googleUserInfo, error) {

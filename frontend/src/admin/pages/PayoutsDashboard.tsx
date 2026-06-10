@@ -106,6 +106,12 @@ export const PayoutsDashboard: React.FC = () => {
 
 	const handleBulkApprove = async () => {
 		if (selectedIds.length === 0) return;
+		if (!window.confirm(
+			`Approve ${selectedIds.length} payout${selectedIds.length === 1 ? '' : 's'}?\n\n` +
+			`This releases real-money payouts to drivers. Ineligible ones (KYC/bank/hold) are skipped.`
+		)) {
+			return;
+		}
 		setBulkProcessing(true);
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/bulk-approve`, {
@@ -184,6 +190,11 @@ export const PayoutsDashboard: React.FC = () => {
 	};
 
 	const handleRelease = async (id: string) => {
+		if (!window.confirm(
+			`Release the hold on payout ${id}?\n\nThis returns a fraud/dispute-flagged payout to the payable queue.`
+		)) {
+			return;
+		}
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/${id}/release`, {
 				method: 'POST',

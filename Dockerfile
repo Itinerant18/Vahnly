@@ -12,6 +12,9 @@ RUN go mod download
 # Copy the remaining project workspace source paths
 COPY . .
 
+# Create directory for local upload fallback and set ownership to unprivileged user
+RUN mkdir -p /app/public/uploads && chown -R 10001:10001 /app/public/uploads
+
 # Accept a build-time argument specifying which target microservice binary to compile
 ARG TARGET_SERVICE
 
@@ -35,6 +38,9 @@ COPY --from=builder /app/database /database
 
 # Import the compiled static artifact cleanly
 COPY --from=builder /app/service_binary /entrypoint
+
+# Copy the uploads directory with correct unprivileged ownership
+COPY --from=builder --chown=10001:10001 /app/public/uploads /public/uploads
 
 # Run as an unprivileged secure user boundary (UID 10001) instead of root
 USER 10001:10001
