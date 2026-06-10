@@ -65,12 +65,12 @@ func (h *CMSHandler) HandleGetPages(w http.ResponseWriter, r *http.Request) {
 	if pageType != "" {
 		query += fmt.Sprintf(" AND page_type = $%d", idx)
 		args = append(args, pageType)
-		idx++
+		_ = idx
 	}
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", idx)
 		args = append(args, status)
-		idx++
+		_ = idx
 	}
 	query += " ORDER BY page_type, title"
 
@@ -341,14 +341,14 @@ func (h *CMSHandler) HandleGetI18NStrings(w http.ResponseWriter, r *http.Request
 	var args []interface{}
 	idx := 1
 	if ns != "" {
-		query += fmt.Sprintf(" AND namespace = $%d", idx); args = append(args, ns); idx++
+		query += fmt.Sprintf(" AND namespace = $%d", idx); args = append(args, ns); _ = idx
 	}
 	if lang != "" {
-		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); idx++
+		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); _ = idx
 	}
 	if search != "" {
 		query += fmt.Sprintf(" AND (key_name ILIKE $%d OR value ILIKE $%d)", idx, idx)
-		args = append(args, "%"+search+"%"); idx++
+		args = append(args, "%"+search+"%"); _ = idx
 	}
 
 	var total int64
@@ -446,10 +446,10 @@ func (h *CMSHandler) HandleGetAssets(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 	idx := 1
 	if assetType != "" {
-		query += fmt.Sprintf(" AND asset_type = $%d", idx); args = append(args, assetType); idx++
+		query += fmt.Sprintf(" AND asset_type = $%d", idx); args = append(args, assetType); _ = idx
 	}
 	if platform != "" {
-		query += fmt.Sprintf(" AND platform = $%d", idx); args = append(args, platform); idx++
+		query += fmt.Sprintf(" AND platform = $%d", idx); args = append(args, platform); _ = idx
 	}
 	query += " ORDER BY asset_type, display_order"
 

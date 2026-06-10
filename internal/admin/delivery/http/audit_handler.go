@@ -61,7 +61,7 @@ func (h *AuditHandler) HandleGetAuditLogs(w http.ResponseWriter, r *http.Request
 		if val != "" {
 			base += fmt.Sprintf(" AND %s ILIKE $%d", col, idx)
 			args = append(args, "%"+val+"%")
-			idx++
+
 		}
 	}
 	addFilter("admin_email", q.Get("admin_email"))
@@ -72,7 +72,7 @@ func (h *AuditHandler) HandleGetAuditLogs(w http.ResponseWriter, r *http.Request
 	if v := q.Get("entity_id"); v != "" {
 		base += fmt.Sprintf(" AND entity_id = $%d", idx)
 		args = append(args, v)
-		idx++
+
 	}
 
 	var total int64
@@ -175,10 +175,10 @@ func (h *AuditHandler) HandleExportAuditCSV(w http.ResponseWriter, r *http.Reque
 	args := []interface{}{from, to}
 	idx := 3
 	if v := q.Get("module"); v != "" {
-		base += fmt.Sprintf(" AND module = $%d", idx); args = append(args, v); idx++
+		base += fmt.Sprintf(" AND module = $%d", idx); args = append(args, v);
 	}
 	if v := q.Get("admin_email"); v != "" {
-		base += fmt.Sprintf(" AND admin_email ILIKE $%d", idx); args = append(args, "%"+v+"%"); idx++
+		base += fmt.Sprintf(" AND admin_email ILIKE $%d", idx); args = append(args, "%"+v+"%");
 	}
 
 	query := `SELECT id::TEXT, admin_email, admin_role, action, module, entity_type, entity_id, ip_address, created_at ` +

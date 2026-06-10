@@ -82,42 +82,42 @@ func (h *FinanceHandler) HandleGetTransactions(w http.ResponseWriter, r *http.Re
 	if gateway != "" {
 		query += fmt.Sprintf(" AND gateway = $%d", argIdx)
 		args = append(args, strings.ToUpper(gateway))
-		argIdx++
+		_ = argIdx
 	}
 	if method != "" {
 		query += fmt.Sprintf(" AND method = $%d", argIdx)
 		args = append(args, strings.ToUpper(method))
-		argIdx++
+		_ = argIdx
 	}
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 	if txnType != "" {
 		query += fmt.Sprintf(" AND txn_type = $%d", argIdx)
 		args = append(args, strings.ToUpper(txnType))
-		argIdx++
+		_ = argIdx
 	}
 	if userType != "" {
 		query += fmt.Sprintf(" AND user_type = $%d", argIdx)
 		args = append(args, strings.ToUpper(userType))
-		argIdx++
+		_ = argIdx
 	}
 	if search != "" {
 		query += fmt.Sprintf(" AND (id ILIKE $%d OR order_id::text ILIKE $%d OR user_id::text ILIKE $%d)", argIdx, argIdx, argIdx)
 		args = append(args, "%"+search+"%")
-		argIdx++
+		_ = argIdx
 	}
 	if amountMin > 0 {
 		query += fmt.Sprintf(" AND amount_paise >= $%d", argIdx)
 		args = append(args, amountMin)
-		argIdx++
+		_ = argIdx
 	}
 	if amountMax > 0 {
 		query += fmt.Sprintf(" AND amount_paise <= $%d", argIdx)
 		args = append(args, amountMax)
-		argIdx++
+		_ = argIdx
 	}
 
 	// Fetch total count before pagination
@@ -256,7 +256,7 @@ func (h *FinanceHandler) HandleGetRefunds(w http.ResponseWriter, r *http.Request
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	var total int64
@@ -311,7 +311,7 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
-		adminEmail = "admin@example.com"
+		_ = "admin@example.com"
 	}
 
 	var req struct {
@@ -442,7 +442,7 @@ func (h *FinanceHandler) HandleApproveRefund(w http.ResponseWriter, r *http.Requ
 
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
-		adminEmail = "admin@example.com"
+		_ = "admin@example.com"
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -514,7 +514,7 @@ func (h *FinanceHandler) HandleRejectRefund(w http.ResponseWriter, r *http.Reque
 
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
-		adminEmail = "admin@example.com"
+		_ = "admin@example.com"
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
@@ -566,7 +566,7 @@ func (h *FinanceHandler) executeRefundSettlement(ctx context.Context, tx pgx.Tx,
 	descCredit := fmt.Sprintf("Refund processed via card/UPI gateway (settlement outflow) for refund %s", refundID)
 	descDebit := fmt.Sprintf("Refund amount debited from Rider payment receivable for refund %s", refundID)
 
-	var ordIDVal interface{} = nil
+	var ordIDVal interface{}
 	if orderID.Valid {
 		ordIDVal = orderID.String
 	} else {
@@ -649,22 +649,22 @@ func (h *FinanceHandler) HandleGetWallets(w http.ResponseWriter, r *http.Request
 	if userType != "" {
 		query += fmt.Sprintf(" AND user_type = $%d", argIdx)
 		args = append(args, strings.ToUpper(userType))
-		argIdx++
+		_ = argIdx
 	}
 	if search != "" {
 		query += fmt.Sprintf(" AND user_id::text ILIKE $%d", argIdx)
 		args = append(args, "%"+search+"%")
-		argIdx++
+		_ = argIdx
 	}
 	if balanceMin > 0 {
 		query += fmt.Sprintf(" AND balance_paise >= $%d", argIdx)
 		args = append(args, balanceMin)
-		argIdx++
+		_ = argIdx
 	}
 	if balanceMax > 0 {
 		query += fmt.Sprintf(" AND balance_paise <= $%d", argIdx)
 		args = append(args, balanceMax)
-		argIdx++
+		_ = argIdx
 	}
 
 	var total int64
@@ -920,12 +920,12 @@ func (h *FinanceHandler) HandleGetInvoices(w http.ResponseWriter, r *http.Reques
 	if invoiceType != "" {
 		query += fmt.Sprintf(" AND invoice_type = $%d", argIdx)
 		args = append(args, strings.ToUpper(invoiceType))
-		argIdx++
+		_ = argIdx
 	}
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	var total int64
@@ -1007,12 +1007,12 @@ func (h *FinanceHandler) HandleExportInvoices(w http.ResponseWriter, r *http.Req
 	if invoiceType != "" {
 		query += fmt.Sprintf(" AND invoice_type = $%d", argIdx)
 		args = append(args, strings.ToUpper(invoiceType))
-		argIdx++
+		_ = argIdx
 	}
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -1177,7 +1177,7 @@ func (h *FinanceHandler) HandlePostDailyClose(w http.ResponseWriter, r *http.Req
 
 	adminEmail := r.Header.Get("X-Admin-Email")
 	if adminEmail == "" {
-		adminEmail = "admin@example.com"
+		_ = "admin@example.com"
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)

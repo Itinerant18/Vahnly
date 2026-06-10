@@ -164,7 +164,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		h.recordAuditLog(ctx, dbUserID, req.Email, "LOGIN_FAILURE", "Attempt during lockout cooldown", ip)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusLocked)
-		json.NewEncoder(w).Encode(AuthResponse{
+		_ = json.NewEncoder(w).Encode(AuthResponse{
 			Message: fmt.Sprintf("Account locked due to consecutive failures. Try again after %v.", dbLockedUntil.Format(time.RFC3339)),
 		})
 		return
@@ -190,7 +190,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	isSSOLogin := req.SSOProvider != ""
 	if isSSOLogin {
 		// SSO Authentication
-		if strings.ToUpper(dbSSOProvider) != strings.ToUpper(req.SSOProvider) || dbSSOID != req.SSOID {
+		if !strings.EqualFold(dbSSOProvider, req.SSOProvider) || dbSSOID != req.SSOID {
 			// If SSO info is not linked yet, but request claims SSO, we link it for demo/testing or reject. Let's register SSO details on first match.
 			if dbSSOProvider == "" {
 				_, _ = h.dbPool.Exec(ctx, "UPDATE system_admins SET sso_provider = $1, sso_id = $2 WHERE id = $3", req.SSOProvider, req.SSOID, dbUserID)
@@ -254,7 +254,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		}
 		h.recordAuditLog(ctx, dbUserID, req.Email, "2FA_ENROLMENT_REQUIRED", "Login issued enrolment-scoped token (no TOTP secret on file)", ip)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(AuthResponse{
+		_ = json.NewEncoder(w).Encode(AuthResponse{
 			Token:       enrolToken,
 			ExpiresAt:   enrolExp,
 			Role:        dbRole,
@@ -270,7 +270,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 		if req.TwoFactorCode == "" {
 			// Signal to frontend that MFA verification layer is required
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(AuthResponse{
+			_ = json.NewEncoder(w).Encode(AuthResponse{
 				MFARequired: true,
 				Email:       req.Email,
 				Message:     "Mandatory 2FA code verification is required.",
@@ -316,7 +316,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	h.recordAuditLog(ctx, dbUserID, req.Email, "LOGIN_SUCCESS", fmt.Sprintf("Authentication completed. Role: %s, Scope: %s", dbRole, dbCityScope), ip)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(AuthResponse{
+	_ = json.NewEncoder(w).Encode(AuthResponse{
 		Token:     tokenString,
 		ExpiresAt: expirationTime,
 		Role:      dbRole,

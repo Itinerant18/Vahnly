@@ -117,7 +117,7 @@ func (h *SafetyHandler) HandleGetSOSAlerts(w http.ResponseWriter, r *http.Reques
 	if status != "" {
 		query += fmt.Sprintf(" AND s.status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	query += " ORDER BY s.created_at DESC"
@@ -359,12 +359,12 @@ func (h *SafetyHandler) HandleGetIncidents(w http.ResponseWriter, r *http.Reques
 	if category != "" {
 		query += fmt.Sprintf(" AND i.category = $%d", argIdx)
 		args = append(args, strings.ToUpper(category))
-		argIdx++
+		_ = argIdx
 	}
 	if status != "" {
 		query += fmt.Sprintf(" AND i.status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	query += " ORDER BY i.created_at DESC"
@@ -685,7 +685,7 @@ func (h *SafetyHandler) HandleGetAnomalies(w http.ResponseWriter, r *http.Reques
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
+		_ = argIdx
 	}
 
 	query += " ORDER BY created_at DESC"
