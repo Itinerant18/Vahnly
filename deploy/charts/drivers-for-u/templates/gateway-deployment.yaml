@@ -33,9 +33,9 @@ spec:
                   name: {{ include "drivers-for-u.name" . }}-db-credentials
                   key: database-url
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
             - name: JWT_SECRET_SIGNING_KEY
               valueFrom:
                 secretKeyRef:

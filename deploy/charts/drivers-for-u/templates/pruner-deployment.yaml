@@ -26,6 +26,6 @@ spec:
                   name: {{ include "drivers-for-u.name" . }}-db-credentials
                   key: database-url
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
           resources:
             {{- toYaml .Values.pruner.resources | nindent 12 }}

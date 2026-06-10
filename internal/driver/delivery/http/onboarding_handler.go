@@ -121,7 +121,7 @@ func (h *OnboardingHandler) HandleSaveStep(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Transaction initiation failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Merge onboarding data JSONB and update onboarding step
 	var query string

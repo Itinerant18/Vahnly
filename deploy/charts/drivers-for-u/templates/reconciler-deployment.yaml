@@ -28,7 +28,7 @@ spec:
                   name: {{ include "drivers-for-u.name" . }}-db-credentials
                   key: database-url
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: RECONCILER_METRICS_PORT

@@ -24,9 +24,9 @@ spec:
             - name: TARGET_SERVICE
               value: "ingestion"
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
           ports:
             - containerPort: 50051
               name: grpc

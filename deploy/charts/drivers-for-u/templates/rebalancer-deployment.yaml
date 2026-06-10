@@ -23,7 +23,7 @@ spec:
             - name: TARGET_SERVICE
               value: "rebalancer"
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
             - name: CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: REBALANCER_HTTP_ADDR

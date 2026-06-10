@@ -23,7 +23,7 @@ spec:
             - name: TARGET_SERVICE
               value: "analytics"
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: ANALYTICS_PORT

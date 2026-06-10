@@ -21,9 +21,9 @@ spec:
           command: ["/entrypoint"]
           env:
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
             - name: SURGE_CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: SURGE_TRACKED_CELLS

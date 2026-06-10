@@ -94,7 +94,7 @@ func (h *ConfigHandler) HandleUpsertSettings(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "tx_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, s := range req.Settings {
 		_, _ = tx.Exec(ctx,
@@ -278,7 +278,7 @@ func (h *ConfigHandler) HandleCreateAppVersion(w http.ResponseWriter, r *http.Re
 		http.Error(w, "tx_init_failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if req.IsLatest {
 		_, _ = tx.Exec(ctx, `UPDATE app_versions SET is_latest = false WHERE platform = $1`, req.Platform)
@@ -316,7 +316,7 @@ func (h *ConfigHandler) HandleSetLatestVersion(w http.ResponseWriter, r *http.Re
 	defer cancel()
 
 	tx, _ := h.dbPool.Begin(ctx)
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var platform string
 	_ = tx.QueryRow(ctx, `SELECT platform FROM app_versions WHERE id = $1`, id).Scan(&platform)
@@ -418,16 +418,16 @@ func (h *ConfigHandler) HandleUpdateIntegration(w http.ResponseWriter, r *http.R
 	args := []interface{}{key, adminEmail}
 	idx := 3
 	if req.IsEnabled != nil {
-		query += fmt.Sprintf(", is_enabled = $%d", idx); args = append(args, *req.IsEnabled); idx++
+		query += fmt.Sprintf(", is_enabled = $%d", idx); args = append(args, *req.IsEnabled); _ = idx
 	}
 	if masked != "" {
-		query += fmt.Sprintf(", api_key_masked = $%d", idx); args = append(args, masked); idx++
+		query += fmt.Sprintf(", api_key_masked = $%d", idx); args = append(args, masked); _ = idx
 	}
 	if req.WebhookURL != "" {
-		query += fmt.Sprintf(", webhook_url = $%d", idx); args = append(args, req.WebhookURL); idx++
+		query += fmt.Sprintf(", webhook_url = $%d", idx); args = append(args, req.WebhookURL); _ = idx
 	}
 	if req.ConfigJSON != "" {
-		query += fmt.Sprintf(", config_json = $%d::JSONB", idx); args = append(args, req.ConfigJSON); idx++
+		query += fmt.Sprintf(", config_json = $%d::JSONB", idx); args = append(args, req.ConfigJSON); _ = idx
 	}
 	query += " WHERE integration_key = $1"
 	_, _ = h.dbPool.Exec(ctx, query, args...)
@@ -498,10 +498,10 @@ func (h *ConfigHandler) HandleGetTemplates(w http.ResponseWriter, r *http.Reques
 	var args []interface{}
 	idx := 1
 	if channel != "" {
-		query += fmt.Sprintf(" AND channel = $%d", idx); args = append(args, strings.ToUpper(channel)); idx++
+		query += fmt.Sprintf(" AND channel = $%d", idx); args = append(args, strings.ToUpper(channel)); _ = idx
 	}
 	if lang != "" {
-		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); idx++
+		query += fmt.Sprintf(" AND language_code = $%d", idx); args = append(args, lang); _ = idx
 	}
 	query += " ORDER BY channel, name"
 

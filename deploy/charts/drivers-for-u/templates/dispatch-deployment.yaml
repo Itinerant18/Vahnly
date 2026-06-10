@@ -28,11 +28,11 @@ spec:
                   name: {{ include "drivers-for-u.name" . }}-db-credentials
                   key: database-url
             - name: KAFKA_BROKERS
-              value: {{ .Values.global.env.kafkaBrokers | quote }}
+              value: {{ .Values.networkPolicy.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
-              value: {{ .Values.global.env.redisClusterNodes | quote }}
+              value: {{ .Values.networkPolicy.env.redisClusterNodes | quote }}
             - name: TRITON_SERVER_URL
-              value: {{ .Values.global.env.tritonServerUrl | quote }}
+              value: {{ .Values.networkPolicy.env.tritonServerUrl | quote }}
             - name: ALGORITHM_STRATEGY
               value: {{ .Values.dispatch.algorithmStrategy | quote }}
           ports:
