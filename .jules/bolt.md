@@ -1,0 +1,3 @@
+## 2024-06-10 - React.memo on MapInterpolated Component
+**Learning:** Found an un-memoized highly updated component `MapInterpolated` in the client-app codebase that handles complex canvas rendering and receives frequent driver position updates. Without memoization, its parent component's re-renders can trigger expensive re-evaluations here, even if the props are unchanged.
+**Action:** Adding `React.memo` to `MapInterpolated` to prevent unnecessary re-renders when parent states change but props remain the same, which is a key performance optimization in React applications dealing with fast-updating real-time data.

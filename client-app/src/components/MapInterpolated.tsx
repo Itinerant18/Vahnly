@@ -38,7 +38,16 @@ interface InterpolatedState {
   bearing: number;
 }
 
-export default function MapInterpolated({
+/**
+ * ⚡ Bolt Performance Optimization
+ * 💡 What: Wrapped MapInterpolated component in React.memo()
+ * 🎯 Why: This component renders a heavy 60fps <canvas> loop. The parent component (driver/page)
+ *         has multiple high-frequency state updates (like waitTimer, mapGlideProgress, and UI states).
+ *         Without memoization, every parent state change forces React to re-evaluate this complex component.
+ * 📊 Impact: Prevents unnecessary React render cycles for the canvas component when parent states update
+ *            but map props remain unchanged, saving main thread execution time.
+ */
+const MapInterpolated = React.memo(function MapInterpolated({
   drivers,
   h3Hexagons = [],
   pickup = null,
@@ -58,6 +67,7 @@ export default function MapInterpolated({
   // Update center when prop changes
   useEffect(() => {
     setMapCenter(center);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng]);
 
   // Telemetry Interpolation Update Loop
@@ -381,4 +391,19 @@ export default function MapInterpolated({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Deep comparison for the center, pickup, and destination inline objects
+  if (prevProps.center?.lat !== nextProps.center?.lat || prevProps.center?.lng !== nextProps.center?.lng) return false;
+  if (prevProps.pickup?.lat !== nextProps.pickup?.lat || prevProps.pickup?.lng !== nextProps.pickup?.lng) return false;
+  if (prevProps.destination?.lat !== nextProps.destination?.lat || prevProps.destination?.lng !== nextProps.destination?.lng) return false;
+
+  // Shallow comparison for everything else
+  if (prevProps.theme !== nextProps.theme) return false;
+  if (prevProps.zoom !== nextProps.zoom) return false;
+  if (prevProps.drivers !== nextProps.drivers) return false;
+  if (prevProps.h3Hexagons !== nextProps.h3Hexagons) return false;
+
+  return true;
+});
+
+export default MapInterpolated;
