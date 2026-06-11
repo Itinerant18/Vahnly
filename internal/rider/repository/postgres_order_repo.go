@@ -117,7 +117,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var orderID string
 	err = tx.QueryRow(ctx, `
@@ -295,7 +295,7 @@ func (r *postgresOrderRepo) CancelOrder(ctx context.Context, orderID, riderID, r
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var reasonArg any
 	if strings.TrimSpace(reason) != "" {
@@ -343,7 +343,7 @@ func (r *postgresOrderRepo) RateOrder(ctx context.Context, p RateParams) (string
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var assignedDriverID *string
 	var cityPrefix string

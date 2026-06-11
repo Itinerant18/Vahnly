@@ -309,11 +309,6 @@ func (h *FinanceHandler) HandlePostRefund(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	adminEmail := r.Header.Get("X-Admin-Email")
-	if adminEmail == "" {
-		adminEmail = "admin@example.com"
-	}
-
 	var req struct {
 		TransactionID string `json:"transaction_id"`
 		AmountPaise   int64  `json:"amount_paise"`
@@ -566,7 +561,7 @@ func (h *FinanceHandler) executeRefundSettlement(ctx context.Context, tx pgx.Tx,
 	descCredit := fmt.Sprintf("Refund processed via card/UPI gateway (settlement outflow) for refund %s", refundID)
 	descDebit := fmt.Sprintf("Refund amount debited from Rider payment receivable for refund %s", refundID)
 
-	var ordIDVal interface{} = nil
+	var ordIDVal any
 	if orderID.Valid {
 		ordIDVal = orderID.String
 	} else {
@@ -1012,7 +1007,6 @@ func (h *FinanceHandler) HandleExportInvoices(w http.ResponseWriter, r *http.Req
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argIdx)
 		args = append(args, strings.ToUpper(status))
-		argIdx++
 	}
 
 	query += " ORDER BY created_at DESC"

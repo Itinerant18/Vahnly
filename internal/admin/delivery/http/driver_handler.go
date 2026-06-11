@@ -667,7 +667,9 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 				    reviewed_at = NOW()
 				WHERE driver_id = $3::uuid AND document_type = $4
 			`
-			_, err = h.dbPool.Exec(ctx, updateQuery, dbStatus, adminReviewerID, id, req.DocName)
+			if _, err := h.dbPool.Exec(ctx, updateQuery, dbStatus, adminReviewerID, id, req.DocName); err != nil {
+				h.logger.Printf("[DRIVER_DOCS] failed to update document status: %v", err)
+			}
 
 			// Trigger notification_outbox entry if document is rejected
 			if dbStatus == "REJECTED" {

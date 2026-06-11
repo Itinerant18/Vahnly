@@ -118,8 +118,9 @@ func (r *FleetRebalancer) projectCellDemand(ctx context.Context, cell string, cu
 	samples := make([]float64, 0, len(raw))
 	for i := len(raw) - 1; i >= 0; i-- {
 		var v float64
-		fmt.Sscanf(raw[i], "%g", &v)
-		samples = append(samples, v)
+		if _, err := fmt.Sscanf(raw[i], "%g", &v); err == nil {
+			samples = append(samples, v)
+		}
 	}
 	return ProjectDemand(samples, demandProjectionHorizon)
 }
@@ -175,7 +176,12 @@ func (r *FleetRebalancer) NudgeDrivers(ctx context.Context, targetCell, sourceCe
 	}
 
 	driverSetKey := fmt.Sprintf("drivers:zset:%s:%s", r.cityPrefix, sourceCell)
-	drivers, err := r.redisClient.ZRevRange(ctx, driverSetKey, 0, max-1).Result()
+	drivers, err := r.redisClient.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:   driverSetKey,
+		Start: 0,
+		Stop:  max - 1,
+		Rev:   true,
+	}).Result()
 	if err != nil {
 		return 0, err
 	}
