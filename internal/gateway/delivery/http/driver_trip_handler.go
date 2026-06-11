@@ -682,11 +682,6 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 		FROM order_events
 		WHERE order_id = $1::uuid
 	`, orderID).Scan(&tollsPaise, &parkingPaise)
-	if err != nil {
-		log.Printf("[CONFIRM_PAYMENT] Failed querying order events: %v", err)
-		http.Error(w, "event_query_failed", http.StatusInternalServerError)
-		return
-	}
 
 	nightSurgePaise := int64(5000)
 	careSurchargePaise := int64(1500)

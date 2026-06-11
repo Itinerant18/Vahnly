@@ -209,6 +209,7 @@ func (h *AIHandler) HandleGetDemandForecasts(w http.ResponseWriter, r *http.Requ
 	if allowed := adminAllowedCities(r.Context()); allowed != nil {
 		conds = append(conds, fmt.Sprintf("city = ANY($%d)", idx))
 		args = append(args, allowed)
+		idx++
 	}
 	where := "WHERE " + strings.Join(conds, " AND ")
 

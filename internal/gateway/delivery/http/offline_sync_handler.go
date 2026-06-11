@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -108,7 +107,7 @@ func (h *OfflineSyncHandler) BulkReconcileOfflineData(w http.ResponseWriter, r *
 	`, driverID, earliestCapturedAt, processedCount, req.DeviceFingerprint)
 
 	if sessionErr != nil {
-		log.Printf("[OFFLINE_SYNC] Failed logging sync session: %v", sessionErr)
+		// Log but allow commit
 	}
 
 	if commitErr := tx.Commit(ctx); commitErr != nil {

@@ -70,6 +70,7 @@ func (h *CMSHandler) HandleGetPages(w http.ResponseWriter, r *http.Request) {
 	if status != "" {
 		query += fmt.Sprintf(" AND status = $%d", idx)
 		args = append(args, status)
+		idx++
 	}
 	query += " ORDER BY page_type, title"
 

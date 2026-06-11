@@ -178,7 +178,7 @@ func (h *AuditHandler) HandleExportAuditCSV(w http.ResponseWriter, r *http.Reque
 		base += fmt.Sprintf(" AND module = $%d", idx); args = append(args, v); idx++
 	}
 	if v := q.Get("admin_email"); v != "" {
-		base += fmt.Sprintf(" AND admin_email ILIKE $%d", idx); args = append(args, "%"+v+"%")
+		base += fmt.Sprintf(" AND admin_email ILIKE $%d", idx); args = append(args, "%"+v+"%"); idx++
 	}
 
 	query := `SELECT id::TEXT, admin_email, admin_role, action, module, entity_type, entity_id, ip_address, created_at ` +
