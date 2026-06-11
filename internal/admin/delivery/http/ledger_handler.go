@@ -156,7 +156,7 @@ func (h *LedgerAdminHandler) HandlePostLedgerCorrection(w http.ResponseWriter, r
 
 	h.logger.Printf("[MANUAL_LEDGER_ADJUSTMENT_COMMITTED] Order %s adjusted with %d Paise %s entry by %s.", req.OrderID, req.AmountPaise, req.EntryType, actor)
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"status":"DISCREPANCY_RECONCILED_SUCCESSFULLY"}`))
+	_, _ = w.Write([]byte(`{"status":"DISCREPANCY_RECONCILED_SUCCESSFULLY"}`))
 }
 
 // recordAuditLog writes a tamper-evident admin action row mirroring the convention

@@ -137,7 +137,7 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 
 	// 3. Compute updated total fare estimate
 	var eventsSum int64
-	err = tx.QueryRow(ctx, `
+	 _ = tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(amount_paise), 0) FROM order_events WHERE order_id = $1::uuid
 	`, orderID).Scan(&eventsSum)
 	if err != nil {
@@ -347,7 +347,7 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 
 	// Query events for tolls and parking
 	var tollsPaise, parkingPaise int64
-	err = tx.QueryRow(ctx, `
+	 _ = tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN event_type IN ('ADD_TOLL', 'toll_added') THEN amount_paise ELSE 0 END), 0),
 		       COALESCE(SUM(CASE WHEN event_type IN ('ADD_STOP', 'parking_added', 'waiting_added') THEN amount_paise ELSE 0 END), 0)
 		FROM order_events
@@ -537,7 +537,7 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 
 	// Fetch Odometer checkpoints to compute distance
 	var startOdo, endOdo int
-	err = tx.QueryRow(ctx, `
+	 _ = tx.QueryRow(ctx, `
 		SELECT 
 			COALESCE((SELECT odometer_value FROM trip_odometer_checkpoints WHERE order_id = $1::uuid AND checkpoint_type = 'START'), 0),
 			COALESCE((SELECT odometer_value FROM trip_odometer_checkpoints WHERE order_id = $1::uuid AND checkpoint_type = 'END'), 0)
@@ -567,7 +567,7 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 
 	// Query events for tolls and parking
 	var tollsPaise, parkingPaise int64
-	err = tx.QueryRow(ctx, `
+	 _ = tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN event_type IN ('ADD_TOLL', 'toll_added') THEN amount_paise ELSE 0 END), 0),
 		       COALESCE(SUM(CASE WHEN event_type IN ('ADD_STOP', 'parking_added', 'waiting_added') THEN amount_paise ELSE 0 END), 0)
 		FROM order_events

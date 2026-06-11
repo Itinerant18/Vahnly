@@ -123,7 +123,7 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Transaction initiation failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	updateQuery := `
 		UPDATE drivers 
@@ -437,7 +437,7 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 		http.Error(w, "Transaction initiation failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// 1. Fetch current status, assigned_driver_id, otp_hash, otp_attempts
 	var currentStatus string

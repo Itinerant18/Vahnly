@@ -50,7 +50,7 @@ func (h *DriverTripHandler) MarkArrived(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Transaction failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// 1. Fetch current status, assigned_driver_id
 	var currentStatus string
@@ -143,7 +143,7 @@ func (h *DriverTripHandler) VerifyAndStartTrip(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Transaction initiation failed", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Fetch current status, assigned_driver_id, otp_hash, otp_attempts
 	var currentStatus string

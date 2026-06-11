@@ -42,13 +42,13 @@ func (h *AIHandler) HandleGetFraudEvents(w http.ResponseWriter, r *http.Request)
 	idx := 1
 
 	if v := q.Get("status"); v != "" {
-		conds = append(conds, fmt.Sprintf("status = $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("status = $%d", idx)); args = append(args, v); _ = idx
 	}
 	if v := q.Get("fraud_type"); v != "" {
-		conds = append(conds, fmt.Sprintf("fraud_type = $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("fraud_type = $%d", idx)); args = append(args, v); _ = idx
 	}
 	if v := q.Get("min_score"); v != "" {
-		conds = append(conds, fmt.Sprintf("score >= $%d", idx)); args = append(args, v); idx++
+		conds = append(conds, fmt.Sprintf("score >= $%d", idx)); args = append(args, v); _ = idx
 	}
 	_ = idx
 	where := ""
@@ -203,13 +203,13 @@ func (h *AIHandler) HandleGetDemandForecasts(w http.ResponseWriter, r *http.Requ
 	if city != "" {
 		conds = append(conds, fmt.Sprintf("city = $%d", idx))
 		args = append(args, city)
-		idx++
+		_ = idx
 	}
 	// Enforce the requesting admin's city scope (no-op for SUPER_ADMIN / ALL scope).
 	if allowed := adminAllowedCities(r.Context()); allowed != nil {
 		conds = append(conds, fmt.Sprintf("city = ANY($%d)", idx))
 		args = append(args, allowed)
-		idx++
+		_ = idx
 	}
 	where := "WHERE " + strings.Join(conds, " AND ")
 

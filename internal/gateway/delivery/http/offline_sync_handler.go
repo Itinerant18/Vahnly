@@ -107,6 +107,7 @@ func (h *OfflineSyncHandler) BulkReconcileOfflineData(w http.ResponseWriter, r *
 	`, driverID, earliestCapturedAt, processedCount, req.DeviceFingerprint)
 
 	if sessionErr != nil {
+		log.Printf("Failed writing offline sync session: %v", sessionErr)
 		// Log but allow commit
 	}
 

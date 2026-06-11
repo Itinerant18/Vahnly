@@ -189,7 +189,7 @@ func (h *IncidentAdminHandler) HandleClaimIncident(w http.ResponseWriter, r *htt
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"INCIDENT_CLAIMED_SUCCESSFULLY"}`))
+	_, _ = w.Write([]byte(`{"status":"INCIDENT_CLAIMED_SUCCESSFULLY"}`))
 }
 
 // HandleExecuteTripRecovery processes administrative interventions to resolve stranded orders
@@ -307,7 +307,7 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
+	_, _ = w.Write([]byte(`{"status":"INCIDENT_RECOVERY_EXECUTED_CLEANLY"}`))
 }
 
 // GetIncidents returns the active incidents from the shared Redis-backed queue.

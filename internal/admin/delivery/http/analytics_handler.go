@@ -285,7 +285,7 @@ func (h *AnalyticsHandler) HandleGetPrebuiltDashboard(w http.ResponseWriter, r *
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	result := map[string]any{}
+	_ = result
 
 	switch dashboard {
 	case "operations":
