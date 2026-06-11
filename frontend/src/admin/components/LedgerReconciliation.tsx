@@ -33,10 +33,7 @@ export const LedgerReconciliation: React.FC = () => {
   const fetchLedgerDiscrepancies = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger/discrepancies`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger/discrepancies`);
 
       if (response.ok) {
         const data = await response.json();
@@ -84,13 +81,11 @@ export const LedgerReconciliation: React.FC = () => {
     setAuditLog(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const adminEmail = localStorage.getItem('admin_email') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger/reconcile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
           'X-Admin-Email': adminEmail,
         },
         body: JSON.stringify({

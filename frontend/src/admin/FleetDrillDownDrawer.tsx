@@ -27,12 +27,10 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
   const suspendDriver = async (driverId: string) => {
     setSuspendingId(driverId);
     try {
-      const jwtToken = localStorage.getItem('admin_jwt_token') ?? '';
       await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${driverId}/suspend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${jwtToken}`,
         },
         body: JSON.stringify({ reason: 'Telemetry integrity hold — flagged by operations dashboard.' }),
       });
@@ -54,10 +52,7 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
   const fetchDriversInCell = async (token: string) => {
     setIsLoading(true);
     try {
-      const jwtToken = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/analytics/cells/${token}/drivers`, {
-        headers: { Authorization: `Bearer ${jwtToken}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/analytics/cells/${token}/drivers`);
 
       if (response.ok) {
         const data = await response.json();

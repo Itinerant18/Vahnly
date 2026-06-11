@@ -66,11 +66,10 @@ export const DocumentsVaultDashboard: React.FC = () => {
   // Bulk select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
   const email = localStorage.getItem('admin_email') || '';
   const headers = {
-    Authorization: `Bearer ${token}`, 'X-Admin-Role': role,
+    'X-Admin-Role': role,
     'X-Admin-Email': email, 'Content-Type': 'application/json',
   };
 

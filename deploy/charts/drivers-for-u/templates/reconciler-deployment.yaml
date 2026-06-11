@@ -33,6 +33,7 @@ spec:
               value: {{ .Values.global.region | quote }}
             - name: RECONCILER_METRICS_PORT
               value: "8091"
+            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: 8091
               name: metrics

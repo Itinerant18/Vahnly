@@ -2,9 +2,13 @@ package http
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +17,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+// newTripOTP returns a random 4-digit trip-start OTP and its sha256 hash. Admin-
+// created trips must carry an OTP like rider-created ones, or the driver could
+// never start them (the start handlers now fail closed when no OTP is provisioned).
+func newTripOTP() (plain, hash string) {
+	if n, err := rand.Int(rand.Reader, big.NewInt(10000)); err == nil {
+		plain = fmt.Sprintf("%04d", n.Int64())
+	} else {
+		plain = fmt.Sprintf("%04d", time.Now().UnixNano()%10000)
+	}
+	sum := sha256.Sum256([]byte(plain))
+	return plain, hex.EncodeToString(sum[:])
+}
 
 type AdminTripHandler struct {
 	dbPool      *pgxpool.Pool
@@ -738,13 +755,15 @@ func (h *AdminTripHandler) HandleAdminCreateTrip(w http.ResponseWriter, r *http.
 	dropoffGeom := fmt.Sprintf("SRID=4326;POINT(%.6f %.6f)", req.DropoffLng, req.DropoffLat)
 	pickupH3 := "883cf21855fffff"
 
+	otpPlain, otpHash := newTripOTP()
+
 	if req.AssignedDriverID != "" {
 		queryOrder = `
-			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, assigned_driver_id, surge_multiplier, base_fare_paise, assigned_at, created_at)
-			VALUES ($1, $2::uuid, 'ASSIGNED'::order_status_enum, ST_GeomFromEWKT($3), ST_GeomFromEWKT($4), $5, $6::uuid, 1.0, $7, NOW(), NOW())
+			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, assigned_driver_id, surge_multiplier, base_fare_paise, assigned_at, created_at, otp_hash)
+			VALUES ($1, $2::uuid, 'ASSIGNED'::order_status_enum, ST_GeomFromEWKT($3), ST_GeomFromEWKT($4), $5, $6::uuid, 1.0, $7, NOW(), NOW(), $8)
 			RETURNING id;
 		`
-		orderErr = tx.QueryRow(ctx, queryOrder, req.CityPrefix, custID, pickupGeom, dropoffGeom, pickupH3, req.AssignedDriverID, req.BaseFarePaise).Scan(&orderID)
+		orderErr = tx.QueryRow(ctx, queryOrder, req.CityPrefix, custID, pickupGeom, dropoffGeom, pickupH3, req.AssignedDriverID, req.BaseFarePaise, otpHash).Scan(&orderID)
 		if orderErr == nil {
 			queryDriver := `
 				UPDATE drivers
@@ -755,11 +774,11 @@ func (h *AdminTripHandler) HandleAdminCreateTrip(w http.ResponseWriter, r *http.
 		}
 	} else {
 		queryOrder = `
-			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, surge_multiplier, base_fare_paise, created_at)
-			VALUES ($1, $2::uuid, 'CREATED'::order_status_enum, ST_GeomFromEWKT($3), ST_GeomFromEWKT($4), $5, 1.0, $6, NOW())
+			INSERT INTO orders (city_prefix, customer_id, status, pickup_location, dropoff_location, pickup_h3_cell, surge_multiplier, base_fare_paise, created_at, otp_hash)
+			VALUES ($1, $2::uuid, 'CREATED'::order_status_enum, ST_GeomFromEWKT($3), ST_GeomFromEWKT($4), $5, 1.0, $6, NOW(), $7)
 			RETURNING id;
 		`
-		orderErr = tx.QueryRow(ctx, queryOrder, req.CityPrefix, custID, pickupGeom, dropoffGeom, pickupH3, req.BaseFarePaise).Scan(&orderID)
+		orderErr = tx.QueryRow(ctx, queryOrder, req.CityPrefix, custID, pickupGeom, dropoffGeom, pickupH3, req.BaseFarePaise, otpHash).Scan(&orderID)
 	}
 
 	if orderErr != nil {
@@ -778,6 +797,7 @@ func (h *AdminTripHandler) HandleAdminCreateTrip(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":   "success",
 		"order_id": orderID,
+		"trip_otp": otpPlain, // relay to the rider so the driver can verify trip start
 	})
 }
 

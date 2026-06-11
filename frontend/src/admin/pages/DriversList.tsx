@@ -44,12 +44,10 @@ export const DriversList: React.FC = () => {
 			if (cancellationMax) params.append('cancellation_max', (parseFloat(cancellationMax) / 100).toString());
 			if (tripsMin) params.append('trips_min', tripsMin);
 
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers?${params.toString()}`, {
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});

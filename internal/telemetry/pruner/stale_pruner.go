@@ -4,11 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+// envSeconds reads an integer-seconds env var, falling back to the default.
+func envSeconds(key string, defSec int) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return time.Duration(defSec) * time.Second
+}
 
 type StaleTelemetryPruner struct {
 	clusterClient *redis.ClusterClient
@@ -21,14 +34,21 @@ func NewStaleTelemetryPruner(client *redis.ClusterClient, db *pgxpool.Pool) *Sta
 	return &StaleTelemetryPruner{
 		clusterClient: client,
 		dbPool:         db,
-		pruneInterval:  30 * time.Second, // Sweeps spatial indexes every 30 seconds
-		staleThreshold: 60 * time.Second, // Evicts sessions older than 60 seconds
+		pruneInterval:  envSeconds("PRUNER_INTERVAL_SECONDS", 30), // Sweep cadence (default 30s)
+		staleThreshold: envSeconds("PRUNER_STALE_SECONDS", 60),   // Evict sessions older than (default 60s)
 	}
 }
 
 // StartPrunerLoop blocks and manages the rolling garbage collection schedule
 func (p *StaleTelemetryPruner) StartPrunerLoop(ctx context.Context, cityPrefix string, trackedCells []string) {
-	log.Printf("[PRUNER_DAEMON] Initiating Telemetry Garbage Collector for city [%s]. Monitoring %d cells.", cityPrefix, len(trackedCells))
+	// Per-city stale-threshold override, e.g. PRUNER_STALE_SECONDS_BLR=45. Dense
+	// cities may need a tighter window than sparse ones.
+	if v := os.Getenv("PRUNER_STALE_SECONDS_" + strings.ToUpper(cityPrefix)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			p.staleThreshold = time.Duration(n) * time.Second
+		}
+	}
+	log.Printf("[PRUNER_DAEMON] Initiating Telemetry Garbage Collector for city [%s] (stale=%s, interval=%s). Monitoring %d cells.", cityPrefix, p.staleThreshold, p.pruneInterval, len(trackedCells))
 	ticker := time.NewTicker(p.pruneInterval)
 	defer ticker.Stop()
 

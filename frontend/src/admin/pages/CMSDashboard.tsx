@@ -37,11 +37,10 @@ type Tab = 'pages' | 'i18n' | 'assets';
 // ── Component ────────────────────────────────────────────────────────────────
 export const CMSDashboard: React.FC = () => {
   const [tab, setTab] = useState<Tab>('pages');
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
   const email = localStorage.getItem('admin_email') || '';
   const headers = {
-    Authorization: `Bearer ${token}`, 'X-Admin-Role': role,
+    'X-Admin-Role': role,
     'X-Admin-Email': email, 'Content-Type': 'application/json',
   };
 

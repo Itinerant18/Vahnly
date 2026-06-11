@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
@@ -31,16 +32,18 @@ type SurgeCalculatorEngine struct {
 }
 
 func NewSurgeCalculatorEngine(brokers []string, redisClient *redis.ClusterClient) *SurgeCalculatorEngine {
+	w := &kafka.Writer{
+		Addr:         kafka.TCP(brokers...),
+		Topic:        "surge.zone.updated", // Defined in Section 06 topic topology
+		Balancer:     &kafka.Hash{},         // Partitioned by city prefix hash
+		RequiredAcks: kafka.RequireOne,       // Ensures low latency while preserving delivery durability
+	}
+	kafkacfg.FromEnv().ApplyToWriter(w)
 	return &SurgeCalculatorEngine{
 		clusterClient: redisClient,
-		kafkaWriter: &kafka.Writer{
-			Addr:         kafka.TCP(brokers...),
-			Topic:        "surge.zone.updated", // Defined in Section 06 topic topology
-			Balancer:     &kafka.Hash{},         // Partitioned by city prefix hash
-			RequiredAcks: kafka.RequireOne,       // Ensures low latency while preserving delivery durability
-		},
-		evalInterval: 5 * time.Second, // Evaluates and flushes pricing grids every 5 seconds
-		maxSurgeCap:  4.5,             // Hard safety cap preventing extreme pricing edge anomalies
+		kafkaWriter:   w,
+		evalInterval:  5 * time.Second, // Evaluates and flushes pricing grids every 5 seconds
+		maxSurgeCap:   4.5,             // Hard safety cap preventing extreme pricing edge anomalies
 	}
 }
 

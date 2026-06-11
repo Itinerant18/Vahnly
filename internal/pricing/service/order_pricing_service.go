@@ -11,9 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
+	"github.com/platform/driver-delivery/internal/pricing/surge"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
-	"github.com/platform/driver-delivery/internal/pricing/surge"
 )
 
 // SurgeZoneUpdatedEvent matches the JSON schema emitted by the Surge Calculator (Job 3)
@@ -41,18 +42,22 @@ type OrderPricingService struct {
 	baseFarePaise  int64
 	perMeterPaise  int64
 	logger         *log.Logger
+	dlq            *kafkacfg.DLQ
 }
 
 // NewOrderPricingService instantiates a horizontally scalable pricing gateway engine
 func NewOrderPricingService(brokers []string, groupID string, client *redis.ClusterClient) *OrderPricingService {
+	sec := kafkacfg.FromEnv()
 	return &OrderPricingService{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:        brokers,
-			Topic:          "surge.zone.updated", // Consumes output from our Job 3 pricing engine
-			GroupID:        groupID,              // Horizontal group scaling configuration
-			MinBytes:       10,
-			MaxBytes:       10e6,
+			Brokers:  brokers,
+			Topic:    "surge.zone.updated", // Consumes output from our Job 3 pricing engine
+			GroupID:  groupID,              // Horizontal group scaling configuration
+			MinBytes: 10,
+			MaxBytes: 10e6,
+			Dialer:   sec.Dialer(),
 		}),
+		dlq:            kafkacfg.NewDLQ(brokers, "surge.zone.updated.dlq", sec),
 		clusterClient:  client,
 		surgeRegulator: surge.NewSurgeRegulator(0.20, 15*time.Second, 3.5),
 		baseFarePaise:  4000, // 40.00 Rs baseline
@@ -64,7 +69,7 @@ func NewOrderPricingService(brokers []string, groupID string, client *redis.Clus
 // StartSurgeMatrixSync pumps event loops from Kafka to continuously update the shared cluster state
 func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 	s.logger.Println("Order Pricing Service: Safely synchronized distributed surge cache paths.")
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -82,7 +87,8 @@ func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 
 			var event SurgeZoneUpdatedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				s.logger.Printf("Dropped malformed surge pricing log event: %v", err)
+				s.logger.Printf("Routing malformed surge pricing event to DLQ: %v", err)
+				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
 				continue
 			}
 
@@ -107,6 +113,7 @@ func (s *OrderPricingService) StartSurgeMatrixSyncLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.logger.Println("Draining in-flight pricing cache sync tasks and shutting down...")
+			_ = s.dlq.Close()
 			if err := s.kafkaReader.Close(); err != nil {
 				s.logger.Printf("Failed to close Kafka surge update reader channel cleanly: %v", err)
 			}
@@ -123,7 +130,8 @@ func (s *OrderPricingService) StartSurgeMatrixSyncLoop(ctx context.Context) {
 
 			var event SurgeZoneUpdateEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				s.logger.Printf("Poison pill encounter: failed to unmarshal surge matrix token payload: %v", err)
+				s.logger.Printf("Poison pill: routing unparseable surge matrix payload to DLQ: %v", err)
+				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
 				_ = s.kafkaReader.CommitMessages(ctx, msg)
 				continue
 			}
@@ -218,7 +226,7 @@ func (s *OrderPricingService) CalculateDynamicFarePaise(ctx context.Context, h3C
 	// Mock or active gRPC client binding handler method reference targeting external Triton models
 	mockTritonModelCall := func() (float64, error) {
 		// Simulating normal execution latency inside nominal bounds
-		time.Sleep(12 * time.Millisecond) 
+		time.Sleep(12 * time.Millisecond)
 		return 1.45, nil
 	}
 
@@ -239,7 +247,7 @@ func (s *OrderPricingService) GetFareQuote(ctx context.Context, city string, h3C
 
 	matrixKey := fmt.Sprintf("surge:matrix:%s:%s", city, h3Cell)
 	multiplierStr, err := s.clusterClient.Get(ctx, matrixKey).Result()
-	
+
 	multiplier := 1.0
 	if err == nil {
 		parsed, parseErr := strconv.ParseFloat(multiplierStr, 64)

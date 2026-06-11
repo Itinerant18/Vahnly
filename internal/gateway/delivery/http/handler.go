@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
@@ -70,21 +72,23 @@ type GatewayHandler struct {
 }
 
 func NewGatewayHandler(db *pgxpool.Pool, kw *kafka.Writer, ps *pricingSvc.OrderPricingService, client *redis.ClusterClient) *GatewayHandler {
+	// Dedicated producer for the "driver became available" half of the
+	// driver.state.changed contract. Reuses the order-writer broker address and
+	// inherits its SASL/TLS transport so it authenticates identically.
+	driverStateWriter := &kafka.Writer{
+		Addr:         kw.Addr,
+		Topic:        "driver.state.changed",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+		Transport:    kw.Transport,
+	}
 	return &GatewayHandler{
-		dbPool:      db,
-		kafkaWriter: kw,
-		// Dedicated producer for the "driver became available" half of the
-		// driver.state.changed contract. Reuses the order-writer broker address so
-		// no constructor wiring changes are needed across call sites.
-		driverStateWriter: &kafka.Writer{
-			Addr:         kw.Addr,
-			Topic:        "driver.state.changed",
-			Balancer:     &kafka.Hash{},
-			RequiredAcks: kafka.RequireOne,
-		},
-		pricingService: ps,
-		clusterClient:  client,
-		jwtSecretKey:   nil,
+		dbPool:            db,
+		kafkaWriter:       kw,
+		driverStateWriter: driverStateWriter,
+		pricingService:    ps,
+		clusterClient:     client,
+		jwtSecretKey:      nil,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -183,8 +187,11 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	pickupGeom := fmt.Sprintf("SRID=4326;POINT(%f %f)", req.PickupLng, req.PickupLat)
 	dropoffGeom := fmt.Sprintf("SRID=4326;POINT(%f %f)", req.DropoffLng, req.DropoffLat)
 
-	// Hash default OTP "1234" for the new order
-	sum := sha256.Sum256([]byte("1234"))
+	// Generate a random 4-digit trip-start OTP, stored only as a hash. The plaintext
+	// is returned once in this response so the booking surface (admin/rider) can relay
+	// it; it is never stored or logged in clear. Replaces the universal "1234".
+	otpPlain := generateNumericOTP()
+	sum := sha256.Sum256([]byte(otpPlain))
 	otpHashed := hex.EncodeToString(sum[:])
 
 	if req.OrderID != "" {
@@ -241,7 +248,16 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	_, _ = w.Write([]byte(fmt.Sprintf(`{"order_id":"%s","status":"PROCESSING"}`, orderID)))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"order_id":"%s","status":"PROCESSING","trip_otp":"%s"}`, orderID, otpPlain)))
+}
+
+// generateNumericOTP returns a cryptographically random 4-digit string ("0000"–"9999").
+func generateNumericOTP() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		return fmt.Sprintf("%04d", time.Now().UnixNano()%10000)
+	}
+	return fmt.Sprintf("%04d", n.Int64())
 }
 
 // HandleMatchRealtimeStream upgrades requests to WebSockets and registers the active binary connection session
@@ -1198,10 +1214,11 @@ func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Re
 	if otpHash != nil {
 		targetHash = *otpHash
 	}
-	// Fallback to hashing "1234" if no otp_hash in DB yet
+	// Fail closed: an order with no provisioned OTP cannot be started. (Previously this
+	// fell back to "1234", making every such trip startable with a universal code.)
 	if targetHash == "" {
-		fallbackSum := sha256.Sum256([]byte("1234"))
-		targetHash = hex.EncodeToString(fallbackSum[:])
+		http.Error(w, "otp_not_provisioned", http.StatusConflict)
+		return
 	}
 
 	if inputHash != targetHash {

@@ -63,12 +63,10 @@ export const VehiclesList: React.FC = () => {
 			if (rcExpiredOnly) params.append('rc_expired', 'true');
 			if (insExpiredOnly) params.append('insurance_expired', 'true');
 
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles?${params.toString()}`, {
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});
@@ -101,12 +99,10 @@ export const VehiclesList: React.FC = () => {
 	const handleSendReminders = async () => {
 		setSendingReminders(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/reminders`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});
@@ -156,13 +152,11 @@ export const VehiclesList: React.FC = () => {
 				last_serviced: overrideLastServiced ? new Date(overrideLastServiced).toISOString() : undefined,
 			};
 
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/${selectedVehicle.plate}/override`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},

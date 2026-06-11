@@ -166,10 +166,7 @@ export const ActiveTripRadar: React.FC = () => {
 
   const fetchActiveOrders = async () => {
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders`);
 
       if (response.ok) {
         const data = await response.json();
@@ -246,12 +243,10 @@ export const ActiveTripRadar: React.FC = () => {
     setMessage(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/cancel`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ order_id: orderId })
       });

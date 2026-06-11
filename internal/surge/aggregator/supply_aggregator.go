@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/platform/driver-delivery/internal/events"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
@@ -17,9 +18,11 @@ type SupplyAggregatorStream struct {
 	kafkaReader   *kafka.Reader
 	clusterClient *redis.ClusterClient
 	windowSize    time.Duration
+	dlq           *kafkacfg.DLQ
 }
 
 func NewSupplyAggregatorStream(brokers []string, redisClient *redis.ClusterClient) *SupplyAggregatorStream {
+	sec := kafkacfg.FromEnv()
 	return &SupplyAggregatorStream{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  brokers,
@@ -27,9 +30,11 @@ func NewSupplyAggregatorStream(brokers []string, redisClient *redis.ClusterClien
 			GroupID:  "surge-supply-aggregator-group",
 			MinBytes: 10,
 			MaxBytes: 10e6,
+			Dialer:   sec.Dialer(),
 		}),
 		clusterClient: redisClient,
 		windowSize:    30 * time.Second, // 30-second aggregations
+		dlq:           kafkacfg.NewDLQ(brokers, "driver.state.changed.dlq", sec),
 	}
 }
 
@@ -53,7 +58,8 @@ func (s *SupplyAggregatorStream) StartAggregationEngine(ctx context.Context) {
 
 			var event events.DriverStateChangedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				log.Printf("Dropped unparseable surge telemetry packet: %v", err)
+				log.Printf("Routing unparseable surge supply packet to DLQ: %v", err)
+				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
 				continue
 			}
 
@@ -122,5 +128,6 @@ func (s *SupplyAggregatorStream) GetAvailableDriverCount(ctx context.Context, ci
 }
 
 func (s *SupplyAggregatorStream) Close() error {
+	_ = s.dlq.Close()
 	return s.kafkaReader.Close()
 }

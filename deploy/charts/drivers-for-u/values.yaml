@@ -24,7 +24,10 @@ networkPolicy:
     # a CA bundle is mounted into the pods, otherwise the TLS handshake fails.
     # PLACEHOLDER — the password must be injected via SealedSecret/external-secret,
     # never committed here. Rotate any password that was previously in git history.
-    databaseUrl: "postgresql://app_gateway:REPLACE_ME_VIA_SEALED_SECRET@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=require"
+    # pool_max_conns caps each service's pool so 15 services can't exhaust Postgres
+    # max_connections; statement_timeout (ms) stops a runaway query holding locks
+    # indefinitely. For real scale, front Postgres with PgBouncer and raise the cap.
+    databaseUrl: "postgresql://app_gateway:REPLACE_ME_VIA_SEALED_SECRET@spatial-db.dispatch.svc.cluster.local:5432/delivery_platform?sslmode=require&pool_max_conns=8&statement_timeout=15000"
     kafkaBrokers: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
     redisClusterNodes: "redis-cluster.dispatch.svc.cluster.local:6379"
     tritonServerUrl: "triton-inference-service.dispatch.svc.cluster.local:8001"
@@ -45,6 +48,16 @@ secrets:
   paymentWebhookSigningSecret: "REPLACE_ME_VIA_SEALED_SECRET"
   awsAccessKeyId: "REPLACE_ME_VIA_SEALED_SECRET"
   awsSecretAccessKey: "REPLACE_ME_VIA_SEALED_SECRET"
+  kafkaSaslUsername: "REPLACE_ME_VIA_SEALED_SECRET"
+  kafkaSaslPassword: "REPLACE_ME_VIA_SEALED_SECRET"
+
+# Kafka client security. Enable both for production SASL_SSL (PLAIN over TLS).
+# All producers/consumers read KAFKA_TLS_ENABLED + KAFKA_SASL_* via kafkacfg.
+# IMPORTANT: only flip these on once the broker has the matching listener + ACLs,
+# and every Kafka-talking deployment includes drivers-for-u.kafkaSecurityEnv.
+kafka:
+  tlsEnabled: false
+  saslEnabled: false
 
 # Durable object storage for driver KYC documents. Leave bucket empty to fall back
 # to ephemeral local disk (NOT for production). endpoint is for S3-compatible

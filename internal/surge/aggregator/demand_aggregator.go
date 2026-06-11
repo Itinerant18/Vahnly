@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
@@ -27,9 +28,11 @@ type DemandAggregatorStream struct {
 	kafkaReader   *kafka.Reader
 	clusterClient *redis.ClusterClient
 	windowSize    time.Duration
+	dlq           *kafkacfg.DLQ
 }
 
 func NewDemandAggregatorStream(brokers []string, redisClient *redis.ClusterClient) *DemandAggregatorStream {
+	sec := kafkacfg.FromEnv()
 	return &DemandAggregatorStream{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
@@ -38,9 +41,11 @@ func NewDemandAggregatorStream(brokers []string, redisClient *redis.ClusterClien
 			MinBytes:       10,
 			MaxBytes:       10e6, // 10MB batch buffers
 			CommitInterval: time.Second,
+			Dialer:         sec.Dialer(),
 		}),
 		clusterClient: redisClient,
 		windowSize:    30 * time.Second, // 30-second sliding demand window constraint
+		dlq:           kafkacfg.NewDLQ(brokers, "order.created.dlq", sec),
 	}
 }
 
@@ -65,7 +70,8 @@ func (s *DemandAggregatorStream) StartDemandEngine(ctx context.Context) {
 
 			var event OrderCreatedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				log.Printf("Dropped malformed surge demand telemetry record: %v", err)
+				log.Printf("Routing malformed surge demand record to DLQ: %v", err)
+				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
 				continue
 			}
 
@@ -82,7 +88,7 @@ func (s *DemandAggregatorStream) mutateRollingDemandWindow(ctx context.Context, 
 	// Enforce strict Redis Hashtagging to ensure slot alignment on regional cluster nodes
 	// Target format matches supply structures: surge:demand:{city}:cellID
 	redisKey := fmt.Sprintf("surge:demand:{%s}:%s", event.CityPrefix, event.PickupH3Cell)
-	
+
 	now := time.Now().Unix()
 	expirationBoundary := now + int64(s.windowSize.Seconds())
 
@@ -109,7 +115,7 @@ func (s *DemandAggregatorStream) mutateRollingDemandWindow(ctx context.Context, 
 	return nil
 }
 
-// GetRecentDemandRate returns the non-stale ride request speed within the active window 
+// GetRecentDemandRate returns the non-stale ride request speed within the active window
 func (s *DemandAggregatorStream) GetRecentDemandRate(ctx context.Context, cityPrefix, h3Cell string) (int64, error) {
 	redisKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, h3Cell)
 	now := time.Now().Unix()
@@ -128,5 +134,6 @@ func (s *DemandAggregatorStream) GetRecentDemandRate(ctx context.Context, cityPr
 
 // Close cleanly releases the underlying streaming broker connection state
 func (s *DemandAggregatorStream) Close() error {
+	_ = s.dlq.Close()
 	return s.kafkaReader.Close()
 }

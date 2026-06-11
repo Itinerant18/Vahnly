@@ -191,8 +191,9 @@ func (h *DriverTripHandler) VerifyAndStartTrip(w http.ResponseWriter, r *http.Re
 		targetHash = *otpHash
 	}
 	if targetHash == "" {
-		fallbackSum := sha256.Sum256([]byte("1234"))
-		targetHash = hex.EncodeToString(fallbackSum[:])
+		// Fail closed: no provisioned OTP means the trip cannot be started (was "1234").
+		http.Error(w, "otp_not_provisioned", http.StatusConflict)
+		return
 	}
 
 	if inputHash != targetHash {

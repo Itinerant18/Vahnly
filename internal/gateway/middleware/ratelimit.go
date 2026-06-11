@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ type RateLimiterMiddleware struct {
 	clusterClient *redis.ClusterClient
 	limitCount     int64
 	windowDuration time.Duration
+	failClosed     bool
 }
 
 func NewRateLimiterMiddleware(client *redis.ClusterClient, limit int64, window time.Duration) *RateLimiterMiddleware {
@@ -22,6 +24,12 @@ func NewRateLimiterMiddleware(client *redis.ClusterClient, limit int64, window t
 		windowDuration: window,
 	}
 }
+
+// SetFailClosed controls behavior when Redis is unreachable mid-request. Default is
+// fail-open (preserve throughput); set true to reject (503) instead, so a degraded
+// Redis can't silently disable rate limiting. The nil-client case (Redis not wired,
+// e.g. dev) always fails open regardless.
+func (m *RateLimiterMiddleware) SetFailClosed(v bool) { m.failClosed = v }
 
 // LimitRouteConcurrency enforces distributed tracking limits across horizontal pod nodes
 func (m *RateLimiterMiddleware) LimitRouteConcurrency(next http.HandlerFunc) http.HandlerFunc {
@@ -63,7 +71,14 @@ func (m *RateLimiterMiddleware) LimitRouteConcurrency(next http.HandlerFunc) htt
 
 		_, err := pipe.Exec(redisCtx)
 		if err != nil {
-			// Fail open gracefully to preserve marketplace booking throughput if cache latency anomalies arise
+			if m.failClosed {
+				log.Printf("[RATELIMIT] redis error, failing CLOSED for user %s: %v", userID, err)
+				w.Header().Set("Retry-After", "1")
+				http.Error(w, "rate_limiter_unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			// Fail open to preserve booking throughput; log so the gap is observable.
+			log.Printf("[RATELIMIT] redis error, failing OPEN for user %s: %v", userID, err)
 			next.ServeHTTP(w, r)
 			return
 		}

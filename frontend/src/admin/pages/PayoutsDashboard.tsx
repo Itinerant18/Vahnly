@@ -50,10 +50,8 @@ export const PayoutsDashboard: React.FC = () => {
 	// Bulk operations status
 	const [bulkProcessing, setBulkProcessing] = useState<boolean>(false);
 
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const role = localStorage.getItem('admin_role') || 'ADMIN';
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': role,
 		'Content-Type': 'application/json',
 		'X-Admin-Email': 'finance_admin@platform.com',
@@ -137,7 +135,7 @@ export const PayoutsDashboard: React.FC = () => {
 
 	const handleExportBatch = () => {
 		// Open the file in a new tab/trigger browser download
-		window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/export-batch?Authorization=Bearer ${token}`);
+		window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/export-batch`);
 		// Wait a second and refresh to show state transitioned to PROCESSING
 		setTimeout(() => {
 			fetchPayouts();

@@ -14,6 +14,7 @@ import (
 
 	"github.com/platform/driver-delivery/internal/dispatch/expiry"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 )
 
@@ -46,6 +47,7 @@ func main() {
 		Topic:    "order.created",
 		Balancer: &kafka.Hash{},
 	}
+	kafkacfg.FromEnv().ApplyToWriter(kafkaWriter)
 	defer kafkaWriter.Close()
 
 	// Instantiate the Gateway Handler components to utilize its transaction rollback logic

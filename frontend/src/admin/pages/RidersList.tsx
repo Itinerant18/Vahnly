@@ -61,12 +61,10 @@ export const RidersList: React.FC = () => {
 			if (signupStart) params.append('signup_start', signupStart);
 			if (signupEnd) params.append('signup_end', signupEnd);
 
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders?${params.toString()}`, {
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});

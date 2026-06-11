@@ -18,6 +18,8 @@ spec:
         - name: pricing
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
           command: ["/entrypoint"]
           env:
             - name: KAFKA_BROKERS
@@ -26,5 +28,6 @@ spec:
               value: {{ .Values.global.env.redisClusterNodes | quote }}
             - name: PRICING_GROUP_ID
               value: {{ .Values.pricing.groupID | quote }}
+            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
           resources:
             {{- toYaml .Values.pricing.resources | nindent 12 }}

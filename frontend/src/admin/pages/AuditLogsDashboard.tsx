@@ -75,10 +75,9 @@ export const AuditLogsDashboard: React.FC = () => {
   const [retentionDays, setRetentionDays] = useState(365);
   const [cleanupMsg, setCleanupMsg] = useState('');
 
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'ADMIN';
   const isSuperAdmin = role === 'SUPER_ADMIN';
-  const headers = { Authorization: `Bearer ${token}`, 'X-Admin-Role': role };
+  const headers = { 'X-Admin-Role': role };
 
   const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/audit`;
 

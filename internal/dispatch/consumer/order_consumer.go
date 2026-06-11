@@ -20,6 +20,7 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/events"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
 )
@@ -37,6 +38,7 @@ type OrderCreatedConsumer struct {
 	kafkaWriter        *kafka.Writer
 	driverStateWriter  *kafka.Writer
 	orderRetryWriter   *kafka.Writer
+	dlq                *kafkacfg.DLQ
 	spatialScanner     *repository.SpatialScanner
 	redisClusterClient *redis.ClusterClient
 	dbPool             *pgxpool.Pool
@@ -60,7 +62,8 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 	if len(optionalArgs) > 0 {
 		etaCorrector = optionalArgs[0]
 	}
-	return &OrderCreatedConsumer{
+	sec := kafkacfg.FromEnv()
+	c := &OrderCreatedConsumer{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
 			Topic:          "order.created",
@@ -68,6 +71,7 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 			MinBytes:       10,
 			MaxBytes:       10e6,
 			CommitInterval: 0,
+			Dialer:         sec.Dialer(),
 		}),
 		kafkaWriter: &kafka.Writer{
 			Addr:         kafka.TCP(brokers...),
@@ -87,6 +91,7 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 			Balancer:     &kafka.Hash{},
 			RequiredAcks: kafka.RequireOne,
 		},
+		dlq:                kafkacfg.NewDLQ(brokers, "order.created.dlq", sec),
 		spatialScanner:     scanner,
 		redisClusterClient: redisClient,
 		dbPool:             db,
@@ -98,6 +103,11 @@ func NewOrderCreatedConsumer(brokers []string, groupID string, scanner *reposito
 		lastFlushTime:      time.Now(),
 		rollingArrivalRate: 0.0,
 	}
+	// Secure all producers with the same SASL/TLS as the reader.
+	sec.ApplyToWriter(c.kafkaWriter)
+	sec.ApplyToWriter(c.driverStateWriter)
+	sec.ApplyToWriter(c.orderRetryWriter)
+	return c
 }
 
 func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
@@ -129,7 +139,13 @@ func (c *OrderCreatedConsumer) StartExecutionPipeline(ctx context.Context) {
 
 			var order domain.OrderCreatedPayload
 			if err := json.Unmarshal(msg.Value, &order); err != nil {
-				log.Printf("Malformed JSON event dropped: %v", err)
+				// Unprocessable payload: route to the DLQ for inspection/replay, then
+				// commit so it doesn't block or silently vanish from the partition.
+				if dlqErr := c.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error()); dlqErr != nil {
+					log.Printf("Malformed JSON event AND DLQ publish failed (will not commit, retry later): dlq=%v parse=%v", dlqErr, err)
+					continue // leave uncommitted so we retry rather than lose the event
+				}
+				log.Printf("Malformed JSON event routed to order.created.dlq: %v", err)
 				_ = c.kafkaReader.CommitMessages(ctx, msg)
 				continue
 			}
@@ -722,6 +738,7 @@ func (c *OrderCreatedConsumer) Close() error {
 	_ = c.kafkaReader.Close()
 	_ = c.driverStateWriter.Close()
 	_ = c.orderRetryWriter.Close()
+	_ = c.dlq.Close()
 	return c.kafkaWriter.Close()
 }
 

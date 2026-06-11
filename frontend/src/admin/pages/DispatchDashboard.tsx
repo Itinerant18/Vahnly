@@ -75,10 +75,9 @@ export const DispatchDashboard: React.FC = () => {
 
 	const fetchCities = async () => {
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/dispatch/cities`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -91,10 +90,9 @@ export const DispatchDashboard: React.FC = () => {
 
 	const fetchZonesAndGeofences = async () => {
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/geofence`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -108,10 +106,9 @@ export const DispatchDashboard: React.FC = () => {
 	const fetchRulesForCity = async (prefix: string) => {
 		setRulesLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/dispatch/rules/${prefix}`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -163,12 +160,10 @@ export const DispatchDashboard: React.FC = () => {
 		}
 
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/dispatch/cities`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -227,12 +222,10 @@ export const DispatchDashboard: React.FC = () => {
 		}
 
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/geofence`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -268,12 +261,10 @@ export const DispatchDashboard: React.FC = () => {
 			return;
 		}
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/dispatch/rules/${selectedRulesCity}`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},

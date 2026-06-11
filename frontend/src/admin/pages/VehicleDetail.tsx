@@ -30,11 +30,8 @@ export function VehicleDetail() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const token = localStorage.getItem('admin_jwt_token') || '';
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/${encodeURIComponent(id)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/${encodeURIComponent(id)}`);
       if (res.status === 404) { setNotFound(true); return; }
       if (!res.ok) throw new Error('failed');
       setVehicle(await res.json());

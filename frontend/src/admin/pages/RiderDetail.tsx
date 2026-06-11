@@ -179,12 +179,10 @@ export const RiderDetail: React.FC = () => {
 	const fetchRiderDetail = async () => {
 		setLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/${id}`, {
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});
@@ -216,7 +214,6 @@ export const RiderDetail: React.FC = () => {
 	const handleAction = async (actionSlug: string, body?: any) => {
 		setActionLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
 
@@ -224,7 +221,6 @@ export const RiderDetail: React.FC = () => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'X-Admin-Email': email,
 				},

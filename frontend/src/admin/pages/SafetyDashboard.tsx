@@ -107,12 +107,10 @@ export const SafetyDashboard: React.FC = () => {
 	// Simulation Toolbar states
 	const [simulating, setSimulating] = useState<boolean>(false);
 
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const adminRole = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
 	const adminId = '255e9024-d123-4063-9c6f-1662b7f2e8a5'; // standard super admin id
 
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': adminRole,
 		'X-Admin-ID': adminId,
 		'Content-Type': 'application/json',

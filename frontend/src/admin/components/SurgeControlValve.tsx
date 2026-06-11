@@ -20,17 +20,22 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
   const handleEnforceFreeze = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCellToken) return;
+    if (!window.confirm(
+      `Freeze pricing for zone ${selectedCellToken}?\n\n` +
+      `This overrides live surge for the zone and affects every rider fare estimate ` +
+      `there until the freeze is lifted.`
+    )) {
+      return;
+    }
 
     setIsProcessing(true);
     setStatusMessage(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/freeze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           city_prefix: cityPrefix,

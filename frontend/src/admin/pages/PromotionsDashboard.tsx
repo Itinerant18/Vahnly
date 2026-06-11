@@ -140,10 +140,8 @@ export const PromotionsDashboard: React.FC = () => {
 	const [loyaltyLoading, setLoyaltyLoading] = useState<boolean>(true);
 
 	// Token & Role Auth
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const role = localStorage.getItem('admin_role') || 'ADMIN';
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': role,
 		'Content-Type': 'application/json',
 	};
@@ -322,7 +320,6 @@ export const PromotionsDashboard: React.FC = () => {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos/bulk`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'text/csv',
 				},

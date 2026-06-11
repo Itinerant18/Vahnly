@@ -48,14 +48,12 @@ export const ManualBooking: React.FC = () => {
   const fetchDrivers = async () => {
     setDriversLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') || '';
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
       // Call fleet drivers or compliance pending list, or fetch all online drivers
       // Since there isn't a dedicated endpoint for searching drivers, we call a proxy or return seed drivers
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/pending`, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'X-Admin-Role': role,
         },
       });
@@ -112,7 +110,6 @@ export const ManualBooking: React.FC = () => {
   const handleConfirmBooking = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') || '';
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
       const bookingPayload = {
@@ -130,7 +127,6 @@ export const ManualBooking: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
           'X-Admin-Role': role,
         },
         body: JSON.stringify(bookingPayload),

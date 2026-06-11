@@ -104,10 +104,8 @@ export const FinanceDashboard: React.FC = () => {
 	const [loading, setLoading] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const role = localStorage.getItem('admin_role') || 'ADMIN';
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': role,
 		'Content-Type': 'application/json',
 		'X-Admin-Email': 'finance_admin@platform.com'
@@ -407,7 +405,7 @@ export const FinanceDashboard: React.FC = () => {
 	const handleExportInvoices = () => {
 		const params = new URLSearchParams();
 		if (invoiceType) params.append('invoice_type', invoiceType);
-		window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/invoices/export?${params.toString()}&Authorization=Bearer ${token}`);
+		window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/invoices/export?${params.toString()}`);
 	};
 
 	// --- EFFECTS ---

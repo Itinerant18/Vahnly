@@ -72,7 +72,6 @@ export const ControlRoomDashboard: React.FC = () => {
   // Post-cookie-migration the JWT is no longer in localStorage; effects gate on the session
   // (admin_role, set by /session) instead of a token. Requests authenticate via the cookie.
   const isAuthed = !!localStorage.getItem('admin_role');
-  const adminToken = localStorage.getItem('admin_jwt_token') ?? '';
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -157,7 +156,7 @@ export const ControlRoomDashboard: React.FC = () => {
         clearInterval(flushTimer);
       }
     };
-  }, [adminToken, adminRole]);
+  }, [adminRole]);
 
   useEffect(() => {
     if (adminRole === 'FINANCIAL_AUDITOR') return;
@@ -181,7 +180,7 @@ export const ControlRoomDashboard: React.FC = () => {
       disableDefaultUI: true,
       zoomControl: true,
     });
-  }, [isMapSdkLoaded, adminToken]);
+  }, [isMapSdkLoaded]);
 
   // Poll active SOS alerts every 5 seconds
   useEffect(() => {
@@ -189,9 +188,7 @@ export const ControlRoomDashboard: React.FC = () => {
 
     const fetchActiveSOS = async () => {
       try {
-        const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/sos?status=ACTIVE`, {
-          headers: { Authorization: `Bearer ${adminToken}` },
-        });
+        const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/sos?status=ACTIVE`);
         if (response.ok) {
           const data = await response.json();
           setActiveSOSAlerts(data || []);
@@ -204,7 +201,7 @@ export const ControlRoomDashboard: React.FC = () => {
     fetchActiveSOS();
     const interval = setInterval(fetchActiveSOS, 5000);
     return () => clearInterval(interval);
-  }, [adminToken]);
+  }, []);
 
   // Live fleet KPIs for the sidebar (previously hardcoded literals).
   useEffect(() => {
@@ -357,13 +354,8 @@ export const ControlRoomDashboard: React.FC = () => {
   }, [spatialHeatmap, activeSOSAlerts.length]);
 
   const fetchLedgerLogs = async (): Promise<void> => {
-    const token = localStorage.getItem('admin_jwt_token');
-    if (!token) return;
-
     try {
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/ledger`);
 
       if (response.status === 401 || response.status === 403) return;
 

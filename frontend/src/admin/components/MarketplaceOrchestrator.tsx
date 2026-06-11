@@ -74,10 +74,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
   const fetchLiveFraudAnomalies = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/fraud`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/fraud`);
       if (response.ok) {
         const data = await response.json();
         setFraudAlerts(data.alerts || []);
@@ -109,10 +106,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
   const fetchGeofenceZones = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/geofence`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/geofence`);
       if (response.ok) {
         const data = await response.json();
         setGeofences(data.zones || []);
@@ -192,10 +186,9 @@ export const MarketplaceOrchestrator: React.FC = () => {
     setLogResponse(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/force-match`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: overrideOrderID.trim(), driver_id: overrideDriverID.trim() }),
       });
 
@@ -221,10 +214,9 @@ export const MarketplaceOrchestrator: React.FC = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/fraud-lockout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ driver_id: driverId, action, reason: 'High-variance telemetry anomalies detected.' }),
       });
 
@@ -336,10 +328,9 @@ export const MarketplaceOrchestrator: React.FC = () => {
     setLogResponse(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketplace/geofence`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           zone_name: zoneName.trim(),
           city_prefix: 'KOL',

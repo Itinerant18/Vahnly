@@ -24,3 +24,27 @@ capabilities:
 seccompProfile:
   type: RuntimeDefault
 {{- end -}}
+
+{{/*
+Kafka client security env (SASL_SSL). Include inside any Kafka-talking container's
+`env:` list. No-op when kafka.tlsEnabled/saslEnabled are false, so clients stay
+plaintext for local/dev. Every producer & consumer reads these via kafkacfg.FromEnv.
+*/}}
+{{- define "drivers-for-u.kafkaSecurityEnv" -}}
+{{- if .Values.kafka.tlsEnabled }}
+- name: KAFKA_TLS_ENABLED
+  value: "true"
+{{- end }}
+{{- if .Values.kafka.saslEnabled }}
+- name: KAFKA_SASL_USERNAME
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "drivers-for-u.name" . }}-app-secrets
+      key: kafka-sasl-username
+- name: KAFKA_SASL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "drivers-for-u.name" . }}-app-secrets
+      key: kafka-sasl-password
+{{- end }}
+{{- end -}}

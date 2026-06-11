@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
@@ -69,6 +70,7 @@ func NewIncidentAdminHandler(
 		Topic:    "order.created",
 		Balancer: &kafka.LeastBytes{},
 	}
+	kafkacfg.FromEnv().ApplyToWriter(writer)
 
 	return &IncidentAdminHandler{
 		dbPool:        dbPool,

@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 	"github.com/redis/go-redis/v9"
@@ -42,17 +43,20 @@ type HandoffConsumer struct {
 	reader        *kafka.Reader
 	redisClient   *redis.ClusterClient
 	currentRegion string
+	dlq           *kafkacfg.DLQ
 }
 
 func NewHandoffConsumer(brokers []string, topic, groupID, currentRegion string, redis *redis.ClusterClient) *HandoffConsumer {
+	sec := kafkacfg.FromEnv()
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
 		GroupID:  groupID, // e.g., "dispatch-handoff-kolkata"
 		MinBytes: 10,
 		MaxBytes: 10e6,
+		Dialer:   sec.Dialer(),
 	})
-	return &HandoffConsumer{reader: r, redisClient: redis, currentRegion: currentRegion}
+	return &HandoffConsumer{reader: r, redisClient: redis, currentRegion: currentRegion, dlq: kafkacfg.NewDLQ(brokers, topic+".dlq", sec)}
 }
 
 func (hc *HandoffConsumer) Start(ctx context.Context) {
@@ -74,7 +78,8 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 		var event domain.RegionHandoffEvent
 		if err := json.Unmarshal(m.Value, &event); err != nil {
-			log.Printf("Dropped malformed handoff event: %v", err)
+			log.Printf("Routing malformed handoff event to DLQ: %v", err)
+			_ = hc.dlq.Publish(ctx, m, "json_unmarshal_failed: "+err.Error())
 			_ = hc.reader.CommitMessages(ctx, m)
 			continue
 		}
@@ -129,21 +134,21 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 				spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, h3CellStr)
 				nowEpoch := float64(time.Now().Unix())
-				
+
 				pipe := hc.redisClient.Pipeline()
 				pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: event.DriverID})
 				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
 
 				// Also write status, current cell, and profile to completely hydrate driver state
-				statusKey  := fmt.Sprintf("driver:{%s:%s}:status",       cityPrefix, event.DriverID)
+				statusKey := fmt.Sprintf("driver:{%s:%s}:status", cityPrefix, event.DriverID)
 				trackerKey := fmt.Sprintf("driver:{%s:%s}:current_cell", cityPrefix, event.DriverID)
-				profileKey := fmt.Sprintf("driver:{%s:%s}:profile",      cityPrefix, event.DriverID)
+				profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, event.DriverID)
 
 				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 30*time.Second)
 				pipe.Set(ctx, trackerKey, h3CellStr, 24*time.Hour)
 				pipe.HSet(ctx, profileKey,
-					"osm_node_id",              "1001",
-					"acceptance_rate",          "0.95",
+					"osm_node_id", "1001",
+					"acceptance_rate", "0.95",
 					"cancellation_probability", "0.05",
 				)
 				pipe.Expire(ctx, profileKey, 24*time.Hour)
@@ -187,5 +192,6 @@ func (hc *HandoffConsumer) acquireLWW(ctx context.Context, driverID string, cros
 }
 
 func (hc *HandoffConsumer) Close() error {
+	_ = hc.dlq.Close()
 	return hc.reader.Close()
 }

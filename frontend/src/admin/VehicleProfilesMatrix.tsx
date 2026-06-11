@@ -27,10 +27,7 @@ export const VehicleProfilesMatrix: React.FC = () => {
 
   const fetchCustomerVehicleProfiles = async () => {
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles`);
 
       if (response.ok) {
         const data = await response.json();
@@ -87,12 +84,10 @@ export const VehicleProfilesMatrix: React.FC = () => {
     setStatusMessage(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles/update`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           profile_id: selectedProfile.id,

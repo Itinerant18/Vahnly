@@ -31,10 +31,8 @@ interface Props {
 }
 
 const authHeaders = (json = false): Record<string, string> => {
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const email = localStorage.getItem('admin_email') || '';
   const h: Record<string, string> = {};
-  if (token) h.Authorization = `Bearer ${token}`;
   if (email) h['X-Admin-Email'] = email;
   if (json) h['Content-Type'] = 'application/json';
   return h;
@@ -119,6 +117,13 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
   }, [audit?.is_flagged, acknowledged]);
 
   const saveOverride = async (type: 'START' | 'END') => {
+    if (!window.confirm(
+      `Override the ${type} odometer reading to ${editValue} km for order ${orderId}?\n\n` +
+      `If this pushes mileage variance past tolerance it posts a corrective ledger ` +
+      `entry and places the driver on payout hold.`
+    )) {
+      return;
+    }
     setSaving(true);
     try {
       const r = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${orderId}/odometer-audit`, {

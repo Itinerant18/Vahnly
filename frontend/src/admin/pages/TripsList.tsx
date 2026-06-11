@@ -57,13 +57,10 @@ export const TripsList: React.FC = () => {
       if (payment) params.append('payment_method', payment);
       if (ratingLess3) params.append('rating_less_than_3', 'true');
 
-      // Token for authentication
-      const token = localStorage.getItem('admin_jwt_token') || '';
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'X-Admin-Role': role,
         },
       });
@@ -145,7 +142,6 @@ export const TripsList: React.FC = () => {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Are you sure you want to cancel and refund ${selectedIds.length} selected trips?`)) return;
 
-    const token = localStorage.getItem('admin_jwt_token') || '';
     const role = localStorage.getItem('admin_role') || 'ADMIN';
 
     let successCount = 0;
@@ -155,7 +151,6 @@ export const TripsList: React.FC = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
             'X-Admin-Role': role,
           },
           body: JSON.stringify({ order_id: orderId }),

@@ -29,10 +29,7 @@ export const DriverVerificationQueue: React.FC = () => {
   const fetchPendingApplicants = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/pending`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/pending`);
       
       if (response.ok) {
         const data = await response.json();
@@ -103,12 +100,10 @@ export const DriverVerificationQueue: React.FC = () => {
     setMessage(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/verify`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           driver_id: selectedDriver.id,

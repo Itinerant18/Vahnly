@@ -49,10 +49,8 @@ export const ComplianceDashboard: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
   const headers = {
-    Authorization: `Bearer ${token}`,
     'X-Admin-Role': role,
     'Content-Type': 'application/json',
     'X-Admin-Email': localStorage.getItem('admin_email') || '',

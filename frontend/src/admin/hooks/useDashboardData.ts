@@ -57,10 +57,7 @@ interface ChartsData {
 
 // ─── Auth header helper ──────────────────────────────────────────────
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('admin_jwt_token');
-  return token
-    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-    : { 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json' };
 }
 
 // ─── API fetchers (return null on failure so fallback kicks in) ──────

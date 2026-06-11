@@ -120,12 +120,10 @@ export const TripDetail: React.FC = () => {
   const fetchTripDetail = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') || '';
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'X-Admin-Role': role,
         },
       });
@@ -147,14 +145,12 @@ export const TripDetail: React.FC = () => {
   const handleAdminAction = async (actionPath: string, payload?: any) => {
     setActionLoading(true);
     try {
-      const token = localStorage.getItem('admin_jwt_token') || '';
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/${actionPath}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
           'X-Admin-Role': role,
         },
         body: payload ? JSON.stringify(payload) : undefined,

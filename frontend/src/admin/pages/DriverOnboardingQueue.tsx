@@ -32,12 +32,10 @@ export const DriverOnboardingQueue: React.FC = () => {
 	const fetchQueue = async () => {
 		setLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/onboarding`, {
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 				},
 			});
@@ -70,7 +68,6 @@ export const DriverOnboardingQueue: React.FC = () => {
 		}
 		setActionLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
 
@@ -78,7 +75,6 @@ export const DriverOnboardingQueue: React.FC = () => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'X-Admin-Email': email,
 				},
@@ -105,7 +101,6 @@ export const DriverOnboardingQueue: React.FC = () => {
 	const handleDocUpdate = async (docName: string, docStatus: string) => {
 		if (!selectedApplicant) return;
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
 
@@ -113,7 +108,6 @@ export const DriverOnboardingQueue: React.FC = () => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'X-Admin-Email': email,
 				},

@@ -179,14 +179,12 @@ export const SupportDashboard: React.FC = () => {
 	const [loading, setLoading] = useState<boolean>(false);
 	const [detailLoading, setDetailLoading] = useState<boolean>(false);
 
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const agentRole = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
 	const agentEmail = 'aniketkarmakar018@gmail.com';
 	const agentName = 'Aniket karmakar';
 	const agentId = '00000000-0000-0000-0000-000000000000'; // mock fallback
 
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': agentRole,
 		'X-Admin-Email': agentEmail,
 		'Content-Type': 'application/json',

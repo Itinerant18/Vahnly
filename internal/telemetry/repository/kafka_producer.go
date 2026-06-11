@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 )
 
@@ -15,16 +16,16 @@ type kafkaProducer struct {
 
 // NewKafkaProducer instantiates an isolated Kafka connection pool for telemetry streams
 func NewKafkaProducer(brokers []string) domain.KafkaProducer {
-	return &kafkaProducer{
-		writer: &kafka.Writer{
-			Addr:         kafka.TCP(brokers...),
-			Topic:        "driver.location.updated", // Defined in core topology [cite: 76]
-			Balancer:     &kafka.Hash{},             // Explicitly uses hashing for partition routing [cite: 76]
-			MaxAttempts:  3,
-			RequiredAcks: kafka.RequireOne,          // Fast sub-500ms acknowledgment path [cite: 2]
-			Async:        true,                      // Non-blocking asynchronous ingestion path [cite: 34]
-		},
+	w := &kafka.Writer{
+		Addr:         kafka.TCP(brokers...),
+		Topic:        "driver.location.updated", // Defined in core topology [cite: 76]
+		Balancer:     &kafka.Hash{},             // Explicitly uses hashing for partition routing [cite: 76]
+		MaxAttempts:  3,
+		RequiredAcks: kafka.RequireOne,          // Fast sub-500ms acknowledgment path [cite: 2]
+		Async:        true,                      // Non-blocking asynchronous ingestion path [cite: 34]
 	}
+	kafkacfg.FromEnv().ApplyToWriter(w)
+	return &kafkaProducer{writer: w}
 }
 
 func (p *kafkaProducer) PublishLocationUpdate(ctx context.Context, loc *domain.DriverLocation) error {

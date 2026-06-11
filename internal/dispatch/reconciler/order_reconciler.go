@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/observability"
 	"github.com/segmentio/kafka-go"
 )
@@ -26,14 +27,16 @@ type ReconcileTarget struct {
 }
 
 func NewOrderReconcilerSyncWorker(db *pgxpool.Pool, brokers []string) *OrderReconcilerSyncWorker {
+	w := &kafka.Writer{
+		Addr:         kafka.TCP(brokers...),
+		Topic:        "order.assigned", // Targets the exact event destination of the matching pipeline
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+	}
+	kafkacfg.FromEnv().ApplyToWriter(w)
 	return &OrderReconcilerSyncWorker{
-		dbPool: db,
-		kafkaWriter: &kafka.Writer{
-			Addr:         kafka.TCP(brokers...),
-			Topic:        "order.assigned", // Targets the exact event destination of the matching pipeline
-			Balancer:     &kafka.Hash{},
-			RequiredAcks: kafka.RequireOne,
-		},
+		dbPool:         db,
+		kafkaWriter:    w,
 		syncInterval:   15 * time.Second, // Evaluates database state maps every 15 seconds
 		stuckThreshold: 20 * time.Second, // Captures assignments un-progressed for more than 20 seconds
 	}

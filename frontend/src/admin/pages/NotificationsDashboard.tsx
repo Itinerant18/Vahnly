@@ -135,9 +135,7 @@ export function NotificationsDashboard() {
   const base = '/api/v1/admin/notifications';
 
   const authHeaders = (json = false): Record<string, string> => {
-    const token = localStorage.getItem('admin_jwt_token') || '';
     const h: Record<string, string> = {};
-    if (token) h.Authorization = `Bearer ${token}`;
     if (json) h['Content-Type'] = 'application/json';
     return h;
   };

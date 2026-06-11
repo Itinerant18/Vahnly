@@ -92,10 +92,9 @@ export const PricingDashboard: React.FC = () => {
 	const fetchFares = async () => {
 		setFareLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares?city=${selectedCity}&car_type=${selectedCar}&trip_type=${selectedTrip}`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -103,7 +102,7 @@ export const PricingDashboard: React.FC = () => {
 			}
 			// Fetch history
 			const histRes = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares/history?city=${selectedCity}&car_type=${selectedCar}&trip_type=${selectedTrip}`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (histRes.ok) {
 				const histData = await histRes.json();
@@ -119,10 +118,9 @@ export const PricingDashboard: React.FC = () => {
 	const fetchSurgeRules = async () => {
 		setSurgeLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/surge/rules`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -138,10 +136,9 @@ export const PricingDashboard: React.FC = () => {
 	const fetchCommission = async () => {
 		setCommLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/commission?city=${selectedCommCity}&car_type=${selectedCommCar}`, {
-				headers: { Authorization: `Bearer ${token}`, 'X-Admin-Role': role },
+				headers: { 'X-Admin-Role': role },
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -167,12 +164,10 @@ export const PricingDashboard: React.FC = () => {
 	const handleSaveFare = async () => {
 		if (!fare) return;
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -194,12 +189,10 @@ export const PricingDashboard: React.FC = () => {
 	const handleRevertVersion = async (versionID: number) => {
 		if (!confirm('Revert the active fare configuration to this version?')) return;
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares/revert`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -227,12 +220,10 @@ export const PricingDashboard: React.FC = () => {
 	const handleSaveSurgeRules = async () => {
 		if (!surgeRules) return;
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/surge/rules`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -254,12 +245,10 @@ export const PricingDashboard: React.FC = () => {
 	const handlePostManualSurge = async () => {
 		setOverrideLoading(true);
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/freeze`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},
@@ -287,12 +276,10 @@ export const PricingDashboard: React.FC = () => {
 	const handleSaveCommission = async () => {
 		if (!commission) return;
 		try {
-			const token = localStorage.getItem('admin_jwt_token') || '';
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/commission`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${token}`,
 					'X-Admin-Role': role,
 					'Content-Type': 'application/json',
 				},

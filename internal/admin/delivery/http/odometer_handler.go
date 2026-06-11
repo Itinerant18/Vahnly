@@ -14,10 +14,24 @@ import (
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
-// roadFactor approximates road-network distance from the straight-line (geodesic)
-// distance between pickup and dropoff. The admin service has no routing engine, so
-// the expected distance is ST_Distance * roadFactor rather than a true CH route.
-const odoRoadFactor = 1.3
+// odoRoadFactor approximates road-network distance from the straight-line (geodesic)
+// distance between pickup and dropoff (the admin service has no routing engine).
+// It is distance-tiered: dense intra-city trips wander more (~1.4x), while long
+// outstation trips run mostly on straighter highways (~1.15x). A flat 1.3x badly
+// over-estimated outstation distance (e.g. Kolkata→Digha) and produced false
+// variance flags that needlessly held driver payouts.
+func odoRoadFactor(straightKm float64) float64 {
+	switch {
+	case straightKm < 5:
+		return 1.40
+	case straightKm < 30:
+		return 1.30
+	case straightKm < 100:
+		return 1.22
+	default:
+		return 1.15
+	}
+}
 
 // odoTolerancePct is the |variance| beyond which a trip is flagged for audit.
 const odoTolerancePct = 15.0
@@ -79,13 +93,14 @@ func (h *OdometerHandler) computeAudit(ctx context.Context, orderID string) (*od
 		return nil, false
 	}
 
-	expectedKm := straightKm * odoRoadFactor
+	roadFactor := odoRoadFactor(straightKm)
+	expectedKm := straightKm * roadFactor
 	audit := &odoAudit{
 		OrderID:         orderID,
 		Status:          status,
 		FinancialStatus: financialStatus,
 		ExpectedKm:      round2(expectedKm),
-		RoadFactor:      odoRoadFactor,
+		RoadFactor:      roadFactor,
 		TolerancePct:    odoTolerancePct,
 	}
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/surge/aggregator"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestGetRecentDemandRate_Integration(t *testing.T) {

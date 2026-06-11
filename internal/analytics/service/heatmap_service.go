@@ -10,13 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/platform/driver-delivery/internal/events"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
+	"github.com/segmentio/kafka-go"
 )
 
 type HeatmapAnalyticsService struct {
 	kafkaReader *kafka.Reader
-	
+	dlq         *kafkacfg.DLQ
+
 	// Thread-safe map tracking active driver allocations per H3 Hexagon cell index
 	// Key: H3Cell string, Value: Count int64
 	cellDensityMap sync.Map
@@ -27,6 +29,7 @@ type HeatmapAnalyticsService struct {
 }
 
 func NewHeatmapAnalyticsService(brokers []string, groupID string) *HeatmapAnalyticsService {
+	sec := kafkacfg.FromEnv()
 	return &HeatmapAnalyticsService{
 		kafkaReader: kafka.NewReader(kafka.ReaderConfig{
 			Brokers:        brokers,
@@ -35,7 +38,9 @@ func NewHeatmapAnalyticsService(brokers []string, groupID string) *HeatmapAnalyt
 			MinBytes:       10,
 			MaxBytes:       10e6,
 			CommitInterval: 1 * time.Second,
+			Dialer:         sec.Dialer(),
 		}),
+		dlq:     kafkacfg.NewDLQ(brokers, "driver.state.changed.dlq", sec),
 		clients: make(map[chan []byte]struct{}),
 	}
 }
@@ -43,7 +48,7 @@ func NewHeatmapAnalyticsService(brokers []string, groupID string) *HeatmapAnalyt
 // StartAnalyticsProcessing reads driver transitions and increments cell state counts dynamically
 func (s *HeatmapAnalyticsService) StartAnalyticsProcessing(ctx context.Context, cityPrefix string) {
 	log.Printf("[ANALYTICS_CORE] Operational Fleet Tracking active for region [%s]. Stream sinking launched.", cityPrefix)
-	
+
 	// Launch a sub-worker thread to periodically push consolidated matrix updates to active dashboard connections
 	go s.startBroadcastTicker(ctx)
 
@@ -63,6 +68,7 @@ func (s *HeatmapAnalyticsService) StartAnalyticsProcessing(ctx context.Context, 
 
 			var event events.DriverStateChangedEvent
 			if err := json.Unmarshal(msg.Value, &event); err != nil {
+				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
 				continue
 			}
 
@@ -204,5 +210,6 @@ func (s *HeatmapAnalyticsService) HandleHeatmapStream(w http.ResponseWriter, r *
 }
 
 func (s *HeatmapAnalyticsService) Close() error {
+	_ = s.dlq.Close()
 	return s.kafkaReader.Close()
 }

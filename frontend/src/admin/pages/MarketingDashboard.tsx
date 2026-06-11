@@ -122,10 +122,8 @@ export const MarketingDashboard: React.FC = () => {
 	const [loading, setLoading] = useState<boolean>(false);
 
 	// Auth token
-	const token = localStorage.getItem('admin_jwt_token') || '';
 	const adminRole = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
 	const headers = {
-		Authorization: `Bearer ${token}`,
 		'X-Admin-Role': adminRole,
 		'Content-Type': 'application/json',
 	};

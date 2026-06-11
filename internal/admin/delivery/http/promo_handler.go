@@ -102,29 +102,33 @@ func (h *PromoHandler) HandleGetPromos(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Retrieve all promo code keys from Redis keyspace
-	keys, err := h.redisClient.Keys(ctx, "promo:code:*").Result()
+	// Read promo codes from the index set, then fetch each payload. Avoids the
+	// blocking O(N) KEYS scan (which on a Redis Cluster only hits one node anyway).
+	codes, err := h.redisClient.SMembers(ctx, "promo:index").Result()
 	if err != nil {
-		h.logger.Printf("[PROMOS_ERROR] Keys fetch failed: %v", err)
+		h.logger.Printf("[PROMOS_ERROR] index fetch failed: %v", err)
 		http.Error(w, "redis_read_failed", http.StatusInternalServerError)
 		return
 	}
 
-	promos := make([]PromoCode, 0)
-	for _, key := range keys {
-		val, err := h.redisClient.Get(ctx, key).Result()
-		if err == nil && val != "" {
-			var p PromoCode
-			if err := json.Unmarshal([]byte(val), &p); err == nil {
-				// Read active redemption counter from Redis
-				countKey := "promo:redemptions:" + p.Code
-				if cVal, err := h.redisClient.Get(ctx, countKey).Result(); err == nil {
-					if cnt, err := strconv.Atoi(cVal); err == nil {
-						p.RedemptionsCount = cnt
-					}
+	promos := make([]PromoCode, 0, len(codes))
+	for _, code := range codes {
+		val, err := h.redisClient.Get(ctx, "promo:code:"+code).Result()
+		if err != nil || val == "" {
+			// Payload expired (TTL) but the index entry lingered — self-heal.
+			_ = h.redisClient.SRem(ctx, "promo:index", code).Err()
+			continue
+		}
+		var p PromoCode
+		if err := json.Unmarshal([]byte(val), &p); err == nil {
+			// Read active redemption counter from Redis
+			countKey := "promo:redemptions:" + p.Code
+			if cVal, err := h.redisClient.Get(ctx, countKey).Result(); err == nil {
+				if cnt, err := strconv.Atoi(cVal); err == nil {
+					p.RedemptionsCount = cnt
 				}
-				promos = append(promos, p)
 			}
+			promos = append(promos, p)
 		}
 	}
 
@@ -247,6 +251,8 @@ func (h *PromoHandler) HandlePostPromo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "redis_write_failed", http.StatusInternalServerError)
 		return
 	}
+	// Register in the lookup index so HandleGetPromos finds it without a KEYS scan.
+	_ = h.redisClient.SAdd(ctx, "promo:index", req.Code).Err()
 
 	// Initialize usage redemptions count tracker
 	_ = h.redisClient.SetNX(ctx, "promo:redemptions:"+req.Code, req.RedemptionsCount, 0).Err()
@@ -338,6 +344,7 @@ func (h *PromoHandler) HandlePostPromosBulk(w http.ResponseWriter, r *http.Reque
 		if err == nil {
 			err = h.redisClient.Set(ctx, "promo:code:"+code, bytes, 0).Err()
 			if err == nil {
+				_ = h.redisClient.SAdd(ctx, "promo:index", code).Err()
 				_ = h.redisClient.SetNX(ctx, "promo:redemptions:"+code, 0, 0).Err()
 				successCount++
 			}
@@ -394,8 +401,9 @@ func (h *PromoHandler) HandlePostPromoState(w http.ResponseWriter, r *http.Reque
 
 	updatedBytes, _ := json.Marshal(promo)
 	_ = h.redisClient.Set(ctx, key, updatedBytes, 0).Err()
+	_ = h.redisClient.SAdd(ctx, "promo:index", code).Err()
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_STATE_TRANSITION", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_STATE_TRANSITION",
 		fmt.Sprintf("Transited promo code %s state to %s", code, req.Status), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")

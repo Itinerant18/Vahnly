@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/surge/aggregator"
+	"github.com/redis/go-redis/v9"
 )
 
 // We bypass the private struct restriction by using a test helper or exposing a test-oriented interface.

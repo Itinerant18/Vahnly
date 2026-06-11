@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	grpcDelivery "github.com/platform/driver-delivery/internal/telemetry/delivery/grpc"
 	"github.com/platform/driver-delivery/internal/telemetry/repository"
 	"github.com/platform/driver-delivery/internal/telemetry/usecase"
@@ -121,6 +122,7 @@ func main() {
 		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireOne,
 	}
+	kafkacfg.FromEnv().ApplyToWriter(handoffWriter)
 	defer handoffWriter.Close()
 
 	regionRouter := usecase.NewRegionRouter(redisClusterClient, handoffWriter, "kolkata")

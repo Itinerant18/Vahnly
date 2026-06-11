@@ -69,6 +69,7 @@ spec:
                   key: aws-secret-access-key
             - name: SUPPORTED_REGIONS_MATRIX
               value: {{ .Values.gateway.supportedRegions | quote }}
+            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: {{ .Values.gateway.httpPort }}
               name: http

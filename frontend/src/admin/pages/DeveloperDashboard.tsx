@@ -45,11 +45,10 @@ function relTime(iso: string | null) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export const DeveloperDashboard: React.FC = () => {
   const [tab, setTab] = useState<Tab>('keys');
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
   const email = localStorage.getItem('admin_email') || '';
   const isSuperAdmin = role === 'SUPER_ADMIN';
-  const headers = { Authorization: `Bearer ${token}`, 'X-Admin-Role': role, 'X-Admin-Email': email, 'Content-Type': 'application/json' };
+  const headers = { 'X-Admin-Role': role, 'X-Admin-Email': email, 'Content-Type': 'application/json' };
   const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/dev`;
 
   const TABS: { key: Tab; label: string; icon: string }[] = [

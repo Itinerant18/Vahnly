@@ -61,13 +61,9 @@ export const AdminTeamManagement: React.FC = () => {
     { value: 'AUDITOR', label: 'Read-only Auditor' },
   ];
 
-  const token = localStorage.getItem('admin_jwt_token') ?? '';
-
   const fetchAdmins = async () => {
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team`);
       if (res.ok) {
         const data = await res.json();
         setAdmins(data || []);
@@ -83,9 +79,7 @@ export const AdminTeamManagement: React.FC = () => {
         ? `${API_GATEWAY_BASE_URL}/api/v1/admin/team/audit?admin_id=${encodeURIComponent(adminId)}`
         : `${API_GATEWAY_BASE_URL}/api/v1/admin/team/audit`;
       
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data || []);
@@ -114,8 +108,7 @@ export const AdminTeamManagement: React.FC = () => {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/invite`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           full_name: inviteName.trim(),
@@ -160,8 +153,7 @@ export const AdminTeamManagement: React.FC = () => {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/edit-role`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           admin_id: editAdminUser.id,
@@ -191,8 +183,7 @@ export const AdminTeamManagement: React.FC = () => {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/suspend`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           admin_id: admin.id,
@@ -215,8 +206,7 @@ export const AdminTeamManagement: React.FC = () => {
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/reset-2fa`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ admin_id: adminId })
       });

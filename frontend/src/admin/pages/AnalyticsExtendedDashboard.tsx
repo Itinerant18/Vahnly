@@ -34,9 +34,8 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
   const [tripsData, setTripsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'ADMIN';
-  const headers = { Authorization: `Bearer ${token}`, 'X-Admin-Role': role };
+  const headers = { 'X-Admin-Role': role };
 
   const periodRange = () => {
     const to = new Date();

@@ -208,10 +208,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
   const fetchStalledTelemetryIncidents = async () => {
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/trips/stalled`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/trips/stalled`);
 
       if (response.ok) {
         const data = await response.json();
@@ -303,12 +300,10 @@ export const IncidentRecoveryTerminal: React.FC = () => {
     setTerminalLog(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/trips/claim`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           order_id: orderId,
@@ -345,12 +340,10 @@ export const IncidentRecoveryTerminal: React.FC = () => {
     setTerminalLog(null);
 
     try {
-      const token = localStorage.getItem('admin_jwt_token') ?? '';
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/trips/recover`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           order_id: selectedIncident.order_id,

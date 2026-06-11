@@ -71,10 +71,8 @@ export const AnalyticsDashboard: React.FC = () => {
   const [cities, setCities] = useState<CityRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem('admin_jwt_token') || '';
   const role = localStorage.getItem('admin_role') || 'ADMIN';
   const headers = {
-    Authorization: `Bearer ${token}`,
     'X-Admin-Role': role,
     'X-Admin-Email': localStorage.getItem('admin_email') || '',
   };

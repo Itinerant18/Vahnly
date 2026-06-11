@@ -256,25 +256,19 @@ func (h *DutyHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Resolve target trip ID for foreign key constraint
+	// 2. Resolve the driver's ACTIVE trip, if any. A driver can trigger SOS with no
+	// active trip; in that case the alert stands alone (trip_id NULL, migration 073)
+	// rather than being mis-attributed to a random/completed order.
 	var tripID string
 	tripQuery := `
-		SELECT id FROM orders 
-		WHERE assigned_driver_id = $1 
-		ORDER BY CASE 
-			WHEN status IN ('ASSIGNED', 'EN_ROUTE_TO_PICKUP', 'ARRIVED_AT_PICKUP', 'DELIVERING') THEN 1 
-			ELSE 2 
-		END, created_at DESC 
+		SELECT id FROM orders
+		WHERE assigned_driver_id = $1
+		  AND status IN ('ASSIGNED', 'EN_ROUTE_TO_PICKUP', 'ARRIVED_AT_PICKUP', 'DELIVERING')
+		ORDER BY created_at DESC
 		LIMIT 1
 	`
-	err = h.dbPool.QueryRow(ctx, tripQuery, driverID).Scan(&tripID)
-	if err != nil {
-		// Fallback: search for any order in system
-		err = h.dbPool.QueryRow(ctx, "SELECT id FROM orders LIMIT 1").Scan(&tripID)
-		if err != nil {
-			http.Error(w, "No trips registered in system, SOS constraints unresolvable", http.StatusConflict)
-			return
-		}
+	if err = h.dbPool.QueryRow(ctx, tripQuery, driverID).Scan(&tripID); err != nil {
+		tripID = "" // no active trip — file a standalone SOS
 	}
 
 	// 3. Get driver last known lat/lng
@@ -295,11 +289,15 @@ func (h *DutyHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request) {
 	sosID := fmt.Sprintf("SOS-%d", (time.Now().UnixNano()/1000)%100000)
 	audio := "https://platform-safety-recordings.s3.amazonaws.com/sos/" + sosID + ".mp3"
 	
+	var tripIDArg interface{}
+	if tripID != "" {
+		tripIDArg = tripID
+	}
 	insertQuery := `
 		INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status, audio_stream_url, latitude, longitude, notes)
 		VALUES ($1, $2::uuid, 'DRIVER', 'ACTIVE', $3, $4, $5, 'SOS alert triggered from driver operational cockpit.')
 	`
-	_, err = h.dbPool.Exec(ctx, insertQuery, sosID, tripID, audio, lat, lng)
+	_, err = h.dbPool.Exec(ctx, insertQuery, sosID, tripIDArg, audio, lat, lng)
 	if err != nil {
 		http.Error(w, "Failed registering SOS alert record", http.StatusInternalServerError)
 		return
@@ -484,8 +482,9 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 		targetHash = *otpHash
 	}
 	if targetHash == "" {
-		fallbackSum := sha256.Sum256([]byte("1234"))
-		targetHash = hex.EncodeToString(fallbackSum[:])
+		// Fail closed: no provisioned OTP means the trip cannot be started (was "1234").
+		http.Error(w, "otp_not_provisioned", http.StatusConflict)
+		return
 	}
 
 	if inputHash != targetHash {

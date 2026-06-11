@@ -21,6 +21,7 @@ import (
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
 	"github.com/platform/driver-delivery/internal/crypto"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
+	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
 	"github.com/platform/driver-delivery/internal/storage/objectstore"
@@ -96,6 +97,7 @@ func main() {
 	pricingService := pricingSvc.NewOrderPricingService(brokersList, "gateway-pricing-group", redisClusterClient)
 	go pricingService.StartSurgeMatrixSync(mainCtx)
 
+	kafkaSecurity := kafkacfg.FromEnv()
 	kafkaWriter := &kafka.Writer{
 		Addr:         kafka.TCP(brokersList...),
 		Topic:        "order.created",
@@ -107,6 +109,7 @@ func main() {
 		BatchTimeout: 10 * time.Millisecond,
 		BatchSize:    1,
 	}
+	kafkaSecurity.ApplyToWriter(kafkaWriter)
 	defer kafkaWriter.Close()
 
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
@@ -346,6 +349,9 @@ func main() {
 	authGuard := middleware.NewAuthMiddleware(jwtSecret)
 	// Rate Limit parameters: Allow maximum 1000 requests per 1 minute rolling window
 	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 1000, 1*time.Minute)
+	if getEnv("RATE_LIMIT_FAIL_CLOSED", "false") == "true" {
+		rateLimiter.SetFailClosed(true)
+	}
 
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
 	rawSupportedRegions := getEnv("SUPPORTED_REGIONS_MATRIX", "KOL,BLR") // Declare active shards
@@ -369,6 +375,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/callback", adminAuthHandler.HandleSSOGoogleCallback)
+	// Sign in with Apple (env-gated; uses form_post callback per Apple's spec).
+	mux.HandleFunc("GET /api/v1/admin/auth/sso/apple/start", adminAuthHandler.HandleSSOAppleStart)
+	mux.HandleFunc("POST /api/v1/admin/auth/sso/apple/callback", adminAuthHandler.HandleSSOAppleCallback)
 	// Session introspection (cookie- or bearer-authenticated) + cookie-clearing logout.
 	mux.HandleFunc("GET /api/v1/admin/auth/session", authGuard.AuthenticateJWT(adminAuthHandler.HandleAuthSession))
 	mux.HandleFunc("POST /api/v1/admin/auth/logout", adminAuthHandler.HandleAuthLogout)
@@ -874,6 +883,7 @@ func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client
 		MinBytes:       10,
 		MaxBytes:       10e6,
 		CommitInterval: 1 * time.Second,
+		Dialer:         kafkacfg.FromEnv().Dialer(),
 	})
 	defer reader.Close()
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -15,9 +16,19 @@ func AutoRunDatabaseMigrations(postgresConnURL string, migrationsSourcePath stri
 	log.Printf("[MIGRATION_ENGINE] Reading target data schemas from source: %s", migrationsSourcePath)
 
 	// golang-migrate requires standard postgres:// protocol connections
-	m, err := migrate.New(migrationsSourcePath, postgresConnURL)
+	var m *migrate.Migrate
+	var err error
+	maxRetries := 30
+	for i := 1; i <= maxRetries; i++ {
+		m, err = migrate.New(migrationsSourcePath, postgresConnURL)
+		if err == nil {
+			break
+		}
+		log.Printf("[MIGRATION_ENGINE] Database connection attempt %d/%d failed: %v. Retrying in 2s...", i, maxRetries, err)
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		return fmt.Errorf("failed instantiating migration driver context: %w", err)
+		return fmt.Errorf("failed instantiating migration driver context after retries: %w", err)
 	}
 	defer m.Close()
 

@@ -193,10 +193,11 @@ func (m *AuthMiddleware) RequireRole(targetRole string, next http.HandlerFunc) h
 				return
 			}
 
-			claims := &CustomClaims{}
-			_, _ = jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-				return m.jwtSecretKey, nil
-			})
+			claims, valid := m.ValidateToken(tokenStr)
+			if !valid {
+				http.Error(w, "cryptographic_token_validation_failed", http.StatusUnauthorized)
+				return
+			}
 
 			if claims.TwoFactorPending {
 				http.Error(w, "two_factor_enrolment_incomplete", http.StatusForbidden)
@@ -236,10 +237,11 @@ func (m *AuthMiddleware) RequireAnyRole(allowedRoles []string, next http.Handler
 				return
 			}
 
-			claims := &CustomClaims{}
-			_, _ = jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-				return m.jwtSecretKey, nil
-			})
+			claims, valid := m.ValidateToken(tokenStr)
+			if !valid {
+				http.Error(w, "cryptographic_token_validation_failed", http.StatusUnauthorized)
+				return
+			}
 
 			if claims.TwoFactorPending {
 				http.Error(w, "two_factor_enrolment_incomplete", http.StatusForbidden)
