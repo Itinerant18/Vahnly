@@ -1,0 +1,3 @@
+## 2026-06-11 - Unnecessary Locking in Single-Threaded Routing Methods
+**Learning:** Found an anti-pattern in the routing logic (`ComputeShortestPathETA`) where a local, function-scoped `sync.Mutex` was being used to protect local maps and priority queues inside a non-concurrent Dijkstra loop. Because no goroutines were spawned within the function, these variables were never subject to concurrent access, making the locking an unnecessary overhead in a hot path.
+**Action:** When inspecting tight algorithmic loops or data processing functions, verify if local variables are actually accessed concurrently before assuming mutexes are necessary. Removing unused local locks can improve baseline execution speeds without affecting correctness.

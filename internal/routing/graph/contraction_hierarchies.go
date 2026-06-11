@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"sync"
 )
 
 // CHNode represents a preprocessed vertex in the city's road graph
@@ -115,18 +114,21 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 	// Local search state arrays initialized to infinity
 	forwardDist := make(map[int64]float64)
 	backwardDist := make(map[int64]float64)
-	
+
 	forwardDist[sourceID] = 0.0
 	backwardDist[targetID] = 0.0
 
 	pqForward := &PriorityQueue{{nodeID: sourceID, priority: 0.0}}
 	pqBackward := &PriorityQueue{{nodeID: targetID, priority: 0.0}}
-	
+
 	heap.Init(pqForward)
 	heap.Init(pqBackward)
 
 	bestEstimate := math.MaxFloat64
-	var mu sync.Mutex // Protects map reads if evaluating parallel threads
+
+	// ⚡ Bolt Optimization: Removed local sync.Mutex operations from this bidirectional Dijkstra
+	// function. The variables pqForward, pqBackward, forwardDist, and backwardDist are function-scoped
+	// and processed in a single-threaded loop, making the locking unnecessary overhead.
 
 	// Loop until both search trees are empty
 	for pqForward.Len() > 0 || pqBackward.Len() > 0 {
@@ -138,23 +140,19 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 
 		// 1. Forward Search Step (Moving upward from Source)
 		if pqForward.Len() > 0 {
-			mu.Lock()
 			curr := heap.Pop(pqForward).(*Item)
 			u := curr.nodeID
 			uDist := curr.priority
-			mu.Unlock()
 
 			if uDist <= forwardDist[u] {
 				for _, edge := range s.forwardGraph[u] {
 					v := edge.To
 					alt := uDist + edge.Weight
-					
+
 					if d, ok := forwardDist[v]; !ok || alt < d {
 						forwardDist[v] = alt
-						mu.Lock()
 						heap.Push(pqForward, &Item{nodeID: v, priority: alt})
-						mu.Unlock()
-						
+
 						// Check meeting intersection point
 						if backD, evaluated := backwardDist[v]; evaluated {
 							if alt+backD < bestEstimate {
@@ -168,23 +166,19 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 
 		// 2. Backward Search Step (Moving upward from Target)
 		if pqBackward.Len() > 0 {
-			mu.Lock()
 			curr := heap.Pop(pqBackward).(*Item)
 			u := curr.nodeID
 			uDist := curr.priority
-			mu.Unlock()
 
 			if uDist <= backwardDist[u] {
 				for _, edge := range s.backwardGraph[u] {
 					v := edge.To // In backward graph, this means edge coming from v to u
 					alt := uDist + edge.Weight
-					
+
 					if d, ok := backwardDist[v]; !ok || alt < d {
 						backwardDist[v] = alt
-						mu.Lock()
 						heap.Push(pqBackward, &Item{nodeID: v, priority: alt})
-						mu.Unlock()
-						
+
 						// Check meeting intersection point
 						if forD, evaluated := forwardDist[v]; evaluated {
 							if alt+forD < bestEstimate {
