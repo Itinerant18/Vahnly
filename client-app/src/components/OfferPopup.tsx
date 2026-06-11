@@ -180,6 +180,27 @@ export function OfferPopup() {
           </div>
         </div>
 
+        {/* RIDER CAR CONTEXT (Phase 10) */}
+        {(currentOffer.carMake || currentOffer.carModel) && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-1.5 text-left">
+            <p className="text-sm font-bold text-white">
+              You&apos;ll be driving a{' '}
+              {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel]
+                .filter(Boolean)
+                .join(' ')}
+            </p>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+              {currentOffer.carType || 'CAR'} · {currentOffer.carTransmission || 'Any'}
+            </p>
+            {currentOffer.transmissionMatch === false && (
+              <div className="mt-1 rounded-lg border border-amber-600/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-400">
+                ⚠ Car transmission doesn&apos;t match your expertise
+              </div>
+            )}
+            <p className="text-[10px] text-zinc-500">For {currentOffer.riderName}</p>
+          </div>
+        )}
+
         {/* TRIP INFO GRID */}
         <div className="border-t border-b border-zinc-900 py-3 space-y-2.5 text-xs text-left">
           <div>

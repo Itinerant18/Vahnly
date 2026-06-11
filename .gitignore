@@ -112,6 +112,16 @@ client-app/ios/Pods/
 client-app/ios/build/
 
 # ----------------------------------------------------------------------------
+# 5.b rider-app (Next.js) build & dependency state
+# ----------------------------------------------------------------------------
+rider-app/node_modules/
+rider-app/.next/
+rider-app/out/
+rider-app/build/
+rider-app/.turbo/
+rider-app/coverage/
+
+# ----------------------------------------------------------------------------
 # 6. AI / IDE / tool caches (regenerable, personal to each developer)
 # ----------------------------------------------------------------------------
 .vscode/

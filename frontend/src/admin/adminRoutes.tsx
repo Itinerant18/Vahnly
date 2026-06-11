@@ -112,6 +112,12 @@ const FranchiseDashboard = lazy(() =>
 const AdminToolsDashboard = lazy(() =>
   import('./pages/AdminToolsDashboard').then((m) => ({ default: m.AdminToolsDashboard }))
 );
+const CarIssuesDashboard = lazy(() =>
+  import('./pages/CarIssuesDashboard').then((m) => ({ default: m.CarIssuesDashboard }))
+);
+const PromoCodesManager = lazy(() =>
+  import('./pages/PromoCodesManager').then((m) => ({ default: m.PromoCodesManager }))
+);
 
 // Suspense wrapper for lazy routes
 const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -145,6 +151,8 @@ export const adminRoutes: RouteObject[] = [
   { path: 'pricing', element: <LazyWrap><PricingDashboard /></LazyWrap> },
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
   { path: 'promos', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
+  { path: 'promo-codes', element: <LazyWrap><PromoCodesManager /></LazyWrap> },
+  { path: 'car-issues', element: <LazyWrap><CarIssuesDashboard /></LazyWrap> },
   { path: 'finance', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payments', element: <LazyWrap><FinanceDashboard /></LazyWrap> },
   { path: 'payouts', element: <LazyWrap><PayoutsDashboard /></LazyWrap> },
@@ -198,11 +206,13 @@ export const navItems: NavItem[] = [
   { key: 'riders', label: 'Riders', path: '/riders', icon: 'Riders', group: 'fleet' },
   { key: 'drivers', label: 'Drivers', path: '/drivers', icon: 'Drivers', group: 'fleet' },
   { key: 'vehicles', label: 'Vehicles', path: '/vehicles', icon: 'Vehicles', group: 'fleet' },
+  { key: 'car-issues', label: 'Car Issues', path: '/car-issues', icon: 'Vehicles', group: 'fleet' },
   { key: 'dispatch', label: 'Dispatch & Zones', path: '/dispatch', icon: 'Dispatch', group: 'fleet' },
   { key: 'pricing', label: 'Pricing & Surge', path: '/pricing', icon: 'Pricing', group: 'fleet' },
 
   // Finance
   { key: 'promotions', label: 'Promotions', path: '/promotions', icon: 'Promotions', group: 'finance' },
+  { key: 'promo-codes', label: 'Promo Codes', path: '/promo-codes', icon: 'Promotions', group: 'finance' },
   { key: 'payments', label: 'Payments & Finance', path: '/finance', icon: 'Payments', group: 'finance' },
   { key: 'payouts', label: 'Payouts', path: '/payouts', icon: 'Payouts', group: 'finance' },
 

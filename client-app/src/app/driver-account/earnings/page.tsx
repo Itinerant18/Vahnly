@@ -69,10 +69,13 @@ export default function DriverEarningsPage() {
   ];
 
   const liveNet = earnings ? earnings.total_paise / 100 : null;
+  const liveTips = earnings && earnings.tips_paise ? earnings.tips_paise / 100 : 0;
   const fallbackRange = range === 'CUSTOM' ? 'TODAY' : range;
   const currentStats = liveNet === null
     ? fallbackStats[fallbackRange]
-    : { gross: liveNet, trips: liveNet, tips: 0, bonus: 0, incentives: 0, commissions: 0, net: liveNet };
+    // Tips are a subset of total earnings — break them out as their own line and
+    // show the remainder as ride earnings so the total still reconciles.
+    : { gross: liveNet, trips: liveNet - liveTips, tips: liveTips, bonus: 0, incentives: 0, commissions: 0, net: liveNet };
   const trips = earnings
     ? earnings.breakdown.map((item) => ({
         id: item.order_id,

@@ -84,6 +84,30 @@ export const RidersList: React.FC = () => {
 		fetchRiders();
 	}, [search, city, tag, referral, tripsMin, tripsMax, ratingMin, walletMin, walletMax, ltvMin, ltvMax, signupStart, signupEnd]);
 
+	const exportCSV = () => {
+		const headers = ['ID', 'Name', 'Phone', 'Cities', 'Trips', 'Spent (₹)', 'Status', 'Joined'];
+		const rows = riders.map((r) => [
+			r.customer_id,
+			r.name,
+			r.phone,
+			(r.cities || []).join('|'),
+			String(r.total_trips),
+			(r.lifetime_value / 100).toFixed(2),
+			r.status,
+			r.signup_date ? new Date(r.signup_date).toISOString().slice(0, 10) : '',
+		]);
+		const csv = [headers, ...rows]
+			.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+			.join('\n');
+		const blob = new Blob([csv], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'riders.csv';
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
 	const handleResetFilters = () => {
 		setSearch('');
 		setCity('');
@@ -107,6 +131,13 @@ export const RidersList: React.FC = () => {
 					<h1 className="text-2xl font-bold tracking-tight text-ink">Riders Matrix</h1>
 					<p className="text-xs text-mute mt-1">Monitor passenger lifetime value, activity trends, risk scores, and account status</p>
 				</div>
+				<button
+					onClick={exportCSV}
+					disabled={riders.length === 0}
+					className="h-9 px-4 rounded-pill bg-ink text-canvas text-xs font-semibold disabled:opacity-40"
+				>
+					Export CSV
+				</button>
 			</div>
 
 			{/* ---- Filters Panel ---- */}

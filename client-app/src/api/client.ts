@@ -108,6 +108,13 @@ export interface OrderOffer {
   d4mCareOptIn?: boolean;
   distanceKm?: number;
   durationMinutes?: number;
+  // Phase 10: rider's car + driver transmission-match context.
+  carMake?: string;
+  carModel?: string;
+  carType?: string;
+  carColor?: string;
+  carTransmission?: string; // "Manual" | "Automatic"
+  transmissionMatch?: boolean;
 }
 
 export type PendingOfferOrder = OrderOffer;
@@ -148,6 +155,7 @@ export interface EarningsBreakdownItem {
 
 export interface EarningsResponse {
   total_paise: number;
+  tips_paise?: number; // subset of total: TIP_CREDIT entries from rider ratings (Phase 10)
   trip_count: number;
   period_from: string;
   period_to: string;
@@ -824,13 +832,31 @@ export interface FinalBill {
 export async function addOrderEvent(
   token: string,
   orderId: string,
-  payload: { event_type: 'ADD_TOLL' | 'ADD_STOP' | 'REPORT_ISSUE'; amount_paise: number; description: string },
+  payload: {
+    event_type: 'ADD_TOLL' | 'ADD_STOP' | 'REPORT_ISSUE' | 'toll_added' | 'parking_added' | 'waiting_added';
+    amount_paise: number;
+    description: string;
+  },
 ): Promise<{ success: boolean; message: string }> {
   return request<{ success: boolean; message: string }>(`/api/v1/driver/orders/${orderId}/events`, {
     method: 'POST',
     token,
     body: payload,
   });
+}
+
+export type CarIssueType = 'FUEL_LOW' | 'WARNING_LIGHT' | 'TYRE' | 'AC' | 'OTHER';
+
+// Phase 10: driver files a post-trip issue about the rider's car.
+export async function reportCarIssue(
+  token: string,
+  orderId: string,
+  payload: { issue_type: CarIssueType; description: string },
+): Promise<{ success: boolean; admin_notified: boolean; message: string }> {
+  return request<{ success: boolean; admin_notified: boolean; message: string }>(
+    `/api/v1/driver/orders/${orderId}/car-issue-report`,
+    { method: 'POST', token, body: payload },
+  );
 }
 
 export async function driverEndTrip(

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/segmentio/kafka-go"
 )
 
 type FinalBill struct {
@@ -164,6 +165,114 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Event recorded and ledger updated",
+	})
+}
+
+var validCarIssueTypes = map[string]bool{
+	"FUEL_LOW": true, "WARNING_LIGHT": true, "TYRE": true, "AC": true, "OTHER": true,
+}
+
+// HandleDriverCarIssueReport handles POST /api/v1/driver/orders/{id}/car-issue-report.
+// The driver files an issue about the rider's car after the trip; the report is stored
+// and admin is notified asynchronously via the "trip.car.issue" Kafka topic.
+func (h *GatewayHandler) HandleDriverCarIssueReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		IssueType   string `json:"issue_type"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+	if !validCarIssueTypes[req.IssueType] {
+		http.Error(w, "invalid_issue_type: must be FUEL_LOW, WARNING_LIGHT, TYRE, AC, or OTHER", http.StatusBadRequest)
+		return
+	}
+	if len(req.Description) > 1000 {
+		http.Error(w, "description_too_long", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	// Verify the driver was actually assigned to this order, and capture the rider's car id.
+	var assignedDriverID *string
+	var garageCarID *string
+	err := h.dbPool.QueryRow(ctx, `
+		SELECT assigned_driver_id::text, garage_car_id::text
+		FROM orders
+		WHERE id = $1::uuid
+	`, orderID).Scan(&assignedDriverID, &garageCarID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "database_read_exception", http.StatusInternalServerError)
+		return
+	}
+	if assignedDriverID == nil || *assignedDriverID != driverID {
+		http.Error(w, "forbidden: driver identity mismatch", http.StatusForbidden)
+		return
+	}
+
+	// Notify admin via Kafka first; only flag admin_notified if the publish succeeded.
+	adminNotified := false
+	evt := map[string]interface{}{
+		"order_id":            orderID,
+		"driver_id":           driverID,
+		"rider_garage_car_id": garageCarID,
+		"issue_type":          req.IssueType,
+		"description":         req.Description,
+		"reported_at":         time.Now().UTC(),
+	}
+	if payload, mErr := json.Marshal(evt); mErr == nil {
+		if pErr := h.kafkaWriter.WriteMessages(ctx, kafka.Message{
+			Topic: "trip.car.issue",
+			Key:   []byte(orderID),
+			Value: payload,
+		}); pErr == nil {
+			adminNotified = true
+		} else {
+			log.Printf("[CAR_ISSUE] kafka publish failed for order %s: %v", orderID, pErr)
+		}
+	}
+
+	var descArg interface{}
+	if req.Description != "" {
+		descArg = req.Description
+	}
+	_, err = h.dbPool.Exec(ctx, `
+		INSERT INTO car_issue_reports (order_id, driver_id, rider_garage_car_id, issue_type, description, admin_notified)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)
+	`, orderID, driverID, garageCarID, req.IssueType, descArg, adminNotified)
+	if err != nil {
+		log.Printf("[CAR_ISSUE] failed inserting report for order %s: %v", orderID, err)
+		http.Error(w, "failed_to_save_report", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"admin_notified": adminNotified,
+		"message":        "Car issue reported",
 	})
 }
 
@@ -357,7 +466,7 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 		log.Printf("[END_TRIP] Failed querying events sum: %v", err)
 	}
 
-	nightSurgePaise := int64(5000) // flat night surge ₹50
+	nightSurgePaise := int64(5000)    // flat night surge ₹50
 	careSurchargePaise := int64(1500) // flat care surcharge ₹15
 
 	nonTollFarePaise := baseFarePaise + distanceChargePaise + waitChargePaise + overtimeChargePaise + nightSurgePaise + careSurchargePaise
@@ -383,7 +492,7 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 		if math.Abs(variancePct) > 15.0 {
 			// Flag review, hold payout, post corrective adjustment entries
 			_, _ = tx.Exec(ctx, `UPDATE orders SET financial_status = 'REVIEW_REQUIRED' WHERE id = $1::uuid`, orderID)
-			
+
 			holdReason := fmt.Sprintf("Odometer variance %.1f%% under financial review (order %s)", variancePct, orderID)
 			_, _ = tx.Exec(ctx, `UPDATE drivers SET payout_hold = true, payout_hold_reason = $1 WHERE id = $2::uuid`, holdReason, driverID)
 
@@ -397,7 +506,7 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 			                 VALUES ($1::uuid, $2, $2, 'CORRECTIVE_ADJUSTMENT', $3, $4, $5, NOW())`
 			_, _ = tx.Exec(ctx, insertLedger, orderID, cityPrefix, "DEBIT", correctivePaise, desc)
 			_, _ = tx.Exec(ctx, insertLedger, orderID, cityPrefix, "CREDIT", correctivePaise, desc)
-			
+
 			log.Printf("[END_TRIP_AUDIT] Order %s flagged REVIEW_REQUIRED due to odometer variance (%.1f%%)", orderID, variancePct)
 		}
 	}

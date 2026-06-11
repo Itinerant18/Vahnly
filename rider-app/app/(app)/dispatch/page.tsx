@@ -1,0 +1,279 @@
+"use client";
+
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useBookingStore } from "@/lib/store/bookingStore";
+import { useTripStore } from "@/lib/store/tripStore";
+import { ordersApi } from "@/lib/api/orders";
+import { formatCurrency } from "@/lib/utils/formatCurrency";
+
+type DispatchState = "BOOKING" | "SEARCHING" | "TIMEOUT";
+
+const SEARCH_TIMEOUT_MS = 60_000;
+const POLL_INTERVAL_MS = 3_000;
+
+function RadarRing({ delay, size }: { delay: string; size: string }) {
+  return (
+    <div
+      className="absolute rounded-full border border-[#FF6B35]/30"
+      style={{
+        width: size,
+        height: size,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        animation: `ping 2s ${delay} ease-out infinite`,
+      }}
+    />
+  );
+}
+
+function RadarAnimation() {
+  return (
+    <div className="relative flex h-48 w-48 items-center justify-center">
+      <RadarRing delay="0s" size="192px" />
+      <RadarRing delay="0.5s" size="148px" />
+      <RadarRing delay="1s" size="104px" />
+      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#FF6B35]/10 ring-2 ring-[#FF6B35]/40">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#FF6B35" strokeWidth="1.5" />
+          <path d="M12 7v5l3 3" stroke="#FF6B35" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function CountdownRing({ seconds, total }: { seconds: number; total: number }) {
+  const pct = seconds / total;
+  const r = 24;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * pct;
+  return (
+    <svg width="64" height="64" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r={r} fill="none" stroke="#1E1E1E" strokeWidth="4" />
+      <circle
+        cx="32"
+        cy="32"
+        r={r}
+        fill="none"
+        stroke="#FF6B35"
+        strokeWidth="4"
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        transform="rotate(-90 32 32)"
+        style={{ transition: "stroke-dasharray 0.5s linear" }}
+      />
+      <text x="32" y="37" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">
+        {seconds}
+      </text>
+    </svg>
+  );
+}
+
+function DispatchContent() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const orderId = params.get("orderId");
+
+  const bookDriver = useBookingStore((s) => s.bookDriver);
+  const fareEstimate = useBookingStore((s) => s.fareEstimate);
+  const tripType = useBookingStore((s) => s.tripType);
+  const resetBooking = useBookingStore((s) => s.reset);
+  const setActiveOrder = useTripStore((s) => s.setActiveOrder);
+  const setOTP = useTripStore((s) => s.setOTP);
+
+  const [state, setState] = useState<DispatchState>(orderId ? "SEARCHING" : "BOOKING");
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(orderId);
+  const [remainingSecs, setRemainingSecs] = useState(60);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startedRef = useRef(false);
+
+  const stopTimers = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  };
+
+  const startSearching = (oid: string) => {
+    setActiveOrderId(oid);
+    setState("SEARCHING");
+
+    // Countdown timer
+    let secs = 60;
+    setRemainingSecs(secs);
+    const countInterval = setInterval(() => {
+      secs--;
+      setRemainingSecs(secs);
+    }, 1000);
+
+    // Poll order status
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await ordersApi.active();
+        if (res.order.id === oid && res.order.status !== "CREATED") {
+          stopTimers();
+          clearInterval(countInterval);
+          setActiveOrder(res.order);
+          if (res.order.status === "ASSIGNED" || res.order.status === "EN_ROUTE_TO_PICKUP") {
+            router.replace("/trip/live");
+          } else if (res.order.status === "CANCELLED") {
+            setState("TIMEOUT");
+          }
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, POLL_INTERVAL_MS);
+
+    // Hard timeout
+    timeoutRef.current = setTimeout(() => {
+      clearInterval(countInterval);
+      stopTimers();
+      setState("TIMEOUT");
+    }, SEARCH_TIMEOUT_MS);
+  };
+
+  // Book on mount if no orderId passed
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    if (orderId) {
+      startSearching(orderId);
+      return;
+    }
+
+    bookDriver()
+      .then(({ order, otp }) => { setOTP(otp); startSearching(order.id); })
+      .catch(() => setState("TIMEOUT"));
+
+    return () => stopTimers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTryAgain = () => {
+    stopTimers();
+    setState("BOOKING");
+    startedRef.current = false;
+    setActiveOrderId(null);
+    bookDriver()
+      .then(({ order, otp }) => {
+        setOTP(otp);
+        startedRef.current = true;
+        startSearching(order.id);
+      })
+      .catch(() => setState("TIMEOUT"));
+  };
+
+  const handleGoBack = () => {
+    stopTimers();
+    resetBooking();
+    router.replace("/home");
+  };
+
+  const tripLabel: Record<string, string> = {
+    IN_CITY_ROUND: "Round Trip",
+    IN_CITY_ONE_WAY: "One-Way",
+    MINI_OUTSTATION: "Mini Outstation",
+    OUTSTATION: "Outstation",
+  };
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-6">
+      {state === "BOOKING" && (
+        <div className="flex flex-col items-center gap-6 text-center">
+          <div className="h-16 w-16 animate-pulse rounded-full bg-[#FF6B35]/20 ring-2 ring-[#FF6B35]/30" />
+          <p className="text-[#9CA3AF]">Preparing your booking…</p>
+        </div>
+      )}
+
+      {state === "SEARCHING" && (
+        <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
+          <RadarAnimation />
+
+          <div>
+            <h1 className="text-xl font-bold text-white">Finding a driver near you…</h1>
+            <p className="mt-1 text-sm text-[#9CA3AF]">Usually takes 30–60 seconds</p>
+          </div>
+
+          {/* Trip summary chip */}
+          {fareEstimate && (
+            <div className="flex items-center gap-3 rounded-2xl bg-[#1E1E1E] px-4 py-2.5">
+              <span className="text-sm text-[#9CA3AF]">{tripLabel[tripType] ?? tripType}</span>
+              <span className="h-1 w-1 rounded-full bg-[#9CA3AF]" />
+              <span className="text-sm font-semibold text-white">
+                {formatCurrency(fareEstimate.fare_breakdown.estimated_total_paise)}
+              </span>
+            </div>
+          )}
+
+          <CountdownRing seconds={remainingSecs} total={60} />
+
+          {/* Cancel button (free within first 30s) */}
+          {remainingSecs > 30 && activeOrderId && (
+            <button
+              onClick={() => {
+                stopTimers();
+                ordersApi.cancel(activeOrderId, "RIDER_CHANGED_MIND").catch(() => {});
+                handleGoBack();
+              }}
+              className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-[#9CA3AF]"
+            >
+              Cancel (no fee)
+            </button>
+          )}
+          {remainingSecs <= 30 && (
+            <p className="text-xs text-[#9CA3AF]">Cancellation fee may apply</p>
+          )}
+        </div>
+      )}
+
+      {state === "TIMEOUT" && (
+        <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1E1E1E]">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.5" />
+              <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">No drivers available</h1>
+            <p className="mt-1 text-sm text-[#9CA3AF]">
+              All drivers in your area are busy right now. Try again in a few minutes.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-3">
+            <button
+              onClick={handleTryAgain}
+              className="h-14 w-full rounded-2xl bg-[#FF6B35] text-base font-bold text-white shadow-lg shadow-[#FF6B35]/20"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => router.push("/home")}
+              className="h-12 w-full rounded-2xl bg-[#1E1E1E] text-sm font-medium text-[#9CA3AF]"
+            >
+              Schedule for Later
+            </button>
+            <button
+              onClick={handleGoBack}
+              className="h-12 w-full text-sm text-[#9CA3AF]"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function DispatchPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#0A0A0A]" />}>
+      <DispatchContent />
+    </Suspense>
+  );
+}

@@ -59,7 +59,7 @@ echo "==> Waiting up to ${WAIT_SECONDS}s for db-migrator..."
 deadline=$((SECONDS + WAIT_SECONDS))
 done=0
 while (( SECONDS < deadline )); do
-    state=$(docker compose ps db-migrator --format json 2>/dev/null | head -1 || true)
+    state=$(docker compose ps -a db-migrator --format json 2>/dev/null | head -1 || true)
     if echo "$state" | grep -q '"State":"exited"' && echo "$state" | grep -q '"ExitCode":0'; then
         done=1
         break
@@ -99,10 +99,15 @@ if [[ "${SKIP_SEED:-0}" != "1" ]]; then
         PGPASSWORD="${POSTGRES_PASSWORD:-password}" \
             psql -h localhost -p 5432 -U "${POSTGRES_USER:-postgres}" \
                  -d "${POSTGRES_DB:-delivery_platform}" -f bin/seed.sql >/dev/null 2>&1 \
-            && ok "Seed applied" \
+            && ok "Seed applied (via host psql)" \
             || warn "psql seed returned non-zero (likely already seeded)"
     else
-        warn "psql not on PATH. Install postgresql-client or run 'psql -f bin/seed.sql' manually."
+        echo "  psql not on host PATH. Trying to seed via Docker container..."
+        if docker compose exec -T spatial-db psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-delivery_platform}" < bin/seed.sql >/dev/null 2>&1; then
+            ok "Seed applied (via docker compose exec)"
+        else
+            warn "Docker-based psql seed returned non-zero (likely already seeded)"
+        fi
     fi
 fi
 

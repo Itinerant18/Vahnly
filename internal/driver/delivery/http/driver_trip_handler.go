@@ -13,13 +13,33 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/platform/driver-delivery/internal/rider/realtime"
 )
+
+// publishRiderTripEvent looks up the order's rider and pushes a live-trip event to
+// the rider WebSocket. Fire-and-forget (go ...) so it never adds latency to the
+// driver state-transition request.
+func publishRiderTripEvent(pool *pgxpool.Pool, client *redis.ClusterClient, orderID, msgType string, data map[string]any) {
+	if client == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var riderID *string
+	if err := pool.QueryRow(ctx, "SELECT rider_id::text FROM orders WHERE id = $1::uuid", orderID).Scan(&riderID); err != nil || riderID == nil || *riderID == "" {
+		return
+	}
+	_ = realtime.Publish(ctx, client, *riderID, msgType, data)
+}
 
 // A local shim to match the user's expected signature URLParam without requiring external v1 dependencies
 type chiShim struct{}
+
 func (chiShim) URLParam(r *http.Request, key string) string {
 	return r.PathValue(key)
 }
+
 var chi chiShim
 
 type DriverTripHandler struct {
@@ -101,6 +121,17 @@ func (h *DriverTripHandler) MarkArrived(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Commit failed", http.StatusInternalServerError)
 		return
 	}
+
+	// Rider live-trip WS: driver arrived (non-blocking).
+	driverIDStr := ""
+	if assignedDriverID != nil {
+		driverIDStr = *assignedDriverID
+	}
+	go publishRiderTripEvent(h.dbPool, h.clusterClient, orderID, realtime.MsgDriverArrived, map[string]any{
+		"order_id":   orderID,
+		"driver_id":  driverIDStr,
+		"arrived_at": time.Now().UTC(),
+	})
 
 	// 3. Publish to EventBus -> Triggers Push Notification to Rider App
 	if h.clusterClient != nil {
@@ -254,6 +285,13 @@ func (h *DriverTripHandler) VerifyAndStartTrip(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Transaction commit failed", http.StatusInternalServerError)
 		return
 	}
+
+	// Rider live-trip WS: trip started (non-blocking).
+	go publishRiderTripEvent(h.dbPool, h.clusterClient, orderID, realtime.MsgTripStarted, map[string]any{
+		"order_id":       orderID,
+		"started_at":     time.Now().UTC(),
+		"odometer_start": req.StartOdometer,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "trip_started"})

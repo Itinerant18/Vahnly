@@ -21,8 +21,9 @@ import (
 	"github.com/platform/driver-delivery/internal/dispatch/repository"
 	"github.com/platform/driver-delivery/internal/events"
 	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
-	"go.opentelemetry.io/otel"
 	"github.com/platform/driver-delivery/internal/observability"
+	"github.com/platform/driver-delivery/internal/rider/realtime"
+	"go.opentelemetry.io/otel"
 )
 
 const maxHungarianCommitWorkers = 16
@@ -727,11 +728,77 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 
+	// Rider live-trip WS: order assigned. Fire-and-forget so it never adds latency
+	// to the matching/assignment hot path (rule #3).
+	go c.pushRiderAssigned(match.OrderID, match.DriverID, match.EstimatedEtaSeconds)
+
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
 		Key:     []byte(match.OrderID),
 		Value:   bytes,
 		Headers: msgHeaders,
 	})
+}
+
+// pushRiderAssigned enriches the assignment (driver + garage car) and pushes
+// rider.order.assigned to the rider WS, with a notification_outbox FCM backup.
+func (c *OrderCreatedConsumer) pushRiderAssigned(orderID, driverID string, etaSeconds int) {
+	if c.redisClusterClient == nil || c.dbPool == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var riderID, driverName, carMake, carModel, carTransmission *string
+	var driverRating *float64
+	err := c.dbPool.QueryRow(ctx, `
+		SELECT o.rider_id::text, d.name, d.rating, g.make, g.model, g.transmission
+		FROM orders o
+		LEFT JOIN drivers d ON d.id = o.assigned_driver_id
+		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		WHERE o.id = $1::uuid`, orderID).Scan(&riderID, &driverName, &driverRating, &carMake, &carModel, &carTransmission)
+	if err != nil || riderID == nil || *riderID == "" {
+		return
+	}
+
+	vehicleContext := ""
+	if carMake != nil && carModel != nil {
+		vehicleContext = fmt.Sprintf("Driving your %s %s", *carMake, *carModel)
+	}
+	data := map[string]interface{}{
+		"order_id":               orderID,
+		"driver_id":              driverID,
+		"driver_name":            derefStr(driverName),
+		"driver_photo":           "",
+		"driver_rating":          derefFloat(driverRating),
+		"driver_trips_count":     0,
+		"transmission_expertise": derefStr(carTransmission),
+		"eta_minutes":            etaSeconds / 60,
+		"eta_km":                 0,
+		"vehicle_context":        vehicleContext,
+	}
+	_ = realtime.Publish(ctx, c.redisClusterClient, *riderID, realtime.MsgOrderAssigned, data)
+
+	// FCM backup via the transactional outbox.
+	if payload, mErr := json.Marshal(data); mErr == nil {
+		_, _ = c.dbPool.Exec(ctx, `
+			INSERT INTO notification_outbox (user_id, title, body, payload, status)
+			VALUES ($1::uuid, 'Driver assigned', $2, $3::jsonb, 'PENDING')`,
+			*riderID, vehicleContext, payload)
+	}
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func derefFloat(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
 }
 
 func (c *OrderCreatedConsumer) Close() error {
@@ -775,15 +842,15 @@ func (c *OrderConsumer) ProcessMatch(matchEvent MatchPayload) {
 	offerPayload := map[string]interface{}{
 		"type": "OFFER_PENDING",
 		"data": map[string]interface{}{
-			"order_id":         matchEvent.OrderID,
-			"rider_name":       matchEvent.RiderName,
-			"rider_rating":     matchEvent.RiderRating,
-			"pickup_address":   matchEvent.PickupAddress,
-			"drop_address":     matchEvent.DropAddress,
-			"trip_type":        matchEvent.TripType, // CITY, OUTSTATION
-			"eta_minutes":      matchEvent.ETAMinutes,
-			"fare_estimate":    matchEvent.EstimatedFare,
-			"expires_in_secs":  15, // The strict countdown window
+			"order_id":        matchEvent.OrderID,
+			"rider_name":      matchEvent.RiderName,
+			"rider_rating":    matchEvent.RiderRating,
+			"pickup_address":  matchEvent.PickupAddress,
+			"drop_address":    matchEvent.DropAddress,
+			"trip_type":       matchEvent.TripType, // CITY, OUTSTATION
+			"eta_minutes":     matchEvent.ETAMinutes,
+			"fare_estimate":   matchEvent.EstimatedFare,
+			"expires_in_secs": 15, // The strict countdown window
 		},
 	}
 

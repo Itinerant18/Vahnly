@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,7 +23,7 @@ type GeofenceZonePayload struct {
 	CityPrefix           string       `json:"city_prefix"`
 	IsActive             bool         `json:"is_active"`
 	PolygonCoords        [][2]float64 `json:"polygon_coordinates"` // Array of [lat, lng] map points
-	PolicyType           string       `json:"policy_type"`          // "ACTIVE_DISPATCH", "BLACKLIST_BLOCK", "SURGE_FLOOR_FORCE", "TRANSMISSION_RESTRICT"
+	PolicyType           string       `json:"policy_type"`         // "ACTIVE_DISPATCH", "BLACKLIST_BLOCK", "SURGE_FLOOR_FORCE", "TRANSMISSION_RESTRICT"
 	SurgeMultiplier      float64      `json:"surge_multiplier"`
 	AllowedTransmissions string       `json:"allowed_transmissions"` // "ALL", "AUTOMATIC_ONLY", "MANUAL_ONLY"
 	ActivationStart      *time.Time   `json:"activation_start"`
@@ -199,6 +200,58 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 	if payload, mErr := json.Marshal(assignmentEvent); mErr == nil {
 		_ = h.clusterClient.Publish(ctx, "gateway:assignments:broadcast", string(payload)).Err()
 	}
+
+	// Phase 10: an operations force-match is not a normal offer, so tell the driver
+	// explicitly. Gather rider + car context for a human-readable push, deliver a typed
+	// `driver.force.assigned` WS message, and queue an FCM backup so an offline driver
+	// still learns of the assignment.
+	var riderName, carMake, carModel, pickupAddr string
+	_ = h.dbPool.QueryRow(ctx, `
+		SELECT COALESCE(r.name, ''),
+		       COALESCE(g.make, o.one_time_car_make, ''),
+		       COALESCE(g.model, o.one_time_car_model, ''),
+		       'Pickup (' || ROUND(ST_Y(o.pickup_location::geometry)::numeric, 4) || ', ' ||
+		                     ROUND(ST_X(o.pickup_location::geometry)::numeric, 4) || ')'
+		FROM orders o
+		LEFT JOIN riders r       ON r.id = o.rider_id
+		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		WHERE o.id = $1::uuid`, req.OrderID).Scan(&riderName, &carMake, &carModel, &pickupAddr)
+
+	firstName := riderName
+	if firstName == "" {
+		firstName = "a rider"
+	} else if i := strings.IndexByte(firstName, ' '); i > 0 {
+		firstName = firstName[:i]
+	}
+	carContext := strings.TrimSpace(carMake + " " + carModel)
+	if carContext == "" {
+		carContext = "their car"
+	}
+	forceMsg := "You've been assigned a trip by operations"
+
+	forceAssigned := map[string]interface{}{
+		"type":           "driver.force.assigned",
+		"driver_id":      req.DriverID,
+		"order_id":       req.OrderID,
+		"pickup_address": pickupAddr,
+		"rider_name":     firstName,
+		"car_context":    carContext,
+		"message":        forceMsg,
+	}
+	if payload, mErr := json.Marshal(forceAssigned); mErr == nil {
+		_ = h.clusterClient.Publish(ctx, "gateway:assignments:broadcast", string(payload)).Err()
+	}
+
+	// In-app notification + FCM outbox backup.
+	_, _ = h.dbPool.Exec(ctx, `
+		INSERT INTO driver_notifications (driver_id, category, title, body)
+		VALUES ($1::uuid, 'TRIPS', $2, $3)`,
+		req.DriverID, "New trip assigned", forceMsg)
+	fcmPayload := fmt.Sprintf(`{"type":"driver.force.assigned","order_id":"%s"}`, req.OrderID)
+	_, _ = h.dbPool.Exec(ctx, `
+		INSERT INTO notification_outbox (user_id, title, body, payload)
+		VALUES ($1::uuid, $2, $3, $4::jsonb)`,
+		req.DriverID, "New trip assigned", forceMsg, fcmPayload)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))

@@ -253,7 +253,31 @@ data:
         --partitions 3 \
         --replication-factor 1
     done
-    echo "All dispatch event topics created."
+
+    # Rider domain topics (Phase 5): 6 partitions, 7-day retention, + a DLQ each.
+    # replication-factor is 1 on this single-broker local cluster; production (Helm)
+    # provisions these with replication-factor 3.
+    RIDER_TOPICS=(
+      "rider.order.created"
+      "rider.order.cancelled"
+      "rider.order.completed"
+      "rider.rated"
+      "rider.sos"
+      "rider.wallet.topup"
+      "rider.referral.event"
+    )
+    for topic in "${RIDER_TOPICS[@]}"; do
+      for t in "$topic" "$topic.dlq"; do
+        echo "Creating rider topic: $t"
+        kafka-topics --bootstrap-server kafka-service:9092 \
+          --create --if-not-exists \
+          --topic "$t" \
+          --partitions 6 \
+          --replication-factor 1 \
+          --config retention.ms=604800000
+      done
+    done
+    echo "All dispatch + rider event topics created."
 
 ---
 apiVersion: apps/v1

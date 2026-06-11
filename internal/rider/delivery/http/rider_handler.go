@@ -1,0 +1,500 @@
+package http
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log"
+	"net/http"
+	"strconv"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/platform/driver-delivery/internal/rider/repository"
+	"github.com/platform/driver-delivery/internal/rider/service"
+)
+
+// RiderHandler serves the rider auth + onboarding HTTP API. All responses use
+// the envelope {"success":true,"data":...} or {"success":false,"error","code"}.
+type RiderHandler struct {
+	repo       repository.RiderRepository
+	auth       *service.AuthService
+	onboarding *service.OnboardingService
+	referral   *service.ReferralService
+	logger     *log.Logger
+}
+
+func NewRiderHandler(repo repository.RiderRepository, auth *service.AuthService, onboarding *service.OnboardingService, referral *service.ReferralService, logger *log.Logger) *RiderHandler {
+	return &RiderHandler{repo: repo, auth: auth, onboarding: onboarding, referral: referral, logger: logger}
+}
+
+// ---- response envelope helpers ----
+
+func writeJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeData(w http.ResponseWriter, status int, data any) {
+	writeJSON(w, status, map[string]any{"success": true, "data": data})
+}
+
+func writeError(w http.ResponseWriter, status int, msg, code string) {
+	writeJSON(w, status, map[string]any{"success": false, "error": msg, "code": code})
+}
+
+// writeServiceError maps service/repository sentinel errors to HTTP responses.
+func (h *RiderHandler) writeServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, service.ErrInvalidPhone),
+		errors.Is(err, service.ErrInvalidName),
+		errors.Is(err, service.ErrInvalidEmail),
+		errors.Is(err, service.ErrInvalidDOB),
+		errors.Is(err, service.ErrUnderage),
+		errors.Is(err, service.ErrInvalidGender),
+		errors.Is(err, service.ErrLocationOutOfBounds),
+		errors.Is(err, service.ErrMissingCarField):
+		writeError(w, http.StatusBadRequest, err.Error(), "ERR_VALIDATION")
+	case errors.Is(err, service.ErrOTPRateLimited):
+		w.Header().Set("Retry-After", "3600")
+		writeError(w, http.StatusTooManyRequests, err.Error(), "ERR_RATE_LIMITED")
+	case errors.Is(err, service.ErrOTPNotFound),
+		errors.Is(err, service.ErrOTPInvalid),
+		errors.Is(err, service.ErrOTPMaxAttempts):
+		writeError(w, http.StatusUnauthorized, err.Error(), "ERR_OTP")
+	case errors.Is(err, service.ErrMaxEmergencyContacts):
+		writeError(w, http.StatusConflict, err.Error(), "ERR_MAX_CONTACTS")
+	case errors.Is(err, service.ErrRiderInactive):
+		writeError(w, http.StatusForbidden, err.Error(), "ERR_INACTIVE")
+	case errors.Is(err, pgx.ErrNoRows):
+		writeError(w, http.StatusNotFound, "resource not found", "ERR_NOT_FOUND")
+	default:
+		if h.logger != nil {
+			h.logger.Printf("[RIDER] internal error: %v", err)
+		}
+		writeError(w, http.StatusInternalServerError, "internal server error", "ERR_INTERNAL")
+	}
+}
+
+func decodeJSON(r *http.Request, dst any) error {
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
+// riderID returns the authenticated rider id, writing a 401 and returning false
+// if the rider is missing from context (should not happen behind Require).
+func (h *RiderHandler) riderID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	rider, ok := GetRiderFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing authenticated rider", "ERR_UNAUTHENTICATED")
+		return "", false
+	}
+	return rider.ID, true
+}
+
+func parsePagination(r *http.Request) (limit, offset int) {
+	limit, offset = 20, 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	return limit, offset
+}
+
+// ---- Public auth endpoints ----
+
+func (h *RiderHandler) HandleSendOTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	if err := h.auth.SendOTP(r.Context(), req.Phone); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "OTP sent", "expires_in_seconds": 300})
+}
+
+func (h *RiderHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone          string `json:"phone"`
+		OTP            string `json:"otp"`
+		ReferredByCode string `json:"referred_by_code"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+
+	rider, token, err := h.auth.VerifyOTP(r.Context(), req.Phone, req.OTP)
+	if err != nil {
+		if errors.Is(err, service.ErrNewRider) {
+			// Brand-new rider: issue a session token so the client can complete
+			// onboarding, and flag the new-user state.
+			newToken, tErr := h.auth.IssueSession(r.Context(), rider)
+			if tErr != nil {
+				h.writeServiceError(w, tErr)
+				return
+			}
+			// Attach the referral (best-effort, off the response path).
+			if h.referral != nil && req.ReferredByCode != "" {
+				go h.referral.AttachReferral(context.Background(), rider.ID, req.ReferredByCode)
+			}
+			writeData(w, http.StatusOK, map[string]any{
+				"token":        newToken,
+				"rider":        rider,
+				"is_new_rider": true,
+			})
+			return
+		}
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{
+		"token":        token,
+		"rider":        rider,
+		"is_new_rider": false,
+	})
+}
+
+// ---- Profile ----
+
+func (h *RiderHandler) HandleGetMe(w http.ResponseWriter, r *http.Request) {
+	rider, ok := GetRiderFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing authenticated rider", "ERR_UNAUTHENTICATED")
+		return
+	}
+	writeData(w, http.StatusOK, rider)
+}
+
+func (h *RiderHandler) HandleUpdateMe(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.UpdateProfileRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	rider, err := h.onboarding.UpdateProfile(r.Context(), id, req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, rider)
+}
+
+// ---- Garage ----
+
+func (h *RiderHandler) HandleAddCar(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.GarageCarRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	req.ID = "" // create path
+	car, err := h.onboarding.AddGarageCar(r.Context(), id, req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusCreated, car)
+}
+
+func (h *RiderHandler) HandleListCars(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	cars, err := h.repo.GetGarageCars(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, cars)
+}
+
+func (h *RiderHandler) HandleUpdateCar(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.GarageCarRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	req.ID = r.PathValue("carId")
+	car, err := h.onboarding.AddGarageCar(r.Context(), id, req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, car)
+}
+
+func (h *RiderHandler) HandleDeleteCar(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.DeleteGarageCar(r.Context(), r.PathValue("carId"), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "car removed"})
+}
+
+func (h *RiderHandler) HandleSetDefaultCar(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.SetDefaultCar(r.Context(), r.PathValue("carId"), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "default car updated"})
+}
+
+// ---- Saved places ----
+
+func (h *RiderHandler) HandleAddPlace(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.SavePlaceRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	place, err := h.onboarding.SavePlace(r.Context(), id, req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusCreated, place)
+}
+
+func (h *RiderHandler) HandleListPlaces(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	places, err := h.repo.GetSavedPlaces(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, places)
+}
+
+func (h *RiderHandler) HandleDeletePlace(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.DeleteSavedPlace(r.Context(), r.PathValue("placeId"), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "place removed"})
+}
+
+// ---- Emergency contacts ----
+
+func (h *RiderHandler) HandleAddEmergencyContact(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.EmergencyContactRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	req.ID = "" // create path — subject to the 3-contact cap
+	if err := h.onboarding.AddEmergencyContact(r.Context(), id, req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusCreated, map[string]any{"message": "emergency contact added"})
+}
+
+func (h *RiderHandler) HandleListEmergencyContacts(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	contacts, err := h.repo.GetEmergencyContacts(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, contacts)
+}
+
+func (h *RiderHandler) HandleUpdateEmergencyContact(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req service.EmergencyContactRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	req.ID = r.PathValue("contactId")
+	if err := h.onboarding.AddEmergencyContact(r.Context(), id, req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "emergency contact updated"})
+}
+
+func (h *RiderHandler) HandleDeleteEmergencyContact(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.DeleteEmergencyContact(r.Context(), r.PathValue("contactId"), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "emergency contact removed"})
+}
+
+// ---- Wallet ----
+
+func (h *RiderHandler) HandleGetWallet(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	wallet, err := h.repo.GetOrCreateWallet(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, wallet)
+}
+
+func (h *RiderHandler) HandleGetWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	limit, offset := parsePagination(r)
+	txns, total, err := h.repo.GetWalletTransactions(r.Context(), id, limit, offset)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{
+		"transactions": txns,
+		"total":        total,
+		"limit":        limit,
+		"offset":       offset,
+	})
+}
+
+// HandleWalletTopup is intentionally not implemented: wallet top-up requires a
+// payment-gateway integration that is out of scope for the auth/onboarding build.
+func (h *RiderHandler) HandleWalletTopup(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented, "wallet top-up requires payment gateway integration", "ERR_NOT_IMPLEMENTED")
+}
+
+// ---- Device tokens ----
+
+func (h *RiderHandler) HandleAddDeviceToken(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Token    string `json:"device_token"`
+		Platform string `json:"platform"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	if req.Token == "" || req.Platform == "" {
+		writeError(w, http.StatusBadRequest, "device_token and platform are required", "ERR_VALIDATION")
+		return
+	}
+	if err := h.repo.SaveDeviceToken(r.Context(), id, req.Token, req.Platform); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "device token registered"})
+}
+
+func (h *RiderHandler) HandleDeleteDeviceToken(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.DeactivateDeviceToken(r.Context(), id, r.PathValue("token")); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "device token removed"})
+}
+
+// ---- Referral + notifications ----
+
+func (h *RiderHandler) HandleGetReferral(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	referrals, err := h.repo.GetRiderReferrals(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, referrals)
+}
+
+func (h *RiderHandler) HandleListNotifications(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	limit, offset := parsePagination(r)
+	notifs, err := h.repo.GetNotifications(r.Context(), id, limit, offset)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, notifs)
+}
+
+func (h *RiderHandler) HandleMarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.MarkNotificationRead(r.Context(), r.PathValue("id"), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "notification marked read"})
+}

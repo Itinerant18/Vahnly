@@ -16,7 +16,13 @@ type OrderCreatedPayload struct {
 	PickupOSMNodeID int64   `json:"pickup_osm_node_id"`
 	BaseFarePaise   int64   `json:"base_fare_paise"`
 	RetryCount      int     `json:"retry_count"` // MILESTONE 3: Track allocation depth across batch re-queue passes
-	
+
+	// Rider-domain fields. Optional + omitempty so driver-originated orders and the
+	// existing dispatch consumer are unaffected; rider orders ride these along.
+	RiderID      string `json:"rider_id,omitempty"`
+	CarType      string `json:"car_type,omitempty"`
+	Transmission string `json:"transmission,omitempty"`
+
 	// App-level pipeline logging parameter context
 	KafkaMessageContext kafka.Message `json:"-"`
 

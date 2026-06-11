@@ -1,6 +1,87 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SvgAreaChart } from '../components/SvgAreaChart';
 import { useDashboardData, TimeRange } from '../hooks/useDashboardData';
+import { API_GATEWAY_BASE_URL } from '../../config';
+import { getAdminRole } from '../auth';
+
+/* ------------------------------------------------------------------ */
+/*  Rider Metrics (Phase 11)                                           */
+/* ------------------------------------------------------------------ */
+
+interface RiderMetrics {
+  active_riders_today: number;
+  new_signups_today: number;
+  trips_booked_today: number;
+  avg_fare_paise_today: number;
+  daily_bookings: { label: string; value: number }[];
+}
+
+const RiderMetricsSection: React.FC = () => {
+  const [metrics, setMetrics] = useState<RiderMetrics | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/metrics`, { headers: { 'X-Admin-Role': getAdminRole() } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => alive && d && setMetrics(d as RiderMetrics))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const m = metrics;
+  const avgFare = m ? `₹${(m.avg_fare_paise_today / 100).toFixed(0)}` : '—';
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold text-ink">Rider Metrics</h2>
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+          <span className="text-xs font-medium text-body">Active Riders Today</span>
+          <div className="text-2xl font-bold font-mono text-ink mt-1">{m ? m.active_riders_today : '—'}</div>
+        </div>
+        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+          <span className="text-xs font-medium text-body">New Signups Today</span>
+          <div className="text-2xl font-bold font-mono text-ink mt-1">{m ? m.new_signups_today : '—'}</div>
+        </div>
+        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+          <span className="text-xs font-medium text-body">Trips Booked Today</span>
+          <div className="text-2xl font-bold font-mono text-ink mt-1">{m ? m.trips_booked_today : '—'}</div>
+        </div>
+        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+          <span className="text-xs font-medium text-body">Avg Fare Today</span>
+          <div className="text-2xl font-bold font-mono text-ink mt-1">{avgFare}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {m && m.daily_bookings.length >= 2 ? (
+          <SvgAreaChart data={m.daily_bookings} title="Daily bookings (7d)" />
+        ) : (
+          <div className="bg-canvas rounded-xl border border-canvas-soft p-4 text-xs text-mute flex items-center justify-center min-h-[180px]">
+            Daily bookings chart (insufficient data)
+          </div>
+        )}
+        {/* Rider retention cohorts — static placeholder for now */}
+        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+          <div className="text-[13px] font-semibold text-ink mb-3">Rider retention</div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            {[
+              { k: 'Day 1', v: '62%' },
+              { k: 'Day 7', v: '38%' },
+              { k: 'Day 30', v: '21%' },
+            ].map((c) => (
+              <div key={c.k} className="bg-canvas-soft rounded-lg p-3">
+                <div className="text-lg font-bold font-mono text-ink">{c.v}</div>
+                <div className="text-[10px] text-mute uppercase tracking-wider mt-0.5">{c.k}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -187,6 +268,9 @@ export const DashboardHome: React.FC = () => {
         <SvgAreaChart data={cancelChart} title="Cancellation rate" valueSuffix="%" />
         <SvgAreaChart data={driversChart} title="Drivers online" />
       </div>
+
+      {/* ---- Rider Metrics (Phase 11) ---- */}
+      <RiderMetricsSection />
 
       {/* ---- Bottom: Trips Table + Alerts ---- */}
       <div className="grid grid-cols-5 gap-4">

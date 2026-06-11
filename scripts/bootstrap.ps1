@@ -91,10 +91,16 @@ Write-Host "==> Waiting up to $WaitSeconds s for db-migrator to finish..."
 $deadline = (Get-Date).AddSeconds($WaitSeconds)
 $migratorDone = $false
 while ((Get-Date) -lt $deadline) {
-    $state = docker compose ps db-migrator --format json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-    if ($state -and $state.State -eq 'exited' -and $state.ExitCode -eq 0) {
-        $migratorDone = $true
-        break
+    $stateJson = docker compose ps -a db-migrator --format json 2>$null
+    if ($stateJson) {
+        $state = $stateJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($state) {
+            $targetState = if ($state -is [array]) { $state[0] } else { $state }
+            if ($targetState.State -eq 'exited' -and $targetState.ExitCode -eq 0) {
+                $migratorDone = $true
+                break
+            }
+        }
     }
     Start-Sleep -Seconds 2
 }
@@ -133,14 +139,24 @@ if (-not $SkipSeed) {
     $pgPass = $env:POSTGRES_PASSWORD
     $env:PGPASSWORD = $pgPass
     try {
-        psql -h localhost -p 5432 -U postgres -d delivery_platform -f bin/seed.sql 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  [OK]  Seed applied."
+        if (Get-Command psql -ErrorAction SilentlyContinue) {
+            psql -h localhost -p 5432 -U postgres -d delivery_platform -f bin/seed.sql 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  [OK]  Seed applied (via host psql)."
+            } else {
+                Write-Warning "[WARN] psql seed returned non-zero. Likely already seeded."
+            }
         } else {
-            Write-Warning "[WARN] psql seed returned non-zero. Likely already seeded."
+            Write-Host "  psql not on host PATH. Trying to seed via Docker container..."
+            Get-Content bin/seed.sql -Raw | docker compose exec -T spatial-db psql -U postgres -d delivery_platform 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  [OK]  Seed applied (via docker compose exec)."
+            } else {
+                Write-Warning "[WARN] Docker-based psql seed returned non-zero. Likely already seeded."
+            }
         }
     } catch {
-        Write-Warning "[WARN] psql not on PATH. Skipping seed. Install PostgreSQL client or run 'psql -f bin/seed.sql' manually."
+        Write-Warning "[WARN] Failed to apply seed: $_"
     }
 }
 

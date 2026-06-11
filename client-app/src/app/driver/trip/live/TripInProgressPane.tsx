@@ -74,6 +74,46 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
   const [issueText, setIssueText] = useState('');
   const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
 
+  // Rider context panel (Phase 10)
+  const [riderPanelOpen, setRiderPanelOpen] = useState(true);
+
+  // Add Toll/Parking modal (Phase 10)
+  const [showChargeModal, setShowChargeModal] = useState(false);
+  const [chargeType, setChargeType] = useState<'toll_added' | 'parking_added'>('toll_added');
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeSubmitting, setChargeSubmitting] = useState(false);
+
+  const riderFirstName = String(activeTrip?.customer_name || 'Rider').split(' ')[0];
+  const carMake = activeTrip?.car_make || activeTrip?.rider_car_make;
+  const carModel = activeTrip?.car_model || activeTrip?.rider_car_model;
+  const carPlate = activeTrip?.car_plate || activeTrip?.rider_car_plate;
+  const emergencyCount = activeTrip?.emergency_contact_count ?? 0;
+  const d4mCareOpted = Boolean(activeTrip?.d4m_care_opted ?? activeTrip?.d4mCareOptIn);
+
+  const submitCharge = async () => {
+    const rupees = parseFloat(chargeAmount);
+    if (!rupees || rupees <= 0 || chargeSubmitting) return;
+    setChargeSubmitting(true);
+    try {
+      if (token && activeTrip?.order_id) {
+        await addOrderEvent(token, activeTrip.order_id, {
+          event_type: chargeType,
+          amount_paise: Math.round(rupees * 100),
+          description: chargeType === 'toll_added' ? 'Toll added mid-trip' : 'Parking added mid-trip',
+        });
+      }
+      // Reflect in the parent's running totals via the existing quick handlers.
+      if (chargeType === 'toll_added') handleTollAddition();
+      else handleParkingAddition();
+      setShowChargeModal(false);
+      setChargeAmount('');
+    } catch (e) {
+      alert('Failed to add charge. Please try again.');
+    } finally {
+      setChargeSubmitting(false);
+    }
+  };
+
   // 1. Duration counter logic
   useEffect(() => {
     const timer = setInterval(() => {
@@ -245,6 +285,58 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
               </div>
             </div>
 
+            {/* 2b. Rider Context Panel (Phase 10, collapsible) */}
+            <div className="bg-zinc-900/40 border border-zinc-850 rounded-2xl overflow-hidden">
+              <button
+                onClick={() => setRiderPanelOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-2.5 cursor-pointer"
+              >
+                <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">
+                  Rider Context
+                </span>
+                <span className="text-[9px] text-zinc-400">{riderPanelOpen ? '▲' : '▼'}</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {riderPanelOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden px-4 pb-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-zinc-850 border border-zinc-800 flex items-center justify-center text-sm font-extrabold text-white font-sans select-none">
+                        {riderFirstName.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-extrabold text-white">{riderFirstName}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase tracking-wide">Rider</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1.5 text-[10px]">
+                      <p className="text-zinc-400">
+                        Riding in their:{' '}
+                        <span className="text-white font-bold">
+                          {[carMake, carModel].filter(Boolean).join(' ') || 'Car'}
+                        </span>
+                        {carPlate && <span className="text-zinc-500"> [{carPlate}]</span>}
+                      </p>
+                      <p className="text-zinc-400">
+                        Emergency contacts on file:{' '}
+                        <span className="text-white font-bold">{emergencyCount}</span>
+                      </p>
+                      {d4mCareOpted && (
+                        <span className="inline-block mt-1 text-[8px] font-mono font-bold bg-emerald-950/40 border border-emerald-900 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider">
+                          🛡️ D4M Care — you&apos;re covered under insurance
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* 3. Live Trip Counter Metrics */}
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-900">
@@ -304,6 +396,14 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                 🚨 REPORT ISSUE
               </button>
             </div>
+
+            {/* 5b. Add Toll/Parking with custom amount (Phase 10) */}
+            <button
+              onClick={() => setShowChargeModal(true)}
+              className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[9px] font-bold uppercase py-2.5 rounded-xl text-zinc-300 transition cursor-pointer"
+            >
+              ➕ Add Toll / Parking
+            </button>
 
             {/* Report Issue Form Expansion */}
             <AnimatePresence>
@@ -423,6 +523,59 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
         onConfirm={handleSlideToEndTrip}
         color="red"
       />
+
+      {/* Add Toll/Parking Modal (Phase 10) */}
+      {showChargeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-300">
+              Add Charge
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              {(['toll_added', 'parking_added'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setChargeType(t)}
+                  className={`py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition cursor-pointer ${
+                    chargeType === t
+                      ? 'bg-zinc-900 border-white text-white'
+                      : 'bg-black border-zinc-900 text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {t === 'toll_added' ? '🛣️ Toll' : '🅿️ Parking'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-black border border-zinc-800 px-3">
+              <span className="text-sm text-zinc-500">₹</span>
+              <input
+                type="number"
+                min="0"
+                value={chargeAmount}
+                onChange={(e) => setChargeAmount(e.target.value)}
+                placeholder="Amount"
+                className="flex-1 bg-transparent py-3 text-sm text-white outline-none font-mono"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowChargeModal(false)}
+                className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider text-zinc-400 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitCharge}
+                disabled={chargeSubmitting || !chargeAmount}
+                className="bg-white text-black px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50"
+              >
+                {chargeSubmitting ? 'Adding...' : 'Add Charge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

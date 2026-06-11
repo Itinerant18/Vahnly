@@ -17,13 +17,19 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	adminHttp "github.com/platform/driver-delivery/internal/admin/delivery/http"
+	"github.com/platform/driver-delivery/internal/crypto"
 	driverHttp "github.com/platform/driver-delivery/internal/driver/delivery/http"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
-	"github.com/platform/driver-delivery/internal/crypto"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
+	"github.com/platform/driver-delivery/internal/notification"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	riderHttp "github.com/platform/driver-delivery/internal/rider/delivery/http"
+	riderMonitor "github.com/platform/driver-delivery/internal/rider/monitor"
+	riderRealtime "github.com/platform/driver-delivery/internal/rider/realtime"
+	riderRepo "github.com/platform/driver-delivery/internal/rider/repository"
+	riderSvc "github.com/platform/driver-delivery/internal/rider/service"
 	"github.com/platform/driver-delivery/internal/storage/objectstore"
 )
 
@@ -135,6 +141,44 @@ func main() {
 	}
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverTripHandler := driverHttp.NewDriverTripHandler(dbPool, redisClusterClient)
+
+	// Rider (car-owner) auth + onboarding. Standalone JWT middleware (RIDER role),
+	// Redis-backed OTP rate limiting and session tracking, shared pgx pool.
+	riderAppLogger := log.New(os.Stdout, "[RIDER_APP] ", log.LstdFlags)
+	riderAppRepo := riderRepo.NewPostgresRiderRepository(dbPool)
+	riderAuthSvc := riderSvc.NewAuthService(riderAppRepo, riderSvc.NewRedisRiderCache(redisClusterClient), riderSvc.LogSMSSender{Logger: riderAppLogger}, jwtSecret)
+	riderOnboardingSvc := riderSvc.NewOnboardingService(riderAppRepo)
+	// Rider push notifications + referral engine (Phase 5).
+	riderNotifier := notification.NewRiderNotifier(dbPool, notification.StubFCMSender{})
+	riderReferralSvc := riderSvc.NewReferralService(riderAppRepo, riderNotifier)
+	riderAppHandler := riderHttp.NewRiderHandler(riderAppRepo, riderAuthSvc, riderOnboardingSvc, riderReferralSvc, riderAppLogger)
+	riderAuthMW := riderHttp.NewRiderAuthMiddleware(riderAuthSvc)
+
+	// Reward referrals on the referred rider's first completed trip. Wired via the
+	// gateway completion callback (in-process) rather than a separate Kafka consumer.
+	gatewayHttp.RiderTripCompletedCallback = func(orderID, riderID string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = riderReferralSvc.RewardFirstCompletedTrip(ctx, riderID)
+	}
+
+	// Rider booking + fare estimate. Reuses the existing pricing engine (fare),
+	// the order.created Kafka topic (dispatch), and the shared Redis spatial index.
+	riderOrderRepo := riderRepo.NewPostgresOrderRepository(dbPool)
+	riderEventPublisher := riderSvc.NewKafkaEventPublisher(brokersList)
+	defer riderEventPublisher.Close()
+	riderBookingSvc := riderSvc.NewBookingService(riderOrderRepo, riderAppRepo, pricingService, riderRepo.NewDBPromoValidator(dbPool), redisClusterClient, riderEventPublisher, riderAppRepo, riderSvc.LogSMSSender{Logger: riderAppLogger})
+	riderBookingHandler := riderHttp.NewBookingHandler(riderBookingSvc, riderAppLogger)
+
+	// Rider live-trip WebSocket hub. Backplane subscribes to the rider broadcast
+	// channel; services push events via realtime.Publish (Redis pub/sub).
+	riderHub := riderRealtime.NewHub(redisClusterClient, riderAuthSvc)
+	go riderHub.RunBackplane(mainCtx)
+
+	// Ride Check anomaly monitor (Janitor responsibility): scans DELIVERING trips
+	// every 30s for no-movement anomalies and alerts the rider.
+	go riderMonitor.NewRideCheckMonitor(dbPool, redisClusterClient, riderEventPublisher).Run(mainCtx)
+
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverFeaturesHandler := gatewayHttp.NewDriverFeaturesHandler(dbPool)
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
@@ -176,7 +220,7 @@ func main() {
 		var licensePlate string
 		var vehicleModel string
 		var cityPrefix string
-		
+
 		err := dbPool.QueryRow(mainCtx, `
 			SELECT d.name, d.city_prefix, COALESCE(v.license_plate, 'WB-02-AK-9988'), COALESCE(v.make_model, 'Audi A6 Premium')
 			FROM drivers d
@@ -219,7 +263,7 @@ func main() {
 		var licensePlate string
 		var vehicleModel string
 		var cityPrefix string
-		
+
 		err := dbPool.QueryRow(mainCtx, `
 			SELECT d.name, d.city_prefix, COALESCE(v.license_plate, 'WB-02-AK-9988'), COALESCE(v.make_model, 'Audi A6 Premium')
 			FROM drivers d
@@ -269,6 +313,10 @@ func main() {
 
 	riderLogger := log.New(os.Stdout, "[RIDER_ADMIN] ", log.LstdFlags)
 	riderHandler := adminHttp.NewRiderHandler(dbPool, redisClusterClient, riderLogger)
+
+	// Phase 11: rider management, promo-codes, and car-issue admin APIs (real tables).
+	adminRiderLogger := log.New(os.Stdout, "[RIDER_MGMT_ADMIN] ", log.LstdFlags)
+	adminRiderHandler := adminHttp.NewAdminRiderHandler(dbPool, redisClusterClient, riderNotifier, adminRiderLogger)
 
 	driverLogger := log.New(os.Stdout, "[DRIVER_ADMIN] ", log.LstdFlags)
 	driverHandler := adminHttp.NewDriverHandler(dbPool, redisClusterClient, driverLogger)
@@ -426,6 +474,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/events", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverAddOrderEvent))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/end", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverEndTrip))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverConfirmPayment))))
+	mux.HandleFunc("POST /api/v1/driver/orders/{id}/car-issue-report", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverCarIssueReport))))
 	mux.HandleFunc("GET /api/v1/driver/trips", authGuard.AuthenticateJWT(handler.HandleDriverGetTrips))
 	mux.HandleFunc("GET /api/v1/driver/earnings", authGuard.AuthenticateJWT(handler.HandleDriverGetEarnings))
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
@@ -454,6 +503,50 @@ func main() {
 
 	// Driver odometer ingestion endpoint (Phase 2: The Odometer Writer)
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))
+
+	// Rider App: auth + onboarding routes. Public OTP endpoints, then RIDER-scoped
+	// protected endpoints guarded by the standalone rider auth middleware.
+	mux.HandleFunc("POST /api/v1/rider/auth/send-otp", riderAppHandler.HandleSendOTP)
+	mux.HandleFunc("POST /api/v1/rider/auth/verify-otp", riderAppHandler.HandleVerifyOTP)
+
+	mux.HandleFunc("GET /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleGetMe))
+	mux.HandleFunc("PUT /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleUpdateMe))
+	mux.HandleFunc("POST /api/v1/rider/me/garage", riderAuthMW.Require(riderAppHandler.HandleAddCar))
+	mux.HandleFunc("GET /api/v1/rider/me/garage", riderAuthMW.Require(riderAppHandler.HandleListCars))
+	mux.HandleFunc("PUT /api/v1/rider/me/garage/{carId}", riderAuthMW.Require(riderAppHandler.HandleUpdateCar))
+	mux.HandleFunc("DELETE /api/v1/rider/me/garage/{carId}", riderAuthMW.Require(riderAppHandler.HandleDeleteCar))
+	mux.HandleFunc("PATCH /api/v1/rider/me/garage/{carId}/set-default", riderAuthMW.Require(riderAppHandler.HandleSetDefaultCar))
+	mux.HandleFunc("POST /api/v1/rider/me/places", riderAuthMW.Require(riderAppHandler.HandleAddPlace))
+	mux.HandleFunc("GET /api/v1/rider/me/places", riderAuthMW.Require(riderAppHandler.HandleListPlaces))
+	mux.HandleFunc("DELETE /api/v1/rider/me/places/{placeId}", riderAuthMW.Require(riderAppHandler.HandleDeletePlace))
+	mux.HandleFunc("POST /api/v1/rider/me/emergency-contacts", riderAuthMW.Require(riderAppHandler.HandleAddEmergencyContact))
+	mux.HandleFunc("GET /api/v1/rider/me/emergency-contacts", riderAuthMW.Require(riderAppHandler.HandleListEmergencyContacts))
+	mux.HandleFunc("PUT /api/v1/rider/me/emergency-contacts/{contactId}", riderAuthMW.Require(riderAppHandler.HandleUpdateEmergencyContact))
+	mux.HandleFunc("DELETE /api/v1/rider/me/emergency-contacts/{contactId}", riderAuthMW.Require(riderAppHandler.HandleDeleteEmergencyContact))
+	mux.HandleFunc("GET /api/v1/rider/me/wallet", riderAuthMW.Require(riderAppHandler.HandleGetWallet))
+	mux.HandleFunc("GET /api/v1/rider/me/wallet/transactions", riderAuthMW.Require(riderAppHandler.HandleGetWalletTransactions))
+	mux.HandleFunc("POST /api/v1/rider/me/wallet/topup", riderAuthMW.Require(riderAppHandler.HandleWalletTopup))
+	mux.HandleFunc("POST /api/v1/rider/me/device-tokens", riderAuthMW.Require(riderAppHandler.HandleAddDeviceToken))
+	mux.HandleFunc("DELETE /api/v1/rider/me/device-tokens/{token}", riderAuthMW.Require(riderAppHandler.HandleDeleteDeviceToken))
+	mux.HandleFunc("GET /api/v1/rider/me/referral", riderAuthMW.Require(riderAppHandler.HandleGetReferral))
+	mux.HandleFunc("GET /api/v1/rider/me/notifications", riderAuthMW.Require(riderAppHandler.HandleListNotifications))
+	mux.HandleFunc("PATCH /api/v1/rider/me/notifications/{id}/read", riderAuthMW.Require(riderAppHandler.HandleMarkNotificationRead))
+
+	// Rider App: fare estimate + booking lifecycle. Protected routes are RIDER-scoped;
+	// trip-share is public (sanitized, token-gated).
+	mux.HandleFunc("POST /api/v1/rider/fare-estimate", riderAuthMW.Require(riderBookingHandler.HandleFareEstimate))
+	mux.HandleFunc("POST /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleCreateOrder))
+	mux.HandleFunc("GET /api/v1/rider/orders/active", riderAuthMW.Require(riderBookingHandler.HandleGetActiveOrder))
+	mux.HandleFunc("GET /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleOrderHistory))
+	mux.HandleFunc("DELETE /api/v1/rider/orders/{orderId}/cancel", riderAuthMW.Require(riderBookingHandler.HandleCancelOrder))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/rate", riderAuthMW.Require(riderBookingHandler.HandleRateDriver))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", riderAuthMW.Require(riderBookingHandler.HandleSOS))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/stops", riderAuthMW.Require(riderBookingHandler.HandleAddStop))
+	mux.HandleFunc("PATCH /api/v1/rider/orders/{orderId}/extend", riderAuthMW.Require(riderBookingHandler.HandleExtend))
+	mux.HandleFunc("GET /api/v1/trip-share/{shareToken}", riderBookingHandler.HandleTripShare)
+
+	// Rider live-trip WebSocket (token in query; authenticated via RiderFromJWT).
+	mux.HandleFunc("GET /ws/rider", riderHub.HandleRiderStream)
 
 	// Register administrative control routes, protected by granular RBAC role gates
 	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, handler.HandleAdminGetLedger))
@@ -506,6 +599,24 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
 	mux.HandleFunc("PATCH /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
 
+	// Phase 11 rider management (real tables). More-specific patterns take precedence
+	// over the {action} wildcard above in the Go 1.22 ServeMux.
+	mux.HandleFunc("GET /api/v1/admin/riders/metrics", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_LEAD", "ANALYTICS", "FINANCE"}, adminRiderHandler.HandleRiderMetrics))
+	mux.HandleFunc("PATCH /api/v1/admin/riders/{id}/status", authGuard.RequireRole("SUPER_ADMIN", adminRiderHandler.HandleUpdateRiderStatus))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/orders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_LEAD", "FINANCE", "COMPLIANCE"}, adminRiderHandler.HandleGetRiderOrders))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/wallet", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_LEAD", "FINANCIAL_AUDITOR", "FINANCE"}, adminRiderHandler.HandleGetRiderWallet))
+	mux.HandleFunc("POST /api/v1/admin/riders/{id}/wallet/adjust", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, adminRiderHandler.HandleAdjustRiderWallet))
+
+	// Phase 11 promo-codes
+	mux.HandleFunc("GET /api/v1/admin/promo-codes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "ANALYTICS", "FINANCE"}, adminRiderHandler.HandleListPromoCodes))
+	mux.HandleFunc("POST /api/v1/admin/promo-codes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKETING"}, adminRiderHandler.HandleCreatePromoCode))
+	mux.HandleFunc("PATCH /api/v1/admin/promo-codes/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKETING"}, adminRiderHandler.HandleUpdatePromoCode))
+	mux.HandleFunc("GET /api/v1/admin/promo-codes/{id}/usages", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "ANALYTICS", "FINANCE"}, adminRiderHandler.HandleGetPromoUsages))
+
+	// Phase 11 car-issue reports
+	mux.HandleFunc("GET /api/v1/admin/car-issue-reports", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "SUPPORT_LEAD"}, adminRiderHandler.HandleListCarIssueReports))
+	mux.HandleFunc("PATCH /api/v1/admin/car-issue-reports/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "SUPPORT_LEAD"}, adminRiderHandler.HandleUpdateCarIssueReport))
+
 	// Vehicles control endpoints
 	mux.HandleFunc("GET /api/v1/admin/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicles))
 	mux.HandleFunc("POST /api/v1/admin/vehicles/reminders", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleSendDocReminders))
@@ -513,7 +624,6 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/vehicles/{plate}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetVehicleDetail))
 	mux.HandleFunc("GET /api/v1/admin/customers/vehicles", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandleGetCustomerVehicleProfiles))
 	mux.HandleFunc("POST /api/v1/admin/customers/vehicles/update", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, vehicleHandler.HandlePostCustomerVehicleProfileUpdate))
-
 
 	// Dispatch, Zones & Rules control endpoints
 	mux.HandleFunc("GET /api/v1/admin/dispatch/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, dispatchHandler.HandleGetCities))

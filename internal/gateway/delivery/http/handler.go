@@ -39,6 +39,7 @@ import (
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"github.com/platform/driver-delivery/internal/observability"
 	pricingSvc "github.com/platform/driver-delivery/internal/pricing/service"
+	riderRealtime "github.com/platform/driver-delivery/internal/rider/realtime"
 	. "github.com/platform/driver-delivery/pkg/api/v1"
 	"go.opentelemetry.io/otel"
 )
@@ -51,6 +52,10 @@ var SOSCallback func(tripID string, lat, lng float64)
 
 // StalledTripCallback allows flagging stalled/idle trips to the administrative incidents manager
 var StalledTripCallback func(driverID string, tripID string, lat, lng float64, duration int)
+
+// RiderTripCompletedCallback is invoked (in-process) when a rider's trip completes,
+// so the referral engine can reward a first completed trip. Set from main.
+var RiderTripCompletedCallback func(orderID, riderID string)
 
 // ActiveWebSocketSession encapsulates everything needed for active connection management
 type ActiveWebSocketSession struct {
@@ -1420,9 +1425,38 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	// Driver returned to the available pool: announce it so surge supply + heatmap recover.
 	h.emitDriverAvailable(ctx, cityPrefix, req.DriverID, "ONLINE_DELIVERING")
 
+	// Rider live-trip WS: trip completed (non-blocking).
+	go h.pushRiderTripEvent(req.OrderID, riderRealtime.MsgTripCompleted, map[string]interface{}{
+		"order_id":         req.OrderID,
+		"total_fare_paise": baseFarePaise,
+		"fare_breakdown":   map[string]interface{}{"base_fare_paise": baseFarePaise},
+		"distance_km":      0,
+		"duration_minutes": 0,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"COMPLETED","total_debited_paise":%d,"driver_credited_paise":%d}`, baseFarePaise, driverEarningsPaise)))
+}
+
+// pushRiderTripEvent looks up the order's rider and pushes a live-trip event to the
+// rider WebSocket. Fire-and-forget so it never adds latency to the trip lifecycle.
+func (h *GatewayHandler) pushRiderTripEvent(orderID, msgType string, data map[string]interface{}) {
+	if h.clusterClient == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var riderID *string
+	if err := h.dbPool.QueryRow(ctx, "SELECT rider_id::text FROM orders WHERE id = $1::uuid", orderID).Scan(&riderID); err != nil || riderID == nil || *riderID == "" {
+		return
+	}
+	_ = riderRealtime.Publish(ctx, h.clusterClient, *riderID, msgType, data)
+
+	// On trip completion, let the referral engine reward a first completed trip.
+	if msgType == riderRealtime.MsgTripCompleted && RiderTripCompletedCallback != nil {
+		RiderTripCompletedCallback(orderID, *riderID)
+	}
 }
 
 // HandlePaymentWebhook intercepts asynchronous external provider billing tokens and updates transaction matrices securely
@@ -1942,6 +1976,14 @@ type OrderOffer struct {
 	D4MCareOptIn         bool            `json:"d4mCareOptIn,omitempty"`
 	DistanceKm           float64         `json:"distanceKm,omitempty"`
 	DurationMinutes      int             `json:"durationMinutes,omitempty"`
+
+	// Phase 10: rider + car context surfaced to the driver offer popup.
+	CarMake           string `json:"carMake,omitempty"`
+	CarModel          string `json:"carModel,omitempty"`
+	CarType           string `json:"carType,omitempty"`
+	CarColor          string `json:"carColor,omitempty"`
+	CarTransmission   string `json:"carTransmission,omitempty"` // "Manual" | "Automatic"
+	TransmissionMatch bool   `json:"transmissionMatch"`         // driver expertise covers the car's transmission
 }
 
 func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Request) {
@@ -1963,23 +2005,48 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		dropoffLng      float64
 		baseFarePaise   int64
 		surgeMultiplier float64
-		customerID      string
+		riderName       string
+		carMake         string
+		carModel        string
+		carType         string
+		carTransmission string
+		carColor        string
+		d4mCareOpted    bool
+		drvManual       bool
+		drvAutomatic    bool
 	)
 
+	// Phase 10: join the rider, their selected car (garage or one-time), and the
+	// driver's transmission expertise so the offer popup can show real context and a
+	// transmission-match warning. COALESCE keeps the offer resilient to missing rows.
 	query := `
-		SELECT id::text, city_prefix, pickup_h3_cell,
-		       ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry),
-		       ST_Y(dropoff_location::geometry), ST_X(dropoff_location::geometry),
-		       base_fare_paise, surge_multiplier::float8, customer_id::text
-		FROM orders
-		WHERE assigned_driver_id = $1::uuid
-		  AND status = 'ASSIGNED'::order_status_enum
-		ORDER BY assigned_at DESC NULLS LAST
+		SELECT o.id::text, o.city_prefix, o.pickup_h3_cell,
+		       ST_Y(o.pickup_location::geometry), ST_X(o.pickup_location::geometry),
+		       ST_Y(o.dropoff_location::geometry), ST_X(o.dropoff_location::geometry),
+		       o.base_fare_paise, o.surge_multiplier::float8,
+		       COALESCE(r.name, ''),
+		       COALESCE(g.make, o.one_time_car_make, ''),
+		       COALESCE(g.model, o.one_time_car_model, ''),
+		       COALESCE(g.car_type, o.one_time_car_type, ''),
+		       COALESCE(g.transmission, o.one_time_car_transmission, ''),
+		       COALESCE(g.color, ''),
+		       COALESCE(o.d4m_care_opted, false),
+		       COALESCE(d.transmission_manual, true),
+		       COALESCE(d.transmission_automatic, true)
+		FROM orders o
+		LEFT JOIN riders r       ON r.id = o.rider_id
+		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		LEFT JOIN drivers d      ON d.id = o.assigned_driver_id
+		WHERE o.assigned_driver_id = $1::uuid
+		  AND o.status = 'ASSIGNED'::order_status_enum
+		ORDER BY o.assigned_at DESC NULLS LAST
 		LIMIT 1;
 	`
 	err := h.dbPool.QueryRow(ctx, query, driverID).Scan(
 		&orderID, &cityPrefix, &pickupH3Cell, &pickupLat, &pickupLng,
-		&dropoffLat, &dropoffLng, &baseFarePaise, &surgeMultiplier, &customerID,
+		&dropoffLat, &dropoffLng, &baseFarePaise, &surgeMultiplier,
+		&riderName, &carMake, &carModel, &carType, &carTransmission, &carColor,
+		&d4mCareOpted, &drvManual, &drvAutomatic,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1996,21 +2063,39 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		ttlSeconds = int64(ttl.Seconds())
 	}
 
-	// Calculate optimized mock/derived fields for premium visual execution
 	riderRating := 4.85
 	tripType := "CITY"
 	if strings.Contains(strings.ToLower(cityPrefix), "out") {
 		tripType = "OUTSTATION"
 	}
 
-	notes := "Rider has heavy luggage bags, request trunk clearance."
-	carTypeRequested := "PREMIUM_SUV"
-	transmissionRequired := "AUTOMATIC"
-	d4mCareOptIn := true
+	// First name only — the driver never needs the rider's full identity.
+	firstName := riderName
+	if firstName == "" {
+		firstName = "Rider"
+	} else if i := strings.IndexByte(firstName, ' '); i > 0 {
+		firstName = firstName[:i]
+	}
+
+	// Normalise the car transmission to a display string and decide whether the
+	// driver's expertise covers it. Unknown transmission => assume a match (no warning).
+	transUpper := strings.ToUpper(strings.TrimSpace(carTransmission))
+	transmissionDisplay := ""
+	transmissionMatch := true
+	switch transUpper {
+	case "MANUAL":
+		transmissionDisplay = "Manual"
+		transmissionMatch = drvManual
+	case "AUTOMATIC":
+		transmissionDisplay = "Automatic"
+		transmissionMatch = drvAutomatic
+	}
+
+	notes := ""
 
 	offer := OrderOffer{
 		OrderID:     orderID,
-		RiderName:   "Rahul Sharma",
+		RiderName:   firstName,
 		RiderRating: riderRating,
 		Pickup: LocationDetails{
 			Address: fmt.Sprintf("Pickup Near Cell %s (%f, %f)", pickupH3Cell, pickupLat, pickupLng),
@@ -2026,11 +2111,17 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		ETAMinutes:           6,
 		TripType:             tripType,
 		Notes:                notes,
-		CarTypeRequested:     carTypeRequested,
-		TransmissionRequired: transmissionRequired,
-		D4MCareOptIn:         d4mCareOptIn,
+		CarTypeRequested:     carType,
+		TransmissionRequired: transUpper,
+		D4MCareOptIn:         d4mCareOpted,
 		DistanceKm:           4.8,
 		DurationMinutes:      12,
+		CarMake:              carMake,
+		CarModel:             carModel,
+		CarType:              carType,
+		CarColor:             carColor,
+		CarTransmission:      transmissionDisplay,
+		TransmissionMatch:    transmissionMatch,
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -2226,7 +2317,7 @@ func (h *GatewayHandler) HandleDriverGetEarnings(w http.ResponseWriter, r *http.
 	defer cancel()
 
 	rows, err := h.dbPool.Query(ctx, `
-		SELECT o.id::text, fle.amount_paise, COALESCE(o.completed_at, fle.created_at) AS completed_at
+		SELECT o.id::text, fle.amount_paise, fle.description, COALESCE(o.completed_at, fle.created_at) AS completed_at
 		FROM financial_ledger_entries fle
 		JOIN orders o ON o.id = fle.order_id
 		WHERE o.assigned_driver_id = $1::uuid
@@ -2243,22 +2334,29 @@ func (h *GatewayHandler) HandleDriverGetEarnings(w http.ResponseWriter, r *http.
 	defer rows.Close()
 
 	var totalPaise int64
+	var tipsPaise int64 // subset of total: TIP_CREDIT entries from rider ratings
 	breakdown := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var (
 			orderID     string
 			amountPaise int64
+			description *string
 			completedAt time.Time
 		)
-		if err := rows.Scan(&orderID, &amountPaise, &completedAt); err != nil {
+		if err := rows.Scan(&orderID, &amountPaise, &description, &completedAt); err != nil {
 			http.Error(w, "driver_earnings_decode_failed", http.StatusInternalServerError)
 			return
 		}
 		totalPaise += amountPaise
+		isTip := description != nil && strings.HasPrefix(*description, "TIP_CREDIT")
+		if isTip {
+			tipsPaise += amountPaise
+		}
 		breakdown = append(breakdown, map[string]interface{}{
 			"order_id":     orderID,
 			"amount_paise": amountPaise,
 			"completed_at": completedAt,
+			"is_tip":       isTip,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -2268,6 +2366,7 @@ func (h *GatewayHandler) HandleDriverGetEarnings(w http.ResponseWriter, r *http.
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_paise": totalPaise,
+		"tips_paise":  tipsPaise,
 		"trip_count":  len(breakdown),
 		"period_from": periodFrom,
 		"period_to":   periodTo,

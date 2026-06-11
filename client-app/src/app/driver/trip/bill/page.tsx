@@ -3,17 +3,49 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { FinalBill } from '@/api/client';
+import { FinalBill, reportCarIssue, CarIssueType } from '@/api/client';
+
+const CAR_ISSUE_TYPES: { value: CarIssueType; label: string }[] = [
+  { value: 'FUEL_LOW', label: 'Fuel Low' },
+  { value: 'WARNING_LIGHT', label: 'Warning Light' },
+  { value: 'TYRE', label: 'Tyre' },
+  { value: 'AC', label: 'AC' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 export default function FinalBillPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderID = searchParams.get('order_id') || '';
   const { token } = useAuthStore();
-  
+
   const [bill, setBill] = useState<FinalBill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CASH' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Phase 10: post-trip car issue report
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [issueType, setIssueType] = useState<CarIssueType>('FUEL_LOW');
+  const [issueDesc, setIssueDesc] = useState('');
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
+  const [issueDone, setIssueDone] = useState(false);
+
+  const submitCarIssue = async () => {
+    if (issueSubmitting) return;
+    setIssueSubmitting(true);
+    try {
+      if (token && orderID) {
+        await reportCarIssue(token, orderID, { issue_type: issueType, description: issueDesc });
+      }
+      setIssueDone(true);
+      setShowIssueForm(false);
+      setIssueDesc('');
+    } catch (e) {
+      alert('Failed to report car issue. Please try again.');
+    } finally {
+      setIssueSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     // Read from sessionStorage first
@@ -145,6 +177,67 @@ export default function FinalBillPage() {
               <span className="text-emerald-400 text-sm font-extrabold">₹{totalAmount.toFixed(2)}</span>
             </div>
           </div>
+        </div>
+
+        {/* Report Car Issue (Phase 10) */}
+        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 shadow-xl text-left">
+          {!showIssueForm && !issueDone && (
+            <button
+              onClick={() => setShowIssueForm(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-amber-900/40 bg-amber-950/20 text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:bg-amber-950/40 transition cursor-pointer"
+            >
+              🔧 Report Car Issue
+            </button>
+          )}
+          {issueDone && (
+            <p className="text-center text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+              ✓ Car issue reported — admin notified
+            </p>
+          )}
+          {showIssueForm && (
+            <div className="space-y-3">
+              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider block">
+                Report Car Issue
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {CAR_ISSUE_TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => setIssueType(t.value)}
+                    className={`py-2 rounded-lg text-[9px] font-bold uppercase tracking-wide border transition cursor-pointer ${
+                      issueType === t.value
+                        ? 'bg-amber-950/40 border-amber-700 text-amber-300'
+                        : 'bg-black border-zinc-900 text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={issueDesc}
+                onChange={(e) => setIssueDesc(e.target.value)}
+                placeholder="Describe the issue (optional)"
+                rows={2}
+                className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-amber-600 text-xs font-mono resize-none"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowIssueForm(false)}
+                  className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitCarIssue}
+                  disabled={issueSubmitting}
+                  className="bg-amber-600 hover:bg-amber-700 text-black px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                >
+                  {issueSubmitting ? 'Filing...' : 'Submit Report'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Payment Selector */}
