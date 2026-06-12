@@ -1023,3 +1023,158 @@ export async function getPayoutDetail(token: string, payoutId: string): Promise<
   return request<PayoutHistoryItem>(`/api/v1/driver/payouts/${payoutId}`, { method: "GET", token });
 }
 
+// ─── Vehicle management ───────────────────────────────────────────────────────
+
+export type VehicleDocStatus = "VALID" | "EXPIRING" | "EXPIRED" | "MISSING";
+
+export interface VehicleDocSlot {
+  document_type: "RC" | "INSURANCE" | "PUC";
+  storage_url?: string;
+  expiry_date?: string | null;
+  status: VehicleDocStatus;
+}
+
+export interface DriverVehicleFull {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  plate: string;
+  fuel_type: string;
+  car_type: string;
+  transmission: string;
+  documents: VehicleDocSlot[];
+}
+
+export async function getVehicles(token: string): Promise<{ vehicles: DriverVehicleFull[] }> {
+  return request<{ vehicles: DriverVehicleFull[] }>("/api/v1/driver/vehicles", { method: "GET", token });
+}
+
+export async function createVehicle(
+  token: string,
+  body: { make: string; model: string; year: number; plate: string; fuel_type: string; car_type: string; transmission: string },
+): Promise<DriverVehicleFull> {
+  return request<DriverVehicleFull>("/api/v1/driver/vehicles", { method: "POST", token, body });
+}
+
+export async function uploadVehicleDocument(
+  token: string,
+  vehicleId: string,
+  documentType: string,
+  file: File,
+  expiryDate: string,
+): Promise<VehicleDocSlot> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("document_type", documentType);
+  if (expiryDate) form.append("expiry_date", expiryDate);
+  const res = await fetch(buildUrl(`/api/v1/driver/vehicles/${vehicleId}/documents`), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+    body: form,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new ApiClientError(text || `upload_failed_${res.status}`, res.status, text);
+  return JSON.parse(text) as VehicleDocSlot;
+}
+
+export async function deleteVehicleNew(token: string, id: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/vehicles/${id}`, { method: "DELETE", token });
+}
+
+// ─── Support tickets ──────────────────────────────────────────────────────────
+
+export type TicketCategory = "TRIP" | "PAYMENT" | "VEHICLE" | "ACCOUNT" | "SAFETY" | "OTHER";
+export type TicketStatus = "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
+
+export interface SupportTicketListItem {
+  ticket_number: string;
+  category: string;
+  subject: string;
+  status: TicketStatus;
+  priority: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportTicketMessage {
+  sender_type: string;
+  sender_name: string;
+  content: string;
+  attachment_urls: string[];
+  created_at: string;
+}
+
+export async function createSupportTicket(
+  token: string,
+  body: { category: TicketCategory; subject: string; description: string; order_id?: string; attachments?: string[] },
+): Promise<{ ticket_number: string; status: string; priority: string }> {
+  return request("/api/v1/driver/support/tickets", { method: "POST", token, body });
+}
+
+export async function uploadSupportAttachment(token: string, file: File): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(buildUrl("/api/v1/driver/support/attachments"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+    body: form,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new ApiClientError(text || `upload_failed_${res.status}`, res.status, text);
+  return JSON.parse(text) as { url: string };
+}
+
+export async function getSupportTickets(token: string): Promise<{ tickets: SupportTicketListItem[] }> {
+  return request<{ tickets: SupportTicketListItem[] }>("/api/v1/driver/support/tickets", { method: "GET", token });
+}
+
+export async function getSupportTicket(
+  token: string,
+  id: string,
+): Promise<{ ticket: SupportTicketListItem; description: string; messages: SupportTicketMessage[] }> {
+  return request(`/api/v1/driver/support/tickets/${id}`, { method: "GET", token });
+}
+
+export async function replySupportTicket(
+  token: string,
+  id: string,
+  message: string,
+  attachments: string[] = [],
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/support/tickets/${id}/reply`, {
+    method: "POST",
+    token,
+    body: { message, attachments },
+  });
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+export interface NotificationPrefs {
+  trip_offers: boolean;
+  earnings: boolean;
+  promotions: boolean;
+  safety: boolean;
+}
+
+export async function updateNotificationPrefs(token: string, prefs: NotificationPrefs): Promise<NotificationPrefs> {
+  return request<NotificationPrefs>("/api/v1/driver/notifications/preferences", { method: "PATCH", token, body: prefs });
+}
+
+export async function updateLanguage(token: string, language: string): Promise<{ preferred_language: string }> {
+  return request<{ preferred_language: string }>("/api/v1/driver/profile/language", { method: "PATCH", token, body: { language } });
+}
+
+export async function changeDriverPassword(token: string, currentPassword: string, newPassword: string): Promise<{ status: string }> {
+  return request<{ status: string }>("/api/v1/driver/auth/change-password", {
+    method: "POST",
+    token,
+    body: { current_password: currentPassword, new_password: newPassword },
+  });
+}
+
+export async function deleteDriverAccount(token: string): Promise<{ status: string }> {
+  return request<{ status: string }>("/api/v1/driver/account", { method: "DELETE", token });
+}
+

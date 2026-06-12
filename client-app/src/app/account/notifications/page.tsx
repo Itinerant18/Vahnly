@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function RiderNotificationsPage() {
+  const t = useTranslations('accountNotifications');
   const [logs, setLogs] = useState<string[]>([]);
   const [notifications, setNotifications] = useState([
     { id: '1', type: 'TRIP', title: 'Driver Assigned', body: 'Pilot Aniket Karmakar is en route to guide your Audi A6 Sedan. ETA: 4 mins.', date: '2026-06-03 14:05', read: false },
@@ -27,7 +29,7 @@ export default function RiderNotificationsPage() {
         return { ...n, read: true };
       })
     );
-    alert('All alerts marked read.');
+    alert(t('allMarkedRead'));
   };
 
   const handleDelete = (id: string, title: string) => {
@@ -40,15 +42,15 @@ export default function RiderNotificationsPage() {
       {/* Header */}
       <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white font-move">Notification Center</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Filter incoming alerts or edit category toggles</p>
+          <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={handleMarkAllRead}
           className="text-zinc-400 hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider"
         >
-          Mark all read
+          {t('markAllRead')}
         </button>
       </div>
 
@@ -58,7 +60,7 @@ export default function RiderNotificationsPage() {
         <div className="md:col-span-2 space-y-3">
           {notifications.length === 0 ? (
             <div className="py-8 text-center text-xs text-zinc-500 italic font-mono">
-              Inbox empty.
+              {t('inboxEmpty')}
             </div>
           ) : (
             notifications.map((item) => (
@@ -83,7 +85,7 @@ export default function RiderNotificationsPage() {
                   onClick={() => handleDelete(item.id, item.title)}
                   className="text-zinc-600 hover:text-zinc-400 font-mono text-[8px] uppercase tracking-widest cursor-pointer self-start border border-zinc-900 hover:border-zinc-800 p-1.5 rounded"
                 >
-                  Dismiss
+                  {t('dismiss')}
                 </button>
               </div>
             ))
@@ -93,12 +95,12 @@ export default function RiderNotificationsPage() {
         {/* Preferences settings */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 h-max">
           <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Alert Preferences
+            {t('alertPreferences')}
           </h4>
 
           <div className="space-y-4 text-xs font-mono text-zinc-400">
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-white font-sans font-medium">Push Notifications</span>
+              <span className="text-white font-sans font-medium">{t('pushNotifications')}</span>
               <button
                 type="button"
                 onClick={() => setPushTrip(!pushTrip)}
@@ -109,7 +111,7 @@ export default function RiderNotificationsPage() {
             </div>
 
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-white font-sans font-medium">SMS Text Codes</span>
+              <span className="text-white font-sans font-medium">{t('smsTextCodes')}</span>
               <button
                 type="button"
                 onClick={() => setSmsTrip(!smsTrip)}
@@ -120,7 +122,7 @@ export default function RiderNotificationsPage() {
             </div>
 
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-white font-sans font-medium">Email Newsletter</span>
+              <span className="text-white font-sans font-medium">{t('emailNewsletter')}</span>
               <button
                 type="button"
                 onClick={() => setEmailTrip(!emailTrip)}
@@ -137,7 +139,7 @@ export default function RiderNotificationsPage() {
       {/* Audit Log preview */}
       {logs.length > 0 && (
         <div className="border-t border-zinc-900 pt-4 text-left font-mono">
-          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">Notification delivery audit:</span>
+          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">{t('deliveryAudit')}</span>
           <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 max-h-24 overflow-y-auto text-[8px] text-zinc-500 space-y-1 scrollbar-thin">
             {logs.map((lg, i) => (
               <div key={i} className="truncate select-all leading-normal">{lg}</div>

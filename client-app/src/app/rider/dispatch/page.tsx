@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ResilientStreamManager } from '@/network/ResilientStreamManager';
 import { useAuthStore } from '@/store/useAuthStore';
 import { API_GATEWAY_BASE_URL } from '@/config';
@@ -59,6 +60,7 @@ function parseBinaryEnvelope(buffer: ArrayBuffer): { type: string; data: any } |
 }
 
 export default function RiderDispatchPage() {
+  const t = useTranslations('riderDispatch');
   const router = useRouter();
   const { token } = useAuthStore();
 
@@ -75,7 +77,7 @@ export default function RiderDispatchPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ sender: 'RIDER' | 'DRIVER'; text: string; time: string }[]>([
-    { sender: 'DRIVER', text: 'Hello, I am on my way to your vehicle location. See you shortly.', time: '14:31' }
+    { sender: 'DRIVER', text: t('chatGreeting'), time: '14:31' }
   ]);
   const [newChatMessage, setNewChatMessage] = useState('');
 
@@ -137,11 +139,11 @@ export default function RiderDispatchPage() {
             rating: matchPayload.driver_rating ? `★ ${matchPayload.driver_rating}` : '★ 4.88',
             plate: matchPayload.vehicle_plate || 'WB-04-BG-7762',
             car: vehicleLabel,
-            eta: '3 mins away',
+            eta: t('etaMinsAway', { mins: 3 }),
             transmission: carTransmission,
             photo: '👨🏽‍✈️'
           };
-          
+
           setAssignedDriver(details);
           sessionStorage.setItem('assigned_driver_specs', JSON.stringify(details));
           setMatchState('ASSIGNED');
@@ -164,7 +166,7 @@ export default function RiderDispatchPage() {
         rating: '★ 4.92',
         plate: 'WB-02-AK-9988',
         car: vehicleLabel,
-        eta: '4 mins away',
+        eta: t('etaMinsAway', { mins: 4 }),
         transmission: carTransmission,
         photo: '👨🏽‍✈️'
       };
@@ -383,7 +385,7 @@ export default function RiderDispatchPage() {
 
   const handleConfirmCancel = () => {
     if (!cancelReason) {
-      alert('Please select a cancellation reason before proceeding.');
+      alert(t('selectReasonAlert'));
       return;
     }
     console.log('[AbortControl] Cancellation log entry:', {
@@ -418,7 +420,7 @@ export default function RiderDispatchPage() {
     setTimeout(() => {
       setChatMessages(prev => [...prev, {
         sender: 'DRIVER',
-        text: 'Received. Pushing location GPS nodes now.',
+        text: t('chatAutoReply'),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
     }, 2000);
@@ -431,9 +433,9 @@ export default function RiderDispatchPage() {
       <header className="bg-zinc-950/80 border-b border-zinc-900/60 p-4 fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full backdrop-blur-md font-mono text-[10px]">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="font-bold uppercase tracking-widest text-zinc-300">DISPATCH GATEWAY CONSOLE</span>
+          <span className="font-bold uppercase tracking-widest text-zinc-300">{t('headerTitle')}</span>
         </div>
-        <span className="text-zinc-500 font-semibold uppercase">SHARD: KOL</span>
+        <span className="text-zinc-500 font-semibold uppercase">{t('headerShard')}</span>
       </header>
 
       {/* ==================== LAYER 1 (Z-INDEX: 10): DIMMED MAP BACKGROUND ==================== */}
@@ -449,7 +451,7 @@ export default function RiderDispatchPage() {
           {/* Circular Countdown Tracker Badge */}
           <div className="bg-black/90 border border-zinc-800 h-16 w-16 rounded-full flex items-center justify-center shadow-2xl z-40 select-none">
             <span className="font-mono text-sm font-bold text-white animate-pulse">
-              {countdown}s
+              {t('countdownSeconds', { seconds: countdown })}
             </span>
           </div>
         </div>
@@ -464,24 +466,28 @@ export default function RiderDispatchPage() {
             
             <div className="space-y-1">
               <div className="flex justify-between items-center text-[8px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
-                <span>Seeking Bipartite Pilot Match</span>
-                <span className="text-blue-400">active scan</span>
+                <span>{t('seekingMatch')}</span>
+                <span className="text-blue-400">{t('activeScan')}</span>
               </div>
               <h3 className="text-xs font-bold text-white font-mono mt-1 uppercase">
-                {scanRadiusExpanded ? '🔍 EXPANDED RADAR SEARCH ACTIVE (2 CELLS)' : '🔍 FILTERING NEARBY COMPLIANT PILOTS'}
+                {scanRadiusExpanded ? t('searchExpanded') : t('searchFiltering')}
               </h3>
               <p className="text-[9px] text-zinc-400 font-sans leading-relaxed">
-                Matching attributes: verified {bookingSpecs?.car?.transmission || 'AUTOMATIC'} certified operator to pilot your {bookingSpecs?.car?.make || 'default'} {bookingSpecs?.car?.model || 'vehicle'}.
+                {t('matchingAttributes', {
+                  transmission: bookingSpecs?.car?.transmission || 'AUTOMATIC',
+                  make: bookingSpecs?.car?.make || 'default',
+                  model: bookingSpecs?.car?.model || 'vehicle',
+                })}
               </p>
             </div>
 
             {/* Route summary info strip */}
             {bookingSpecs && (
               <div className="bg-zinc-900/50 p-3.5 border border-zinc-900 rounded-xl text-[10px] font-mono text-zinc-400 space-y-1.5 leading-normal">
-                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">Pickup:</span> {bookingSpecs.pickup}</div>
-                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">Drop:</span> {bookingSpecs.dropoff || 'Hourly Pack'}</div>
+                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">{t('pickupLabel')}</span> {bookingSpecs.pickup}</div>
+                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">{t('dropLabel')}</span> {bookingSpecs.dropoff || t('hourlyPack')}</div>
                 <div className="flex justify-between items-center text-emerald-400 font-bold border-t border-zinc-900 pt-1.5 mt-1.5 text-xs">
-                  <span>Upfront pricing:</span>
+                  <span>{t('upfrontPricing')}</span>
                   <span>₹{bookingSpecs.fare.toFixed(2)}</span>
                 </div>
               </div>
@@ -492,7 +498,7 @@ export default function RiderDispatchPage() {
               onClick={handleAbortTrigger}
               className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-red-500 py-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center"
             >
-              Cancel Dispatch request
+              {t('cancelDispatch')}
             </button>
           </div>
         )}
@@ -503,10 +509,10 @@ export default function RiderDispatchPage() {
             
             <div className="text-center border-b border-zinc-900 pb-3.5 space-y-1">
               <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
-                BIPARTITE MATCH PAIRING DETECTED
+                {t('matchDetected')}
               </span>
-              <h3 className="text-sm font-bold text-white font-sans mt-2">Driver Partner En Route to Your Car</h3>
-              <p className="text-[9px] text-zinc-500 font-mono">Arriving in {assignedDriver.eta} (Estimated 0.9 KM)</p>
+              <h3 className="text-sm font-bold text-white font-sans mt-2">{t('driverEnRoute')}</h3>
+              <p className="text-[9px] text-zinc-500 font-mono">{t('arrivingIn', { eta: assignedDriver.eta })}</p>
             </div>
 
             {/* Pilot Profile Identity Card */}
@@ -517,21 +523,21 @@ export default function RiderDispatchPage() {
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-white text-sm">{assignedDriver.name}</h4>
                 <div className="flex items-center gap-1.5 font-mono text-[9px]">
-                  <span className="text-amber-400 font-bold">{assignedDriver.rating} Rating</span>
+                  <span className="text-amber-400 font-bold">{t('ratingLabel', { rating: assignedDriver.rating })}</span>
                   <span className="text-zinc-700">•</span>
-                  <span className="text-zinc-500">Verified Professional</span>
+                  <span className="text-zinc-500">{t('verifiedProfessional')}</span>
                 </div>
                 
                 {/* Transmission Competency Verification Badge */}
                 <span className="bg-emerald-950/30 text-emerald-400 border border-emerald-900/50 px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase inline-block">
-                  {assignedDriver.transmission === 'MANUAL' ? '⚙️ Manual Certified' : '⚡ Automatic Certified'}
+                  {assignedDriver.transmission === 'MANUAL' ? t('manualCertified') : t('automaticCertified')}
                 </span>
               </div>
             </div>
 
             {/* Matched Vehicle Context Label */}
             <div className="bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl text-xs font-mono text-zinc-400 leading-normal">
-              🚗 <span className="text-zinc-500 font-bold uppercase text-[9px]">VEHICLE TARGET:</span> Guiding Your {assignedDriver.car} (License: {assignedDriver.plate})
+              🚗 <span className="text-zinc-500 font-bold uppercase text-[9px]">{t('vehicleTarget')}</span> {t('guidingYourVehicle', { car: assignedDriver.car, plate: assignedDriver.plate })}
             </div>
 
             {/* Secure Communication Channels */}

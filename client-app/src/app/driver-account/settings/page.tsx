@@ -1,178 +1,184 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useLocaleSwitch, SUPPORTED_LOCALES, type Locale } from '@/i18n/LocaleProvider';
+import { getPref, setPref } from '@/lib/prefs';
+import { isBiometricAvailable, enrollBiometric } from '@/lib/biometric';
+import {
+  updateLanguage, updateNotificationPrefs, changeDriverPassword, deleteDriverAccount,
+  type NotificationPrefs,
+} from '@/api/client';
+
+const NAV_KEY = 'preferred_nav';
+const BIO_KEY = 'biometric_enabled';
+type NavApp = 'GOOGLE' | 'MAPS' | 'WAZE';
+
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`h-5 w-10 rounded-full transition relative p-0.5 ${on ? 'bg-white' : 'bg-zinc-800'}`}>
+      <div className={`h-4 w-4 rounded-full transition-transform ${on ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+    </button>
+  );
+}
 
 export default function DriverSettingsPage() {
-  const [lang, setLang] = useState('English');
-  const [navApp, setNavApp] = useState('Google Maps');
-  const [darkMode, setDarkMode] = useState(true);
-  const [pushNotif, setPushNotif] = useState(true);
-  const [biometric, setBiometric] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const t = useTranslations('settings');
+  const router = useRouter();
+  const { token, logout } = useAuthStore();
+  const { locale, setLocale } = useLocaleSwitch();
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const [prefs, setPrefs] = useState<NotificationPrefs>({ trip_offers: true, earnings: true, promotions: true, safety: true });
+  const [navApp, setNavApp] = useState<NavApp>('GOOGLE');
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [pwd, setPwd] = useState({ current: '', next: '' });
+  const [pwdMsg, setPwdMsg] = useState<string | null>(null);
+  const [deleteText, setDeleteText] = useState('');
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    void getPref(NAV_KEY).then((v) => { if (v) setNavApp(v as NavApp); });
+    void getPref(BIO_KEY).then((v) => setBioEnabled(v === 'true'));
+    void isBiometricAvailable().then(setBioAvailable);
+  }, []);
+
+  const flash = () => { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500); };
+
+  const onLanguage = async (l: Locale) => {
+    setLocale(l); // persists + re-renders immediately
+    if (token) { try { await updateLanguage(token, l); } catch { /* local pref still applies */ } }
+  };
+
+  const savePrefs = async (next: NotificationPrefs) => {
+    setPrefs(next);
+    if (token) { try { await updateNotificationPrefs(token, next); flash(); } catch { /* ignore */ } }
+  };
+
+  const onNav = (app: NavApp) => { setNavApp(app); void setPref(NAV_KEY, app); flash(); };
+
+  const onBiometric = async () => {
+    if (!bioAvailable) return;
+    if (!bioEnabled) {
+      // Trigger the real OS biometric prompt; only persist on success.
+      const ok = await enrollBiometric(token ?? 'driver');
+      if (!ok) { alert(t('biometricUnavailable')); return; }
+      setBioEnabled(true);
+      void setPref(BIO_KEY, 'true');
+    } else {
+      setBioEnabled(false);
+      void setPref(BIO_KEY, 'false');
+    }
+    flash();
+  };
+
+  const onChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      alert('Provide both current and new passwords.');
-      return;
+    if (!token) return;
+    setPwdMsg(null);
+    try {
+      await changeDriverPassword(token, pwd.current, pwd.next);
+      setPwd({ current: '', next: '' });
+      setPwdMsg('✓ ' + t('saved'));
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      setPwdMsg(status === 401 ? '⚠ Current password incorrect.' : '⚠ Could not change password.');
     }
-    alert('Password updated successfully.');
-    setCurrentPassword('');
-    setNewPassword('');
   };
 
-  const handleDeleteAccount = () => {
-    if (confirm('🚨 DANGER ZONE: Are you sure you want to permanently delete your Driver Partner account and clear all escrow history? This action is irreversible.')) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+  const onDelete = async () => {
+    if (!token || deleteText !== 'DELETE') return;
+    try {
+      await deleteDriverAccount(token);
+      logout();
+      router.replace('/login');
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      alert(status === 409 ? 'Finish your active trip before deleting.' : 'Could not delete account.');
     }
   };
+
+  const navOptions: NavApp[] = ['GOOGLE', 'MAPS', 'WAZE'];
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Account Settings</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Configure navigation preferences, biometrics, notification targets, and passwords</p>
+    <div className="space-y-6 text-left pb-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+        {savedFlash && <span className="text-[10px] font-mono text-emerald-400">{t('saved')}</span>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Toggle options */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            App Preferences
-          </h4>
-
-          <div className="space-y-4 text-xs font-mono">
-            {/* Lang select */}
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-zinc-400 font-sans">System Language</span>
-              <select
-                value={lang}
-                onChange={(e) => setLang(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
-              >
-                <option>English</option>
-                <option>Bengali</option>
-                <option>Hindi</option>
-                <option>Kannada</option>
-              </select>
-            </div>
-
-            {/* Nav select */}
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-zinc-400 font-sans">Navigation Target Map</span>
-              <select
-                value={navApp}
-                onChange={(e) => setNavApp(e.target.value)}
-                className="bg-zinc-900 text-white outline-none rounded border border-zinc-800 p-1 font-bold"
-              >
-                <option>Google Maps</option>
-                <option>Mapbox Core</option>
-                <option>Apple Maps</option>
-              </select>
-            </div>
-
-            {/* Dark mode */}
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-zinc-400 font-sans">Dark Mode Theme</span>
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${darkMode ? 'bg-white' : 'bg-zinc-800'}`}
-              >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${darkMode ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
-              </button>
-            </div>
-
-            {/* Push notification */}
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-zinc-400 font-sans">Push Notifications</span>
-              <button
-                onClick={() => setPushNotif(!pushNotif)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${pushNotif ? 'bg-white' : 'bg-zinc-800'}`}
-              >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${pushNotif ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
-              </button>
-            </div>
-
-            {/* Biometric login */}
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <span className="text-zinc-400 font-sans">FaceID / TouchID Biometrics</span>
-              <button
-                onClick={() => setBiometric(!biometric)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${biometric ? 'bg-white' : 'bg-zinc-800'}`}
-              >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${biometric ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Change password */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Change Password
-          </h4>
-
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Current Password</label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-zinc-900 border border-zinc-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-zinc-900 border border-zinc-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-white hover:bg-zinc-200 text-black py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95"
-            >
-              Update Password
+      {/* Language */}
+      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('language')}</h4>
+        <div className="flex gap-2">
+          {SUPPORTED_LOCALES.map((l) => (
+            <button key={l.code} onClick={() => onLanguage(l.code)}
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${locale === l.code ? 'bg-white text-black font-bold' : 'bg-zinc-900 text-zinc-400'}`}>
+              {l.label}
             </button>
-          </form>
+          ))}
         </div>
+      </section>
 
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-zinc-950 border border-red-950 rounded-2xl p-5 space-y-4">
-        <h4 className="text-xs font-bold text-red-500 font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Danger Zone
-        </h4>
-
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 text-xs">
-          <div className="text-zinc-400 font-sans leading-relaxed">
-            <span className="font-bold text-white block">Delete Partner Account</span>
-            Permanent removal of all KYC documents, vehicle history, and wallet details.
+      {/* Notification preferences */}
+      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('notifications')}</h4>
+        {([['trip_offers', t('tripOffers')], ['earnings', t('earnings')], ['promotions', t('promotions')], ['safety', t('safety')]] as const).map(([key, label]) => (
+          <div key={key} className="flex justify-between items-center">
+            <span className="text-xs font-mono text-zinc-300">{label}</span>
+            <Toggle on={prefs[key]} onClick={() => savePrefs({ ...prefs, [key]: !prefs[key] })} />
           </div>
+        ))}
+      </section>
 
-          <button
-            onClick={handleDeleteAccount}
-            className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] uppercase tracking-wider py-2.5 px-4 rounded-xl cursor-pointer transition shrink-0 active:scale-95 border border-red-500"
-          >
-            Delete Account
-          </button>
+      {/* Navigation app */}
+      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('navApp')}</h4>
+        <div className="flex gap-2">
+          {navOptions.map((app) => (
+            <button key={app} onClick={() => onNav(app)}
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${navApp === app ? 'bg-white text-black font-bold' : 'bg-zinc-900 text-zinc-400'}`}>
+              {app}
+            </button>
+          ))}
         </div>
-      </div>
+      </section>
 
+      {/* Biometric */}
+      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 flex justify-between items-center">
+        <div>
+          <span className="text-xs font-mono text-zinc-300 block">{t('biometric')}</span>
+          {!bioAvailable && <span className="text-[9px] font-mono text-zinc-600">{t('biometricUnavailable')}</span>}
+        </div>
+        <Toggle on={bioEnabled && bioAvailable} onClick={onBiometric} />
+      </section>
+
+      {/* Change password */}
+      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('changePassword')}</h4>
+        <form onSubmit={onChangePassword} className="space-y-3">
+          <input type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} placeholder={t('currentPassword')} required
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+          <input type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} placeholder={t('newPassword')} required minLength={8}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+          {pwdMsg && <p className="text-[10px] font-mono text-zinc-400">{pwdMsg}</p>}
+          <button type="submit" className="w-full bg-white text-black rounded-xl py-2.5 text-[10px] font-bold uppercase">{t('save')}</button>
+        </form>
+      </section>
+
+      {/* Danger zone */}
+      <section className="bg-red-500/5 border border-red-500/30 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-red-300 font-mono uppercase tracking-wider">{t('dangerZone')}</h4>
+        <p className="text-[10px] font-mono text-zinc-400 leading-relaxed">{t('deleteWarning')}</p>
+        <input value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder={t('typeDelete')}
+          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+        <button onClick={onDelete} disabled={deleteText !== 'DELETE'}
+          className="w-full bg-red-500/20 text-red-300 border border-red-500/40 rounded-xl py-2.5 text-[10px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed">
+          {t('confirmDelete')}
+        </button>
+      </section>
     </div>
   );
 }

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function Home() {
+  const t = useTranslations('indexPage');
   const router = useRouter();
   const { token, isAuthenticated } = useAuthStore();
-  const [statusMessage, setStatusMessage] = useState('Initializing Secure Access...');
+  const [statusMessage, setStatusMessage] = useState(t('initializing'));
 
   useEffect(() => {
     // 0. Setup Deep Linking and Universal Links routing listeners
@@ -56,33 +58,33 @@ export default function Home() {
 
       // 2. Local Secure Storage Auth Token Validation
       if (!token || !isAuthenticated) {
-        setStatusMessage('Authentication Required. Redirecting...');
+        setStatusMessage(t('authRequired'));
         await new Promise(resolve => setTimeout(resolve, 800));
         router.push('/login');
         return;
       }
 
       // 3. Verify User Session Status (Check for active ongoing trips)
-      setStatusMessage('Verifying Session Integrity...');
+      setStatusMessage(t('verifyingSession'));
       const activeTripId = localStorage.getItem('active_trip_id');
-      
+
       if (activeTripId) {
-        setStatusMessage('Active Ride State Detected. Restoring trip...');
+        setStatusMessage(t('activeRideDetected'));
         await new Promise(resolve => setTimeout(resolve, 800));
         router.push(`/rider/trip/live?tripId=${encodeURIComponent(activeTripId)}`);
         return;
       }
 
       // 4. Check Onboarding Completion
-      setStatusMessage('Checking Onboarding Completion...');
+      setStatusMessage(t('checkingOnboarding'));
       const onboardingCompleted = localStorage.getItem('rider_onboarding_completed') === 'true';
       await new Promise(resolve => setTimeout(resolve, 600));
 
       if (onboardingCompleted) {
-        setStatusMessage('Onboarding Verified. Redirecting...');
+        setStatusMessage(t('onboardingVerified'));
         router.push('/rider');
       } else {
-        setStatusMessage('Setup Required. Redirecting to onboarding...');
+        setStatusMessage(t('setupRequired'));
         router.push('/onboarding');
       }
     };
@@ -116,7 +118,7 @@ export default function Home() {
       </div>
 
       <footer className="absolute bottom-8 left-6 right-6 flex justify-between items-center text-[9px] text-zinc-600 font-mono select-none">
-        <span>SECURITY: SHA-256 SESSION LOCK</span>
+        <span>{t('securityLabel')}</span>
         <span>BUILD: v2.4.1-prod</span>
       </footer>
     </div>

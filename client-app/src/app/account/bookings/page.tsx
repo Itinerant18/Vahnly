@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface BillBreakdown {
   basePaise: number;
@@ -29,6 +30,7 @@ interface BookingItem {
 }
 
 export default function RiderBookingsPage() {
+  const t = useTranslations('accountBookings');
   const [activeTab, setActiveTab] = useState<'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'>('COMPLETED');
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
   const [replayProgress, setReplayProgress] = useState(0);
@@ -234,8 +236,8 @@ export default function RiderBookingsPage() {
   const filtered = bookings.filter((b) => b.status.toUpperCase() === activeTab);
 
   const handleCancelBooking = (id: string) => {
-    if (confirm('Cancel this scheduled trip? Cancellation fees may apply.')) {
-      alert(`Booking ${id} cancelled successfully.`);
+    if (confirm(t('cancelConfirm'))) {
+      alert(t('cancelSuccess', { id }));
     }
   };
 
@@ -262,22 +264,22 @@ export default function RiderBookingsPage() {
         <div className="space-y-6 animate-fadeIn">
           {/* Header */}
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-white font-move">My Bookings</h2>
-            <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Inspect upcoming schedules, completed records, or receipt invoice disputes</p>
+            <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+            <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
           </div>
 
           {/* Tabs */}
           <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 max-w-sm font-mono text-[9px]">
-            {(['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED'] as const).map((t) => (
+            {(['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED'] as const).map((tab) => (
               <button
-                key={t}
+                key={tab}
                 type="button"
-                onClick={() => setActiveTab(t)}
+                onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-1.5 font-bold uppercase rounded-lg transition-all cursor-pointer ${
-                  activeTab === t ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'
+                  activeTab === tab ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                {t}
+                {t(`tab${tab.charAt(0)}${tab.slice(1).toLowerCase()}`)}
               </button>
             ))}
           </div>
@@ -286,7 +288,7 @@ export default function RiderBookingsPage() {
           <div className="space-y-3">
             {filtered.length === 0 ? (
               <div className="py-8 text-center text-xs text-zinc-500 italic font-mono">
-                No bookings found in this folder.
+                {t('emptyList')}
               </div>
             ) : (
               filtered.map((item) => (
@@ -306,18 +308,18 @@ export default function RiderBookingsPage() {
                         }`}>
                           {item.type}
                         </span>
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase">{item.date.split(' ')[0]} • ID: {item.id}</span>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase">{item.date.split(' ')[0]} • {t('idLabel')}: {item.id}</span>
                       </div>
                       
                       <h4 className="text-sm font-bold text-white truncate font-sans tracking-tight">
                         {item.route}
                       </h4>
-                      <p className="text-[10px] text-zinc-500 font-mono">Vehicle: {item.car} • Pilot: {item.driver.split(' ')[0]}</p>
+                      <p className="text-[10px] text-zinc-500 font-mono">{t('vehicleLabel')}: {item.car} • {t('pilotLabel')}: {item.driver.split(' ')[0]}</p>
                     </div>
 
                     <div className="text-right shrink-0 flex flex-col justify-between space-y-4">
                       <span className="text-sm font-bold text-emerald-400">{formatPaise(item.bill.netPaise)}</span>
-                      <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider block">Inspect ➔</span>
+                      <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider block">{t('inspect')}</span>
                     </div>
                   </div>
                 </button>
@@ -331,15 +333,15 @@ export default function RiderBookingsPage() {
           {/* Header */}
           <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white font-move">Booking Audit Receipt</h2>
-              <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">ID: {selectedBooking.id.toUpperCase()} ({selectedBooking.date})</p>
+              <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('detailTitle')}</h2>
+              <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('detailMeta', { id: selectedBooking.id.toUpperCase(), date: selectedBooking.date })}</p>
             </div>
 
             <button
               onClick={() => setSelectedBooking(null)}
               className="text-xs font-bold uppercase tracking-wider border border-zinc-800 px-4 py-2 rounded-full hover:bg-zinc-900 transition font-mono cursor-pointer"
             >
-              ← Back to list
+              {t('backToList')}
             </button>
           </div>
 
@@ -356,24 +358,24 @@ export default function RiderBookingsPage() {
               {/* Controls Overlay */}
               <div className="absolute inset-x-0 top-0 p-4 flex justify-between items-center bg-gradient-to-b from-black to-transparent z-10">
                 <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 px-2.5 py-1 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
-                  GPS TRAIL REPLAY: {replayProgress}%
+                  {t('gpsTrailReplay', { progress: replayProgress })}
                 </span>
 
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
                   className="bg-white text-black font-mono font-bold text-[8px] uppercase px-3 py-1 rounded-full cursor-pointer hover:bg-zinc-200"
                 >
-                  {isPlaying ? '⏸️ Pause' : '▶️ Play'}
+                  {isPlaying ? t('pause') : t('play')}
                 </button>
               </div>
 
               <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black to-transparent text-[10px] font-mono text-zinc-400 z-10">
-                <span>Stable tracking telemetry index • No anomalies</span>
+                <span>{t('telemetryStatus')}</span>
               </div>
             </div>
           ) : (
             <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-center text-xs text-zinc-500 italic font-mono">
-              GPS trajectory not available for upcoming matches.
+              {t('gpsUnavailable')}
             </div>
           )}
 
@@ -381,27 +383,27 @@ export default function RiderBookingsPage() {
             {/* Specs card */}
             <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
               <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2 flex justify-between items-center">
-                <span>Trip Specifications</span>
+                <span>{t('tripSpecifications')}</span>
                 <button
                   onClick={() => handleCloneBooking(selectedBooking)}
                   className="text-[8px] text-zinc-400 hover:text-white underline uppercase cursor-pointer"
                 >
-                  🔄 Rebook / Clone
+                  {t('rebookClone')}
                 </button>
               </h4>
 
               <div className="space-y-3 text-xs font-mono text-zinc-400">
-                <div>📍 <span className="text-zinc-600 font-bold uppercase text-[9px] block mb-0.5 font-mono">Pickup location</span> {selectedBooking.pickup}</div>
-                <div>🏁 <span className="text-zinc-600 font-bold uppercase text-[9px] block mb-0.5 font-mono">Destination</span> {selectedBooking.dropoff}</div>
+                <div>📍 <span className="text-zinc-600 font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('pickupLocation')}</span> {selectedBooking.pickup}</div>
+                <div>🏁 <span className="text-zinc-600 font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('destination')}</span> {selectedBooking.dropoff}</div>
                 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-900 text-[10px] font-mono">
                   <div>
-                    <span className="text-zinc-600 block text-[8px] uppercase font-bold">Driving Distance</span>
-                    <span className="text-white block mt-0.5 font-bold">{selectedBooking.distance} KM</span>
+                    <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('drivingDistance')}</span>
+                    <span className="text-white block mt-0.5 font-bold">{t('distanceValue', { distance: selectedBooking.distance })}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-600 block text-[8px] uppercase font-bold">Transit Duration</span>
-                    <span className="text-white block mt-0.5 font-bold">{selectedBooking.duration} Mins</span>
+                    <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('transitDuration')}</span>
+                    <span className="text-white block mt-0.5 font-bold">{t('durationValue', { duration: selectedBooking.duration })}</span>
                   </div>
                 </div>
               </div>
@@ -411,7 +413,7 @@ export default function RiderBookingsPage() {
             <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
               <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
                 <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
-                  Itemized Receipt
+                  {t('itemizedReceipt')}
                 </h4>
                 
                 {selectedBooking.status === 'Upcoming' ? (
@@ -419,43 +421,43 @@ export default function RiderBookingsPage() {
                     onClick={() => handleCancelBooking(selectedBooking.id)}
                     className="text-red-500 hover:text-red-400 font-mono font-bold text-[8px] uppercase tracking-wider cursor-pointer"
                   >
-                    Cancel Booking
+                    {t('cancelBooking')}
                   </button>
                 ) : (
                   <button
                     onClick={() => handleRaiseDispute(selectedBooking)}
                     className="text-red-500 hover:text-red-400 font-mono font-bold text-[8px] uppercase tracking-wider cursor-pointer"
                   >
-                    Dispute Bill
+                    {t('disputeBill')}
                   </button>
                 )}
               </div>
 
               <div className="space-y-2 font-mono text-[10px] text-zinc-400">
                 <div className="flex justify-between">
-                  <span>Upfront Base Price Quoted:</span>
+                  <span>{t('upfrontBasePrice')}</span>
                   <span className="text-white">{formatPaise(selectedBooking.bill.basePaise)}</span>
                 </div>
                 {selectedBooking.bill.tollsPaise > 0 && (
                   <div className="flex justify-between">
-                    <span>Toll Additions:</span>
+                    <span>{t('tollAdditions')}</span>
                     <span className="text-white">{formatPaise(selectedBooking.bill.tollsPaise)}</span>
                   </div>
                 )}
                 {selectedBooking.bill.parkingPaise > 0 && (
                   <div className="flex justify-between">
-                    <span>Parking Additions:</span>
+                    <span>{t('parkingAdditions')}</span>
                     <span className="text-white">{formatPaise(selectedBooking.bill.parkingPaise)}</span>
                   </div>
                 )}
                 {selectedBooking.bill.surgePaise > 0 && (
                   <div className="flex justify-between">
-                    <span>Surge Multipliers:</span>
+                    <span>{t('surgeMultipliers')}</span>
                     <span className="text-white">{formatPaise(selectedBooking.bill.surgePaise)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-xs text-white border-t border-zinc-800 pt-2.5">
-                  <span>Total Settled Billing:</span>
+                  <span>{t('totalSettledBilling')}</span>
                   <span className="text-emerald-400">{formatPaise(selectedBooking.bill.netPaise)}</span>
                 </div>
               </div>

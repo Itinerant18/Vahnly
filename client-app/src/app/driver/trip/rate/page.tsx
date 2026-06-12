@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { driverConfirmPayment } from '@/api/client';
 
 export default function RateRiderPage() {
+  const t = useTranslations('driverTripRate');
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderID = searchParams.get('order_id') || '';
@@ -18,7 +20,13 @@ export default function RateRiderPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const availableTags = ['Polite', 'Friendly', 'Clean', 'On Time', 'Respectful'];
+  const availableTags: { value: string; labelKey: string }[] = [
+    { value: 'Polite', labelKey: 'tagPolite' },
+    { value: 'Friendly', labelKey: 'tagFriendly' },
+    { value: 'Clean', labelKey: 'tagClean' },
+    { value: 'On Time', labelKey: 'tagOnTime' },
+    { value: 'Respectful', labelKey: 'tagRespectful' },
+  ];
 
   useEffect(() => {
     try {
@@ -57,7 +65,7 @@ export default function RateRiderPage() {
         sessionStorage.removeItem('current_final_bill');
       } catch (e) {}
 
-      alert('Settlement complete. You are now ONLINE to receive next offers.');
+      alert(t('settlementComplete'));
       router.push('/driver');
     } catch (err) {
       console.error('Failed to confirm payment and rate:', err);
@@ -72,16 +80,16 @@ export default function RateRiderPage() {
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-6 font-mono flex flex-col justify-between selection:bg-white selection:text-black">
       <header className="border-b border-zinc-900 pb-4 mb-4">
-        <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Transit Feedback Panel</span>
-        <h1 className="text-sm font-bold text-white mt-1 uppercase">Rate Your Journey Experience</h1>
-        <p className="text-[8px] text-zinc-655 mt-0.5">ORDER ID: {orderID.substring(0, 18)}...</p>
+        <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">{t('panelLabel')}</span>
+        <h1 className="text-sm font-bold text-white mt-1 uppercase">{t('title')}</h1>
+        <p className="text-[8px] text-zinc-655 mt-0.5">{t('orderId', { id: orderID.substring(0, 18) })}</p>
       </header>
 
       <main className="flex-grow max-w-md mx-auto w-full space-y-6 flex flex-col justify-center py-4">
         {/* Star Rating Component */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-center space-y-4 shadow-xl">
           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">
-            Rider Score Rating
+            {t('riderScoreRating')}
           </span>
           <div className="flex justify-center gap-3 text-3xl select-none">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -98,34 +106,34 @@ export default function RateRiderPage() {
             ))}
           </div>
           <span className="text-[10px] text-zinc-500 block font-bold">
-            {rating === 5 && 'EXCELLENT TRANSIT'}
-            {rating === 4 && 'GOOD EXPERIENCE'}
-            {rating === 3 && 'AVERAGE TRIP'}
-            {rating === 2 && 'UNSATISFACTORY'}
-            {rating === 1 && 'CRITICAL DISPUTE'}
+            {rating === 5 && t('rating5')}
+            {rating === 4 && t('rating4')}
+            {rating === 3 && t('rating3')}
+            {rating === 2 && t('rating2')}
+            {rating === 1 && t('rating1')}
           </span>
         </div>
 
         {/* Quick-Tap Feedback Tags */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3.5 shadow-xl text-left">
           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block border-b border-zinc-900 pb-2">
-            Add Quick Feedback Tags
+            {t('addQuickFeedbackTags')}
           </span>
           <div className="flex flex-wrap gap-2 pt-1.5">
             {availableTags.map((tag) => {
-              const active = selectedTags.includes(tag);
+              const active = selectedTags.includes(tag.value);
               return (
                 <button
-                  key={tag}
+                  key={tag.value}
                   type="button"
-                  onClick={() => toggleTag(tag)}
+                  onClick={() => toggleTag(tag.value)}
                   className={`px-3 py-1.5 rounded-full border text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
                     active
                       ? 'bg-white border-white text-black'
                       : 'bg-black border-zinc-850 text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
-                  {tag}
+                  {t(tag.labelKey)}
                 </button>
               );
             })}
@@ -139,7 +147,7 @@ export default function RateRiderPage() {
           disabled={isSubmitting}
           className="w-full bg-white hover:bg-zinc-200 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono border border-white active:scale-[0.98]"
         >
-          {isSubmitting ? 'Submitting Settlement...' : 'Submit Feedback & Go Online'}
+          {isSubmitting ? t('submitting') : t('submitButton')}
         </button>
       </footer>
     </div>

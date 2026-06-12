@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { API_GATEWAY_BASE_URL } from '@/config';
@@ -32,6 +33,7 @@ interface DriverState {
 }
 
 export default function RiderDashboardPage() {
+  const t = useTranslations('riderHome');
   const router = useRouter();
   const { user, token } = useAuthStore();
   const riderName = user?.name || 'Sarah Connor';
@@ -199,12 +201,12 @@ export default function RiderDashboardPage() {
     // If bottom sheet is collapsed, focus search and expand to Route Config
     if (sheetHeight <= 25) {
       setPickupCoords(clickedCoords);
-      setPickupText(`Pin: ${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`);
+      setPickupText(t('pinLabel', { lat: clickedCoords.lat.toFixed(4), lng: clickedCoords.lng.toFixed(4) }));
       setSheetHeight(45);
     } else {
       // Set dropoff location
       setDropoffCoords(clickedCoords);
-      setDropoffText(`Drop-off: ${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`);
+      setDropoffText(t('dropoffLabel', { lat: clickedCoords.lat.toFixed(4), lng: clickedCoords.lng.toFixed(4) }));
       // Shift bottom sheet to spec config phase
       setSheetHeight(85);
     }
@@ -687,7 +689,7 @@ export default function RiderDashboardPage() {
 
   const handleAddStop = () => {
     if (stops.length >= 3) {
-      alert('Maximum of 3 stops can be configured mid-route.');
+      alert(t('maxStopsAlert'));
       return;
     }
     setStops(prev => [...prev, '']);
@@ -786,7 +788,7 @@ export default function RiderDashboardPage() {
           setTimeout(() => dispatchOrderBackground(attempt + 1), delay);
         } else {
           // Trigger error modal / alert to rider
-          alert('🚨 ORDER CREATION ERROR: Network failure after 4 attempts. Please check cellular connectivity.');
+          alert(t('orderCreationError'));
         }
       }
     };
@@ -800,7 +802,7 @@ export default function RiderDashboardPage() {
     if (dropoffRequired && !dropoffText.trim()) {
       setDropoffInputFlash(true);
       setTimeout(() => setDropoffInputFlash(false), 800);
-      alert('⚠️ Destination Address Required: Dropoff location is missing. Please type or double-click on the map to set a dropoff pin.');
+      alert(t('destinationRequiredAlert'));
       return;
     }
 
@@ -840,25 +842,25 @@ export default function RiderDashboardPage() {
   const handleBindOneTimeCar = (e: React.FormEvent) => {
     e.preventDefault();
     if (!oneTimeMake.trim() || !oneTimeModel.trim()) {
-      setOneTimeError('Make and Model parameters are mandatory.');
+      setOneTimeError(t('makeModelMandatory'));
       return;
     }
     setOneTimeError('');
     setSheetHeight(85); // Slide back down to C
-    alert(`✔️ Secondary vehicle override active: ${oneTimeMake} ${oneTimeModel} (${oneTimeTier}) bound.`);
+    alert(t('overrideBoundAlert', { make: oneTimeMake, model: oneTimeModel, tier: oneTimeTier }));
   };
 
   const triggerSOS = () => {
     setShowSosModal(false);
-    alert('🚨 SAFETY PANIC DISPATCH: Distress coordinates broadcasted. Emergency contacts support logs and 112 police hotline nodes triggered.');
+    alert(t('sosDispatchAlert'));
   };
 
   // Coordinate shortcuts databases
   const favorites = [
-    { label: 'Home (Park St)', name: 'Park Street Dining Grid, Kolkata', lat: 22.5480, lng: 88.3512 },
-    { label: 'Work (Salt Lake)', name: 'Salt Lake Sector V Tech Hub, Kolkata', lat: 22.5726, lng: 88.4339 },
-    { label: 'Airport (CCU)', name: 'Kolkata Netaji Subhash Int Airport (CCU)', lat: 22.6547, lng: 88.4467 },
-    { label: 'Howrah Station', name: 'Howrah Railway Junction, Kolkata', lat: 22.5834, lng: 88.3418 }
+    { label: t('favoriteHomeLabel'), name: t('favoriteHomeName'), lat: 22.5480, lng: 88.3512 },
+    { label: t('favoriteWorkLabel'), name: t('favoriteWorkName'), lat: 22.5726, lng: 88.4339 },
+    { label: t('favoriteAirportLabel'), name: t('favoriteAirportName'), lat: 22.6547, lng: 88.4467 },
+    { label: t('favoriteHowrahLabel'), name: t('favoriteHowrahName'), lat: 22.5834, lng: 88.3418 }
   ];
 
   return (
@@ -880,22 +882,22 @@ export default function RiderDashboardPage() {
           <button
             onClick={() => setIsDrawerOpen(true)}
             className="h-9 w-9 bg-zinc-900 hover:bg-zinc-850 rounded-xl border border-zinc-800 flex items-center justify-center text-sm cursor-pointer transition active:scale-95"
-            aria-label="Open Navigation Drawer"
+            aria-label={t('openNavigationDrawer')}
           >
             ☰
           </button>
-          
+
           <div>
-            <h1 className="text-xs font-bold font-mono tracking-tight text-white uppercase">DRIVERS-FOR-U</h1>
+            <h1 className="text-xs font-bold font-mono tracking-tight text-white uppercase">{t('appTitle')}</h1>
             <select
               value={currentCity}
               onChange={(e) => setCurrentCity(e.target.value)}
               className="bg-transparent text-[9px] font-mono font-bold text-zinc-500 uppercase outline-none cursor-pointer mt-0.5"
             >
-              <option>Kolkata</option>
-              <option>Bangalore</option>
-              <option>Mumbai</option>
-              <option>Delhi NCR</option>
+              <option value="Kolkata">{t('cityKolkata')}</option>
+              <option value="Bangalore">{t('cityBangalore')}</option>
+              <option value="Mumbai">{t('cityMumbai')}</option>
+              <option value="Delhi NCR">{t('cityDelhiNcr')}</option>
             </select>
           </div>
         </div>
@@ -918,7 +920,7 @@ export default function RiderDashboardPage() {
             onClick={() => setShowSosModal(true)}
             className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition cursor-pointer border border-red-500"
           >
-            🚨 SOS
+            {t('sosButton')}
           </button>
         </div>
       </header>
@@ -938,7 +940,7 @@ export default function RiderDashboardPage() {
         <div className="absolute top-20 left-4 z-20 flex flex-col gap-2">
           {/* Pulsing Supply Badge */}
           <div className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono font-bold uppercase py-1 px-2.5 rounded-full tracking-wider select-none backdrop-blur-sm">
-            📍 Nearest driver: {closestDriverEta} min away
+            {t('nearestDriver', { eta: closestDriverEta })}
           </div>
         </div>
 
@@ -988,7 +990,7 @@ export default function RiderDashboardPage() {
                 className="w-full bg-zinc-900/80 border border-zinc-850 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:border-zinc-700 transition"
               >
                 <span className="text-zinc-500">🔍</span>
-                <span className="text-xs text-zinc-400 font-mono">Where should the driver guide your vehicle?</span>
+                <span className="text-xs text-zinc-400 font-mono">{t('searchPrompt')}</span>
               </div>
 
               {/* Quick Tiles grid shortcuts */}
@@ -998,7 +1000,7 @@ export default function RiderDashboardPage() {
                   className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
                 >
                   <span>🚗</span>
-                  <span className="truncate">My Garage</span>
+                  <span className="truncate">{t('tileMyGarage')}</span>
                 </Link>
                 <button
                   onClick={() => {
@@ -1008,26 +1010,26 @@ export default function RiderDashboardPage() {
                     setDropoffCoords({ lat: 22.5480, lng: 88.3512 });
                     setTripType('CITY_ROUND');
                     setSheetHeight(85);
-                    alert('🔄 Last trip parameters loaded successfully!');
+                    alert(t('rebookLoadedAlert'));
                   }}
                   className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition cursor-pointer text-zinc-400 hover:text-white"
                 >
                   <span>🔄</span>
-                  <span className="truncate">Rebook Last</span>
+                  <span className="truncate">{t('tileRebookLast')}</span>
                 </button>
                 <Link
                   href="/account/rewards"
                   className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
                 >
                   <span>🎁</span>
-                  <span className="truncate">Offers</span>
+                  <span className="truncate">{t('tileOffers')}</span>
                 </Link>
                 <Link
                   href="/account/refer"
                   className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
                 >
                   <span>🏆</span>
-                  <span className="truncate">Refer Earn</span>
+                  <span className="truncate">{t('tileReferEarn')}</span>
                 </Link>
               </div>
             </div>
@@ -1039,10 +1041,10 @@ export default function RiderDashboardPage() {
               {/* Segmented Trip Type Tab switches */}
               <div className="flex bg-zinc-900/60 p-1 rounded-xl border border-zinc-900 font-mono text-[9px] uppercase font-bold text-zinc-500">
                 {[
-                  { id: 'CITY_ROUND', label: 'Round Trip' },
-                  { id: 'CITY_ONEWAY', label: 'One Way' },
-                  { id: 'MINI_OUTSTATION', label: 'Mini (8h)' },
-                  { id: 'OUTSTATION', label: 'Outstation' }
+                  { id: 'CITY_ROUND', label: t('tripTypeRoundTrip') },
+                  { id: 'CITY_ONEWAY', label: t('tripTypeOneWay') },
+                  { id: 'MINI_OUTSTATION', label: t('tripTypeMini') },
+                  { id: 'OUTSTATION', label: t('tripTypeOutstation') }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -1060,13 +1062,13 @@ export default function RiderDashboardPage() {
               {/* Autocomplete Input Forms */}
               <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 font-sans text-xs">
                 <div>
-                  <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Pick-up Location</label>
+                  <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('pickupLocationLabel')}</label>
                   <input
                     type="text"
                     value={pickupText}
                     onChange={(e) => setPickupText(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white focus:outline-none focus:border-zinc-500 text-xs"
-                    placeholder="Enter pickup address"
+                    placeholder={t('pickupAddressPlaceholder')}
                   />
                   <div className="flex gap-1.5 mt-1.5 flex-wrap">
                     {favorites.slice(0, 3).map((f) => (
@@ -1085,13 +1087,13 @@ export default function RiderDashboardPage() {
                 {stops.map((stop, i) => (
                   <div key={i} className="flex gap-2 items-center animate-fadeIn">
                     <div className="flex-1">
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Stop {i + 1}</label>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('stopLabel', { number: i + 1 })}</label>
                       <input
                         type="text"
                         value={stop}
                         onChange={(e) => handleStopChange(i, e.target.value)}
                         className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-white focus:outline-none focus:border-zinc-500 text-xs"
-                        placeholder="Enter stop address"
+                        placeholder={t('stopAddressPlaceholder')}
                       />
                     </div>
                     <button
@@ -1107,17 +1109,17 @@ export default function RiderDashboardPage() {
                 {/* Dropoff Address */}
                 {tripType !== 'CITY_ROUND' && (
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Destination Address (Required)</label>
+                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('destinationAddressLabel')}</label>
                     <input
                       type="text"
                       value={dropoffText}
                       onChange={(e) => setDropoffText(e.target.value)}
                       className={`w-full bg-zinc-950 border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
-                        dropoffInputFlash 
-                          ? 'border-red-500 ring-2 ring-red-500/20 animate-shake' 
+                        dropoffInputFlash
+                          ? 'border-red-500 ring-2 ring-red-500/20 animate-shake'
                           : 'border-zinc-850 focus:border-zinc-500'
                       }`}
-                      placeholder="Where should the driver guide your vehicle?"
+                      placeholder={t('searchPrompt')}
                     />
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
                       {favorites.map((f) => (
@@ -1139,7 +1141,7 @@ export default function RiderDashboardPage() {
                     onClick={handleAddStop}
                     className="text-[8px] font-mono font-bold uppercase text-zinc-500 hover:text-white flex items-center gap-1 cursor-pointer"
                   >
-                    ➕ Add Stop (Max 3)
+                    {t('addStopButton')}
                   </button>
                 </div>
               </div>
@@ -1158,7 +1160,7 @@ export default function RiderDashboardPage() {
                 }}
                 className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider transition hover:bg-zinc-200"
               >
-                Proceed to Asset & pricing ➔
+                {t('proceedToAssetCta')}
               </button>
             </div>
           )}
@@ -1169,22 +1171,22 @@ export default function RiderDashboardPage() {
               {/* Route Summary bar */}
               <div className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-3.5 rounded-xl font-mono text-[9px]">
                 <div className="truncate pr-4">
-                  <span className="text-zinc-500 block uppercase">ROUTE</span>
-                  <span className="text-white font-sans block truncate text-xs font-semibold">{pickupText} ➔ {tripType === 'CITY_ROUND' ? 'Round Pack' : dropoffText}</span>
+                  <span className="text-zinc-500 block uppercase">{t('routeLabel')}</span>
+                  <span className="text-white font-sans block truncate text-xs font-semibold">{pickupText} ➔ {tripType === 'CITY_ROUND' ? t('roundPack') : dropoffText}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSheetHeight(45)}
                   className="text-zinc-400 hover:text-white uppercase font-bold text-[8px]"
                 >
-                  Edit
+                  {t('editButton')}
                 </button>
               </div>
 
               {/* Garage Vehicle Selector matrix */}
               <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 text-xs">
                 <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-500 uppercase font-mono font-bold text-[8px]">Select Vehicle from Garage</span>
+                  <span className="text-zinc-500 uppercase font-mono font-bold text-[8px]">{t('selectVehicleFromGarage')}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1195,7 +1197,7 @@ export default function RiderDashboardPage() {
                     }}
                     className="text-[8px] font-mono font-bold text-zinc-400 hover:text-white uppercase"
                   >
-                    {useOneTimeCar ? 'Use Garage' : 'One-Time override'}
+                    {useOneTimeCar ? t('useGarageToggle') : t('oneTimeOverrideToggle')}
                   </button>
                 </div>
 
@@ -1218,7 +1220,7 @@ export default function RiderDashboardPage() {
                         </div>
                         {car.isDefault && (
                           <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
-                            Default
+                            {t('defaultBadge')}
                           </span>
                         )}
                       </label>
@@ -1227,14 +1229,14 @@ export default function RiderDashboardPage() {
                 ) : (
                   <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl flex justify-between items-center font-mono text-xs">
                     <div>
-                      <span className="text-white block font-sans font-semibold">{oneTimeMake || 'Override'} {oneTimeModel || 'Car'}</span>
+                      <span className="text-white block font-sans font-semibold">{oneTimeMake || t('overrideFallbackMake')} {oneTimeModel || t('overrideFallbackModel')}</span>
                       <span className="text-[8px] text-zinc-500 block uppercase mt-0.5">{oneTimeTransmission} • {oneTimeTier}</span>
                     </div>
                     <button
                       onClick={() => setSheetHeight(100)}
                       className="text-zinc-400 hover:text-white text-[8px] font-bold uppercase"
                     >
-                      Config
+                      {t('configButton')}
                     </button>
                   </div>
                 )}
@@ -1243,15 +1245,15 @@ export default function RiderDashboardPage() {
               {/* Schedule control */}
               <div className="flex justify-between items-center bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider block">Departure Schedule</span>
-                  <span className="font-bold text-white text-xs">{scheduleLater ? `Scheduled: ${scheduleDate} @ ${scheduleTime}` : 'Immediate Departure'}</span>
+                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider block">{t('departureScheduleLabel')}</span>
+                  <span className="font-bold text-white text-xs">{scheduleLater ? t('scheduledFor', { date: scheduleDate, time: scheduleTime }) : t('immediateDeparture')}</span>
                 </div>
 
                 <button
                   onClick={() => setScheduleLater(!scheduleLater)}
                   className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-[9px] font-mono font-bold uppercase py-1.5 px-3 rounded-xl text-zinc-300 cursor-pointer"
                 >
-                  {scheduleLater ? 'Now' : 'Later'}
+                  {scheduleLater ? t('scheduleNow') : t('scheduleLater')}
                 </button>
               </div>
 
@@ -1278,8 +1280,8 @@ export default function RiderDashboardPage() {
                   {tripType === 'CITY_ROUND' ? (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500 uppercase font-bold text-[8px]">Job Duration</span>
-                        <span className="text-white font-bold">{durationHours} Hours Package</span>
+                        <span className="text-zinc-500 uppercase font-bold text-[8px]">{t('jobDuration')}</span>
+                        <span className="text-white font-bold">{t('hoursPackage', { hours: durationHours })}</span>
                       </div>
                       <input
                         type="range"
@@ -1293,8 +1295,8 @@ export default function RiderDashboardPage() {
                   ) : (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500 uppercase font-bold text-[8px]">Outstation Days</span>
-                        <span className="text-white font-bold">{durationDays} Days Package</span>
+                        <span className="text-zinc-500 uppercase font-bold text-[8px]">{t('outstationDays')}</span>
+                        <span className="text-white font-bold">{t('daysPackage', { days: durationDays })}</span>
                       </div>
                       <input
                         type="range"
@@ -1312,7 +1314,7 @@ export default function RiderDashboardPage() {
               {/* Surcharges steps grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="flex justify-between items-center bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl">
-                  <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase">Passengers</span>
+                  <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase">{t('passengersLabel')}</span>
                   <div className="flex gap-3 items-center font-mono font-bold">
                     <button
                       onClick={() => setPassengersCount(c => Math.max(1, c - 1))}
@@ -1332,8 +1334,8 @@ export default function RiderDashboardPage() {
 
                 <div className="flex justify-between items-center bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl">
                   <div>
-                    <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase block">D4M Care Surcharge</span>
-                    <span className="text-[9px] text-zinc-400 block mt-0.5">₹49 (Support + Insurance)</span>
+                    <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase block">{t('d4mCareSurcharge')}</span>
+                    <span className="text-[9px] text-zinc-400 block mt-0.5">{t('d4mCareDetail')}</span>
                   </div>
                   <button
                     type="button"
@@ -1347,13 +1349,13 @@ export default function RiderDashboardPage() {
 
               {/* Promos */}
               <div className="bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl text-xs">
-                <label className="block text-[8px] font-mono font-bold text-zinc-500 uppercase mb-1">Promo Coupon Code</label>
+                <label className="block text-[8px] font-mono font-bold text-zinc-500 uppercase mb-1">{t('promoCouponCodeLabel')}</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="e.g. FREE50"
+                    placeholder={t('promoCodePlaceholder')}
                     className="flex-grow bg-zinc-950 border border-zinc-850 rounded-xl p-2.5 text-white focus:outline-none font-mono text-xs uppercase"
                   />
                   <button
@@ -1361,14 +1363,14 @@ export default function RiderDashboardPage() {
                     onClick={handleApplyPromo}
                     className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-850 rounded-xl px-4 text-[9px] font-mono font-bold uppercase tracking-wider transition cursor-pointer"
                   >
-                    Apply
+                    {t('applyButton')}
                   </button>
                 </div>
                 {promoApplied && (
                   <span className={`text-[8px] font-mono block mt-1.5 uppercase font-bold ${
                     promoApplied === 'SUCCESS' ? 'text-emerald-400' : 'text-red-500'
                   }`}>
-                    {promoApplied === 'SUCCESS' ? '✔️ Coupon applied: ₹100 discount activated!' : '❌ Invalid code pattern.'}
+                    {promoApplied === 'SUCCESS' ? t('promoSuccess') : t('promoError')}
                   </span>
                 )}
               </div>
@@ -1376,43 +1378,43 @@ export default function RiderDashboardPage() {
               {/* Payment methods */}
               <div className="flex justify-between items-center bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">Payment Method</span>
-                  <span className="font-bold text-white text-xs">{paymentMethod} Wallet</span>
+                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">{t('paymentMethodLabel')}</span>
+                  <span className="font-bold text-white text-xs">{t('paymentWallet', { method: paymentMethod })}</span>
                 </div>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="bg-zinc-950 border border-zinc-850 rounded-xl p-2 font-mono text-[9px] font-bold text-zinc-300 outline-none cursor-pointer"
                 >
-                  <option>UPI</option>
-                  <option>CASH</option>
-                  <option>CREDIT CARD</option>
-                  <option>WALLET</option>
+                  <option value="UPI">{t('paymentUpi')}</option>
+                  <option value="CASH">{t('paymentCash')}</option>
+                  <option value="CREDIT CARD">{t('paymentCreditCard')}</option>
+                  <option value="WALLET">{t('paymentWalletOption')}</option>
                 </select>
               </div>
 
               {/* Dynamic Surge Matrix Banner */}
               {surgeMultiplier > 1.0 && (
                 <div className="bg-amber-950/80 border border-amber-900 text-amber-200 p-3 rounded-xl font-mono text-[9px] uppercase tracking-wider flex items-center justify-between animate-pulse">
-                  <span>⚡ Surge pricing active due to high regional demand</span>
-                  <span className="font-extrabold text-amber-300">{surgeMultiplier}x multiplier</span>
+                  <span>{t('surgeActive')}</span>
+                  <span className="font-extrabold text-amber-300">{t('surgeMultiplier', { multiplier: surgeMultiplier })}</span>
                 </div>
               )}
 
               {/* Pricing breakdown summary */}
               <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-4 rounded-xl font-mono text-xs border-dashed">
                 <div>
-                  <span className="text-zinc-500 block text-[8px] uppercase">ESTIMATED FARE</span>
+                  <span className="text-zinc-500 block text-[8px] uppercase">{t('estimatedFareLabel')}</span>
                   <span className="text-2xl font-bold text-white block mt-0.5">
-                    {isQuoteLoading ? '₹Calculating...' : `₹${estimatedFare.toFixed(2)}`}
+                    {isQuoteLoading ? t('fareCalculating') : `₹${estimatedFare.toFixed(2)}`}
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert(`Upfront Billing: Base modified for tier modifiers. Duration hours modifier active. Surge multiplier: ${surgeMultiplier}x. Promos applied: ${promoApplied === 'SUCCESS' ? '₹100' : '₹0'}. D4M Care surcharge: ${d4mCareEnabled ? '₹49' : '₹0'}.`)}
+                  onClick={() => alert(t('billingBreakdown', { surge: surgeMultiplier, promo: promoApplied === 'SUCCESS' ? '₹100' : '₹0', care: d4mCareEnabled ? '₹49' : '₹0' }))}
                   className="text-zinc-500 hover:text-white text-[8px] font-bold uppercase tracking-wider block"
                 >
-                  Breakdown ➔
+                  {t('breakdownButton')}
                 </button>
               </div>
 
@@ -1428,7 +1430,7 @@ export default function RiderDashboardPage() {
                 />
 
                 <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 pointer-events-none z-10">
-                  {isSliding ? 'Slide to confirm...' : 'Slide to book pilot'}
+                  {isSliding ? t('slideToConfirm') : t('slideToBookPilot')}
                 </span>
 
                 <div
@@ -1448,13 +1450,13 @@ export default function RiderDashboardPage() {
           {sheetHeight > 95 && (
             <div className="space-y-5 animate-fadeIn">
               <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
-                <h3 className="text-sm font-mono font-bold uppercase text-white">One-Time Car config overrides</h3>
+                <h3 className="text-sm font-mono font-bold uppercase text-white">{t('oneTimeCarConfigHeading')}</h3>
                 <button
                   type="button"
                   onClick={() => setSheetHeight(85)}
                   className="text-xs text-zinc-500 hover:text-white uppercase font-bold"
                 >
-                  Cancel
+                  {t('cancelButton')}
                 </button>
               </div>
 
@@ -1467,28 +1469,28 @@ export default function RiderDashboardPage() {
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Manufacturer Make</label>
+                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('manufacturerMakeLabel')}</label>
                     <input
                       type="text"
                       value={oneTimeMake}
                       onChange={(e) => setOneTimeMake(e.target.value)}
-                      placeholder="e.g. Maruti Suzuki"
+                      placeholder={t('manufacturerMakePlaceholder')}
                       className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Model Name</label>
+                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('modelNameLabel')}</label>
                     <input
                       type="text"
                       value={oneTimeModel}
                       onChange={(e) => setOneTimeModel(e.target.value)}
-                      placeholder="e.g. Swift vXI"
+                      placeholder={t('modelNamePlaceholder')}
                       className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3 font-mono text-xs">
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">Transmission</label>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">{t('transmissionLabel')}</label>
                       <select
                         value={oneTimeTransmission}
                         onChange={(e) => setOneTimeTransmission(e.target.value as any)}
@@ -1499,7 +1501,7 @@ export default function RiderDashboardPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">Pricing tier</label>
+                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">{t('pricingTierLabel')}</label>
                       <select
                         value={oneTimeTier}
                         onChange={(e) => setOneTimeTier(e.target.value as any)}
@@ -1517,7 +1519,7 @@ export default function RiderDashboardPage() {
                   type="submit"
                   className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider hover:bg-zinc-200 mt-2"
                 >
-                  Bind Custom Override details
+                  {t('bindOverrideButton')}
                 </button>
               </form>
             </div>
@@ -1526,7 +1528,7 @@ export default function RiderDashboardPage() {
         </div>
 
         <footer className="bg-black py-2.5 text-center text-[7px] font-mono text-zinc-700 border-t border-zinc-950 select-none">
-          SECURE TRANSACTIONS EDGE GATEWAY • SHARD: {currentCity.toUpperCase()}
+          {t('footerShard', { shard: currentCity.toUpperCase() })}
         </footer>
       </div>
 
@@ -1535,9 +1537,9 @@ export default function RiderDashboardPage() {
         <div className="fixed inset-0 z-[999999] bg-red-950/95 backdrop-blur-md flex flex-col justify-center items-center p-6 text-center animate-fadeIn">
           <div className="max-w-md space-y-6">
             <span className="text-5xl block animate-bounce">🚨</span>
-            <h2 className="text-3xl font-extrabold tracking-tight text-white font-mono uppercase">EMERGENCY SOS LOCKOUT</h2>
+            <h2 className="text-3xl font-extrabold tracking-tight text-white font-mono uppercase">{t('emergencySosLockout')}</h2>
             <p className="text-red-200 text-xs leading-relaxed font-mono">
-              Triggers instant coordinates alerts to emergency contacts (Sarah Connor support logs) and automatically dials 112 police hotline nodes.
+              {t('sosModalDescription', { name: riderName })}
             </p>
             <div className="flex gap-4 max-w-xs mx-auto">
               <button
@@ -1545,14 +1547,14 @@ export default function RiderDashboardPage() {
                 onClick={() => setShowSosModal(false)}
                 className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
-                Cancel
+                {t('cancelButton')}
               </button>
               <button
                 type="button"
                 onClick={triggerSOS}
                 className="flex-1 bg-white hover:bg-zinc-200 text-red-600 font-bold py-3 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95 animate-pulse"
               >
-                DIAL 112 NOW
+                {t('dial112Button')}
               </button>
             </div>
           </div>
@@ -1571,9 +1573,9 @@ export default function RiderDashboardPage() {
                 <div>
                   <h4 className="text-sm font-bold tracking-tight text-white">{riderName}</h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] text-zinc-500 font-mono">Passenger Account</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">{t('passengerAccount')}</span>
                     <span className="bg-zinc-900 text-emerald-400 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
-                      VERIFIED
+                      {t('verifiedBadge')}
                     </span>
                   </div>
                 </div>
@@ -1581,17 +1583,17 @@ export default function RiderDashboardPage() {
 
               <nav className="space-y-1">
                 {[
-                  { label: 'Booking Home', href: '/rider', icon: '🔑' },
-                  { label: 'My Garage', href: '/account/garage', icon: '🚗' },
-                  { label: 'Trip History', href: '/account/bookings', icon: '📁' },
-                  { label: 'My Profile', href: '/account/profile', icon: '👤' },
-                  { label: 'Payments & Methods', href: '/account/payments', icon: '💳' },
-                  { label: 'Wallet Balance', href: '/account/wallet', icon: '💼' },
-                  { label: 'Promos & Rewards', href: '/account/rewards', icon: '🎁' },
-                  { label: 'Refer & Earn', href: '/account/refer', icon: '🏆' },
-                  { label: 'Saved Places', href: '/account/places', icon: '📍' },
-                  { label: 'Emergency Contacts', href: '/account/emergency', icon: '🛡️' },
-                  { label: 'Support & Help', href: '/account/support', icon: '💬' }
+                  { label: t('navBookingHome'), href: '/rider', icon: '🔑' },
+                  { label: t('navMyGarage'), href: '/account/garage', icon: '🚗' },
+                  { label: t('navTripHistory'), href: '/account/bookings', icon: '📁' },
+                  { label: t('navMyProfile'), href: '/account/profile', icon: '👤' },
+                  { label: t('navPaymentsMethods'), href: '/account/payments', icon: '💳' },
+                  { label: t('navWalletBalance'), href: '/account/wallet', icon: '💼' },
+                  { label: t('navPromosRewards'), href: '/account/rewards', icon: '🎁' },
+                  { label: t('navReferEarn'), href: '/account/refer', icon: '🏆' },
+                  { label: t('navSavedPlaces'), href: '/account/places', icon: '📍' },
+                  { label: t('navEmergencyContacts'), href: '/account/emergency', icon: '🛡️' },
+                  { label: t('navSupportHelp'), href: '/account/support', icon: '💬' }
                 ].map((item) => (
                   <Link
                     key={item.label}
@@ -1615,7 +1617,7 @@ export default function RiderDashboardPage() {
                 }}
                 className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-white rounded-xl py-3.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer font-mono border border-zinc-800"
               >
-                🚪 Terminate Session & Logout
+                {t('logoutButton')}
               </button>
             </div>
           </div>

@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function RiderReferPage() {
+  const t = useTranslations('accountRefer');
   const code = 'RIDER-SARAH-452';
 
   const stats = {
@@ -29,13 +31,13 @@ export default function RiderReferPage() {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Join Drivers-For-U as Rider',
-        text: `Use invite code ${code} to get ₹100 discount on your first professional driver match!`,
+        title: t('shareTitle'),
+        text: t('shareText', { code }),
         url: window.location.origin
       }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(`Use invite code ${code} to get ₹100 discount on your first professional driver match! Link: ${window.location.origin}`);
-      alert('Referral invite link copied successfully to clipboard.');
+      navigator.clipboard.writeText(t('shareTextWithLink', { code, link: window.location.origin }));
+      alert(t('inviteCopied'));
     }
   };
 
@@ -43,13 +45,13 @@ export default function RiderReferPage() {
     <div className="space-y-6 text-left">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Refer & Earn Rewards</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Invite vehicle owners to hire pilots and unlock platform wallet cashbacks</p>
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
       </div>
 
       {/* Code card */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-center space-y-4 max-w-md mx-auto">
-        <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">Your Unique Invite Code</span>
+        <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">{t('uniqueInviteCode')}</span>
         <div className="bg-zinc-900 border border-zinc-850 p-4 rounded-xl font-mono text-xl font-bold tracking-widest text-white select-all">
           {code}
         </div>
@@ -57,22 +59,22 @@ export default function RiderReferPage() {
           onClick={handleShare}
           className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95"
         >
-          📢 Share Invite Code
+          {t('shareInviteCode')}
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl space-y-1 text-center font-mono">
-          <span className="text-zinc-500 block text-[8px] uppercase">PARTNERS JOINED</span>
-          <span className="text-xl font-bold text-white block mt-0.5">{stats.joined} Owners</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('partnersJoined')}</span>
+          <span className="text-xl font-bold text-white block mt-0.5">{t('ownersCount', { count: stats.joined })}</span>
         </div>
         <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl space-y-1 text-center font-mono">
-          <span className="text-zinc-500 block text-[8px] uppercase">STATUS AWARDED</span>
-          <span className="text-xl font-bold text-white block mt-1">{stats.rewarded} settled</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('statusAwarded')}</span>
+          <span className="text-xl font-bold text-white block mt-1">{t('settledCount', { count: stats.rewarded })}</span>
         </div>
         <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl space-y-1 text-center font-mono">
-          <span className="text-zinc-500 block text-[8px] uppercase">TOTAL WALLET CASHBACK</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('totalWalletCashback')}</span>
           <span className="text-xl font-bold text-emerald-400 block mt-1">₹{stats.earnings.toFixed(2)}</span>
         </div>
       </div>
@@ -80,7 +82,7 @@ export default function RiderReferPage() {
       {/* Status List */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Referral Milestones History
+          {t('milestonesHistory')}
         </h4>
 
         <div className="space-y-4 divide-y divide-zinc-900">
@@ -88,7 +90,7 @@ export default function RiderReferPage() {
             <div key={idx} className="pt-4 first:pt-0 flex flex-col sm:flex-row justify-between sm:items-center gap-4 text-xs font-mono">
               <div className="space-y-1">
                 <span className="text-white block font-sans font-bold text-sm">{item.name}</span>
-                <span className="text-zinc-500 text-[8px] block">Invited on: {item.date}</span>
+                <span className="text-zinc-500 text-[8px] block">{t('invitedOn', { date: item.date })}</span>
               </div>
 
               {/* Progress Milestones Checklist Grid */}
@@ -98,21 +100,21 @@ export default function RiderReferPage() {
                     ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900' 
                     : 'bg-zinc-900 text-zinc-600 border-zinc-850'
                 }`}>
-                  Joined
+                  {t('joined')}
                 </div>
                 <div className={`p-1.5 rounded border ${
                   item.milestones.firstRide 
                     ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900' 
                     : 'bg-zinc-900 text-zinc-600 border-zinc-850'
                 }`}>
-                  First Ride Active
+                  {t('firstRideActive')}
                 </div>
                 <div className={`p-1.5 rounded border ${
                   item.milestones.bonusCredited 
                     ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900' 
                     : 'bg-zinc-900 text-zinc-600 border-zinc-850'
                 }`}>
-                  Bonus Credited
+                  {t('bonusCredited')}
                 </div>
               </div>
 

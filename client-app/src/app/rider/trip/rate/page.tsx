@@ -2,9 +2,11 @@
 
 import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { API_GATEWAY_BASE_URL } from '@/config';
 
 function TripRateContent() {
+  const t = useTranslations('riderTripRate');
   const searchParams = useSearchParams();
   const router = useRouter();
   const tripId = searchParams?.get('tripId') || 'trp-sandbox-2209';
@@ -20,6 +22,17 @@ function TripRateContent() {
   // Bi-Axial Behavioral Tag Chips
   const positiveTags = ['Safe Driving', 'Knew Routes', 'Punctual', 'Polite', 'Clean Vehicle'];
   const negativeTags = ['Rash Driving', 'Late Arrival', 'Rude Behavior', 'Navigational Errors'];
+  const tagLabels: Record<string, string> = {
+    'Safe Driving': t('tagSafeDriving'),
+    'Knew Routes': t('tagKnewRoutes'),
+    'Punctual': t('tagPunctual'),
+    'Polite': t('tagPolite'),
+    'Clean Vehicle': t('tagCleanVehicle'),
+    'Rash Driving': t('tagRashDriving'),
+    'Late Arrival': t('tagLateArrival'),
+    'Rude Behavior': t('tagRudeBehavior'),
+    'Navigational Errors': t('tagNavigationalErrors'),
+  };
 
   const handleToggleTag = (tag: string) => {
     setSelectedTags((prev) => 
@@ -53,7 +66,7 @@ function TripRateContent() {
       } catch (e) {}
     }
 
-    alert(`Feedback and review completed! steering back to booking dashboard.`);
+    alert(t('feedbackCompleted'));
     
     // Clear active session parameters
     sessionStorage.removeItem('current_booking_specs');
@@ -76,9 +89,9 @@ function TripRateContent() {
       <header className="border-b border-zinc-900 pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left shrink-0">
         <div>
           <span className="bg-zinc-900 text-zinc-500 border border-zinc-850 px-2.5 py-1 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
-            RATE YOUR PILOT
+            {t('badge')}
           </span>
-          <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">Driver Quality Review</h1>
+          <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">{t('title')}</h1>
         </div>
         <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">ID: {tripId.slice(0, 10)}</span>
       </header>
@@ -88,7 +101,7 @@ function TripRateContent() {
         
         {/* Interactive 5-Star block with hover effects */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 text-center space-y-3">
-          <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">How was Aniket's service?</span>
+          <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">{t('howWasService')}</span>
           <div className="flex justify-center gap-3">
             {[1, 2, 3, 4, 5].map((star) => {
               const isActive = hoverRating !== null ? star <= hoverRating : star <= rating;
@@ -109,17 +122,17 @@ function TripRateContent() {
             })}
           </div>
           <span className="text-xs font-mono font-bold text-white block mt-1 uppercase">
-            {rating === 5 && 'Excellent Service'}
-            {rating === 4 && 'Good Service'}
-            {rating === 3 && 'Average'}
-            {rating < 3 && 'Unsatisfactory'}
+            {rating === 5 && t('ratingExcellent')}
+            {rating === 4 && t('ratingGood')}
+            {rating === 3 && t('ratingAverage')}
+            {rating < 3 && t('ratingUnsatisfactory')}
           </span>
         </div>
 
         {/* Dynamic Behavioral Tag Chips (Bi-Axial: positive vs negative conditional display) */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
           <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
-            {rating <= 3 ? 'Select Areas for Improvement' : 'What went well?'}
+            {rating <= 3 ? t('areasForImprovement') : t('whatWentWell')}
           </span>
 
           {/* Positive Tag Grid (Only shown if rating is Good/Excellent) */}
@@ -136,7 +149,7 @@ function TripRateContent() {
                       : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
                   }`}
                 >
-                  👍 {tag}
+                  👍 {tagLabels[tag]}
                 </button>
               ))}
             </div>
@@ -157,12 +170,12 @@ function TripRateContent() {
                         : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
                     }`}
                   >
-                    ⚠️ {tag}
+                    ⚠️ {tagLabels[tag]}
                   </button>
                 ))}
               </div>
               <p className="text-[8px] text-zinc-500 font-mono uppercase mt-1 leading-normal">
-                ❗ Note: Poor ratings trigger automatic quality assurance compliance review.
+                {t('poorRatingNote')}
               </p>
             </div>
           )}
@@ -170,7 +183,7 @@ function TripRateContent() {
 
         {/* Deduplicated Tip Allocation Row */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 font-mono">
-          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Add Tip for the Driver Partner</span>
+          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">{t('addTip')}</span>
           
           <div className="grid grid-cols-5 gap-2 text-xs">
             {[0, 20, 50, 100].map((amt) => (
@@ -184,7 +197,7 @@ function TripRateContent() {
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400'
                 }`}
               >
-                {amt === 0 ? 'No Tip' : `₹${amt}`}
+                {amt === 0 ? t('noTip') : `₹${amt}`}
               </button>
             ))}
             
@@ -194,7 +207,7 @@ function TripRateContent() {
                 tipAmount === -1 ? 'bg-white border-white text-black' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
               }`}
             >
-              Custom
+              {t('customTip')}
             </button>
           </div>
 
@@ -206,7 +219,7 @@ function TripRateContent() {
                 type="number"
                 value={customTip}
                 onChange={(e) => setCustomTip(e.target.value)}
-                placeholder="Enter custom amount"
+                placeholder={t('customAmountPlaceholder')}
                 className="bg-zinc-900 border border-zinc-850 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-zinc-700 w-full"
               />
             </div>
@@ -215,12 +228,12 @@ function TripRateContent() {
 
         {/* Text Comments */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 text-xs">
-          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Feedback Review Comments</span>
+          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">{t('commentsLabel')}</span>
           <textarea
             value={comments}
             onChange={(e) => setComments(e.target.value)}
             rows={2}
-            placeholder="Write comments about your trip experience (optional)..."
+            placeholder={t('commentsPlaceholder')}
             className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-zinc-500 font-sans"
             maxLength={500}
           />
@@ -238,14 +251,14 @@ function TripRateContent() {
             disabled={isSubmitting}
             className="bg-zinc-950 hover:bg-zinc-900 text-zinc-500 font-mono font-bold uppercase py-3.5 border border-zinc-900 rounded-xl transition cursor-pointer text-center disabled:opacity-50"
           >
-            Skip Feedback
+            {t('skipFeedback')}
           </button>
           <button
             onClick={handleSubmitFeedback}
             disabled={isSubmitting}
             className="bg-white hover:bg-zinc-200 text-black font-sans font-bold uppercase py-3.5 rounded-xl transition cursor-pointer text-center disabled:opacity-50"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Review'}
+            {isSubmitting ? t('submitting') : t('submitReview')}
           </button>
         </div>
 
@@ -259,10 +272,11 @@ function TripRateContent() {
 }
 
 export default function TripRatePage() {
+  const t = useTranslations('riderTripRate');
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-black flex items-center justify-center font-sans text-zinc-500 font-mono text-xs uppercase animate-pulse">
-        Loading Review Portal...
+        {t('loadingPortal')}
       </div>
     }>
       <TripRateContent />

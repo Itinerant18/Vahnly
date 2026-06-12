@@ -1,10 +1,12 @@
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 export default function DriverLoginRedirect() {
+  const t = useTranslations('driverLogin');
   const router = useRouter();
-  
+
   useEffect(() => {
     router.replace('/login?role=driver');
   }, [router]);
@@ -12,7 +14,7 @@ export default function DriverLoginRedirect() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center font-sans">
       <div className="text-zinc-500 font-mono text-xs uppercase animate-pulse">
-        Redirecting to Unified Fleet Access Portal...
+        {t('redirecting')}
       </div>
     </div>
   );

@@ -130,6 +130,18 @@ func main() {
 	kafkaSecurity.ApplyToWriter(payoutWriter)
 	defer payoutWriter.Close()
 
+	// Dedicated producer for support.ticket.created (support pipeline).
+	supportWriter := &kafka.Writer{
+		Addr:         kafka.TCP(brokersList...),
+		Topic:        "support.ticket.created",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+		BatchTimeout: 10 * time.Millisecond,
+		BatchSize:    1,
+	}
+	kafkaSecurity.ApplyToWriter(supportWriter)
+	defer supportWriter.Close()
+
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
 	handler.SetJWTSecret(jwtSecret)
 	go handler.StartGPSWriteBehindWorker(mainCtx)
@@ -198,6 +210,7 @@ func main() {
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverFeaturesHandler := gatewayHttp.NewDriverFeaturesHandler(dbPool)
 	driverEarningsHandler := gatewayHttp.NewDriverEarningsHandler(dbPool, redisClusterClient, payoutWriter, log.New(os.Stdout, "[DRIVER_EARNINGS] ", log.LstdFlags))
+	driverSelfServiceHandler := gatewayHttp.NewDriverSelfServiceHandler(dbPool, redisClusterClient, objStore, supportWriter, log.New(os.Stdout, "[DRIVER_SELF] ", log.LstdFlags))
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
 	offlineSyncHandler := gatewayHttp.NewOfflineSyncHandler(dbPool)
 	tripAuditHandler := gatewayHttp.NewTripAuditHandler(dbPool)
@@ -530,6 +543,23 @@ func main() {
 	mux.HandleFunc("GET /api/v1/driver/payouts/{payoutId}", authGuard.AuthenticateJWT(driverEarningsHandler.GetPayoutDetail))
 	mux.HandleFunc("GET /api/v1/driver/wallet", authGuard.AuthenticateJWT(driverFeaturesHandler.GetWallet))
 	mux.HandleFunc("POST /api/v1/driver/wallet/topup", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, driverEarningsHandler.AdminWalletTopup))
+
+	// Driver self-service: Vehicle management
+	mux.HandleFunc("GET /api/v1/driver/vehicles", authGuard.AuthenticateJWT(driverSelfServiceHandler.ListVehicles))
+	mux.HandleFunc("POST /api/v1/driver/vehicles", authGuard.AuthenticateJWT(driverSelfServiceHandler.CreateVehicle))
+	mux.HandleFunc("POST /api/v1/driver/vehicles/{id}/documents", authGuard.AuthenticateJWT(driverSelfServiceHandler.UploadVehicleDocument))
+	mux.HandleFunc("DELETE /api/v1/driver/vehicles/{id}", authGuard.AuthenticateJWT(driverSelfServiceHandler.DeleteVehicle))
+	// Driver self-service: Support tickets
+	mux.HandleFunc("POST /api/v1/driver/support/attachments", authGuard.AuthenticateJWT(driverSelfServiceHandler.UploadSupportAttachment))
+	mux.HandleFunc("POST /api/v1/driver/support/tickets", authGuard.AuthenticateJWT(driverSelfServiceHandler.CreateTicket))
+	mux.HandleFunc("GET /api/v1/driver/support/tickets", authGuard.AuthenticateJWT(driverSelfServiceHandler.ListTickets))
+	mux.HandleFunc("GET /api/v1/driver/support/tickets/{id}", authGuard.AuthenticateJWT(driverSelfServiceHandler.GetTicket))
+	mux.HandleFunc("POST /api/v1/driver/support/tickets/{id}/reply", authGuard.AuthenticateJWT(driverSelfServiceHandler.ReplyTicket))
+	// Driver self-service: Settings
+	mux.HandleFunc("PATCH /api/v1/driver/notifications/preferences", authGuard.AuthenticateJWT(driverSelfServiceHandler.UpdateNotificationPrefs))
+	mux.HandleFunc("PATCH /api/v1/driver/profile/language", authGuard.AuthenticateJWT(driverSelfServiceHandler.UpdateLanguage))
+	mux.HandleFunc("POST /api/v1/driver/auth/change-password", authGuard.AuthenticateJWT(driverSelfServiceHandler.ChangePassword))
+	mux.HandleFunc("DELETE /api/v1/driver/account", authGuard.AuthenticateJWT(driverSelfServiceHandler.DeleteAccount))
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)

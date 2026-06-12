@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function RiderInsurancePage() {
+  const t = useTranslations('accountInsurance');
   const [subscription, setSubscription] = useState('TRIP_BY_TRIP');
   const [claims, setClaims] = useState([
     { id: 'CLM-011', date: '2026-05-10', type: 'Windshield crack compensation', amount: 4500.00, status: 'Settled' }
   ]);
 
   const handleFileClaim = () => {
-    const reason = prompt('Enter description of incident for filing insurance claim:');
+    const reason = prompt(t('incidentPrompt'));
     if (!reason) return;
 
     const created = {
@@ -21,7 +23,7 @@ export default function RiderInsurancePage() {
     };
 
     setClaims((prev) => [created, ...prev]);
-    alert(`Insurance claim ${created.id} submitted. Auto claims adjusters will review vehicle dashboard logs.`);
+    alert(t('claimSubmitted', { id: created.id }));
   };
 
   return (
@@ -29,22 +31,22 @@ export default function RiderInsurancePage() {
       {/* Header */}
       <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white font-move">Insurance & D4M Care</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Configure monthly protection plans or submit vehicle damage claims</p>
+          <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={handleFileClaim}
           className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
         >
-          File a Claim
+          {t('fileClaim')}
         </button>
       </div>
 
       {/* Subscription Type */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          D4M Care Subscription Plan
+          {t('subscriptionPlan')}
         </h4>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
@@ -57,8 +59,8 @@ export default function RiderInsurancePage() {
                 onChange={() => setSubscription('TRIP_BY_TRIP')}
               />
               <div>
-                <span className="text-white font-sans font-medium block">Trip-by-Trip Coverage</span>
-                <span className="text-[9px] text-zinc-500 block mt-0.5">₹49 per matching ride allocation</span>
+                <span className="text-white font-sans font-medium block">{t('tripByTripCoverage')}</span>
+                <span className="text-[9px] text-zinc-500 block mt-0.5">{t('tripByTripPrice')}</span>
               </div>
             </div>
           </label>
@@ -72,8 +74,8 @@ export default function RiderInsurancePage() {
                 onChange={() => setSubscription('MONTHLY')}
               />
               <div>
-                <span className="text-white font-sans font-medium block">Monthly Unlimited Pack</span>
-                <span className="text-[9px] text-zinc-500 block mt-0.5">₹399 per month unlimited protection</span>
+                <span className="text-white font-sans font-medium block">{t('monthlyUnlimitedPack')}</span>
+                <span className="text-[9px] text-zinc-500 block mt-0.5">{t('monthlyUnlimitedPrice')}</span>
               </div>
             </div>
           </label>
@@ -82,25 +84,25 @@ export default function RiderInsurancePage() {
 
       {/* Coverage details */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 font-mono text-xs text-zinc-400">
-        <span className="text-zinc-600 block text-[8px] uppercase font-bold border-b border-zinc-900 pb-1.5">Active Insurance Policy Details</span>
+        <span className="text-zinc-600 block text-[8px] uppercase font-bold border-b border-zinc-900 pb-1.5">{t('policyDetails')}</span>
         <div className="flex justify-between">
-          <span>Accidental Damage Shield:</span>
-          <span className="text-white">Covered up to ₹2,00,000</span>
+          <span>{t('accidentalDamageShield')}</span>
+          <span className="text-white">{t('accidentalDamageValue')}</span>
         </div>
         <div className="flex justify-between">
-          <span>Medical Expense Coverage:</span>
-          <span className="text-white">Covered up to ₹50,000</span>
+          <span>{t('medicalExpenseCoverage')}</span>
+          <span className="text-white">{t('medicalExpenseValue')}</span>
         </div>
         <div className="flex justify-between">
-          <span>Roadside Towing support:</span>
-          <span className="text-white">Unlimited 24/7 coverage</span>
+          <span>{t('roadsideTowingSupport')}</span>
+          <span className="text-white">{t('roadsideTowingValue')}</span>
         </div>
       </div>
 
       {/* Past Claims */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Claims History
+          {t('claimsHistory')}
         </h4>
 
         <div className="divide-y divide-zinc-900">

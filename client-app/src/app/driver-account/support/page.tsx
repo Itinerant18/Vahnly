@@ -1,236 +1,215 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useAuthStore } from '@/store/useAuthStore';
+import {
+  createSupportTicket, getSupportTickets, getSupportTicket, replySupportTicket,
+  uploadSupportAttachment, getTripHistory,
+  type SupportTicketListItem, type SupportTicketMessage, type TicketCategory, type DriverTrip,
+} from '@/api/client';
+import { formatCompactDate } from '@/lib/format';
+
+const HOTLINE = '+911800123456';
+
+const STATUS_STYLE: Record<string, string> = {
+  OPEN: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
+  PENDING: 'text-sky-400 bg-sky-400/10 border-sky-400/30',
+  RESOLVED: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
+  CLOSED: 'text-zinc-400 bg-zinc-800 border-zinc-700',
+};
+
+type CatTile = { key: TicketCategory; label: string; icon: string };
 
 export default function DriverSupportPage() {
-  const [ticketCategory, setTicketCategory] = useState('Payment settlement mismatch');
-  const [ticketDescription, setTicketDescription] = useState('');
-  const [faqOpen, setFaqOpen] = useState<number | null>(null);
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'bot', text: 'Welcome to Driver Support. Select a category below or type a query to speak with a dispatcher.', time: '12:00 PM' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [tickets, setTickets] = useState([
-    { id: 'TCK-2241', category: 'Odometer mismatch report', date: '2026-05-28', status: 'Closed', response: 'End Odometer reading recalculated to match GPS track logs.' },
-    { id: 'TCK-2190', category: 'Commission refund request', date: '2026-05-24', status: 'Closed', response: 'GST credit notes refunded to wallet balance.' }
-  ]);
+  const t = useTranslations('support');
+  const { token } = useAuthStore();
+  const [view, setView] = useState<'new' | 'list' | 'thread'>('new');
+  const [tickets, setTickets] = useState<SupportTicketListItem[]>([]);
 
-  const faqs = [
-    { q: 'How are extra mileage charges computed during trips?', a: 'Extra mileage charges are computed at ₹18 per KM after exceeding the upfront packaged limit. End Odometer minus Start Odometer provides the total mileage elapsed.' },
-    { q: 'Why did my match acceptance index decrease?', a: 'Acceptance index decreases when booking offer popups time out (after 15 seconds) or are explicitly declined. Maintain a >85% acceptance rate to unlock Gold/Platinum incentives.' },
-    { q: 'When do instant withdrawals settle to bank accounts?', a: 'Withdrawals requested via linked UPI IDs settle within 10 minutes. Bank transfers (IMPS/NEFT) can take up to 24 hours depending on network bank processing windows.' },
-    { q: 'How does fatigue tracking geofencing alert drivers?', a: 'Drivers are restricted from going on duty for 6 mandatory hours after completing 10 continuous hours of operational ride tracking.' }
+  // New ticket state
+  const [category, setCategory] = useState<TicketCategory | null>(null);
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [trips, setTrips] = useState<DriverTrip[]>([]);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [createdNumber, setCreatedNumber] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Thread state
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [thread, setThread] = useState<{ ticket: SupportTicketListItem; description: string; messages: SupportTicketMessage[] } | null>(null);
+  const [replyMsg, setReplyMsg] = useState('');
+
+  const cats: CatTile[] = [
+    { key: 'TRIP', label: t('catTrip'), icon: '🚗' },
+    { key: 'PAYMENT', label: t('catPayment'), icon: '💳' },
+    { key: 'VEHICLE', label: t('catVehicle'), icon: '🔧' },
+    { key: 'ACCOUNT', label: t('catAccount'), icon: '👤' },
+    { key: 'SAFETY', label: t('catSafety'), icon: '🛡️' },
+    { key: 'OTHER', label: t('catOther'), icon: '❓' },
   ];
 
-  const handleSendChatMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const loadTickets = useCallback(async () => {
+    if (!token) return;
+    try { setTickets((await getSupportTickets(token)).tickets); } catch (e) { console.warn(e); }
+  }, [token]);
 
-    const userMsg = { sender: 'driver', text: chatInput, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    setChatMessages((prev) => [...prev, userMsg]);
+  useEffect(() => {
+    if (!token) return;
+    void loadTickets();
+    getTripHistory(token, 10, 0).then((r) => setTrips(r.trips)).catch(() => {});
+  }, [token, loadTickets]);
 
-    setChatInput('');
-
-    // Simulated reply
-    setTimeout(() => {
-      const botReply = {
-        sender: 'bot',
-        text: `Dispatcher node acknowledged: "${chatInput}". Syncing coordinates and forwarding this query to regional team leaders.`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setChatMessages((prev) => [...prev, botReply]);
-    }, 1000);
+  const openThread = async (id: string) => {
+    if (!token) return;
+    setActiveId(id); setView('thread'); setThread(null);
+    try { setThread(await getSupportTicket(token, id)); } catch (e) { console.warn(e); }
   };
 
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleAttach = async (file: File) => {
+    if (!token) return;
+    try { const { url } = await uploadSupportAttachment(token, file); setAttachments((a) => [...a, url]); }
+    catch { alert('Attachment upload failed.'); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketDescription.trim()) {
-      alert('Provide a description of the support ticket.');
-      return;
-    }
+    if (!token || !category) return;
+    setSubmitting(true);
+    try {
+      const res = await createSupportTicket(token, {
+        category, subject: subject || category, description,
+        order_id: orderId || undefined, attachments,
+      });
+      setCreatedNumber(res.ticket_number);
+      setCategory(null); setSubject(''); setDescription(''); setOrderId(''); setAttachments([]);
+      await loadTickets();
+    } catch { alert('Could not submit ticket.'); }
+    finally { setSubmitting(false); }
+  };
 
-    const newTicket = {
-      id: `TCK-${Math.floor(Math.random() * 9000 + 1000)}`,
-      category: ticketCategory,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Open',
-      response: 'Ticket registered. A support representative will review details shortly.'
-    };
-
-    setTickets((prev) => [newTicket, ...prev]);
-    setTicketDescription('');
-    alert(`Support ticket ${newTicket.id} created successfully.`);
+  const handleReply = async () => {
+    if (!token || !activeId || !replyMsg.trim()) return;
+    try { await replySupportTicket(token, activeId, replyMsg); setReplyMsg(''); await openThread(activeId); }
+    catch { alert('Reply failed.'); }
   };
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Support Academy & Tickets</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Access FAQs, raise formal dispute tickets, or chat with dispatch coordinators</p>
+    <div className="space-y-5 text-left pb-6">
+      {/* Hotline always visible */}
+      <a href={`tel:${HOTLINE}`} className="flex items-center justify-center gap-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 py-3 text-xs font-mono font-bold uppercase tracking-wider">
+        📞 {t('hotline')}
+      </a>
+
+      <div className="flex gap-2 font-mono text-[10px]">
+        <button onClick={() => { setView('new'); setCreatedNumber(null); }} className={`flex-1 py-2 rounded-lg font-bold uppercase ${view === 'new' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>{t('newTicket')}</button>
+        <button onClick={() => setView('list')} className={`flex-1 py-2 rounded-lg font-bold uppercase ${view === 'list' || view === 'thread' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>{t('myTickets')}</button>
       </div>
 
-      {/* Hotline emergency quick dialer */}
-      <div className="bg-red-950/20 border border-red-900 rounded-2xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <div>
-          <h4 className="text-xs font-bold text-red-400 font-mono uppercase tracking-wider">🚨 Safety Dispatch Hotline</h4>
-          <p className="text-[11px] text-red-200/70 mt-1 font-sans leading-normal">
-            For on-road emergencies, physical vehicle issues, or safety concern alerts, call the emergency hotline immediately.
-          </p>
+      {/* NEW TICKET */}
+      {view === 'new' && (createdNumber ? (
+        <div className="bg-zinc-950 border border-emerald-500/30 rounded-2xl p-8 text-center space-y-3">
+          <div className="text-4xl">✓</div>
+          <p className="text-white font-bold">{t('ticketCreated')}</p>
+          <p className="text-emerald-400 font-mono text-lg">{createdNumber}</p>
+          <button onClick={() => { setCreatedNumber(null); setView('list'); }} className="text-[10px] font-mono text-zinc-400 underline">{t('myTickets')}</button>
         </div>
-        
-        <button
-          onClick={() => alert('Dialing safety dispatch hotline proxy: +91 1800 220 9988...')}
-          className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded-xl shrink-0 cursor-pointer active:scale-95"
-        >
-          Call Emergency Support
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* FAQs Accordion Column */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Frequently Asked Questions
-          </h3>
-
-          <div className="space-y-2">
-            {faqs.map((faq, idx) => (
-              <div key={idx} className="bg-zinc-950 border border-zinc-900 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
-                  className="w-full text-left p-4 text-xs font-bold text-zinc-300 hover:text-white transition flex justify-between items-center cursor-pointer"
-                >
-                  <span>{faq.q}</span>
-                  <span>{faqOpen === idx ? '▲' : '▼'}</span>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase font-mono mb-2">{t('category')}</label>
+            <div className="grid grid-cols-3 gap-2">
+              {cats.map((c, i) => (
+                <button key={i} type="button" onClick={() => setCategory(c.key)}
+                  className={`rounded-xl border p-3 text-center transition ${category === c.key ? 'border-white bg-zinc-900' : 'border-zinc-800 bg-zinc-950'}`}>
+                  <div className="text-xl">{c.icon}</div>
+                  <div className="text-[9px] font-mono text-zinc-400 mt-1">{c.label}</div>
                 </button>
-                {faqOpen === idx && (
-                  <div className="px-4 pb-4 text-[11px] text-zinc-400 leading-relaxed font-sans border-t border-zinc-900/40 pt-2 bg-zinc-900/10">
-                    {faq.a}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Live Chat simulation Column */}
-        <div className="space-y-4 flex flex-col h-[400px]">
-          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Dispatcher Live Chat
-          </h3>
-
-          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl flex-1 flex flex-col justify-between overflow-hidden">
-            {/* Messages box */}
-            <div className="p-4 overflow-y-auto space-y-3 flex-grow max-h-[280px] scrollbar-thin">
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`flex flex-col max-w-[80%] ${msg.sender === 'driver' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                  <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${
-                    msg.sender === 'driver' ? 'bg-white text-black font-medium' : 'bg-zinc-900 text-zinc-300'
-                  }`}>
-                    {msg.text}
-                  </div>
-                  <span className="text-[7px] font-mono text-zinc-600 mt-1">{msg.time}</span>
-                </div>
               ))}
             </div>
-
-            {/* Input form */}
-            <form onSubmit={handleSendChatMessage} className="p-3 border-t border-zinc-900 flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type query to speak with dispatcher..."
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-500"
-              />
-              <button
-                type="submit"
-                className="bg-white hover:bg-zinc-200 text-black px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
-              >
-                Send
-              </button>
-            </form>
           </div>
-        </div>
 
-      </div>
-
-      {/* Support ticket creation form and history */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-        
-        {/* Ticket Form */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Raise Support Ticket
-          </h4>
-
-          <form onSubmit={handleCreateTicket} className="space-y-4">
+          {(category === 'TRIP') && trips.length > 0 && (
             <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Problem Category</label>
-              <select
-                value={ticketCategory}
-                onChange={(e) => setTicketCategory(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none text-zinc-300"
-              >
-                <option>Payment settlement mismatch</option>
-                <option>Odometer capture error</option>
-                <option>App crash / GPS loop issues</option>
-                <option>Rider behavioral dispute</option>
-                <option>Other routing compliance questions</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Incident Description</label>
-              <textarea
-                value={ticketDescription}
-                onChange={(e) => setTicketDescription(e.target.value)}
-                rows={3}
-                placeholder="Describe details of the issue..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none text-white font-sans"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95"
-            >
-              Submit Ticket
-            </button>
-          </form>
-        </div>
-
-        {/* Ticket history */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Ticket History / Status
-          </h4>
-
-          <div className="divide-y divide-zinc-900">
-            {tickets.map((t) => (
-              <div key={t.id} className="py-3.5 space-y-2 text-xs font-mono">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-white font-sans font-medium block">{t.category}</span>
-                    <span className="text-zinc-500 text-[8px] block mt-0.5">{t.date} • ID: {t.id}</span>
-                  </div>
-                  <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
-                    {t.status}
-                  </span>
-                </div>
-                <div className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-900 text-[10px] text-zinc-400 leading-normal font-sans">
-                  <span className="font-bold font-mono text-[8px] text-zinc-500 block uppercase mb-1">Support Resolution:</span>
-                  {t.response}
-                </div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase font-mono mb-2">{t('selectTrip')}</label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {trips.map((tr) => (
+                  <label key={tr.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-300 bg-zinc-950 border border-zinc-900 rounded-lg p-2 cursor-pointer">
+                    <input type="radio" name="trip" checked={orderId === tr.id} onChange={() => setOrderId(tr.id)} />
+                    <span>{tr.id.slice(0, 8)} · {tr.status}</span>
+                  </label>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t('subject')}
+            className="w-full bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('description')} rows={4} required
+            className="w-full bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono" />
+
+          <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleAttach(e.target.files[0])} />
+            <button type="button" onClick={() => fileRef.current?.click()} className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded-xl px-4 py-2 text-[10px] font-mono uppercase">📎 {t('attachPhoto')}</button>
+            {attachments.length > 0 && <span className="text-[10px] font-mono text-emerald-400">{attachments.length} attached</span>}
           </div>
+
+          <button type="submit" disabled={!category || submitting}
+            className="w-full bg-white text-black rounded-xl py-3.5 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            {submitting ? '…' : t('submit')}
+          </button>
+        </form>
+      ))}
+
+      {/* MY TICKETS */}
+      {view === 'list' && (
+        <div className="space-y-2">
+          {tickets.length === 0 && <p className="text-[10px] font-mono text-zinc-600 text-center py-4">{t('noTickets')}</p>}
+          {tickets.map((tk) => (
+            <button key={tk.ticket_number} onClick={() => openThread(tk.ticket_number)}
+              className="w-full bg-zinc-950 border border-zinc-900 rounded-xl p-4 flex justify-between items-center text-left">
+              <div>
+                <span className="text-white font-mono text-xs font-bold">{tk.ticket_number}</span>
+                <span className="block text-zinc-500 text-[9px] font-mono mt-0.5">{tk.category} · {formatCompactDate(tk.updated_at)}</span>
+              </div>
+              <span className={`text-[8px] font-mono uppercase font-bold px-2 py-1 rounded-full border ${STATUS_STYLE[tk.status] ?? STATUS_STYLE.OPEN}`}>{tk.status}</span>
+            </button>
+          ))}
         </div>
+      )}
 
-      </div>
-
+      {/* THREAD */}
+      {view === 'thread' && (
+        <div className="space-y-3">
+          <button onClick={() => setView('list')} className="text-[10px] font-mono text-zinc-400">← {t('myTickets')}</button>
+          {!thread && <p className="text-[10px] font-mono text-zinc-600">Loading…</p>}
+          {thread && (
+            <>
+              <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3">
+                <span className="text-white font-mono text-xs font-bold">{thread.ticket.ticket_number}</span>
+                <span className="block text-zinc-500 text-[9px] font-mono">{thread.ticket.subject}</span>
+              </div>
+              <div className="space-y-2">
+                {thread.messages.map((m, i) => (
+                  <div key={i} className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${m.sender_type === 'DRIVER' ? 'ml-auto bg-white text-black' : 'bg-zinc-900 text-zinc-200'}`}>
+                    <p>{m.content}</p>
+                    <span className="block text-[8px] opacity-60 mt-1 font-mono">{m.sender_name} · {formatCompactDate(m.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 sticky bottom-0">
+                <input value={replyMsg} onChange={(e) => setReplyMsg(e.target.value)} placeholder={t('reply')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleReply()}
+                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+                <button onClick={handleReply} className="bg-white text-black rounded-xl px-4 text-[10px] font-bold uppercase">{t('send')}</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,17 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getDriverTraining, TrainingModule } from '@/api/client';
 
-function statusLabel(status: string): string {
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'IN_PROGRESS') return 'In Progress';
-  return 'Not Started';
-}
-
 export default function DriverTrainingPage() {
+  const t = useTranslations('driverTraining');
   const { token } = useAuthStore();
+
+  const statusLabel = (status: string): string => {
+    if (status === 'COMPLETED') return t('statusCompleted');
+    if (status === 'IN_PROGRESS') return t('statusInProgress');
+    return t('statusNotStarted');
+  };
+
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,30 +35,30 @@ export default function DriverTrainingPage() {
     <div className="space-y-6 text-left">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Training Academy</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Certify expertise to unlock premium luxury and EV vehicle dispatch filters</p>
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
       </div>
 
       {/* Progress overview */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-2">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Certification Progress
+          {t('certificationProgress')}
         </h4>
         <p className="font-mono text-[11px] text-zinc-400">
-          <span className="text-emerald-400 font-bold">{completed}</span> of {modules.length} modules completed
+          <span className="text-emerald-400 font-bold">{completed}</span> {t('ofModulesCompleted', { total: modules.length })}
         </p>
       </div>
 
       {/* Modules listing */}
       <div className="space-y-4">
         <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Academy Modules
+          {t('academyModules')}
         </h3>
 
         <div className="space-y-3">
-          {loading && <p className="text-[10px] font-mono text-zinc-600">Loading modules…</p>}
+          {loading && <p className="text-[10px] font-mono text-zinc-600">{t('loadingModules')}</p>}
           {!loading && modules.length === 0 && (
-            <p className="text-[10px] font-mono text-zinc-600">No training modules available yet.</p>
+            <p className="text-[10px] font-mono text-zinc-600">{t('noModules')}</p>
           )}
           {modules.map((m) => (
             <div key={m.id} className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl space-y-4">
@@ -80,7 +83,7 @@ export default function DriverTrainingPage() {
               </div>
 
               <div className="border-t border-zinc-900 pt-3 text-[10px] font-mono text-zinc-400 flex justify-between">
-                <span>Quiz Score:</span>
+                <span>{t('quizScore')}</span>
                 <span className="text-white font-bold">{m.score != null ? `${m.score}%` : '—'}</span>
               </div>
             </div>

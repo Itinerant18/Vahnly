@@ -1,10 +1,12 @@
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 export default function RiderLoginRedirect() {
+  const t = useTranslations('riderLogin');
   const router = useRouter();
-  
+
   useEffect(() => {
     router.replace('/login?role=rider');
   }, [router]);
@@ -12,7 +14,7 @@ export default function RiderLoginRedirect() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center font-sans text-zinc-400">
       <div className="font-mono text-xs uppercase animate-pulse">
-        Redirecting to Unified Ride Access Portal...
+        {t('redirecting')}
       </div>
     </div>
   );

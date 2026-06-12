@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 
 function PublicShareContent() {
+  const t = useTranslations('share');
   const searchParams = useSearchParams();
   const tripId = searchParams?.get('tripId') || 'trp-2209';
 
@@ -35,11 +37,11 @@ function PublicShareContent() {
       <header className="border-b border-zinc-850 pb-4 flex justify-between items-center w-full max-w-xl mx-auto text-left">
         <div>
           <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
-            Live Public Tracking Share
+            {t('liveBadge')}
           </span>
-          <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">Platform Journey Tracker</h1>
+          <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">{t('journeyTracker')}</h1>
         </div>
-        <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">ID: {tripData.id}</span>
+        <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">{t('idLabel', { id: tripData.id })}</span>
       </header>
 
       {/* Main Map Box */}
@@ -76,14 +78,14 @@ function PublicShareContent() {
 
           {/* Map details overlay header */}
           <div className="relative z-10 p-4 bg-gradient-to-b from-black to-transparent flex justify-between items-center text-[9px] font-mono font-bold text-zinc-500">
-            <span>DRIVER ETA: {Math.max(1, Math.round(tripData.etaMins - (replayProgress / 100) * tripData.etaMins))} MINS</span>
+            <span>{t('driverEta', { mins: Math.max(1, Math.round(tripData.etaMins - (replayProgress / 100) * tripData.etaMins)) })}</span>
             <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded uppercase">
-              EN ROUTE
+              {t('enRoute')}
             </span>
           </div>
 
           <div className="relative z-10 p-4 bg-gradient-to-t from-black to-transparent text-[9px] font-mono text-zinc-500">
-            <span>Live telemetry path sync: 100% active</span>
+            <span>{t('telemetrySync')}</span>
           </div>
         </div>
 
@@ -96,16 +98,16 @@ function PublicShareContent() {
             <div>
               <h4 className="text-xs font-bold text-white">{tripData.driverName} ({tripData.driverRating})</h4>
               <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block mt-0.5">
-                Pilot allocated by {tripData.riderName.split(' ')[0]}
+                {t('pilotAllocatedBy', { name: tripData.riderName.split(' ')[0] })}
               </span>
             </div>
           </div>
 
           <div className="space-y-2.5 text-xs font-mono text-zinc-400">
-            <div>📍 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5">Pickup Node</span> {tripData.pickup}</div>
-            <div>🏁 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5 font-mono">Destination</span> {tripData.dropoff}</div>
+            <div>📍 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5">{t('pickupNode')}</span> {tripData.pickup}</div>
+            <div>🏁 <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-0.5 font-mono">{t('destination')}</span> {tripData.dropoff}</div>
             <div className="border-t border-zinc-900 pt-2.5 text-[9px]">
-              <span className="text-zinc-600 block text-[8px] uppercase font-bold">Assigned Vehicle</span>
+              <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('assignedVehicle')}</span>
               <span className="text-white block mt-0.5">{tripData.car}</span>
             </div>
           </div>
@@ -114,41 +116,42 @@ function PublicShareContent() {
         {/* Timeline tracker */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 font-mono text-[9px]">
           <h4 className="text-[10px] font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-2">
-            Trip Progress Timeline
+            {t('timelineTitle')}
           </h4>
           <div className="space-y-2 text-zinc-400">
             <div className="flex items-center gap-2 text-zinc-500">
               <span>●</span>
-              <span>Trip booked at 21:05</span>
+              <span>{t('timelineBooked')}</span>
             </div>
             <div className="flex items-center gap-2 text-zinc-500">
               <span>●</span>
-              <span>Driver assigned at 21:07</span>
+              <span>{t('timelineAssigned')}</span>
             </div>
             <div className="flex items-center gap-2 text-zinc-500">
               <span>●</span>
-              <span>Driver arrived at 21:12</span>
+              <span>{t('timelineArrived')}</span>
             </div>
             <div className="flex items-center gap-2 text-white font-bold">
               <span>●</span>
-              <span>Trip started at 21:15 (In transit)</span>
+              <span>{t('timelineStarted')}</span>
             </div>
           </div>
         </div>
       </main>
 
       <footer className="w-full max-w-xl mx-auto text-center text-[8px] font-mono text-zinc-700 select-none pt-4 border-t border-zinc-900">
-        ENCRYPTED PUBLIC DISPATCH TRAIL • GEOFENCE ENABLED
+        {t('footer')}
       </footer>
     </div>
   );
 }
 
 export default function PublicSharePage() {
+  const t = useTranslations('share');
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-black flex items-center justify-center font-sans text-zinc-500 font-mono text-xs uppercase animate-pulse">
-        Establishing Secure Share Connection...
+        {t('loadingFallback')}
       </div>
     }>
       <PublicShareContent />

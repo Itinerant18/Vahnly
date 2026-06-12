@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function DriverPerformancePage() {
+  const t = useTranslations('driverPerformance');
   const metrics = {
     rating: 4.92,
     acceptance: 96,
@@ -12,49 +14,49 @@ export default function DriverPerformancePage() {
   };
 
   const compliments = [
-    { label: '🎖️ Safe Driver Navigation', count: 184 },
-    { label: '💬 Exceptionally Polite', count: 142 },
-    { label: '🧹 Clean Cabin Maintenance', count: 96 },
-    { label: '⏰ Perfect Punctuality', count: 88 }
+    { label: t('compliment1'), count: 184 },
+    { label: t('compliment2'), count: 142 },
+    { label: t('compliment3'), count: 96 },
+    { label: t('compliment4'), count: 88 }
   ];
 
   const reviews = [
-    { name: 'Anirban Das', rating: 5, date: '2026-06-03', text: 'Exceptionally smooth automatic transmission transition. Guided the Audi A6 through heavy Salt Lake route traffic with ease.' },
-    { name: 'Rohan Sen', rating: 5, date: '2026-06-01', text: 'Punctual arrival. Polite behavior and followed all speed bounds.' },
-    { name: 'Priya Dey', rating: 4, date: '2026-05-28', text: 'Good pilot. Highly recommended for manual transmission cars.' }
+    { name: 'Anirban Das', rating: 5, date: '2026-06-03', text: t('review1Text') },
+    { name: 'Rohan Sen', rating: 5, date: '2026-06-01', text: t('review2Text') },
+    { name: 'Priya Dey', rating: 4, date: '2026-05-28', text: t('review3Text') }
   ];
 
   const tiers = [
-    { name: 'Bronze Standard', perks: 'Base commission settlement rate (15%).' },
-    { name: 'Silver Classic', perks: '10% discount on in-app wallet fuel-cards.' },
-    { name: 'Gold Partner (Your Active Tier)', perks: 'Lower service commission (10%), priority dispatch assignment match locks.' },
-    { name: 'Platinum Elite', perks: '5% lower commission, auto-instant withdrawal clears, free health insurance perks.' }
+    { name: t('tier1Name'), perks: t('tier1Perks') },
+    { name: t('tier2Name'), perks: t('tier2Perks') },
+    { name: t('tier3Name'), perks: t('tier3Perks') },
+    { name: t('tier4Name'), perks: t('tier4Perks') }
   ];
 
   return (
     <div className="space-y-6 text-left">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Performance & Metrics</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Track dispatcher quality scores, compliments, and partner status tiers</p>
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
       </div>
 
       {/* Primary Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-mono text-xs">
         <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-2xl">
-          <span className="text-zinc-500 block text-[8px] uppercase">RATING SCORE</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('ratingScore')}</span>
           <span className="text-xl font-bold text-amber-500 block mt-1">★ {metrics.rating}</span>
         </div>
         <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-2xl">
-          <span className="text-zinc-500 block text-[8px] uppercase">ACCEPT INDEX</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('acceptIndex')}</span>
           <span className="text-xl font-bold text-white block mt-1">{metrics.acceptance}%</span>
         </div>
         <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-2xl">
-          <span className="text-zinc-500 block text-[8px] uppercase">CANCEL RATE</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('cancelRate')}</span>
           <span className="text-xl font-bold text-red-500 block mt-1">{metrics.cancellation}%</span>
         </div>
         <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-2xl">
-          <span className="text-zinc-500 block text-[8px] uppercase">COMPLETE RATE</span>
+          <span className="text-zinc-500 block text-[8px] uppercase">{t('completeRate')}</span>
           <span className="text-xl font-bold text-emerald-400 block mt-1">{metrics.completion}%</span>
         </div>
       </div>
@@ -62,18 +64,18 @@ export default function DriverPerformancePage() {
       {/* Tier benefits */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Partner Level Benefits
+          {t('tierBenefitsTitle')}
         </h4>
 
         <div className="space-y-3">
-          {tiers.map((t, idx) => (
+          {tiers.map((tier, idx) => (
             <div key={idx} className={`p-3 rounded-xl border text-xs leading-relaxed ${
-              t.name.includes('Gold') 
-                ? 'bg-emerald-950/20 border-emerald-900/60 text-emerald-300' 
+              idx === 2
+                ? 'bg-emerald-950/20 border-emerald-900/60 text-emerald-300'
                 : 'bg-zinc-900/40 border-zinc-900 text-zinc-400'
             }`}>
-              <span className="block font-bold text-white font-mono text-[10px] uppercase">{t.name}</span>
-              <span className="block mt-0.5">{t.perks}</span>
+              <span className="block font-bold text-white font-mono text-[10px] uppercase">{tier.name}</span>
+              <span className="block mt-0.5">{tier.perks}</span>
             </div>
           ))}
         </div>
@@ -82,7 +84,7 @@ export default function DriverPerformancePage() {
       {/* Compliments counts */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Compliments Log
+          {t('complimentsTitle')}
         </h4>
 
         <div className="grid grid-cols-2 gap-4 text-xs font-mono">
@@ -98,7 +100,7 @@ export default function DriverPerformancePage() {
       {/* Reviews logs */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Recent Rider Reviews
+          {t('reviewsTitle')}
         </h4>
 
         <div className="divide-y divide-zinc-900">
