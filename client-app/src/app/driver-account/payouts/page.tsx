@@ -1,83 +1,82 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getDriverAccountEarnings, triggerDriverWithdrawal } from '@/api/client';
+import {
+  getDriverPayouts, requestDriverPayout, ApiClientError,
+  type DriverPayoutsResponse, type PayoutStatus,
+} from '@/api/client';
+import { formatCurrency, formatCompactDate } from '@/lib/format';
 
-interface PayoutHistoryItem {
-  id: string;
-  date: string;
-  amount: number;
-  status: string;
-  channel: string;
-}
+const MIN_PAYOUT_PAISE = 10000; // ₹100
+
+const STATUS_STYLE: Record<PayoutStatus, string> = {
+  PENDING: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
+  PROCESSING: 'text-sky-400 bg-sky-400/10 border-sky-400/30',
+  PAID: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
+  FAILED: 'text-red-400 bg-red-400/10 border-red-400/30',
+};
 
 export default function DriverPayoutsPage() {
   const { token } = useAuthStore();
-  const [balance, setBalance] = useState(0);
+  const [data, setData] = useState<DriverPayoutsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [withdrawVal, setWithdrawVal] = useState('');
-  const [bankDetails, setBankDetails] = useState({ account: '•••• •••• ••••', holder: '', upi: '' });
-  const [isEditingBank, setIsEditingBank] = useState(false);
-  const [autoPayout, setAutoPayout] = useState(true);
-  // Withdrawals made this session. A driver-facing payout-history endpoint does not yet
-  // exist, so we surface confirmed withdrawals (with real payout refs) rather than
-  // fabricating a settled history.
-  const [history, setHistory] = useState<PayoutHistoryItem[]>([]);
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
 
-  const loadBalance = useCallback(async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+  const load = useCallback(async () => {
+    if (!token) { setLoading(false); return; }
     try {
-      const earnings = await getDriverAccountEarnings(token, 'MONTH');
-      setBalance(earnings.net_payout);
+      setData(await getDriverPayouts(token));
     } catch (err) {
-      console.warn('Failed to load payout balance:', err);
+      console.warn('[Payouts] load failed:', err);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  useEffect(() => {
-    loadBalance();
-  }, [loadBalance]);
+  useEffect(() => { void load(); }, [load]);
 
-  const handleWithdrawAll = () => {
-    setWithdrawVal(balance.toString());
-  };
+  const availablePaise = data?.available_balance_paise ?? 0;
+  const bank = data?.bank_account;
 
-  const handleRequestPayout = async (e: React.FormEvent) => {
+  const handleMax = () => setAmount((availablePaise / 100).toFixed(2));
+
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) {
-      alert('Please sign in to withdraw.');
+    if (!token) return;
+    setFeedback(null);
+    const amountPaise = Math.round(parseFloat(amount || '0') * 100);
+    if (!amountPaise || amountPaise < MIN_PAYOUT_PAISE) {
+      setFeedback({ kind: 'err', msg: 'Minimum withdrawal is ₹100.' });
       return;
     }
-    if (balance <= 0) {
-      alert('No withdrawable balance available.');
+    if (amountPaise > availablePaise) {
+      setFeedback({ kind: 'err', msg: 'Amount exceeds your available balance.' });
       return;
     }
     setSubmitting(true);
     try {
-      // Instant payout settles the full available balance server-side.
-      const res = await triggerDriverWithdrawal(token);
-      setHistory((prev) => [
-        {
-          id: res.payout_id,
-          date: new Date().toISOString().split('T')[0],
-          amount: balance,
-          status: res.status || 'Processing',
-          channel: 'UPI Instant',
-        },
-        ...prev,
-      ]);
-      setWithdrawVal('');
-      alert(`Instant payout initiated (ref ${res.payout_id}). Your available balance is settling to the linked account.`);
-      await loadBalance();
-    } catch (err: any) {
-      alert(err?.message || 'Withdrawal failed. Please try again.');
+      const res = await requestDriverPayout(token, amountPaise);
+      setFeedback({ kind: 'ok', msg: `Payout requested (${res.payout_id}). ${res.estimated_time}.` });
+      setAmount('');
+      await load();
+    } catch (err) {
+      // Idempotency: the backend returns 409 when a payout is already in flight.
+      if (err instanceof ApiClientError) {
+        if (err.status === 409) {
+          setFeedback({ kind: 'err', msg: 'Payout already requested — only one per hour.' });
+        } else if (err.status === 403) {
+          setFeedback({ kind: 'err', msg: 'Add a verified bank account before withdrawing.' });
+        } else if (err.status === 400) {
+          setFeedback({ kind: 'err', msg: 'Invalid amount for withdrawal.' });
+        } else {
+          setFeedback({ kind: 'err', msg: 'Withdrawal failed. Please try again.' });
+        }
+      } else {
+        setFeedback({ kind: 'err', msg: 'Withdrawal failed. Please try again.' });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -85,172 +84,106 @@ export default function DriverPayoutsPage() {
 
   return (
     <div className="space-y-6 text-left">
-      {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">Payout Settlement Node</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Withdraw earnings to linked accounts or toggle auto-settlement schedules</p>
+        <h2 className="text-xl font-bold tracking-tight text-white font-move">Payouts</h2>
+        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Withdraw your earnings to your bank</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        
-        {/* Withdraw Panel Container (Left 2 columns on desktop) */}
         <div className="sm:col-span-2 space-y-6">
-          
-          {/* Card Balance */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex justify-between items-center relative overflow-hidden">
-            <div className="space-y-1">
-              <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">Withdrawable Balance</span>
-              <h3 className="text-3xl font-mono font-bold text-emerald-400">{loading ? '₹—' : `₹${balance.toFixed(2)}`}</h3>
-              <span className="text-[8px] font-mono text-zinc-600 block pt-0.5">Clears immediately to linked UPI node</span>
-            </div>
-            
-            <div className="flex flex-col items-end gap-1.5 text-[9px] font-mono uppercase font-bold text-zinc-400 text-right">
-              <span>Auto-Payout: {autoPayout ? 'ENABLED' : 'DISABLED'}</span>
-              <button 
-                onClick={() => setAutoPayout(!autoPayout)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 cursor-pointer ${autoPayout ? 'bg-white' : 'bg-zinc-800'}`}
-              >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${autoPayout ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
-              </button>
-            </div>
+          {/* Balance */}
+          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 space-y-1">
+            <span className="text-zinc-500 text-[9px] uppercase font-mono tracking-wider font-bold">Available to Withdraw</span>
+            <h3 className="text-3xl font-mono font-bold text-emerald-400">{loading ? '₹—' : formatCurrency(availablePaise)}</h3>
+            <span className="text-[8px] font-mono text-zinc-600 block pt-0.5">Net ledger earnings minus pending payouts</span>
           </div>
 
-          {/* Form withdrawal input */}
-          <form onSubmit={handleRequestPayout} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-            <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-              Withdraw Funds
-            </h4>
-            
+          {/* Withdraw form */}
+          <form onSubmit={handleRequest} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
+            <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">Request Payout</h4>
             <div className="space-y-2">
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono tracking-wider">Amount to Withdraw (INR)</label>
+              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono tracking-wider">Amount (min ₹100)</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <span className="absolute left-3.5 top-3.5 text-zinc-500 font-mono text-xs">₹</span>
                   <input
-                    type="number"
-                    value={withdrawVal}
-                    onChange={(e) => setWithdrawVal(e.target.value)}
-                    placeholder="Enter amount"
-                    min="1"
-                    step="0.01"
+                    type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter amount" min="100" step="0.01"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 pl-7 text-white focus:outline-none focus:border-zinc-500 text-xs font-mono"
                     required
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleWithdrawAll}
-                  className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 rounded-xl px-4 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono font-bold"
-                >
-                  Withdraw Max
+                <button type="button" onClick={handleMax} disabled={availablePaise < MIN_PAYOUT_PAISE}
+                  className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 rounded-xl px-4 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono disabled:opacity-40">
+                  Max
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting || loading || balance <= 0}
-              className="w-full bg-white hover:bg-zinc-200 text-black py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Processing…' : 'Request Instant Withdrawal'}
-            </button>
-            <p className="text-[8px] font-mono text-zinc-600 text-center -mt-1">Instant payout settles your full available balance.</p>
-          </form>
+            {feedback && (
+              <div className={`rounded-xl px-3 py-2 text-[10px] font-mono ${feedback.kind === 'ok' ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/30' : 'bg-red-400/10 text-red-300 border border-red-400/30'}`}>
+                {feedback.kind === 'ok' ? '✓ ' : '⚠ '}{feedback.msg}
+              </div>
+            )}
 
+            <button type="submit" disabled={submitting || loading || availablePaise < MIN_PAYOUT_PAISE}
+              className="w-full bg-white hover:bg-zinc-200 text-black py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95 font-sans disabled:opacity-50 disabled:cursor-not-allowed">
+              {submitting ? 'Requesting…' : 'Request Payout'}
+            </button>
+          </form>
         </div>
 
-        {/* Bank Config Info (Right column on desktop) */}
+        {/* Linked bank */}
         <div className="space-y-6">
           <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-              <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Linked Settlement Accounts</h4>
-              <button
-                type="button"
-                onClick={() => setIsEditingBank(!isEditingBank)}
-                className="text-[8px] font-mono font-bold text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer"
-              >
-                {isEditingBank ? 'Save' : 'Edit'}
-              </button>
+              <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Linked Bank</h4>
+              {bank?.verified
+                ? <span className="text-[8px] font-mono text-emerald-400 uppercase">● Verified</span>
+                : <span className="text-[8px] font-mono text-amber-400 uppercase">● Unverified</span>}
             </div>
-
-            {isEditingBank ? (
-              <div className="space-y-3 text-xs font-mono">
-                <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Account Holder</label>
-                  <input
-                    type="text"
-                    value={bankDetails.holder}
-                    onChange={(e) => setBankDetails({ ...bankDetails, holder: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Account Number</label>
-                  <input
-                    type="text"
-                    value={bankDetails.account}
-                    onChange={(e) => setBankDetails({ ...bankDetails, account: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">UPI ID Destination</label>
-                  <input
-                    type="text"
-                    value={bankDetails.upi}
-                    onChange={(e) => setBankDetails({ ...bankDetails, upi: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
-                  />
-                </div>
+            <div className="space-y-3 font-mono text-xs text-zinc-400 leading-relaxed">
+              <div>
+                <span className="text-zinc-600 block text-[8px] uppercase">Bank</span>
+                <span className="font-bold text-white">{bank?.bank_name || '—'}</span>
               </div>
-            ) : (
-              <div className="space-y-3 font-mono text-xs text-zinc-400 leading-relaxed">
-                <div>
-                  <span className="text-zinc-600 block text-[8px] uppercase">Bank Account Name</span>
-                  <span className="font-bold text-white">{bankDetails.holder}</span>
-                </div>
-                <div>
-                  <span className="text-zinc-600 block text-[8px] uppercase">Account Endpoint</span>
-                  <span className="font-bold text-white">{bankDetails.account}</span>
-                </div>
-                <div>
-                  <span className="text-zinc-600 block text-[8px] uppercase">UPI ID</span>
-                  <span className="font-bold text-emerald-400">{bankDetails.upi}</span>
-                </div>
+              <div>
+                <span className="text-zinc-600 block text-[8px] uppercase">Account</span>
+                <span className="font-bold text-white">{bank?.account_masked || '—'}</span>
               </div>
-            )}
+              <div>
+                <span className="text-zinc-600 block text-[8px] uppercase">IFSC</span>
+                <span className="font-bold text-white">{bank?.ifsc || '—'}</span>
+              </div>
+            </div>
+            <p className="text-[8px] font-mono text-zinc-600 leading-relaxed">Bank details are managed during onboarding / KYC. Contact support to change them.</p>
           </div>
         </div>
-
       </div>
 
-      {/* History of settlements */}
+      {/* History */}
       <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
-          Settlement Withdrawal History
-        </h4>
-
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">Payout History</h4>
         <div className="divide-y divide-zinc-900">
-          {history.length === 0 && (
-            <p className="py-3 text-[10px] font-mono text-zinc-600 text-center">No withdrawals yet this session.</p>
+          {(data?.payout_history ?? []).length === 0 && (
+            <p className="py-3 text-[10px] font-mono text-zinc-600 text-center">No payouts yet.</p>
           )}
-          {history.map((item) => (
-            <div key={item.id} className="py-3 flex justify-between items-center text-xs font-mono">
+          {(data?.payout_history ?? []).map((p) => (
+            <div key={p.id} className="py-3 flex justify-between items-center text-xs font-mono">
               <div>
-                <span className="text-white block font-sans font-medium">Payout Request {item.id}</span>
-                <span className="text-zinc-500 text-[8px] block mt-0.5">{item.date} via {item.channel}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-white block font-bold">₹{item.amount.toFixed(2)}</span>
-                <span className={`text-[8px] block mt-0.5 ${item.status === 'Settled' ? 'text-emerald-500' : 'text-amber-500 animate-pulse'}`}>
-                  ● {item.status}
+                <span className="text-white block font-sans font-medium">{formatCurrency(p.amount_paise)}</span>
+                <span className="text-zinc-500 text-[8px] block mt-0.5">
+                  Requested {formatCompactDate(p.requested_at)}
+                  {p.status === 'PAID' ? ` • Paid ${formatCompactDate(p.updated_at)}` : ''}
                 </span>
               </div>
+              <span className={`text-[8px] font-mono uppercase font-bold px-2 py-1 rounded-full border ${STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING}`}>
+                {p.status}
+              </span>
             </div>
           ))}
         </div>
       </div>
-
     </div>
   );
 }

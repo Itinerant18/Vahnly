@@ -44,6 +44,7 @@ export interface AuthState {
   fetchMe: () => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
+  setRider: (rider: Rider) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -90,6 +91,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setToken: (token: string) => {
     persistToken(token);
     set({ token });
+  },
+
+  setRider: (rider: Rider) => {
+    persistRider(rider);
+    set({ rider });
   },
 }));
 

@@ -255,7 +255,7 @@ func (h *DocumentsHandler) HandleGetExpiringDocuments(w http.ResponseWriter, r *
 		        version, tags, expiry_date::TEXT, uploaded_by_email, status, created_at, updated_at
 		 FROM documents_vault
 		 WHERE expiry_date IS NOT NULL
-		   AND expiry_date <= CURRENT_DATE + $1
+		   AND expiry_date <= CURRENT_DATE + $1::int
 		   AND expiry_date >= CURRENT_DATE
 		   AND status = 'ACTIVE'
 		 ORDER BY expiry_date ASC`, days)

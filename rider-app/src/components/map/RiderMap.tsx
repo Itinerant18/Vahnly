@@ -43,38 +43,66 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
   const defaultCenter = center ?? { lat: 22.5726, lng: 88.3639 };
 
   useEffect(() => {
-    if (!mapRef.current || leafletMap.current) return;
+    let isCancelled = false;
+    let createdMap: L.Map | null = null;
+
+    const container = mapRef.current;
+    if (!container) return;
 
     // Dynamic import to avoid SSR issues (this component is only loaded client-side)
-    import("leaflet").then((L) => {
-      const map = L.map(mapRef.current!, {
-        center: [defaultCenter.lat, defaultCenter.lng],
-        zoom: 15,
-        zoomControl: false,
-        attributionControl: false,
+    import("leaflet")
+      .then((L) => {
+        if (isCancelled || !mapRef.current) return;
+
+        // A previous map (StrictMode re-invoke / HMR) may still own this DOM
+        // node. Bail rather than let L.map throw "already initialized".
+        if (leafletMap.current || (container as any)._leaflet_id != null) return;
+
+        let map: L.Map;
+        try {
+          map = L.map(container, {
+            center: [defaultCenter.lat, defaultCenter.lng],
+            zoom: 15,
+            zoomControl: false,
+            attributionControl: false,
+          });
+        } catch {
+          // Container still bound to a stale Leaflet instance — skip this pass.
+          return;
+        }
+
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          { subdomains: "abcd", maxZoom: 19 }
+        ).addTo(map);
+
+        // User location marker
+        const userIcon = L.divIcon({
+          html: USER_ICON_HTML,
+          className: "",
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+
+        const uMarker = L.marker([defaultCenter.lat, defaultCenter.lng], { icon: userIcon }).addTo(map);
+        userMarker.current = uMarker;
+
+        createdMap = map;
+        leafletMap.current = map;
+      })
+      .catch(() => {
+        // Swallow dynamic-import / init races so they never surface as an
+        // unhandledRejection in dev (StrictMode double-mount, fast-refresh).
       });
-
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        { subdomains: "abcd", maxZoom: 19 }
-      ).addTo(map);
-
-      // User location marker
-      const userIcon = L.divIcon({
-        html: USER_ICON_HTML,
-        className: "",
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-
-      const uMarker = L.marker([defaultCenter.lat, defaultCenter.lng], { icon: userIcon }).addTo(map);
-      userMarker.current = uMarker;
-
-      leafletMap.current = map;
-    });
 
     return () => {
-      leafletMap.current?.remove();
+      isCancelled = true;
+      const map = createdMap ?? leafletMap.current;
+      if (map) {
+        map.remove();
+      }
+      // Clear Leaflet's container binding so a remount can re-initialize cleanly.
+      delete (container as any)._leaflet_id;
       leafletMap.current = null;
       userMarker.current = null;
       driverMarkers.current = [];

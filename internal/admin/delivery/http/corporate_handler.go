@@ -60,18 +60,18 @@ func (h *CorporateHandler) HandleGetAccounts(w http.ResponseWriter, r *http.Requ
 	search := q.Get("search")
 	plan := q.Get("plan_type")
 
-	base := `FROM corporate_accounts ca WHERE 1=1`
+	where := `WHERE 1=1`
 	var args []interface{}
 	idx := 1
 	if search != "" {
-		base += fmt.Sprintf(" AND ca.company_name ILIKE $%d", idx); args = append(args, "%"+search+"%"); idx++
+		where += fmt.Sprintf(" AND ca.company_name ILIKE $%d", idx); args = append(args, "%"+search+"%"); idx++
 	}
 	if plan != "" {
-		base += fmt.Sprintf(" AND ca.plan_type = $%d", idx); args = append(args, plan); idx++
+		where += fmt.Sprintf(" AND ca.plan_type = $%d", idx); args = append(args, plan); idx++
 	}
 
 	var total int64
-	_ = h.dbPool.QueryRow(ctx, "SELECT COUNT(*) "+base, args...).Scan(&total)
+	_ = h.dbPool.QueryRow(ctx, "SELECT COUNT(*) FROM corporate_accounts ca "+where, args...).Scan(&total)
 
 	limit := parseBoundedQueryInt(q.Get("limit"), 50, 1, 200)
 	offset := parseBoundedQueryInt(q.Get("offset"), 0, 0, 1_000_000)
@@ -83,8 +83,9 @@ func (h *CorporateHandler) HandleGetAccounts(w http.ResponseWriter, r *http.Requ
 		        ca.primary_contact_name, ca.primary_contact_phone, ca.sso_provider, ca.sso_domain,
 		        ca.created_by, ca.created_at::TEXT,
 		        COUNT(ce.id) AS employee_count
-		 `+base+`
+		 FROM corporate_accounts ca
 		 LEFT JOIN corporate_employees ce ON ce.corporate_id = ca.id AND ce.is_active = true
+		 `+where+`
 		 GROUP BY ca.id
 		 ORDER BY ca.company_name
 		 LIMIT $`+fmt.Sprint(idx)+` OFFSET $`+fmt.Sprint(idx+1),

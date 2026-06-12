@@ -900,6 +900,126 @@ export async function syncOfflinePayload(
   });
 }
 
+// ─── Driver Earnings / Payouts / Wallet (ledger-backed) ───────────────────────
 
+export type EarningsPeriod = "TODAY" | "WEEK" | "MONTH" | "CUSTOM";
 
+export interface DriverEarningsSummary {
+  gross_earnings_paise: number;
+  tips_paise: number;
+  bonuses_paise: number;
+  incentives_paise: number;
+  platform_deductions_paise: number;
+  net_earnings_paise: number;
+  trip_count: number;
+  online_hours: number;
+  acceptance_rate: number;
+}
+
+export interface DriverDailyBreakdown {
+  date: string;
+  earnings_paise: number;
+  trips: number;
+}
+
+export interface DriverRecentTrip {
+  order_id: string;
+  pickup_short: string;
+  drop_short: string;
+  fare_paise: number;
+  driver_earnings_paise: number;
+  tip_paise: number;
+  completed_at: string;
+  distance_km: number;
+  duration_minutes: number;
+}
+
+export interface DriverEarningsResponse {
+  period: EarningsPeriod;
+  summary: DriverEarningsSummary;
+  daily_breakdown: DriverDailyBreakdown[];
+  recent_trips: DriverRecentTrip[];
+}
+
+export async function getDriverEarnings(
+  token: string,
+  period: EarningsPeriod,
+  from?: string,
+  to?: string,
+): Promise<DriverEarningsResponse> {
+  const params: Record<string, string | number> = { period };
+  if (period === "CUSTOM" && from && to) {
+    params.from = from;
+    params.to = to;
+  }
+  return request<DriverEarningsResponse>(`/api/v1/driver/earnings?${encodeQuery(params)}`, {
+    method: "GET",
+    token,
+  });
+}
+
+// Fetches the monthly statement CSV as raw text (server generates it on the fly).
+export async function getEarningsStatementCsv(
+  token: string,
+  year: number,
+  month: number,
+): Promise<string> {
+  const res = await fetch(buildUrl(`/api/v1/driver/earnings/statement?year=${year}&month=${month}`), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+  });
+  if (!res.ok) {
+    throw new ApiClientError(`statement_failed_${res.status}`, res.status, await res.text());
+  }
+  return res.text();
+}
+
+export type PayoutStatus = "PENDING" | "PROCESSING" | "PAID" | "FAILED";
+
+export interface PayoutHistoryItem {
+  id: string;
+  amount_paise: number;
+  net_amount_paise: number;
+  status: PayoutStatus;
+  failure_reason: string | null;
+  requested_at: string;
+  updated_at: string;
+}
+
+export interface DriverPayoutsResponse {
+  available_balance_paise: number;
+  bank_account: {
+    verified: boolean;
+    bank_name?: string;
+    ifsc?: string;
+    account_masked?: string;
+  };
+  upi_id: string;
+  payout_history: PayoutHistoryItem[];
+}
+
+export async function getDriverPayouts(token: string): Promise<DriverPayoutsResponse> {
+  return request<DriverPayoutsResponse>("/api/v1/driver/payouts", { method: "GET", token });
+}
+
+export interface PayoutRequestResult {
+  payout_id: string;
+  status: PayoutStatus;
+  estimated_time: string;
+}
+
+export async function requestDriverPayout(
+  token: string,
+  amountPaise: number,
+): Promise<PayoutRequestResult> {
+  return request<PayoutRequestResult>("/api/v1/driver/payouts/request", {
+    method: "POST",
+    token,
+    body: { amount_paise: amountPaise },
+  });
+}
+
+export async function getPayoutDetail(token: string, payoutId: string): Promise<PayoutHistoryItem> {
+  return request<PayoutHistoryItem>(`/api/v1/driver/payouts/${payoutId}`, { method: "GET", token });
+}
 

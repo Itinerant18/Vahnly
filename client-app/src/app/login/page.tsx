@@ -112,29 +112,46 @@ function UnifiedLoginContent() {
     }
   };
 
-  const handleRequestOtp = (e: React.FormEvent) => {
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || phone.replace(/\s/g, '').length < 10) {
       setAuthError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    
+
     setLoading(true);
     setAuthError(null);
-    
-    setTimeout(() => {
-      setLoading(false);
+
+    try {
+      // Real OTP dispatch via the rider auth service (bcrypt-hashed, 5 min TTL).
+      await apiFetch('/api/v1/rider/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: `${countryCode}${phone.replace(/\s/g, '')}` })
+      });
       setAuthStep('AWAITING_OTP');
       setCooldown(30); // 30 second resend cooldown
       addAuditLog('OTP_REQUESTED', { phone: `${countryCode} ${phone}`, timestamp: new Date().toISOString() });
-    }, 800);
+    } catch (err) {
+      console.warn('[UnifiedAuth] OTP request failed.', err);
+      setAuthError('Could not send OTP. Check the number and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (cooldown > 0) return;
     setCooldown(30);
     setAuthStep('COOL_DOWN_LOCKOUT');
     addAuditLog('OTP_RESEND_TRIGGERED', { phone: `${countryCode} ${phone}`, timestamp: new Date().toISOString() });
+    try {
+      await apiFetch('/api/v1/rider/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: `${countryCode}${phone.replace(/\s/g, '')}` })
+      });
+    } catch (err) {
+      console.warn('[UnifiedAuth] OTP resend failed.', err);
+    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -180,7 +197,7 @@ function UnifiedLoginContent() {
         addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
         router.push('/driver');
       } else {
-        // Rider login accepts code and phone
+        // Rider login verifies the real OTP issued by /rider/auth/send-otp.
         const enteredOtp = otp.join('');
         if (enteredOtp.length < 6) {
           setAuthError('Please complete the 6-digit OTP verification code.');
@@ -188,18 +205,26 @@ function UnifiedLoginContent() {
           return;
         }
 
-        const res = await apiFetch('/api/v1/auth/rider/login', {
+        const res = await apiFetch('/api/v1/rider/auth/verify-otp', {
           method: 'POST',
-          body: JSON.stringify({ phone: fullPhone, otp: enteredOtp })
+          body: JSON.stringify({
+            phone: `${countryCode}${phone.replace(/\s/g, '')}`,
+            otp: enteredOtp,
+            referred_by_code: ''
+          })
         });
+        if (!res?.success || !res?.data?.token) {
+          throw new Error(res?.error ?? 'otp_verification_failed');
+        }
 
-        login(res.token, {
-          id: res.user.id,
-          role: res.user.role,
-          name: res.user.name,
-          phone: res.user.phone ?? fullPhone,
+        const rider = res.data.rider;
+        login(res.data.token, {
+          id: rider.id,
+          role: 'RIDER',
+          name: rider.name ?? 'Rider',
+          phone: rider.phone ?? fullPhone,
         });
-        addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
+        addAuditLog('LOGIN_SUCCESS', { userId: rider.id, role });
         
         // Prevent bypassing onboarding if incomplete
         const onboardingCompleted = localStorage.getItem('rider_onboarding_completed') === 'true';
@@ -321,7 +346,7 @@ function UnifiedLoginContent() {
 
         {authStep === 'AWAITING_OTP' && (
           <div className="bg-zinc-900 border border-zinc-800 text-emerald-400 text-[10px] py-3 px-4 rounded-xl mb-4 font-mono">
-            🔔 [MOCK_SMS_GATEWAY]: OTP request registered! Use code <strong>123456</strong> to bypass and log in.
+            🔔 OTP sent to {countryCode} {phone}. It expires in 5 minutes.
           </div>
         )}
 

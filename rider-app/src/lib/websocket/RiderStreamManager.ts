@@ -50,6 +50,12 @@ export class RiderStreamManager {
   }
 
   public connect(): void {
+    void this.connectAsync();
+  }
+
+  // Mint a single-use WS ticket with the bearer token (POST /api/v1/ws/ticket),
+  // then open the socket with ?ticket= so the long-lived JWT never enters the URL.
+  private async connectAsync(): Promise<void> {
     this.isPurposelyClosed = false;
 
     // Token pre-flight check — never open a socket without one.
@@ -59,7 +65,22 @@ export class RiderStreamManager {
       return;
     }
 
-    const url = `${this.wsBaseUrl}/ws/rider?token=${encodeURIComponent(token)}`;
+    let ticket: string;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/ws/ticket`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`ticket_request_failed_${res.status}`);
+      ticket = (await res.json()).ticket;
+      if (!ticket) throw new Error("ticket_missing");
+    } catch {
+      this.executeJitteredReconnection();
+      return;
+    }
+    if (this.isPurposelyClosed) return;
+
+    const url = `${this.wsBaseUrl}/ws/rider?ticket=${encodeURIComponent(ticket)}`;
     this.ws = new WebSocket(url);
     // rider.driver.location may arrive as a binary protobuf frame.
     this.ws.binaryType = "arraybuffer";

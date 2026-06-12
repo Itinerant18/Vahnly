@@ -427,9 +427,12 @@ services:
       - REDIS_CLUSTER_NODES=redis-node-1:6379
       - KAFKA_BROKERS=kafka-broker:9092
       - HTTP_PORT=8080
-      - JWT_SECRET_SIGNING_KEY=kolkata_marketplace_backbone_secret_token_string
+      - JWT_SECRET_SIGNING_KEY=${JWT_SECRET_SIGNING_KEY:?set JWT_SECRET_SIGNING_KEY in .env}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
-      - SUPPORTED_REGIONS_MATRIX=KOL,BLR
+      - SUPPORTED_REGIONS_MATRIX=${SUPPORTED_REGIONS_MATRIX:-}
+      # Dev only: allow KYC uploads to fall back to ephemeral local disk when S3 is
+      # unconfigured. Unset/false in production → gateway refuses to boot without S3.
+      - ALLOW_LOCAL_OBJECT_STORE=${ALLOW_LOCAL_OBJECT_STORE:-false}
     depends_on:
       spatial-db:
         condition: service_healthy

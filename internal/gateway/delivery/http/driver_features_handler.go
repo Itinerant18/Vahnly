@@ -152,8 +152,10 @@ func (h *DriverFeaturesHandler) GetWallet(w http.ResponseWriter, r *http.Request
 
 	var balance int64
 	// COALESCE so a driver with no wallet row yet reports a zero balance instead of erroring.
+	// Column is available_balance — the old balance_paise reference silently errored and
+	// always reported 0.
 	_ = h.dbPool.QueryRow(ctx,
-		`SELECT COALESCE((SELECT balance_paise FROM driver_wallets WHERE driver_id = $1::uuid), 0)`,
+		`SELECT COALESCE((SELECT available_balance FROM driver_wallets WHERE driver_id = $1::uuid), 0)`,
 		driverID).Scan(&balance)
 
 	type txn struct {

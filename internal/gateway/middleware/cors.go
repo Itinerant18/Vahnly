@@ -13,26 +13,39 @@ func NewCORSMiddleware() *CORSMiddleware {
 }
 
 func (c *CORSMiddleware) Handler(next http.Handler) http.Handler {
-	// The admin frontend origin that is permitted to send credentialed (cookie) requests.
-	// Same-origin deployments leave this empty and never trigger CORS at all.
-	allowedOrigin := strings.TrimRight(os.Getenv("ADMIN_FRONTEND_URL"), "/")
+	// Closed allow-list of browser origins permitted to read responses cross-origin.
+	// No wildcard: an origin not on the list gets no Access-Control-Allow-Origin header,
+	// so the browser blocks the response. Sources (deduped):
+	//   - ADMIN_FRONTEND_URL (the credentialed admin SPA)
+	//   - CORS_ALLOWED_ORIGINS (comma-separated; production frontend origins)
+	//   - sensible localhost dev defaults (admin :5173, driver :3000, rider :3050)
+	allowed := map[string]bool{
+		"http://localhost:5173": true,
+		"http://localhost:3000": true,
+		"http://localhost:3050": true,
+	}
+	if admin := strings.TrimRight(os.Getenv("ADMIN_FRONTEND_URL"), "/"); admin != "" {
+		allowed[admin] = true
+	}
+	for _, o := range strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ",") {
+		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
+			allowed[o] = true
+		}
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		// Credentialed requests cannot use a wildcard origin. Echo the request origin only
-		// when it matches the configured admin frontend, and allow credentials so the
-		// session cookie is accepted cross-origin.
-		if allowedOrigin != "" && origin == allowedOrigin {
+		// Only reflect an origin that is explicitly allow-listed, and pair it with
+		// Allow-Credentials so the admin session cookie is accepted. Unknown origins
+		// receive no ACAO header at all (browser blocks) — never a wildcard.
+		if origin != "" && allowed[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Add("Vary", "Origin")
-		} else {
-			// Non-credentialed cross-origin reads keep the permissive wildcard.
-			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Region-Prefix, X-Idempotency-Key, X-Admin-Role, X-Admin-Email, X-Admin-ID")
 
 		if r.Method == http.MethodOptions {

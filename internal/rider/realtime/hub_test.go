@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/platform/driver-delivery/internal/domain"
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
 // fakeAuth authenticates any token as a fixed rider.
@@ -28,10 +29,15 @@ func TestRiderWS_ReceivesOrderAssignedWithin500ms(t *testing.T) {
 	const riderID = "rider-itest-1"
 	hub := NewHub(nil, fakeAuth{riderID: riderID}) // nil redis: local delivery only
 
-	srv := httptest.NewServer(http.HandlerFunc(hub.HandleRiderStream))
+	// HandleRiderStream now reads identity from the request context (injected by the
+	// WS-ticket middleware in production). Simulate that injection here.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.InjectClaims(r.Context(), &middleware.CustomClaims{UserID: riderID, Role: domain.RoleRider})
+		hub.HandleRiderStream(w, r.WithContext(ctx))
+	}))
 	defer srv.Close()
 
-	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1) + "/ws/rider?token=test"
+	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1) + "/ws/rider?ticket=test"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("dial rider ws: %v", err)

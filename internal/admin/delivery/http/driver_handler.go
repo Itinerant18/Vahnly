@@ -12,6 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/platform/driver-delivery/internal/gateway/middleware"
 )
 
 type DriverHandler struct {
@@ -699,14 +701,30 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		}
 
 	case "suspend":
+		// Postgres is the system of record; the Redis override is a read cache.
+		if _, err := h.dbPool.Exec(ctx, "UPDATE drivers SET account_status = 'SUSPENDED', current_state = 'OFFLINE', updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", id); err != nil {
+			http.Error(w, "suspend_update_failed", http.StatusInternalServerError)
+			return
+		}
+		// Revoke any live login session so outstanding JWTs stop working immediately.
+		_ = h.redisClient.Del(ctx, middleware.DriverSessionKey(id)).Err()
 		override.Status = "SUSPENDED"
 		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_SUSPENDED", fmt.Sprintf("Admin (%s) temporarily suspended driver %s", adminRole, id), ip)
 
 	case "block":
+		if _, err := h.dbPool.Exec(ctx, "UPDATE drivers SET account_status = 'BLOCKED', current_state = 'OFFLINE', updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", id); err != nil {
+			http.Error(w, "block_update_failed", http.StatusInternalServerError)
+			return
+		}
+		_ = h.redisClient.Del(ctx, middleware.DriverSessionKey(id)).Err()
 		override.Status = "BLOCKED"
 		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_BLOCKED", fmt.Sprintf("Admin (%s) permanently blocked driver %s", adminRole, id), ip)
 
 	case "unblock":
+		if _, err := h.dbPool.Exec(ctx, "UPDATE drivers SET account_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", id); err != nil {
+			http.Error(w, "unblock_update_failed", http.StatusInternalServerError)
+			return
+		}
 		override.Status = "ACTIVE"
 		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_UNBLOCKED", fmt.Sprintf("Admin (%s) restored/unblocked account for driver %s", adminRole, id), ip)
 
@@ -755,6 +773,38 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		var req WalletRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "malformed_json", http.StatusBadRequest)
+			return
+		}
+		// Persist to the real wallet ledger (driver_wallets + driver_wallet_transactions)
+		// instead of a Redis-only counter, so the driver app's wallet view reflects it.
+		entryType := "CREDIT"
+		if req.AmountPaise < 0 {
+			entryType = "DEBIT"
+		}
+		tx, err := h.dbPool.Begin(ctx)
+		if err != nil {
+			http.Error(w, "wallet_tx_begin_failed", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback(ctx)
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO driver_wallets (driver_id, available_balance, updated_at)
+			VALUES ($1::uuid, $2, NOW())
+			ON CONFLICT (driver_id) DO UPDATE
+			SET available_balance = driver_wallets.available_balance + $2, updated_at = NOW()
+		`, id, req.AmountPaise); err != nil {
+			http.Error(w, "wallet_balance_update_failed", http.StatusInternalServerError)
+			return
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO driver_wallet_transactions (id, driver_id, amount_paise, entry_type, description, created_at)
+			VALUES (gen_random_uuid(), $1::uuid, $2, $3, $4, NOW())
+		`, id, req.AmountPaise, entryType, req.Description); err != nil {
+			http.Error(w, "wallet_txn_insert_failed", http.StatusInternalServerError)
+			return
+		}
+		if err := tx.Commit(ctx); err != nil {
+			http.Error(w, "wallet_tx_commit_failed", http.StatusInternalServerError)
 			return
 		}
 		override.WalletBalanceAdjustment += req.AmountPaise

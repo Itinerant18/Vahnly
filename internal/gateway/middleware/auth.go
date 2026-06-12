@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -50,8 +51,28 @@ func ClearSessionCookie(w http.ResponseWriter) {
 type ContextKey string
 const UserIDContextKey ContextKey = "userID"
 
+// DriverSessionTTL bounds a driver login session; matches the driver JWT expiry.
+const DriverSessionTTL = 24 * time.Hour
+
+// DriverSessionKey is the Redis key holding the active session jti for a driver.
+// Written at login, checked by the session validator wired in cmd/gateway, and
+// deleted by admin suspend/block actions for instant revocation.
+func DriverSessionKey(driverID string) string {
+	return "driver:session:" + driverID
+}
+
 type AuthMiddleware struct {
 	jwtSecretKey []byte
+	// sessionCheck optionally validates that a token's session is still active
+	// (server-side revocation). Wired per-deployment via SetSessionValidator;
+	// nil means no revocation check (backwards compatible).
+	sessionCheck func(ctx context.Context, claims *CustomClaims) bool
+}
+
+// SetSessionValidator installs a server-side session check invoked after
+// signature validation. Returning false rejects the request with 401.
+func (m *AuthMiddleware) SetSessionValidator(fn func(ctx context.Context, claims *CustomClaims) bool) {
+	m.sessionCheck = fn
 }
 
 type CustomClaims struct {
@@ -140,6 +161,12 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 
 		if err != nil || !token.Valid {
 			http.Error(w, "cryptographic_token_validation_failed", http.StatusUnauthorized)
+			return
+		}
+
+		// Server-side session revocation check (e.g. driver suspended by admin).
+		if m.sessionCheck != nil && !m.sessionCheck(r.Context(), claims) {
+			http.Error(w, "session_revoked_or_expired", http.StatusUnauthorized)
 			return
 		}
 

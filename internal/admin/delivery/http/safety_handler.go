@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -879,6 +880,16 @@ func (h *SafetyHandler) HandleAddBlacklistBlock(w http.ResponseWriter, r *http.R
 	}
 	if createdBy == "" {
 		createdBy = "255e9024-d123-4063-9c6f-1662b7f2e8a5"
+	}
+	// user_id and created_by are cast to uuid in the INSERT — validate up front so a
+	// malformed value is a 400, not a 500 from the database.
+	if _, err := uuid.Parse(req.UserID); err != nil {
+		http.Error(w, "invalid_user_id_uuid", http.StatusBadRequest)
+		return
+	}
+	if _, err := uuid.Parse(createdBy); err != nil {
+		http.Error(w, "invalid_created_by_uuid", http.StatusBadRequest)
+		return
 	}
 
 	query := `

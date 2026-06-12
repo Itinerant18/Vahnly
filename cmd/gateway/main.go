@@ -118,6 +118,18 @@ func main() {
 	kafkaSecurity.ApplyToWriter(kafkaWriter)
 	defer kafkaWriter.Close()
 
+	// Dedicated producer for driver.payout.requested (settlement pipeline).
+	payoutWriter := &kafka.Writer{
+		Addr:         kafka.TCP(brokersList...),
+		Topic:        "driver.payout.requested",
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+		BatchTimeout: 10 * time.Millisecond,
+		BatchSize:    1,
+	}
+	kafkaSecurity.ApplyToWriter(payoutWriter)
+	defer payoutWriter.Close()
+
 	handler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClusterClient)
 	handler.SetJWTSecret(jwtSecret)
 	go handler.StartGPSWriteBehindWorker(mainCtx)
@@ -136,8 +148,12 @@ func main() {
 	if objStore.Enabled() {
 		driverOnboardingHandler.SetObjectStore(objStore)
 		log.Printf("Driver document object storage enabled: bucket=%s region=%s", objStore.Bucket(), objStore.Region())
+	} else if getEnv("ALLOW_LOCAL_OBJECT_STORE", "false") == "true" {
+		log.Printf("WARNING: object storage not configured — KYC documents fall back to ephemeral local disk (ALLOW_LOCAL_OBJECT_STORE=true, dev only)")
 	} else {
-		log.Printf("WARNING: object storage not configured (set S3_BUCKET + AWS creds) — KYC documents fall back to ephemeral local disk")
+		// Fail closed: silently writing KYC/PII docs to ephemeral local disk in
+		// production loses regulated documents on every replica restart. Refuse to boot.
+		log.Fatal("FATAL: object storage not configured (set S3_BUCKET + AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY). Set ALLOW_LOCAL_OBJECT_STORE=true only for local development.")
 	}
 	driverDutyHandler := driverHttp.NewDutyHandler(dbPool, redisClusterClient)
 	driverTripHandler := driverHttp.NewDriverTripHandler(dbPool, redisClusterClient)
@@ -181,6 +197,7 @@ func main() {
 
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverFeaturesHandler := gatewayHttp.NewDriverFeaturesHandler(dbPool)
+	driverEarningsHandler := gatewayHttp.NewDriverEarningsHandler(dbPool, redisClusterClient, payoutWriter, log.New(os.Stdout, "[DRIVER_EARNINGS] ", log.LstdFlags))
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
 	offlineSyncHandler := gatewayHttp.NewOfflineSyncHandler(dbPool)
 	tripAuditHandler := gatewayHttp.NewTripAuditHandler(dbPool)
@@ -395,6 +412,23 @@ func main() {
 
 	// Instantiate edge protection layers
 	authGuard := middleware.NewAuthMiddleware(jwtSecret)
+	// Server-side driver session revocation: a driver token is only valid while its
+	// jti matches the Redis session recorded at login. Admin suspend/block deletes
+	// the key, instantly invalidating outstanding tokens. Other roles (admin SPA
+	// cookie sessions, rider tokens validated by the rider middleware) are untouched.
+	authGuard.SetSessionValidator(func(ctx context.Context, claims *middleware.CustomClaims) bool {
+		if !strings.EqualFold(claims.Role, "DRIVER") {
+			return true
+		}
+		if redisClusterClient == nil {
+			return true // no revocation store wired — fall back to signature-only auth
+		}
+		jti, err := redisClusterClient.Get(ctx, middleware.DriverSessionKey(claims.UserID)).Result()
+		if err != nil || jti == "" {
+			return false // no active session (revoked, expired, or pre-session token)
+		}
+		return jti == claims.ID
+	})
 	// Rate Limit parameters: Allow maximum 1000 requests per 1 minute rolling window
 	rateLimiter := middleware.NewRateLimiterMiddleware(redisClusterClient, 1000, 1*time.Minute)
 	if getEnv("RATE_LIMIT_FAIL_CLOSED", "false") == "true" {
@@ -402,8 +436,18 @@ func main() {
 	}
 
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
-	rawSupportedRegions := getEnv("SUPPORTED_REGIONS_MATRIX", "KOL,BLR") // Declare active shards
+	// Active region shards. Prefer the explicit env override; otherwise load from the
+	// regional_cities table (authoritative) instead of a hardcoded city list. Fail
+	// closed if neither yields a region — a silent default masks misconfiguration.
+	rawSupportedRegions := strings.TrimSpace(os.Getenv("SUPPORTED_REGIONS_MATRIX"))
+	if rawSupportedRegions == "" {
+		rawSupportedRegions = loadActiveRegions(mainCtx, dbPool)
+	}
+	if rawSupportedRegions == "" {
+		log.Fatal("FATAL: no supported regions — set SUPPORTED_REGIONS_MATRIX or seed active rows in regional_cities.")
+	}
 	supportedRegions := strings.Split(rawSupportedRegions, ",")
+	log.Printf("Region shard matrix: %v", supportedRegions)
 	regionRouter := middleware.NewRegionRouterMiddleware(supportedRegions)
 
 	// Single-use WebSocket tickets — replaces the leaky ?jwt= query param on WS upgrades.
@@ -411,8 +455,9 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Authentication / Access routes
-	mux.HandleFunc("POST /api/v1/auth/rider/login", handler.HandleRiderLogin)
+	// Authentication / Access routes. Rider login is handled exclusively by the
+	// real OTP flow (/api/v1/rider/auth/send-otp + verify-otp); the old mock
+	// /api/v1/auth/rider/login endpoint was removed (it accepted any OTP).
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
 	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
 	// Admin creation must be an authenticated SUPER_ADMIN action. Leaving this public
@@ -476,7 +521,15 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverConfirmPayment))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/car-issue-report", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverCarIssueReport))))
 	mux.HandleFunc("GET /api/v1/driver/trips", authGuard.AuthenticateJWT(handler.HandleDriverGetTrips))
-	mux.HandleFunc("GET /api/v1/driver/earnings", authGuard.AuthenticateJWT(handler.HandleDriverGetEarnings))
+	// Driver Earnings / Payouts / Wallet (rich, ledger-backed). The legacy
+	// handler.HandleDriverGetEarnings is superseded by GetEarnings below.
+	mux.HandleFunc("GET /api/v1/driver/earnings", authGuard.AuthenticateJWT(driverEarningsHandler.GetEarnings))
+	mux.HandleFunc("GET /api/v1/driver/earnings/statement", authGuard.AuthenticateJWT(driverEarningsHandler.GetStatement))
+	mux.HandleFunc("GET /api/v1/driver/payouts", authGuard.AuthenticateJWT(driverEarningsHandler.GetPayouts))
+	mux.HandleFunc("POST /api/v1/driver/payouts/request", authGuard.AuthenticateJWT(driverEarningsHandler.RequestPayout))
+	mux.HandleFunc("GET /api/v1/driver/payouts/{payoutId}", authGuard.AuthenticateJWT(driverEarningsHandler.GetPayoutDetail))
+	mux.HandleFunc("GET /api/v1/driver/wallet", authGuard.AuthenticateJWT(driverFeaturesHandler.GetWallet))
+	mux.HandleFunc("POST /api/v1/driver/wallet/topup", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, driverEarningsHandler.AdminWalletTopup))
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
@@ -546,7 +599,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/trip-share/{shareToken}", riderBookingHandler.HandleTripShare)
 
 	// Rider live-trip WebSocket (token in query; authenticated via RiderFromJWT).
-	mux.HandleFunc("GET /ws/rider", riderHub.HandleRiderStream)
+	// Rider live-trip stream. Ticket-authenticated (single-use ?ticket= minted by
+	// POST /api/v1/ws/ticket) — no long-lived JWT in the URL. Identity is injected
+	// into the request context by the ticket middleware.
+	mux.HandleFunc("GET /ws/rider", wsTicket.Authenticate(riderHub.HandleRiderStream))
 
 	// Register administrative control routes, protected by granular RBAC role gates
 	mux.HandleFunc("GET /api/v1/admin/ledger", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, handler.HandleAdminGetLedger))
@@ -1019,6 +1075,23 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// loadActiveRegions reads the active region prefixes from regional_cities (the
+// authoritative source) as a comma-separated list. Returns "" on any error so the
+// caller can fail closed rather than run with an empty region matrix.
+func loadActiveRegions(ctx context.Context, pool *pgxpool.Pool) string {
+	qctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var csv string
+	err := pool.QueryRow(qctx,
+		`SELECT COALESCE(string_agg(city_prefix, ',' ORDER BY city_prefix), '')
+		   FROM regional_cities WHERE is_active = true`).Scan(&csv)
+	if err != nil {
+		log.Printf("WARNING: could not load regions from regional_cities: %v", err)
+		return ""
+	}
+	return csv
 }
 
 // firstEnv returns the first non-empty value among the given env var names, or ""

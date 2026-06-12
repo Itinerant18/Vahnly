@@ -72,11 +72,18 @@ export default function TripMap({
 
   // Initialize map once
   useEffect(() => {
+    let isCancelled = false;
+
     if (!mapRef.current || leafletMapRef.current) return;
     const center = pickup ?? { lat: 22.5726, lng: 88.3639 };
 
     import("leaflet").then((L) => {
-      const map = L.map(mapRef.current!, {
+      if (isCancelled || !mapRef.current) return;
+
+      const container = mapRef.current;
+      if ((container as any)._leaflet_id) return;
+
+      const map = L.map(container, {
         center: [center.lat, center.lng],
         zoom: 15,
         zoomControl: false,
@@ -120,9 +127,12 @@ export default function TripMap({
     });
 
     return () => {
+      isCancelled = true;
       cancelAnimationFrame(rafRef.current);
-      leafletMapRef.current?.remove();
-      leafletMapRef.current = null;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

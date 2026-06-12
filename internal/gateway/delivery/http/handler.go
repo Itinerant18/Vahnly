@@ -2609,50 +2609,6 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 	})
 }
 
-func (h *GatewayHandler) HandleRiderLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		Phone string `json:"phone"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
-		return
-	}
-
-	userID := "usr-mock-11"
-	claims := &middleware.CustomClaims{
-		UserID: userID,
-		Role:   "RIDER",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.jwtSecretKey)
-	if err != nil {
-		http.Error(w, "failed_to_generate_token", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"token": tokenString,
-		"user": map[string]string{
-			"id":    userID,
-			"role":  "RIDER",
-			"name":  "Sarah Connor",
-			"phone": req.Phone,
-		},
-	})
-}
-
 func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
@@ -2676,19 +2632,20 @@ func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Reques
 	defer cancel()
 
 	var (
-		driverID     string
-		driverName   string
-		currentState string
-		passwordHash sql.NullString
+		driverID      string
+		driverName    string
+		currentState  string
+		accountStatus string
+		passwordHash  sql.NullString
 	)
 
 	query := `
-		SELECT id::text, name, current_state::text, password_hash
+		SELECT id::text, name, current_state::text, COALESCE(account_status, 'ACTIVE'), password_hash
 		FROM drivers
 		WHERE phone = $1
 		LIMIT 1;
 	`
-	if err := h.dbPool.QueryRow(ctx, query, req.Phone).Scan(&driverID, &driverName, &currentState, &passwordHash); err != nil {
+	if err := h.dbPool.QueryRow(ctx, query, req.Phone).Scan(&driverID, &driverName, &currentState, &accountStatus, &passwordHash); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "invalid_driver_credentials", http.StatusUnauthorized)
 			return
@@ -2707,11 +2664,19 @@ func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// A suspended/blocked driver must not be able to mint a fresh session.
+	if accountStatus != "ACTIVE" {
+		http.Error(w, "driver_account_"+strings.ToLower(accountStatus), http.StatusForbidden)
+		return
+	}
+
+	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
 		UserID: driverID,
 		Role:   "DRIVER",
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ID:        jti,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(middleware.DriverSessionTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -2721,6 +2686,14 @@ func (h *GatewayHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		http.Error(w, "failed_to_generate_token", http.StatusInternalServerError)
 		return
+	}
+
+	// Record the session jti server-side so admin actions can revoke it. A login
+	// replaces any previous session (single active session per driver).
+	if h.clusterClient != nil {
+		if err := h.clusterClient.Set(r.Context(), middleware.DriverSessionKey(driverID), jti, middleware.DriverSessionTTL).Err(); err != nil {
+			log.Printf("[AUTH_WARN] failed to record driver session for %s: %v", driverID, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
