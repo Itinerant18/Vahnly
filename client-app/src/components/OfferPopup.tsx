@@ -28,14 +28,14 @@ function SlideToAccept({ onAccept }: SlideToAcceptProps) {
     const val = Math.max(0, Math.min(100, (relativeX / width) * 100));
     setSliderVal(val);
 
-    if (val >= 95) {
+    if (val >= 90) {
       onAccept();
       setSliderVal(0);
     }
   };
 
   const handleEnd = () => {
-    if (sliderVal < 95) {
+    if (sliderVal < 90) {
       setSliderVal(0);
     }
   };
@@ -184,17 +184,17 @@ export function OfferPopup() {
         {(currentOffer.carMake || currentOffer.carModel) && (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-1.5 text-left">
             <p className="text-sm font-bold text-white">
-              You&apos;ll be driving a{' '}
+              Driving their{' '}
               {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel]
                 .filter(Boolean)
                 .join(' ')}
             </p>
             <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-              {currentOffer.carType || 'CAR'} · {currentOffer.carTransmission || 'Any'}
+              ({currentOffer.carType || 'CAR'} · {currentOffer.carTransmission || 'Any'})
             </p>
             {currentOffer.transmissionMatch === false && (
               <div className="mt-1 rounded-lg border border-amber-600/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-400">
-                ⚠ Car transmission doesn&apos;t match your expertise
+                ⚠ Requested: {currentOffer.carTransmission || 'Manual'} — doesn&apos;t match your expertise
               </div>
             )}
             <p className="text-[10px] text-zinc-500">For {currentOffer.riderName}</p>
@@ -268,10 +268,10 @@ export function OfferPopup() {
             </div>
             
             <div className="flex flex-col gap-2">
-              {['Too far', 'Break', 'Vehicle issue', 'Other'].map((reason) => (
+              {['Too far', 'Need a break', 'Vehicle issue', 'Other'].map((reason) => (
                 <button
                   key={reason}
-                  onClick={() => handleDeclineSelect(reason.toUpperCase().replace(' ', '_'))}
+                  onClick={() => handleDeclineSelect(reason.toUpperCase().replace(/ /g, '_'))}
                   className="w-full text-left bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 py-3 px-4 rounded-xl text-xs font-mono transition text-zinc-300 hover:text-white cursor-pointer"
                 >
                   {reason}

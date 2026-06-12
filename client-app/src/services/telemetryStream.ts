@@ -1,22 +1,31 @@
 import { updateDriverLocation } from '@/api/client';
+import { TelemetryRingBuffer, GPSCoordinatePacket } from '@/network/TelemetryRingBuffer';
 
 export interface TelemetryStreamOptions {
   token: string;
   driverId: string;
   cityPrefix: string;
+  /** Live connectivity probe. When it returns false, points are buffered locally
+   *  instead of being sent, and flushed (oldest→newest) once connectivity returns. */
+  isConnected?: () => boolean;
 }
 
-export function startTelemetryStream(options: TelemetryStreamOptions): () => void {
+export interface TelemetryStreamHandle {
+  stop: () => void;
+  /** Drain any locally-buffered points. Call this when the connection comes back. */
+  flush: () => void;
+}
+
+export function startTelemetryStream(options: TelemetryStreamOptions): TelemetryStreamHandle {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     console.error('[TELEMETRY_STREAM] Browser geolocation is unavailable.');
-    return () => {};
+    return { stop: () => {}, flush: () => {} };
   }
 
   let isVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  const isConnected = options.isConnected ?? (() => true);
 
-  const sendPosition = async (lat: number, lng: number, bearing: number, speedKms: number) => {
-    if (!isVisible) return;
-
+  const readDeviceContext = async (): Promise<{ batteryLevel: number; networkType: string }> => {
     let batteryLevel = 100;
     let networkType = 'unknown';
 
@@ -33,20 +42,43 @@ export function startTelemetryStream(options: TelemetryStreamOptions): () => voi
     if (conn) {
       networkType = conn.type || conn.effectiveType || 'unknown';
     }
+    return { batteryLevel, networkType };
+  };
 
-    void updateDriverLocation(
-      options.token,
-      options.driverId,
-      options.cityPrefix,
-      lat,
-      lng,
+  // The uploader drains the ring buffer oldest→newest. updateDriverLocation posts a single
+  // point, so cached packets are replayed sequentially; device context is read once per flush.
+  const buffer = new TelemetryRingBuffer(async (packets: GPSCoordinatePacket[]) => {
+    const ctx = await readDeviceContext();
+    for (const p of packets) {
+      await updateDriverLocation(
+        options.token,
+        p.driver_id,
+        p.city_prefix,
+        p.latitude,
+        p.longitude,
+        p.bearing,
+        p.speed_kms,
+        ctx.batteryLevel,
+        ctx.networkType,
+      );
+    }
+    return true;
+  });
+
+  const onPosition = (lat: number, lng: number, bearing: number, speedKms: number) => {
+    if (!isVisible) return;
+    const packet: GPSCoordinatePacket = {
+      driver_id: options.driverId,
+      city_prefix: options.cityPrefix,
+      latitude: lat,
+      longitude: lng,
       bearing,
-      speedKms,
-      batteryLevel,
-      networkType,
-    ).catch((err) => {
-      console.error('[TELEMETRY_STREAM] Location update failed:', err);
-    });
+      speed_kms: speedKms,
+      timestamp_utc: Date.now(),
+    };
+    // When connected, logCoordinate sends immediately (and flushes any backlog);
+    // when offline, the point is retained in the ring buffer for a later flush.
+    buffer.logCoordinate(packet, isConnected());
   };
 
   const handleVisibilityChange = () => {
@@ -59,7 +91,7 @@ export function startTelemetryStream(options: TelemetryStreamOptions): () => voi
 
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {
-      sendPosition(
+      onPosition(
         pos.coords.latitude,
         pos.coords.longitude,
         pos.coords.heading || 0,
@@ -70,10 +102,15 @@ export function startTelemetryStream(options: TelemetryStreamOptions): () => voi
     { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 },
   );
 
-  return () => {
-    navigator.geolocation.clearWatch(watchId);
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
+  return {
+    stop: () => {
+      navigator.geolocation.clearWatch(watchId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    },
+    flush: () => {
+      void buffer.flushCachedTelemetryPools();
+    },
   };
 }

@@ -44,22 +44,24 @@ func TestWSTicket_RejectsWithoutCredentials(t *testing.T) {
 	}
 }
 
-// Transitional ?jwt= fallback authenticates and injects identity into context.
-func TestWSTicket_JWTFallbackInjectsIdentity(t *testing.T) {
+// The transitional ?jwt= fallback has been removed (a long-lived JWT must never appear
+// in a URL). A JWT in the query string must no longer authenticate — only single-use
+// ?ticket= values are accepted.
+func TestWSTicket_JWTQueryFallbackRejected(t *testing.T) {
 	m := NewWSTicketMiddleware(nil, NewAuthMiddleware(wsTestSecret))
 	token := signWSToken(t, "drv-1", "DRIVER", "KOL")
 
-	var gotID, gotScope string
-	h := m.Authenticate(func(w http.ResponseWriter, r *http.Request) {
-		gotID, _ = GetUserIDFromContext(r.Context())
-		gotScope, _ = GetCityScopeFromContext(r.Context())
-	})
+	called := false
+	h := m.Authenticate(func(w http.ResponseWriter, r *http.Request) { called = true })
 
 	rec := httptest.NewRecorder()
 	h(rec, httptest.NewRequest(http.MethodGet, "/api/v1/dispatch/stream?jwt="+token, nil))
 
-	if gotID != "drv-1" || gotScope != "KOL" {
-		t.Fatalf("identity not injected: id=%q scope=%q", gotID, gotScope)
+	if called {
+		t.Fatal("handler must not run for a ?jwt= query — the fallback was removed")
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", rec.Code)
 	}
 }
 

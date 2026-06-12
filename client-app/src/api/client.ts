@@ -883,6 +883,19 @@ export async function driverConfirmPayment(
   });
 }
 
+// Driver rates the rider after a completed trip (separate from payment confirmation).
+export async function rateRider(
+  token: string,
+  orderId: string,
+  payload: { rating: number; tags: string[]; comment: string },
+): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>(`/api/v1/driver/orders/${orderId}/rate-rider`, {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
 export interface OfflineCachedPacket {
   type: "TELEMETRY" | "TRIP_EVENT" | "CHECKPOINT";
   payload: any;

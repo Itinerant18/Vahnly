@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore } from '@/store/useDriverDutyStore';
-import { driverConfirmPayment } from '@/api/client';
+import { rateRider } from '@/api/client';
 
 export default function RateRiderPage() {
   const t = useTranslations('driverTripRate');
@@ -17,27 +17,20 @@ export default function RateRiderPage() {
 
   const [rating, setRating] = useState<number>(5);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
+  const [comment, setComment] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const availableTags: { value: string; labelKey: string }[] = [
+  const positiveTags: { value: string; labelKey: string }[] = [
+    { value: 'On-time', labelKey: 'tagOnTime' },
     { value: 'Polite', labelKey: 'tagPolite' },
-    { value: 'Friendly', labelKey: 'tagFriendly' },
-    { value: 'Clean', labelKey: 'tagClean' },
-    { value: 'On Time', labelKey: 'tagOnTime' },
-    { value: 'Respectful', labelKey: 'tagRespectful' },
+    { value: 'Easy to deal with', labelKey: 'tagEasy' },
   ];
-
-  useEffect(() => {
-    try {
-      const storedMethod = sessionStorage.getItem(`payment_method_${orderID}`);
-      if (storedMethod) {
-        setPaymentMethod(storedMethod);
-      }
-    } catch (e) {
-      console.warn('Failed reading payment method from storage:', e);
-    }
-  }, [orderID]);
+  const negativeTags: { value: string; labelKey: string }[] = [
+    { value: 'Rude', labelKey: 'tagRude' },
+    { value: 'Late', labelKey: 'tagLate' },
+    { value: 'Car in bad condition', labelKey: 'tagBadCondition' },
+  ];
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -49,40 +42,74 @@ export default function RateRiderPage() {
     setIsSubmitting(true);
     try {
       if (token && orderID) {
-        // Calls the POST confirm-payment endpoint which posts double-entry financial ledger splits
-        await driverConfirmPayment(token, orderID, {
-          payment_method: paymentMethod as 'UPI' | 'CASH',
-          rider_rating: rating,
+        await rateRider(token, orderID, {
+          rating,
           tags: selectedTags,
+          comment: comment.trim(),
         });
       }
-      
-      // Update store state and local cleanup
-      setDutyState('ONLINE');
       try {
-        sessionStorage.removeItem(`payment_method_${orderID}`);
         sessionStorage.removeItem(`final_bill_${orderID}`);
         sessionStorage.removeItem('current_final_bill');
       } catch (e) {}
-
-      alert(t('settlementComplete'));
-      router.push('/driver');
+      setSubmitted(true);
     } catch (err) {
-      console.error('Failed to confirm payment and rate:', err);
-      // Fallback transition
-      setDutyState('ONLINE');
-      router.push('/driver');
+      console.error('Failed to rate rider:', err);
+      // Even on failure, advance to the next-step choice — the trip is over.
+      setSubmitted(true);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const goOnline = () => {
+    setDutyState('ONLINE');
+    router.push('/driver');
+  };
+
+  const takeBreak = () => {
+    setDutyState('OFFLINE');
+    router.push('/driver');
+  };
+
+  // Tags shown depend on the score: positive set for 4-5★, negative set for 1-3★.
+  const activeTagSet = rating >= 4 ? positiveTags : negativeTags;
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 font-mono flex flex-col justify-center selection:bg-white selection:text-black">
+        <main className="max-w-md mx-auto w-full space-y-6 text-center">
+          <div className="space-y-2">
+            <span className="text-4xl block">✅</span>
+            <h1 className="text-sm font-bold text-white uppercase tracking-wider">{t('thanksTitle')}</h1>
+            <p className="text-[10px] text-zinc-500">{t('nextPrompt')}</p>
+          </div>
+
+          <div className="space-y-2.5">
+            <button
+              onClick={goOnline}
+              className="w-full bg-white hover:bg-zinc-200 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer border border-white active:scale-[0.98]"
+            >
+              {t('goOnline')}
+            </button>
+            <button
+              onClick={takeBreak}
+              className="w-full bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-900 font-bold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer active:scale-[0.98]"
+            >
+              {t('takeBreak')}
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-6 font-mono flex flex-col justify-between selection:bg-white selection:text-black">
       <header className="border-b border-zinc-900 pb-4 mb-4">
         <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">{t('panelLabel')}</span>
         <h1 className="text-sm font-bold text-white mt-1 uppercase">{t('title')}</h1>
-        <p className="text-[8px] text-zinc-655 mt-0.5">{t('orderId', { id: orderID.substring(0, 18) })}</p>
+        <p className="text-[8px] text-zinc-600 mt-0.5">{t('orderId', { id: orderID.substring(0, 18) })}</p>
       </header>
 
       <main className="flex-grow max-w-md mx-auto w-full space-y-6 flex flex-col justify-center py-4">
@@ -120,7 +147,7 @@ export default function RateRiderPage() {
             {t('addQuickFeedbackTags')}
           </span>
           <div className="flex flex-wrap gap-2 pt-1.5">
-            {availableTags.map((tag) => {
+            {activeTagSet.map((tag) => {
               const active = selectedTags.includes(tag.value);
               return (
                 <button
@@ -139,13 +166,28 @@ export default function RateRiderPage() {
             })}
           </div>
         </div>
+
+        {/* Free-text comment */}
+        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-2.5 shadow-xl text-left">
+          <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">
+            {t('commentLabel')}
+          </span>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder={t('commentPlaceholder')}
+            className="w-full bg-black border border-zinc-850 rounded-xl p-3 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700 resize-none font-sans"
+          />
+        </div>
       </main>
 
       <footer className="mt-8 max-w-md mx-auto w-full">
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full bg-white hover:bg-zinc-200 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono border border-white active:scale-[0.98]"
+          className="w-full bg-white hover:bg-zinc-200 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono border border-white active:scale-[0.98] disabled:opacity-60"
         >
           {isSubmitting ? t('submitting') : t('submitButton')}
         </button>

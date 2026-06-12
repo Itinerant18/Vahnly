@@ -47,6 +47,10 @@ type RiderOrder struct {
 	RiderReviewTags      []string `json:"rider_review_tags,omitempty"`
 	RiderReviewComment   *string  `json:"rider_review_comment,omitempty"`
 
+	DriverRatingForRider *int     `json:"driver_rating_for_rider,omitempty"`
+	DriverReviewTags     []string `json:"driver_review_tags,omitempty"`
+	DriverReviewComment  *string  `json:"driver_review_comment,omitempty"`
+
 	CancelledBy        *string `json:"cancelled_by,omitempty"`
 	CancellationReason *string `json:"cancellation_reason,omitempty"`
 

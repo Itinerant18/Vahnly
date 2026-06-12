@@ -6,7 +6,7 @@ export interface StreamConfig {
   orderID: string;
   cityPrefix: string;
   onMessage: (data: unknown) => void;
-  onStatusChange: (status: 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING') => void;
+  onStatusChange: (status: 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING' | 'OFFLINE') => void;
   /** Override the default WebSocket gateway base URL. */
   wsBaseUrl?: string;
 }
@@ -21,6 +21,9 @@ export class ResilientStreamManager {
   private baseDelayMs: number = 500;
   private maxDelayMs: number = 8000;
   private currentRetryAttempt: number = 0;
+  // After this many consecutive failed attempts we stop the automatic backoff loop
+  // and surface OFFLINE so the UI can offer an explicit "tap to retry".
+  private maxRetries: number = 8;
 
   constructor(config: StreamConfig) {
     this.config = config;
@@ -105,6 +108,13 @@ export class ResilientStreamManager {
 
   /** Schedule a reconnect using full-jitter exponential backoff. */
   private executeJitteredReconnection(): void {
+    // Give up the automatic loop after maxRetries; the UI surfaces OFFLINE + a manual
+    // retry that calls retry() to reset the backoff and try again.
+    if (this.currentRetryAttempt >= this.maxRetries) {
+      this.config.onStatusChange('OFFLINE');
+      return;
+    }
+
     this.config.onStatusChange('RECONNECTING');
 
     const factorDelay = this.baseDelayMs * Math.pow(2, this.currentRetryAttempt);
@@ -117,6 +127,12 @@ export class ResilientStreamManager {
         this.connect();
       }
     }, randomizedJitterDelay);
+  }
+
+  /** Manual reconnect after the automatic loop gave up (OFFLINE). Resets the backoff. */
+  public retry(): void {
+    this.currentRetryAttempt = 0;
+    void this.connect();
   }
 
   public disconnect(): void {

@@ -33,7 +33,7 @@ import {
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
-import { startTelemetryStream } from '@/services/telemetryStream';
+import { startTelemetryStream, TelemetryStreamHandle } from '@/services/telemetryStream';
 import { OfferPopup } from '@/components/OfferPopup';
 import { useOfferStore } from '@/store/useOfferStore';
 import { cellToBoundary } from 'h3-js';
@@ -88,19 +88,23 @@ export default function DriverTerminalPage() {
   const { dutyState, setDutyState, forceMatched } = useDriverDutyStore();
   const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
   
-  // Resilient WebSocket hook for monitoring real-time dispatch streams
-  const { status: wsStatus } = useResilientWebSocket(
+  // Resilient WebSocket hook — single source of truth for the connection chip.
+  const { status: connectionStatus, reconnect } = useResilientWebSocket(
     activeTrip?.order_id || 'global-driver',
     cityPrefix,
     dutyState !== 'OFFLINE'
   );
 
-  const [streamStatus, setStreamStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING'>('DISCONNECTED');
-
-  // Sync streamStatus with wsStatus
+  // Mirror connectionStatus into a ref so the telemetry stream can probe live
+  // connectivity without being torn down and re-created on every status change.
+  const connectionStatusRef = useRef<typeof connectionStatus>(connectionStatus);
   useEffect(() => {
-    setStreamStatus(wsStatus);
-  }, [wsStatus]);
+    connectionStatusRef.current = connectionStatus;
+    // On reconnection, drain any GPS points buffered while we were offline.
+    if (connectionStatus === 'CONNECTED') {
+      telemetryStopRef.current?.flush();
+    }
+  }, [connectionStatus]);
 
   // Statistics polling state
   const [stats, setStats] = useState({
@@ -168,7 +172,7 @@ export default function DriverTerminalPage() {
   const [mapDrivers, setMapDrivers] = useState<MapDriver[]>([]);
 
   // Core structural pointers
-  const telemetryStopRef = useRef<(() => void) | null>(null);
+  const telemetryStopRef = useRef<TelemetryStreamHandle | null>(null);
   const streamRef = useRef<(() => void) | null>(null);
   const waitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -227,7 +231,7 @@ export default function DriverTerminalPage() {
   useEffect(() => {
     logAudit('SESSION_STARTED', { driverID, device: navigator.userAgent });
     return () => {
-      telemetryStopRef.current?.();
+      telemetryStopRef.current?.stop();
       streamRef.current?.();
       if (waitTimerRef.current) clearInterval(waitTimerRef.current);
       if (sosTimerRef.current) clearInterval(sosTimerRef.current);
@@ -373,7 +377,13 @@ export default function DriverTerminalPage() {
     if (!token) return;
 
     if (!telemetryStopRef.current) {
-      telemetryStopRef.current = startTelemetryStream({ token, driverId: driverID, cityPrefix });
+      telemetryStopRef.current = startTelemetryStream({
+        token,
+        driverId: driverID,
+        cityPrefix,
+        // While not CONNECTED, GPS points buffer locally and flush on reconnect.
+        isConnected: () => connectionStatusRef.current === 'CONNECTED',
+      });
       logAudit('TELEMETRY_STREAM_STARTED', { driverID, cityPrefix });
     }
 
@@ -419,14 +429,12 @@ export default function DriverTerminalPage() {
             }]);
           },
           onClose: () => {
-            setStreamStatus('DISCONNECTED');
             logAudit('WS_CONNECTION_STATE', { status: 'DISCONNECTED' });
             streamRef.current = null;
           },
         },
         cityPrefix,
       );
-      setStreamStatus('CONNECTED');
       logAudit('WS_CONNECTION_STATE', { status: 'CONNECTED' });
     }
 
@@ -449,11 +457,10 @@ export default function DriverTerminalPage() {
   };
 
   const closeOnlineStreams = () => {
-    telemetryStopRef.current?.();
+    telemetryStopRef.current?.stop();
     streamRef.current?.();
     telemetryStopRef.current = null;
     streamRef.current = null;
-    setStreamStatus('DISCONNECTED');
   };
 
   useEffect(() => {
@@ -950,6 +957,14 @@ export default function DriverTerminalPage() {
         </div>
       )}
 
+      {/* CONNECTIVITY DEGRADED BANNER: dispatch stream is reconnecting — pause new work */}
+      {connectionStatus === 'RECONNECTING' && dutyState !== 'OFFLINE' && (
+        <div className="fixed top-0 inset-x-0 z-[100000] bg-zinc-800 text-zinc-300 px-4 py-2 flex items-center justify-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider shadow">
+          <span className="h-2 w-2 rounded-full border-[1.5px] border-amber-500 border-t-transparent animate-spin"></span>
+          Reconnecting to dispatch — you won&apos;t receive new offers until the link is restored.
+        </div>
+      )}
+
       {/* 3. INCOMING BOOKING OFFER MODAL SHEET OVERLAY */}
       <OfferPopup />
 
@@ -1040,10 +1055,26 @@ export default function DriverTerminalPage() {
 
         <div className="flex items-center gap-3">
           {dutyState !== 'OFFLINE' && (
-            <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-              WS: {streamStatus.toLowerCase()}
-            </span>
+            connectionStatus === 'OFFLINE' ? (
+              <button
+                type="button"
+                onClick={reconnect}
+                className="bg-red-950/60 text-red-400 border border-red-900 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:bg-red-900/50 transition active:scale-95"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                Offline · Tap to retry
+              </button>
+            ) : connectionStatus === 'CONNECTED' ? (
+              <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Connected
+              </span>
+            ) : (
+              <span className="bg-amber-950/40 text-amber-400 border border-amber-900/60 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full border-[1.5px] border-amber-500 border-t-transparent animate-spin"></span>
+                Reconnecting
+              </span>
+            )
           )}
 
           {/* Emergency SOS red trigger with 2-second hold confirmation */}

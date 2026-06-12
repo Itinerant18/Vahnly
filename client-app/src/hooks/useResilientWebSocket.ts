@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { ResilientStreamManager } from '../network/ResilientStreamManager';
 
 export function useResilientWebSocket(orderID: string, cityPrefix: string, active: boolean = true) {
-  const [status, setStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING'>('DISCONNECTED');
+  const [status, setStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING' | 'OFFLINE'>('DISCONNECTED');
   const [messages, setMessages] = useState<unknown[]>([]);
   const [lastMessage, setLastMessage] = useState<unknown | null>(null);
   
@@ -42,5 +42,10 @@ export function useResilientWebSocket(orderID: string, cityPrefix: string, activ
     };
   }, [orderID, cityPrefix, active]);
 
-  return { status, messages, lastMessage };
+  // Manual retry for the OFFLINE state — resets the backoff and reconnects.
+  const reconnect = useCallback(() => {
+    streamManagerRef.current?.retry();
+  }, []);
+
+  return { status, messages, lastMessage, reconnect };
 }

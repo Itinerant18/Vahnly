@@ -578,6 +578,106 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 }
 
 // HandleDriverConfirmPayment handles POST /api/v1/driver/orders/{id}/confirm-payment
+// HandleDriverRateRider handles POST /api/v1/driver/orders/{id}/rate-rider
+// The driver rates the rider (1-5) with optional tags + comment after a completed trip.
+// Stored on the order's driver_rating_for_rider / driver_review_* columns (distinct from
+// rider_rating_for_driver). Scoped to the order's assigned driver; one rating per order.
+func (h *GatewayHandler) HandleDriverRateRider(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Rating  int      `json:"rating"`
+		Tags    []string `json:"tags"`
+		Comment string   `json:"comment"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+	if req.Rating < 1 || req.Rating > 5 {
+		http.Error(w, "invalid_rating: must be between 1 and 5", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[RATE_RIDER] Transaction begin failed: %v", err)
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var currentStatus string
+	var assignedDriverID *string
+	var existingRating *int
+	err = tx.QueryRow(ctx, `
+		SELECT status::text, assigned_driver_id::text, driver_rating_for_rider
+		FROM orders
+		WHERE id = $1::uuid
+		FOR UPDATE`, orderID).Scan(&currentStatus, &assignedDriverID, &existingRating)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "order_not_found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "database_read_exception", http.StatusInternalServerError)
+		return
+	}
+
+	if assignedDriverID == nil || *assignedDriverID != driverID {
+		http.Error(w, "forbidden: driver identity mismatch", http.StatusForbidden)
+		return
+	}
+	if currentStatus != "COMPLETED" {
+		http.Error(w, fmt.Sprintf("invalid_state: expected COMPLETED, got %s", currentStatus), http.StatusConflict)
+		return
+	}
+	// One rating per order: a second submission is treated as an idempotent no-op.
+	if existingRating != nil {
+		writeJSONResponse(w, http.StatusOK, map[string]interface{}{"success": true, "message": "rider_already_rated"})
+		return
+	}
+
+	var comment interface{}
+	if req.Comment != "" {
+		comment = req.Comment
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE orders SET
+			driver_rating_for_rider = $2,
+			driver_review_tags = $3,
+			driver_review_comment = $4
+		WHERE id = $1::uuid`, orderID, req.Rating, req.Tags, comment); err != nil {
+		log.Printf("[RATE_RIDER] Update failed: %v", err)
+		http.Error(w, "database_write_exception", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "transaction_commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONResponse(w, http.StatusOK, map[string]interface{}{"success": true, "message": "rider_rated"})
+}
+
 func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
