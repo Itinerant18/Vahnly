@@ -261,7 +261,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			if parentCtx == nil {
 				parentCtx = ctx
 			}
-			orderCtx, cancel := context.WithTimeout(parentCtx, 350*time.Millisecond)
+			orderCtx, cancel := context.WithTimeout(parentCtx, 5000*time.Millisecond)
 			defer cancel()
 
 			candidates, err := c.spatialScanner.ScanNearbyDrivers(orderCtx, o.CityPrefix, o.PickupH3Cell)
@@ -355,7 +355,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 }
 
 func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, orders []domain.OrderCreatedPayload) {
-	batchCtx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
+	batchCtx, cancel := context.WithTimeout(ctx, 5000*time.Millisecond)
 	defer cancel()
 
 	driverLocationMap := make(map[string][]matcher.CandidateDriver)

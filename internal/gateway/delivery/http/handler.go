@@ -184,7 +184,7 @@ func (h *GatewayHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Reques
 	spanCtx, span := tracer.Start(r.Context(), "gateway.CreateOrderReceived")
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(spanCtx, 1000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(spanCtx, 5000*time.Millisecond)
 	defer cancel()
 
 	var orderID string
@@ -504,7 +504,7 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	ctx, cancel := context.WithTimeout(r.Context(), 5000*time.Millisecond)
 	defer cancel()
 
 	tx, err := h.dbPool.Begin(ctx)
@@ -939,7 +939,7 @@ func (h *GatewayHandler) HandleArriveAtPickup(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	ctx, cancel := context.WithTimeout(r.Context(), 5000*time.Millisecond)
 	defer cancel()
 
 	tx, err := h.dbPool.Begin(ctx)
@@ -986,7 +986,7 @@ func (h *GatewayHandler) HandleStartTrip(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	ctx, cancel := context.WithTimeout(r.Context(), 5000*time.Millisecond)
 	defer cancel()
 
 	query := `
@@ -1316,7 +1316,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(r.Context(), 5000*time.Millisecond)
 	defer cancel()
 
 	// 1. Idempotency Fence: Prevent duplicate billing/settlement execution under network retries
@@ -1383,13 +1383,14 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	driverEarningsPaise := baseFarePaise - platformCommissionPaise // Prevents rounding fractional leak leakages
 
 	ledgerInsertQuery := `
-		INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6);
+		INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
+		VALUES ($1::uuid, $2, $2, $3, $4, $5, $6);
 	`
 
 	// Leg A: Full Rider Outflow Debit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "RIDER_EXTERNAL_PAYMENT", "DEBIT", baseFarePaise, "Rider automated checkout balance payment processing")
 	if err != nil {
+		log.Printf("[GATEWAY_ERROR] Leg A ledger insert failed: %v", err)
 		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
 		return
 	}
@@ -1397,6 +1398,7 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	// Leg B: Net Driver Share Credit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "DRIVER_EARNINGS", "CREDIT", driverEarningsPaise, "Driver partner transaction payout share allocation (80%)")
 	if err != nil {
+		log.Printf("[GATEWAY_ERROR] Leg B ledger insert failed: %v", err)
 		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
 		return
 	}
@@ -1404,12 +1406,14 @@ func (h *GatewayHandler) HandleCompleteTrip(w http.ResponseWriter, r *http.Reque
 	// Leg C: Corporate Commission Take-Rate Credit
 	_, err = tx.Exec(ctx, ledgerInsertQuery, req.OrderID, cityPrefix, "PLATFORM_COMMISSION", "CREDIT", platformCommissionPaise, "Platform take-rate corporate match commission fee adjustment (20%)")
 	if err != nil {
+		log.Printf("[GATEWAY_ERROR] Leg C ledger insert failed: %v", err)
 		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
 		return
 	}
 
 	// Commit entries atomically to disk
 	if err = tx.Commit(ctx); err != nil {
+		log.Printf("[GATEWAY_ERROR] Ledger tx commit failed: %v", err)
 		http.Error(w, "immutable_ledger_write_failed", http.StatusInternalServerError)
 		return
 	}
@@ -1581,10 +1585,10 @@ func (h *GatewayHandler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Req
 		// ledger stays auditable (debits == credits). A lone CREDIT here would leave the
 		// admin auditor permanently unbalanced against the settlement booked at trip completion.
 		ledgerQuery := `
-			INSERT INTO financial_ledger_entries (order_id, city_prefix, account_type, entry_type, amount_paise, description)
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
 			VALUES
-				($1::uuid, $2, 'PROVIDER_SETTLEMENT_CASH', 'DEBIT', $3, 'External card network cash settlement inflow (webhook clearance)'),
-				($1::uuid, $2, 'RIDER_EXTERNAL_PAYMENT', 'CREDIT', $3, 'Rider external payment receivable cleared via card network settlement');
+				($1::uuid, $2, $2, 'PROVIDER_SETTLEMENT_CASH', 'DEBIT', $3, 'External card network cash settlement inflow (webhook clearance)'),
+				($1::uuid, $2, $2, 'RIDER_EXTERNAL_PAYMENT', 'CREDIT', $3, 'Rider external payment receivable cleared via card network settlement');
 		`
 		_, err = tx.Exec(ctx, ledgerQuery, webhookEvent.Data.OrderID, cityPrefix, webhookEvent.Data.AmountPaise)
 		if err != nil {

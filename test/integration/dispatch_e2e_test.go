@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,9 @@ import (
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
+
+	apiv1 "github.com/platform/driver-delivery/pkg/api/v1"
 
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
@@ -93,6 +97,15 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	})
 	defer redisClient.Close()
 
+	// Warm up the Redis cluster client connections to avoid cold-start timeouts
+	// during the tight 350-400ms execution windows.
+	warmupRedisCtx, warmupRedisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = redisClient.ForEachShard(warmupRedisCtx, func(ctx context.Context, shard *redis.Client) error {
+		return shard.Ping(ctx).Err()
+	})
+	warmupRedisCancel()
+
+
 	consumerCtx, cancelConsumer := context.WithCancel(ctx)
 	defer cancelConsumer()
 
@@ -121,6 +134,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	const targetDriverID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 	seedSQL := []string{
 		"DELETE FROM financial_ledger_entries",
+		"DELETE FROM payment_intents",
 		"DELETE FROM dispatch_match_logs",
 		"DELETE FROM orders",
 		"DELETE FROM drivers WHERE city_prefix = 'KOL'",
@@ -140,6 +154,13 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	spatialKey := "drivers:zset:KOL:88754cb247fffff"
 	_ = redisClient.Del(ctx, spatialKey)
 	defer redisClient.Del(ctx, spatialKey)
+
+	// Clean out any stale Redis keys from prior runs to prevent test state poisoning
+	_ = redisClient.Del(ctx, "idempotency:settlement:"+integrationOrderID)
+	_ = redisClient.Del(ctx, "ws:presence:"+integrationOrderID)
+	_ = redisClient.Del(ctx, "driver:active:trip:"+targetDriverID)
+	_ = redisClient.Del(ctx, "cooldown:driver:"+targetDriverID)
+	_ = redisClient.Del(ctx, "offer:lease:"+integrationOrderID)
 
 	profileKey := "driver:{KOL:" + targetDriverID + "}:profile"
 	_ = redisClient.Del(ctx, profileKey)
@@ -232,6 +253,8 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	mux.HandleFunc("/api/v1/trip/arrive", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleArriveAtPickup))
 	mux.HandleFunc("/api/v1/trip/start", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleStartTrip))
 	mux.HandleFunc("/api/v1/trip/complete", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleCompleteTrip))
+	mux.HandleFunc("/api/v1/pricing/quote", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleGetPricingQuote))
+	mux.HandleFunc("/api/v1/payments/webhook", gatewayHandler.HandlePaymentWebhook)
 	
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -272,6 +295,16 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	}
 	defer wsConn.Close()
 
+	// Warm up the Kafka writer for order.created to establish broker connection
+	// and fetch partition/topic metadata so the first write doesn't incur cold start delay.
+	warmupCtx, warmupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	warmupPayload := []byte(`{"order_id":"00000000-0000-0000-0000-000000000000"}`)
+	_ = kafkaWriter.WriteMessages(warmupCtx, kafka.Message{
+		Key:   []byte("00000000-0000-0000-0000-000000000000"),
+		Value: warmupPayload,
+	})
+	warmupCancel()
+
 	// 10. POST Booking Intent Request
 	orderPayload := map[string]interface{}{
 		"order_id":           integrationOrderID,
@@ -303,10 +336,15 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		t.Fatalf("WebSocket connection timed out waiting for matching event: %v", err)
 	}
 
-	var matchNotification map[string]interface{}
-	_ = json.Unmarshal(wsMsg, &matchNotification)
-	if matchNotification["driver_id"] != targetDriverID {
-		t.Fatalf("Expected driver match %s, got %v", targetDriverID, matchNotification["driver_id"])
+	var matchNotification apiv1.WebSocketBinaryEnvelope
+	if err := proto.Unmarshal(wsMsg, &matchNotification); err != nil {
+		t.Fatalf("Failed to unmarshal binary protobuf envelope: %v", err)
+	}
+	if matchNotification.Assignment == nil {
+		t.Fatalf("Expected assignment frame, got nil")
+	}
+	if matchNotification.Assignment.DriverId != targetDriverID {
+		t.Fatalf("Expected driver match %s, got %v", targetDriverID, matchNotification.Assignment.DriverId)
 	}
 	t.Log("[STAGE 1 OK] Combinatorial matching successfully verified over active WebSocket.")
 
@@ -369,12 +407,17 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		t.Fatalf("WebSocket layer failed to capture live telemetry update frame: %v", err)
 	}
 
-	var telemetryFrame map[string]interface{}
-	_ = json.Unmarshal(wsTelemetryMsg, &telemetryFrame)
-	if telemetryFrame["latitude"] == nil || telemetryFrame["order_id"] != integrationOrderID {
-		t.Fatalf("Malformed telemetry broadcast frame intercepted: %v", string(wsTelemetryMsg))
+	var telemetryFrame apiv1.WebSocketBinaryEnvelope
+	if err := proto.Unmarshal(wsTelemetryMsg, &telemetryFrame); err != nil {
+		t.Fatalf("Failed to unmarshal binary telemetry frame: %v", err)
 	}
-	t.Logf("[STAGE 4 OK] Real-time telemetry streaming verified: Lat=%v, Lng=%v", telemetryFrame["latitude"], telemetryFrame["longitude"])
+	if telemetryFrame.Telemetry == nil {
+		t.Fatalf("Expected telemetry frame, got nil")
+	}
+	if telemetryFrame.Telemetry.OrderId != integrationOrderID {
+		t.Fatalf("Malformed telemetry broadcast frame intercepted: expected order %s, got %s", integrationOrderID, telemetryFrame.Telemetry.OrderId)
+	}
+	t.Logf("[STAGE 4 OK] Real-time telemetry streaming verified: Lat=%v, Lng=%v", telemetryFrame.Telemetry.Latitude, telemetryFrame.Telemetry.Longitude)
 
 	// 15. STAGE 5 LIFECYCLE ASSERTION: Conclude Journey and Verify Double-Entry Financial Ledger Writes
 	reqComplete, _ := http.NewRequest("POST", server.URL+"/api/v1/trip/complete", bytes.NewBuffer(acceptBytes))
@@ -382,8 +425,12 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	reqComplete.Header.Set("X-Region-Prefix", "KOL")
 
 	respComplete, err := http.DefaultClient.Do(reqComplete)
-	if err != nil || respComplete.StatusCode != http.StatusOK {
-		t.Fatalf("POST /api/v1/trip/complete failed")
+	if err != nil {
+		t.Fatalf("POST /api/v1/trip/complete request failed: %v", err)
+	}
+	if respComplete.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(respComplete.Body)
+		t.Fatalf("POST /api/v1/trip/complete failed with status %d: %s", respComplete.StatusCode, string(body))
 	}
 
 	// Read and verify the exact ledger rows inside relational storage maps
