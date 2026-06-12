@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import type {
   EmergencyContact,
+  NotificationPreferences,
   RiderNotificationItem,
   RiderReferral,
   SavedPlace,
@@ -62,4 +63,19 @@ export const accountApi = {
       device_token: deviceToken,
       platform,
     }),
+
+  // Notification preferences (per-category push/SMS/email toggles)
+  notifPreferences: () =>
+    apiClient.get<NotificationPreferences>(
+      "/api/v1/rider/notifications/preferences",
+    ),
+  updateNotifPreferences: (prefs: NotificationPreferences) =>
+    apiClient.patch<NotificationPreferences>(
+      "/api/v1/rider/notifications/preferences",
+      prefs,
+    ),
+
+  // Account deletion (irreversible)
+  deleteAccount: () =>
+    apiClient.del<{ message: string }>("/api/v1/rider/account"),
 };

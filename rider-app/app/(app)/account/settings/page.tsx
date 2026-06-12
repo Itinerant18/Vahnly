@@ -3,12 +3,23 @@
 import { useEffect, useState } from "react";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { useAuthStore } from "@/lib/store/authStore";
+import { authApi } from "@/lib/api/auth";
+import { accountApi } from "@/lib/api/account";
+import type { NotificationPreferences, NotifChannelPrefs } from "@/lib/api/types";
+import { Capacitor } from "@capacitor/core";
 
 const APP_VERSION = "1.0.0";
 
-type Channel = "push" | "sms" | "email";
-const NOTIF_CATS = ["Trip updates", "Promotions", "Safety alerts"] as const;
+type Channel = keyof NotifChannelPrefs; // "push" | "sms" | "email"
 const CHANNELS: Channel[] = ["push", "sms", "email"];
+
+type NotifCategory = keyof NotificationPreferences;
+const NOTIF_ROWS: { key: NotifCategory; label: string }[] = [
+  { key: "trip_updates", label: "Trip updates" },
+  { key: "promotions", label: "Promotions" },
+  { key: "safety_alerts", label: "Safety alerts" },
+  { key: "document_expiry", label: "Document expiry" },
+];
 
 const LANGS = [
   { code: "en", label: "English" },
@@ -16,7 +27,10 @@ const LANGS = [
   { code: "bn", label: "বাংলা" },
 ];
 const THEMES = ["System", "Light", "Dark"] as const;
+type Theme = (typeof THEMES)[number];
 const UNITS = ["km", "miles"] as const;
+
+type PermState = "granted" | "denied" | "ask";
 
 function load<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -28,38 +42,205 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
+function defaultPrefs(): NotificationPreferences {
+  const ch: NotifChannelPrefs = { push: true, sms: false, email: false };
+  return {
+    trip_updates: { ...ch },
+    promotions: { ...ch },
+    safety_alerts: { ...ch },
+    document_expiry: { ...ch },
+  };
+}
+
+function applyTheme(t: Theme) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const dark =
+    t === "Dark" ||
+    (t === "System" &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  if (dark) {
+    root.classList.add("dark");
+    root.classList.remove("light");
+  } else {
+    root.classList.add("light");
+    root.classList.remove("dark");
+  }
+}
+
+function normalizePerm(s: string | undefined): PermState {
+  if (s === "granted") return "granted";
+  if (s === "denied") return "denied";
+  return "ask";
+}
+
 export default function SettingsPage() {
   const logout = useAuthStore((s) => s.logout);
 
   const [lang, setLang] = useState("en");
-  const [theme, setTheme] = useState<(typeof THEMES)[number]>("Dark");
+  const [theme, setTheme] = useState<Theme>("Dark");
   const [unit, setUnit] = useState<(typeof UNITS)[number]>("km");
-  const [prefs, setPrefs] = useState<Record<string, Record<Channel, boolean>>>(() =>
-    Object.fromEntries(NOTIF_CATS.map((c) => [c, { push: true, sms: false, email: false }])),
-  );
+  const [prefs, setPrefs] = useState<NotificationPreferences>(defaultPrefs);
+  const [locationPerm, setLocationPerm] = useState<PermState>("ask");
+  const [notifPerm, setNotifPerm] = useState<PermState>("ask");
   const [showDelete, setShowDelete] = useState(false);
-
-  useEffect(() => {
-    setLang(load("dfu_lang", "en"));
-    setTheme(load("dfu_theme", "Dark"));
-    setUnit(load("dfu_unit", "km"));
-    setPrefs((p) => load("dfu_notif_prefs", p));
-  }, []);
 
   const persist = (key: string, value: unknown) => {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   };
 
-  const togglePref = (cat: string, ch: Channel) => {
+  // Mount: load stored prefs, apply theme, fetch server notif prefs, read permissions.
+  useEffect(() => {
+    const storedLang = load("dfu_lang", "en");
+    const storedTheme = load<Theme>("dfu_theme", "Dark");
+    setLang(storedLang);
+    setTheme(storedTheme);
+    setUnit(load("dfu_unit", "km"));
+    applyTheme(storedTheme);
+
+    let active = true;
+
+    (async () => {
+      try {
+        const server = await accountApi.notifPreferences();
+        if (active && server) setPrefs(server);
+      } catch {
+        if (active) setPrefs((p) => load("dfu_notif_prefs", p));
+      }
+    })();
+
+    void readPermissions().then((p) => {
+      if (!active) return;
+      setLocationPerm(p.location);
+      setNotifPerm(p.notifications);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // ── Language ──────────────────────────────────────────────────────────────
+  const selectLang = (code: string) => {
+    setLang(code);
+    persist("dfu_lang", code);
+    (async () => {
+      try {
+        await authApi.updateProfile({ preferred_language: code });
+      } catch {
+        /* backend may 404; localStorage already persisted */
+      }
+    })();
+  };
+
+  // ── Theme ─────────────────────────────────────────────────────────────────
+  const selectTheme = (t: Theme) => {
+    setTheme(t);
+    persist("dfu_theme", t);
+    applyTheme(t);
+  };
+
+  // ── Notification prefs ──────────────────────────────────────────────────────
+  const togglePref = (cat: NotifCategory, ch: Channel) => {
     setPrefs((p) => {
-      const next = { ...p, [cat]: { ...p[cat], [ch]: !p[cat][ch] } };
+      const next: NotificationPreferences = {
+        ...p,
+        [cat]: { ...p[cat], [ch]: !p[cat][ch] },
+      };
       persist("dfu_notif_prefs", next);
+      (async () => {
+        try {
+          await accountApi.updateNotifPreferences(next);
+        } catch {
+          /* keep optimistic state; localStorage already persisted */
+        }
+      })();
       return next;
     });
   };
 
+  // ── Permissions ─────────────────────────────────────────────────────────────
+  async function readPermissions(): Promise<{ location: PermState; notifications: PermState }> {
+    let location: PermState = "ask";
+    let notifications: PermState = "ask";
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        const s = await Geolocation.checkPermissions();
+        location = normalizePerm(s.location);
+      } else if (typeof navigator !== "undefined" && navigator.permissions?.query) {
+        const s = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+        location = normalizePerm(s.state === "prompt" ? "ask" : s.state);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        const s = await PushNotifications.checkPermissions();
+        notifications = normalizePerm(s.receive);
+      } else if (typeof Notification !== "undefined") {
+        notifications =
+          Notification.permission === "default"
+            ? "ask"
+            : normalizePerm(Notification.permission);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return { location, notifications };
+  }
+
+  const requestLocation = async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        let s = await Geolocation.checkPermissions();
+        if (s.location !== "granted") s = await Geolocation.requestPermissions();
+        setLocationPerm(normalizePerm(s.location));
+      } else {
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+          await new Promise<void>((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              () => resolve(),
+              () => resolve(),
+              { timeout: 8000 },
+            );
+          });
+        }
+        if (typeof navigator !== "undefined" && navigator.permissions?.query) {
+          const s = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          setLocationPerm(normalizePerm(s.state === "prompt" ? "ask" : s.state));
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const requestNotifications = async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        let s = await PushNotifications.checkPermissions();
+        if (s.receive !== "granted") s = await PushNotifications.requestPermissions();
+        setNotifPerm(normalizePerm(s.receive));
+      } else if (typeof Notification !== "undefined") {
+        const res = await Notification.requestPermission();
+        setNotifPerm(res === "default" ? "ask" : normalizePerm(res));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   const openDeviceSettings = () => {
-    // Capacitor App plugin would deep-link here; fall back to guidance on web.
+    // @capacitor/app is not installed; provide guidance instead of deep-linking.
     alert("Open your device Settings → Apps → Drivers-for-U to manage permissions.");
   };
 
@@ -71,10 +252,7 @@ export default function SettingsPage() {
           {LANGS.map((l) => (
             <button
               key={l.code}
-              onClick={() => {
-                setLang(l.code);
-                persist("dfu_lang", l.code);
-              }}
+              onClick={() => selectLang(l.code)}
               className={`flex-1 rounded-xl py-2.5 text-sm ${
                 lang === l.code ? "bg-[#FF6B35] text-white" : "bg-[#1E1E1E] text-[#9CA3AF]"
               }`}
@@ -91,10 +269,7 @@ export default function SettingsPage() {
           {THEMES.map((t) => (
             <button
               key={t}
-              onClick={() => {
-                setTheme(t);
-                persist("dfu_theme", t);
-              }}
+              onClick={() => selectTheme(t)}
               className={`flex-1 rounded-xl py-2.5 text-sm ${
                 theme === t ? "bg-[#FF6B35] text-white" : "bg-[#1E1E1E] text-[#9CA3AF]"
               }`}
@@ -136,18 +311,18 @@ export default function SettingsPage() {
               </span>
             ))}
           </div>
-          {NOTIF_CATS.map((cat) => (
-            <div key={cat} className="flex items-center px-4 py-3">
-              <span className="flex-1 text-sm text-white">{cat}</span>
+          {NOTIF_ROWS.map((row) => (
+            <div key={row.key} className="flex items-center px-4 py-3">
+              <span className="flex-1 text-sm text-white">{row.label}</span>
               {CHANNELS.map((ch) => (
                 <div key={ch} className="flex w-12 justify-center">
                   <button
-                    onClick={() => togglePref(cat, ch)}
-                    className={`h-5 w-5 rounded-md ${
-                      prefs[cat]?.[ch] ? "bg-[#FF6B35]" : "bg-[#3A3A3A]"
+                    onClick={() => togglePref(row.key, ch)}
+                    className={`flex h-5 w-5 items-center justify-center rounded-md ${
+                      prefs[row.key]?.[ch] ? "bg-[#FF6B35]" : "bg-[#3A3A3A]"
                     }`}
                   >
-                    {prefs[cat]?.[ch] && <span className="text-xs text-white">✓</span>}
+                    {prefs[row.key]?.[ch] && <span className="text-xs text-white">✓</span>}
                   </button>
                 </div>
               ))}
@@ -159,14 +334,32 @@ export default function SettingsPage() {
       {/* Permissions */}
       <Group title="App Permissions">
         <div className="space-y-2">
-          {["Location", "Notifications", "Contacts"].map((p) => (
+          <PermissionRow
+            label="Location"
+            state={locationPerm}
+            onRequest={requestLocation}
+            onOpenSettings={openDeviceSettings}
+          />
+          <PermissionRow
+            label="Notifications"
+            state={notifPerm}
+            onRequest={requestNotifications}
+            onOpenSettings={openDeviceSettings}
+          />
+        </div>
+      </Group>
+
+      {/* Connected accounts */}
+      <Group title="Connected Accounts">
+        <div className="space-y-2">
+          {["Google", "Apple"].map((provider) => (
             <button
-              key={p}
-              onClick={openDeviceSettings}
-              className="flex w-full items-center justify-between rounded-2xl bg-[#141414] px-4 py-3.5"
+              key={provider}
+              disabled
+              className="flex w-full cursor-not-allowed items-center justify-between rounded-2xl bg-[#141414] px-4 py-3.5 opacity-50"
             >
-              <span className="text-sm text-white">{p}</span>
-              <span className="text-xs text-[#FF6B35]">Manage →</span>
+              <span className="text-sm text-white">{provider}</span>
+              <span className="text-xs text-[#6B7280]">Coming soon</span>
             </button>
           ))}
         </div>
@@ -193,8 +386,54 @@ export default function SettingsPage() {
         Delete Account
       </button>
 
-      {showDelete && <DeleteAccountSheet onClose={() => setShowDelete(false)} onConfirm={logout} />}
+      {showDelete && (
+        <DeleteAccountSheet
+          onClose={() => setShowDelete(false)}
+          onConfirm={async () => {
+            try {
+              await accountApi.deleteAccount();
+            } catch {
+              /* proceed to logout regardless */
+            } finally {
+              logout();
+            }
+          }}
+        />
+      )}
     </AccountScaffold>
+  );
+}
+
+function PermissionRow({
+  label,
+  state,
+  onRequest,
+  onOpenSettings,
+}: {
+  label: string;
+  state: PermState;
+  onRequest: () => void;
+  onOpenSettings: () => void;
+}) {
+  const stateLabel = state === "granted" ? "Granted" : state === "denied" ? "Denied" : "Ask";
+  const stateColor =
+    state === "granted" ? "text-[#22C55E]" : state === "denied" ? "text-[#EF4444]" : "text-[#9CA3AF]";
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-[#141414] px-4 py-3.5">
+      <div className="flex flex-col">
+        <span className="text-sm text-white">{label}</span>
+        <span className={`text-xs ${stateColor}`}>{stateLabel}</span>
+      </div>
+      {state === "denied" ? (
+        <button onClick={onOpenSettings} className="text-xs font-semibold text-[#FF6B35]">
+          Open Settings
+        </button>
+      ) : (
+        <button onClick={onRequest} className="text-xs font-semibold text-[#FF6B35]">
+          {state === "granted" ? "Granted" : "Allow →"}
+        </button>
+      )}
+    </div>
   );
 }
 

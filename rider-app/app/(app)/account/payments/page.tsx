@@ -1,51 +1,311 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { EmptyState } from "@/components/account/States";
+import { paymentsApi, type AddPaymentMethodInput } from "@/lib/api/payments";
+import type { SavedCard, UpiMethod } from "@/lib/api/types";
 
 const INPUT =
   "w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6B7280] focus:ring-1 focus:ring-[#FF6B35]";
 
-interface UpiId {
-  id: string;
-  vpa: string;
+interface Billing {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  pin: string;
+  gstin: string;
 }
 
+const EMPTY_BILLING: Billing = {
+  name: "",
+  address: "",
+  city: "",
+  state: "",
+  pin: "",
+  gstin: "",
+};
+
 export default function PaymentsPage() {
-  const [upis, setUpis] = useState<UpiId[]>([]);
+  const [cards, setCards] = useState<SavedCard[]>([]);
+  const [upis, setUpis] = useState<UpiMethod[]>([]);
+
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardMasked, setCardMasked] = useState(false);
+  const [expMonth, setExpMonth] = useState("");
+  const [expYear, setExpYear] = useState("");
+  const [cardName, setCardName] = useState("");
+
   const [newUpi, setNewUpi] = useState("");
   const [upiErr, setUpiErr] = useState<string | null>(null);
-  const [autoPay, setAutoPay] = useState(false);
-  const [gst, setGst] = useState({ name: "", gstin: "", address: "" });
-  const [toast, setToast] = useState<string | null>(null);
 
-  const addUpi = () => {
-    if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(newUpi)) {
-      setUpiErr("Enter a valid UPI ID (e.g. name@bank)");
-      return;
-    }
-    setUpis((u) => [...u, { id: newUpi + Date.now(), vpa: newUpi }]);
-    setNewUpi("");
-    setUpiErr(null);
-  };
+  const [autoPay, setAutoPay] = useState(false);
+  const [billing, setBilling] = useState<Billing>(EMPTY_BILLING);
+  const [toast, setToast] = useState<string | null>(null);
 
   const flash = (m: string) => {
     setToast(m);
     setTimeout(() => setToast(null), 1800);
   };
 
+  // ─── Load ──────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await paymentsApi.list();
+        setCards(data.cards ?? []);
+        setUpis(data.upis ?? []);
+      } catch {
+        // No backend — page stays usable as local-only.
+        setCards([]);
+        setUpis([]);
+      }
+    })();
+
+    try {
+      setAutoPay(localStorage.getItem("dfu_autopay") === "true");
+      const raw = localStorage.getItem("dfu_billing");
+      if (raw) setBilling({ ...EMPTY_BILLING, ...(JSON.parse(raw) as Partial<Billing>) });
+    } catch {
+      // localStorage unavailable / corrupt — keep defaults.
+    }
+  }, []);
+
+  // ─── Cards ─────────────────────────────────────────────────────────────────
+  const last4 = (digits: string) => digits.replace(/\s+/g, "").slice(-4);
+
+  const maskCard = () => {
+    const d = last4(cardNumber);
+    if (d) {
+      setCardNumber(`•••• •••• •••• ${d}`);
+      setCardMasked(true);
+    }
+  };
+
+  const resetCardForm = () => {
+    setShowCardForm(false);
+    setCardNumber("");
+    setCardMasked(false);
+    setExpMonth("");
+    setExpYear("");
+    setCardName("");
+  };
+
+  const saveCard = async () => {
+    const digits = cardNumber.replace(/[^\d]/g, "");
+    const input: AddPaymentMethodInput = {
+      type: "CARD",
+      card_number: digits,
+      exp_month: Number(expMonth) || undefined,
+      exp_year: Number(expYear) || undefined,
+      name: cardName || undefined,
+    };
+    try {
+      const data = await paymentsApi.add(input);
+      setCards(data.cards ?? []);
+      setUpis(data.upis ?? []);
+      flash("Card added");
+    } catch {
+      flash("Payment gateway unavailable");
+    } finally {
+      resetCardForm();
+    }
+  };
+
+  const removeCard = async (id: string) => {
+    setCards((list) => list.filter((c) => c.id !== id));
+    try {
+      await paymentsApi.remove(id);
+    } catch {
+      // Optimistic removal already applied.
+    }
+  };
+
+  const setDefaultCard = async (id: string) => {
+    setCards((list) => list.map((c) => ({ ...c, is_default: c.id === id })));
+    try {
+      await paymentsApi.setDefault(id);
+    } catch {
+      // Optimistic update already applied.
+    }
+  };
+
+  // ─── UPI ───────────────────────────────────────────────────────────────────
+  const addUpi = async () => {
+    const vpa = newUpi.trim();
+    if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(vpa)) {
+      setUpiErr("Enter a valid UPI ID (e.g. name@bank)");
+      return;
+    }
+    if (upis.some((u) => u.vpa === vpa)) {
+      setUpiErr("This UPI ID is already saved");
+      return;
+    }
+    setUpiErr(null);
+
+    try {
+      await paymentsApi.verifyUpi(vpa);
+    } catch {
+      // Stub — proceed regardless.
+    }
+
+    try {
+      const data = await paymentsApi.add({ type: "UPI", vpa });
+      setCards(data.cards ?? []);
+      setUpis(data.upis ?? []);
+    } catch {
+      // Optimistic local add so the UI works with no backend.
+      setUpis((list) => [
+        ...list,
+        { id: `local-${Date.now()}`, vpa, is_default: list.length === 0 },
+      ]);
+    }
+    setNewUpi("");
+  };
+
+  const removeUpi = async (id: string) => {
+    setUpis((list) => list.filter((u) => u.id !== id));
+    try {
+      await paymentsApi.remove(id);
+    } catch {
+      // Optimistic removal already applied.
+    }
+  };
+
+  // ─── Prefs ─────────────────────────────────────────────────────────────────
+  const toggleAutoPay = () => {
+    setAutoPay((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem("dfu_autopay", String(next));
+      } catch {
+        // Ignore storage failures.
+      }
+      return next;
+    });
+    flash("Auto-pay preference saved");
+  };
+
+  const saveBilling = () => {
+    try {
+      localStorage.setItem("dfu_billing", JSON.stringify(billing));
+    } catch {
+      // Ignore storage failures.
+    }
+    flash("Billing details saved");
+  };
+
   return (
     <AccountScaffold title="Payments">
       {/* Saved cards */}
       <Section title="Saved Cards">
-        <EmptyState icon="💳" title="No cards saved" message="Add a card for faster checkout." />
-        <button
-          onClick={() => flash("Payment gateway coming soon")}
-          className="w-full rounded-2xl bg-[#1E1E1E] py-3.5 text-sm font-semibold text-[#FF6B35] ring-1 ring-white/8"
-        >
-          + Add Card
-        </button>
+        {cards.length === 0 ? (
+          <EmptyState icon="💳" title="No cards saved" message="Add a card for faster checkout." />
+        ) : (
+          <div className="mb-3 space-y-2">
+            {cards.map((c) => (
+              <div key={c.id} className="rounded-xl bg-[#141414] px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💳</span>
+                    <span className="text-sm text-white">
+                      {c.brand} •••• {c.last4}
+                    </span>
+                    {c.is_default && (
+                      <span className="rounded-full bg-[#FF6B35]/15 px-2 py-0.5 text-[10px] font-semibold text-[#FF6B35]">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => removeCard(c.id)}
+                    className="text-xs font-semibold text-[#EF4444]"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="text-xs text-[#9CA3AF]">
+                    Exp {String(c.exp_month).padStart(2, "0")}/{c.exp_year}
+                  </span>
+                  {!c.is_default && (
+                    <button
+                      onClick={() => setDefaultCard(c.id)}
+                      className="text-xs font-semibold text-[#FF6B35]"
+                    >
+                      Set default
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showCardForm ? (
+          <div className="space-y-3 rounded-2xl bg-[#141414] p-4">
+            <div className="rounded-xl bg-[#1E1E1E] px-3 py-2 text-xs text-[#9CA3AF]">
+              Payment gateway integration coming soon
+            </div>
+            <input
+              value={cardNumber}
+              onChange={(e) => {
+                setCardNumber(e.target.value);
+                setCardMasked(false);
+              }}
+              onBlur={maskCard}
+              inputMode="numeric"
+              placeholder="Card number"
+              className={INPUT}
+            />
+            <div className="flex gap-2">
+              <input
+                value={expMonth}
+                onChange={(e) => setExpMonth(e.target.value.replace(/[^\d]/g, "").slice(0, 2))}
+                inputMode="numeric"
+                placeholder="MM"
+                className={`${INPUT} flex-1`}
+              />
+              <input
+                value={expYear}
+                onChange={(e) => setExpYear(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
+                inputMode="numeric"
+                placeholder="YYYY"
+                className={`${INPUT} flex-1`}
+              />
+            </div>
+            <input
+              value={cardName}
+              onChange={(e) => setCardName(e.target.value)}
+              placeholder="Name on card"
+              className={INPUT}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={resetCardForm}
+                className="flex-1 rounded-2xl bg-[#1E1E1E] py-3 text-sm font-semibold text-[#9CA3AF] ring-1 ring-white/8"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveCard}
+                disabled={!cardMasked || !expMonth || !expYear}
+                className="flex-1 rounded-2xl bg-[#FF6B35] py-3 text-sm font-bold text-white disabled:opacity-40"
+              >
+                Save Card
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowCardForm(true)}
+            className="w-full rounded-2xl bg-[#1E1E1E] py-3.5 text-sm font-semibold text-[#FF6B35] ring-1 ring-white/8"
+          >
+            + Add Card
+          </button>
+        )}
       </Section>
 
       {/* UPI IDs */}
@@ -53,13 +313,21 @@ export default function PaymentsPage() {
         {upis.length > 0 && (
           <div className="mb-3 space-y-2">
             {upis.map((u) => (
-              <div key={u.id} className="flex items-center justify-between rounded-xl bg-[#141414] px-4 py-3">
+              <div
+                key={u.id}
+                className="flex items-center justify-between rounded-xl bg-[#141414] px-4 py-3"
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🏦</span>
                   <span className="text-sm text-white">{u.vpa}</span>
+                  {u.is_default && (
+                    <span className="rounded-full bg-[#FF6B35]/15 px-2 py-0.5 text-[10px] font-semibold text-[#FF6B35]">
+                      Default
+                    </span>
+                  )}
                 </div>
                 <button
-                  onClick={() => setUpis((list) => list.filter((x) => x.id !== u.id))}
+                  onClick={() => removeUpi(u.id)}
                   className="text-xs font-semibold text-[#EF4444]"
                 >
                   Remove
@@ -71,12 +339,17 @@ export default function PaymentsPage() {
         <div className="flex gap-2">
           <input
             value={newUpi}
-            onChange={(e) => setNewUpi(e.target.value)}
-            onBlur={() => newUpi && addUpi()}
+            onChange={(e) => {
+              setNewUpi(e.target.value);
+              if (upiErr) setUpiErr(null);
+            }}
             placeholder="name@bank"
             className={`${INPUT} flex-1`}
           />
-          <button onClick={addUpi} className="rounded-xl bg-[#FF6B35] px-4 text-sm font-semibold text-white">
+          <button
+            onClick={addUpi}
+            className="rounded-xl bg-[#FF6B35] px-4 text-sm font-semibold text-white"
+          >
             Add
           </button>
         </div>
@@ -89,7 +362,7 @@ export default function PaymentsPage() {
           label="Auto-pay trip fares"
           desc="Charge default method automatically at trip end"
           on={autoPay}
-          onChange={() => setAutoPay((v) => !v)}
+          onChange={toggleAutoPay}
         />
       </Section>
 
@@ -97,26 +370,49 @@ export default function PaymentsPage() {
       <Section title="Billing Address (GST)">
         <div className="space-y-3">
           <input
-            value={gst.name}
-            onChange={(e) => setGst({ ...gst, name: e.target.value })}
+            value={billing.name}
+            onChange={(e) => setBilling({ ...billing, name: e.target.value })}
             placeholder="Business / billing name"
             className={INPUT}
           />
-          <input
-            value={gst.gstin}
-            onChange={(e) => setGst({ ...gst, gstin: e.target.value.toUpperCase() })}
-            placeholder="GSTIN (optional)"
-            className={INPUT}
-          />
           <textarea
-            value={gst.address}
-            onChange={(e) => setGst({ ...gst, address: e.target.value })}
+            value={billing.address}
+            onChange={(e) => setBilling({ ...billing, address: e.target.value })}
             placeholder="Billing address"
             rows={2}
             className={`${INPUT} resize-none`}
           />
+          <div className="flex gap-2">
+            <input
+              value={billing.city}
+              onChange={(e) => setBilling({ ...billing, city: e.target.value })}
+              placeholder="City"
+              className={`${INPUT} flex-1`}
+            />
+            <input
+              value={billing.state}
+              onChange={(e) => setBilling({ ...billing, state: e.target.value })}
+              placeholder="State"
+              className={`${INPUT} flex-1`}
+            />
+          </div>
+          <input
+            value={billing.pin}
+            onChange={(e) =>
+              setBilling({ ...billing, pin: e.target.value.replace(/[^\d]/g, "").slice(0, 6) })
+            }
+            inputMode="numeric"
+            placeholder="PIN"
+            className={INPUT}
+          />
+          <input
+            value={billing.gstin}
+            onChange={(e) => setBilling({ ...billing, gstin: e.target.value.toUpperCase() })}
+            placeholder="GSTIN (optional)"
+            className={INPUT}
+          />
           <button
-            onClick={() => flash("Billing details saved")}
+            onClick={saveBilling}
             className="w-full rounded-2xl bg-[#FF6B35] py-3.5 text-sm font-bold text-white"
           >
             Save Billing Details

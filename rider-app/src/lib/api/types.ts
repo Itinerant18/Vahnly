@@ -202,3 +202,102 @@ export interface ApiEnvelope<T> {
   error?: string;
   code?: string;
 }
+
+// ─── Insurance / D4M Care ───────────────────────────────────────────────────
+export type InsuranceClaimStatus = "OPEN" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
+export type InsuranceClaimType = "ACCIDENT" | "PROPERTY_DAMAGE" | "OTHER";
+
+export interface InsuranceClaim {
+  id: string;
+  order_id: string;
+  claim_type: InsuranceClaimType;
+  description: string;
+  status: InsuranceClaimStatus;
+  amount_paise?: number;
+  photos?: string[];
+  created_at: string;
+}
+
+export interface InsuranceCoverage {
+  order_id: string;
+  covered: boolean;
+  plan?: string;
+  coverage_amount_paise?: number;
+}
+
+export interface D4MCareStatus {
+  monthly_active: boolean;
+  plan?: string;
+  renews_at?: string;
+}
+
+// ─── Support tickets (rider) ────────────────────────────────────────────────
+export type SupportTicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id: string;
+  sender: "RIDER" | "AGENT";
+  body: string;
+  created_at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  category: string;
+  status: SupportTicketStatus;
+  order_id?: string;
+  user_type?: string;
+  created_at: string;
+  messages?: SupportTicketMessage[];
+}
+
+// ─── Payment methods ────────────────────────────────────────────────────────
+export interface SavedCard {
+  id: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  is_default: boolean;
+}
+
+export interface UpiMethod {
+  id: string;
+  vpa: string;
+  is_default: boolean;
+}
+
+export interface PaymentMethodsResponse {
+  cards: SavedCard[];
+  upis: UpiMethod[];
+}
+
+// ─── Notification preferences ───────────────────────────────────────────────
+export interface NotifChannelPrefs {
+  push: boolean;
+  sms: boolean;
+  email: boolean;
+}
+
+export interface NotificationPreferences {
+  trip_updates: NotifChannelPrefs;
+  promotions: NotifChannelPrefs;
+  safety_alerts: NotifChannelPrefs;
+  document_expiry: NotifChannelPrefs;
+}
+
+// ─── CMS legal documents ────────────────────────────────────────────────────
+export type CMSDocumentType =
+  | "TERMS_OF_SERVICE"
+  | "PRIVACY_POLICY"
+  | "CANCELLATION_POLICY"
+  | "REFUND_POLICY";
+
+export interface CMSDocument {
+  type: CMSDocumentType;
+  title: string;
+  html: string;
+  updated_at?: string;
+}
