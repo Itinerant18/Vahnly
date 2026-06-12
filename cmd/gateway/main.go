@@ -514,6 +514,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
 	// WS ticket mint (header-authenticated) + ticket-authenticated stream upgrade.
 	mux.HandleFunc("POST /api/v1/ws/ticket", authGuard.AuthenticateJWT(wsTicket.IssueTicket))
+	// Alias (same handler) — role-agnostic ticket minting for both rider and driver apps.
+	mux.HandleFunc("POST /api/v1/ws-ticket", authGuard.AuthenticateJWT(wsTicket.IssueTicket))
 	mux.HandleFunc("GET /api/v1/dispatch/stream", wsTicket.Authenticate(regionRouter.RouteRegionalTraffic(handler.HandleMatchRealtimeStream)))
 	mux.HandleFunc("POST /api/v1/dispatch/accept", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleAcceptOrder)))
 	mux.HandleFunc("POST /api/v1/dispatch/decline", authGuard.AuthenticateJWT(rateLimiter.LimitRouteConcurrency(handler.HandleDeclineOrder)))

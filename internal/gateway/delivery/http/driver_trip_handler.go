@@ -59,8 +59,13 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if req.EventType != "ADD_TOLL" && req.EventType != "ADD_STOP" && req.EventType != "toll_added" && req.EventType != "parking_added" && req.EventType != "waiting_added" && req.EventType != "REPORT_ISSUE" {
-		http.Error(w, "invalid_event_type: must be ADD_TOLL, ADD_STOP, toll_added, parking_added, waiting_added, or REPORT_ISSUE", http.StatusBadRequest)
+	validEventTypes := map[string]bool{
+		"ADD_TOLL": true, "ADD_STOP": true, "REPORT_ISSUE": true,
+		"toll_added": true, "parking_added": true, "waiting_added": true,
+		"TOLL_ADDED": true, "PARKING_ADDED": true, "WAITING_ADDED": true,
+	}
+	if !validEventTypes[req.EventType] {
+		http.Error(w, "invalid_event_type", http.StatusBadRequest)
 		return
 	}
 	if req.AmountPaise < 0 || (req.EventType != "REPORT_ISSUE" && req.AmountPaise <= 0) {
@@ -84,13 +89,14 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	var assignedDriverID *string
 	var cityPrefix string
 	var baseFarePaise int64
+	var customerID *string
 	query := `
-		SELECT status::text, assigned_driver_id::text, city_prefix, base_fare_paise
-		FROM orders 
-		WHERE id = $1::uuid 
+		SELECT status::text, assigned_driver_id::text, city_prefix, base_fare_paise, customer_id::text
+		FROM orders
+		WHERE id = $1::uuid
 		FOR UPDATE
 	`
-	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &cityPrefix, &baseFarePaise)
+	err = tx.QueryRow(ctx, query, orderID).Scan(&currentStatus, &assignedDriverID, &cityPrefix, &baseFarePaise, &customerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "order_not_found", http.StatusNotFound)
@@ -153,18 +159,44 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Publish the updated fare estimate to Redis Pub/Sub so it can be streamed to the rider
-	pubPayload := map[string]interface{}{
-		"order_id":      orderID,
-		"fare_estimate": fareEstimate,
+	// Map the event to the fare component shown to the rider.
+	addedComponent := "OTHER"
+	switch req.EventType {
+	case "ADD_TOLL", "toll_added", "TOLL_ADDED":
+		addedComponent = "TOLL"
+	case "parking_added", "PARKING_ADDED":
+		addedComponent = "PARKING"
+	case "waiting_added", "WAITING_ADDED":
+		addedComponent = "WAITING"
 	}
-	if bytes, marshalErr := json.Marshal(pubPayload); marshalErr == nil {
+
+	// Legacy dispatch channel (kept for existing consumers).
+	if bytes, marshalErr := json.Marshal(map[string]interface{}{"order_id": orderID, "fare_estimate": fareEstimate}); marshalErr == nil {
 		_ = h.clusterClient.Publish(ctx, RedisPubSubChannel, string(bytes)).Err()
 	}
 
+	// Push a targeted rider.fare.updated frame to the rider's live-trip WebSocket via
+	// the rider broadcast backplane (gateway:rider:broadcast → Hub.RunBackplane).
+	if customerID != nil && *customerID != "" {
+		data, _ := json.Marshal(map[string]interface{}{
+			"order_id":           orderID,
+			"new_estimate_paise": fareEstimate,
+			"added_component":    addedComponent,
+			"amount_paise":       req.AmountPaise,
+		})
+		envelope, _ := json.Marshal(map[string]interface{}{
+			"rider_id": *customerID,
+			"type":     "rider.fare.updated",
+			"data":     json.RawMessage(data),
+		})
+		_ = h.clusterClient.Publish(ctx, "gateway:rider:broadcast", string(envelope)).Err()
+	}
+
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "Event recorded and ledger updated",
+		"success":         true,
+		"message":         "Event recorded and ledger updated",
+		"new_estimate_paise": fareEstimate,
+		"added_component": addedComponent,
 	})
 }
 

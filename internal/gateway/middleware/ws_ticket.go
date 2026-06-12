@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -72,43 +71,34 @@ func (m *WSTicketMiddleware) IssueTicket(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// Authenticate validates a single-use ?ticket= (preferred), injects identity into
-// the request context, and proceeds. It transitionally still accepts a ?jwt= token
-// (logged as deprecated) so clients can migrate without an outage; remove that
-// branch once the driver app and admin SPA both issue tickets (HIGH-009 cleanup).
+// Authenticate validates a single-use ?ticket= and injects identity into the
+// request context. There is NO token-in-query fallback — a long-lived JWT must
+// never appear in a URL (logs/history/Referer leakage). Clients call
+// POST /api/v1/ws/ticket (header-authenticated) to mint a ticket first.
 func (m *WSTicketMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if ticket := r.URL.Query().Get("ticket"); ticket != "" {
-			if m.redis == nil {
-				http.Error(w, "ticket_store_unavailable", http.StatusServiceUnavailable)
-				return
-			}
-			ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-			defer cancel()
-			// GETDEL enforces single use — a replayed ticket finds nothing.
-			raw, err := m.redis.GetDel(ctx, "ws:ticket:"+ticket).Result()
-			if err == nil && raw != "" {
-				var p wsTicketPayload
-				if json.Unmarshal([]byte(raw), &p) == nil && p.UserID != "" {
-					next.ServeHTTP(w, r.WithContext(InjectClaims(r.Context(), &CustomClaims{
-						UserID: p.UserID, Role: p.Role, CityScope: p.CityScope,
-					})))
-					return
-				}
-			}
-			http.Error(w, "invalid_or_expired_ws_ticket", http.StatusUnauthorized)
+		ticket := r.URL.Query().Get("ticket")
+		if ticket == "" {
+			http.Error(w, "ws_ticket_required", http.StatusUnauthorized)
 			return
 		}
-
-		// Transitional fallback: accept ?jwt= but warn loudly. Remove once clients migrate.
-		if jwtParam := r.URL.Query().Get("jwt"); jwtParam != "" {
-			if claims, ok := m.jwt.ValidateToken(jwtParam); ok {
-				log.Printf("[WS_AUTH_DEPRECATION] connection authenticated via ?jwt= — switch to POST /api/v1/ws/ticket; path=%s", r.URL.Path)
-				next.ServeHTTP(w, r.WithContext(InjectClaims(r.Context(), claims)))
+		if m.redis == nil {
+			http.Error(w, "ticket_store_unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		// GETDEL enforces single use — a replayed ticket finds nothing.
+		raw, err := m.redis.GetDel(ctx, "ws:ticket:"+ticket).Result()
+		if err == nil && raw != "" {
+			var p wsTicketPayload
+			if json.Unmarshal([]byte(raw), &p) == nil && p.UserID != "" {
+				next.ServeHTTP(w, r.WithContext(InjectClaims(r.Context(), &CustomClaims{
+					UserID: p.UserID, Role: p.Role, CityScope: p.CityScope,
+				})))
 				return
 			}
 		}
-
-		http.Error(w, "ws_ticket_required", http.StatusUnauthorized)
+		http.Error(w, "invalid_or_expired_ws_ticket", http.StatusUnauthorized)
 	}
 }
