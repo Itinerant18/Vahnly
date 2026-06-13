@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface CMSPage {
@@ -15,6 +16,7 @@ interface ContentVersion {
 interface I18NString {
   id: number; key_name: string; namespace: string; language_code: string;
   value: string; description: string; updated_at: string;
+  [key: string]: unknown;
 }
 interface CMSAsset {
   id: number; asset_type: string; platform: string; title: string;
@@ -33,6 +35,34 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 type Tab = 'pages' | 'i18n' | 'assets';
+
+// I18NString carries a numeric id; DataTable's row constraint expects an optional string id,
+// so the table operates over this id-widened view (rowKey supplies the actual key).
+type I18NRow = Omit<I18NString, 'id'> & { id?: string };
+
+// Read-only data columns for the i18n strings DataTable (Edit action appended in-component).
+const I18N_COLUMNS: ColumnDef<I18NRow>[] = [
+  {
+    key: 'key_name', header: 'Key',
+    render: (v) => <span className="font-mono text-mono-small text-body">{String(v)}</span>,
+  },
+  {
+    key: 'namespace', header: 'Namespace',
+    render: (v) => <span className="text-xs text-mute">{String(v)}</span>,
+  },
+  {
+    key: 'language_code', header: 'Lang',
+    render: (v) => (
+      <span className="text-[10px] font-mono border border-canvas-soft rounded px-1.5 py-0.5 text-mute">
+        {String(v).toUpperCase()}
+      </span>
+    ),
+  },
+  {
+    key: 'value', header: 'Value',
+    render: (v) => <span className="text-body max-w-xs truncate block">{String(v)}</span>,
+  },
+];
 
 // ── Component ────────────────────────────────────────────────────────────────
 export const CMSDashboard: React.FC = () => {
@@ -341,32 +371,25 @@ const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => 
         </div>
       )}
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-canvas-soft/50">
-            <tr className="text-xs text-mute">
-              <th className="text-left px-4 py-2.5">Key</th>
-              <th className="text-left px-4 py-2.5">Namespace</th>
-              <th className="text-left px-4 py-2.5">Lang</th>
-              <th className="text-left px-4 py-2.5">Value</th>
-              <th className="text-left px-4 py-2.5 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {strings.map(s => (
-              <tr key={s.id} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
-                <td className="px-4 py-2.5 font-mono text-xs text-body">{s.key_name}</td>
-                <td className="px-4 py-2.5 text-xs text-mute">{s.namespace}</td>
-                <td className="px-4 py-2.5"><span className="text-[10px] font-mono border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{s.language_code.toUpperCase()}</span></td>
-                <td className="px-4 py-2.5 text-body max-w-xs truncate">{s.value}</td>
-                <td className="px-4 py-2.5">
-                  <button onClick={() => setEditing(s)} className="text-xs text-accent hover:underline">Edit</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<I18NRow>
+        columns={[
+          ...I18N_COLUMNS,
+          {
+            key: 'actions', header: '', type: 'actions', width: 64,
+            render: (_v, s) => (
+              <button
+                onClick={(e) => { e.stopPropagation(); setEditing(s as unknown as I18NString); }}
+                className="text-xs text-accent hover:underline"
+              >
+                Edit
+              </button>
+            ),
+          },
+        ]}
+        data={strings as unknown as I18NRow[]}
+        rowKey={(s) => String(s.id)}
+        emptyState={<span className="text-paragraph-small text-content-tertiary">No strings found.</span>}
+      />
     </div>
   );
 };

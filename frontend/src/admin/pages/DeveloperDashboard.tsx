@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface APIKey {
@@ -16,9 +17,10 @@ interface Webhook {
   last_status_code: number | null; failure_count: number; created_at: string;
 }
 interface APILogEntry {
-  id: number; key_prefix: string; method: string; path: string;
+  id: string; key_prefix: string; method: string; path: string;
   status_code: number; response_time_ms: number; ip_address: string;
   is_sandbox: boolean; error_message: string | null; created_at: string;
+  [key: string]: unknown;
 }
 interface LogStats { total: number; error_rate: number; avg_response_ms: number; p99_response_ms: number; }
 interface StatusIncident {
@@ -294,6 +296,38 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
 };
 
 // ── API Logs Tab ──────────────────────────────────────────────────────────────
+const LOG_COLUMNS: ColumnDef<APILogEntry>[] = [
+  {
+    key: 'created_at', header: 'Time', type: 'date',
+    render: (v) => <span className="text-xs text-mute">{relTime(v as string | null)}</span>,
+  },
+  {
+    key: 'key_prefix', header: 'Key',
+    render: (v, r) => (
+      <span className="font-mono text-mono-small text-body">
+        {String(v)}{r.is_sandbox && <span className="ml-1 text-[10px] bg-surface-warning text-content-warning px-1 rounded">sandbox</span>}
+      </span>
+    ),
+  },
+  {
+    key: 'method', header: 'Method',
+    render: (v) => <span className="font-mono text-mono-small font-medium text-body">{String(v)}</span>,
+  },
+  {
+    key: 'path', header: 'Path',
+    render: (v) => <span className="font-mono text-mono-small text-mute truncate max-w-xs block">{String(v)}</span>,
+  },
+  {
+    key: 'status_code', header: 'Status', type: 'numeric',
+    render: (v) => <span className={`font-mono text-mono-small font-medium ${HTTP_COLORS(Number(v))}`}>{String(v)}</span>,
+  },
+  { key: 'response_time_ms', header: 'RT (ms)', type: 'numeric' },
+  {
+    key: 'ip_address', header: 'IP',
+    render: (v) => <span className="font-mono text-mono-small text-mute">{String(v)}</span>,
+  },
+];
+
 const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = ({ base, headers }) => {
   const [logs, setLogs] = useState<APILogEntry[]>([]);
   const [stats, setStats] = useState<LogStats | null>(null);
@@ -334,32 +368,11 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
         </div>
       )}
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-canvas-soft/50"><tr className="text-xs text-mute">
-            <th className="text-left px-4 py-2.5">Time</th>
-            <th className="text-left px-4 py-2.5">Key</th>
-            <th className="text-left px-4 py-2.5">Method</th>
-            <th className="text-left px-4 py-2.5">Path</th>
-            <th className="text-right px-4 py-2.5">Status</th>
-            <th className="text-right px-4 py-2.5">RT (ms)</th>
-            <th className="text-left px-4 py-2.5">IP</th>
-          </tr></thead>
-          <tbody>
-            {logs.map(log => (
-              <tr key={log.id} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
-                <td className="px-4 py-2 text-xs text-mute">{relTime(log.created_at)}</td>
-                <td className="px-4 py-2 font-mono text-xs text-body">{log.key_prefix}{log.is_sandbox && <span className="ml-1 text-[10px] bg-surface-warning text-content-warning px-1 rounded">sandbox</span>}</td>
-                <td className="px-4 py-2 text-xs font-mono font-medium text-body">{log.method}</td>
-                <td className="px-4 py-2 text-xs text-mute font-mono truncate max-w-xs">{log.path}</td>
-                <td className={`px-4 py-2 text-xs font-mono font-medium text-right ${HTTP_COLORS(log.status_code)}`}>{log.status_code}</td>
-                <td className="px-4 py-2 text-xs text-right text-mute font-mono">{log.response_time_ms}</td>
-                <td className="px-4 py-2 text-xs text-mute font-mono">{log.ip_address}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<APILogEntry>
+        columns={LOG_COLUMNS}
+        data={logs}
+        rowKey={(r) => String(r.id)}
+      />
       {Math.ceil(total / PAGE_SIZE) > 1 && (
         <div className="flex justify-between text-sm">
           <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-canvas-soft rounded-lg text-body disabled:opacity-40 hover:bg-canvas-soft">Prev</button>
