@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 export interface TripItem {
   id: string;
@@ -27,6 +28,7 @@ export interface TripItem {
   d4m_care: boolean;
   rating: number;
   plate: string;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
 
 export const TripsList: React.FC = () => {
@@ -85,14 +87,6 @@ export const TripsList: React.FC = () => {
       setSelectedIds(selectedIds.filter((item) => item !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
-    }
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === trips.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(trips.map((t) => t.id));
     }
   };
 
@@ -167,6 +161,133 @@ export const TripsList: React.FC = () => {
     setSelectedIds([]);
     fetchTrips();
   };
+
+  // Column definitions for the DataTable hero component.
+  // Selection + tags columns close over component state/handlers so the
+  // bulk-action bar and tag modal keep firing exactly as before.
+  const TRIP_COLUMNS: ColumnDef<TripItem>[] = [
+    {
+      key: 'select', header: '', width: 40,
+      render: (_v, trip) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="w-3.5 h-3.5 rounded border-canvas-soft text-ink focus:ring-0 focus:outline-none cursor-pointer"
+            checked={selectedIds.includes(trip.id)}
+            onChange={() => toggleSelect(trip.id)}
+          />
+        </span>
+      ),
+    },
+    {
+      key: 'id', header: 'Trip ID',
+      render: (_v, trip) => (
+        <span className="font-mono text-mono-small text-ink font-semibold">
+          TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}
+        </span>
+      ),
+    },
+    { key: 'created_at', header: 'Date', type: 'date' },
+    {
+      key: 'customer_id', header: 'Rider',
+      render: (_v, trip) => (
+        <span className="text-xs text-body">Rider-{trip.customer_id.substring(0, 4)}</span>
+      ),
+    },
+    {
+      key: 'driver_name', header: 'Driver',
+      render: (_v, trip) => (
+        <span className="text-xs text-body font-medium">
+          {trip.driver_name}
+          <span className="block text-[10px] text-mute font-mono">{trip.plate}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'city_prefix', header: 'City & Type',
+      render: (_v, trip) => (
+        <span className="text-xs text-body">
+          <span className="block text-[10px] font-mono text-mute">{trip.city_prefix}</span>
+          <span className="capitalize">{trip.trip_type}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'status', header: 'Status',
+      render: (_v, trip) => (
+        <span
+          className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider ${
+            trip.status === 'COMPLETED'
+              ? 'bg-canvas-soft text-ink border border-canvas-soft'
+              : trip.status === 'CANCELLED'
+              ? 'bg-canvas-soft text-mute'
+              : 'bg-ink text-on-dark'
+          }`}
+        >
+          {trip.status === 'ARRIVED_AT_PICKUP' ? 'Arrived' : trip.status.toLowerCase()}
+        </span>
+      ),
+    },
+    {
+      key: 'base_fare_paise', header: 'Fare',
+      render: (_v, trip) => (
+        <span className="font-mono text-xs text-ink font-semibold">
+          ₹{(trip.base_fare_paise / 100).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'rating', header: 'Rating',
+      render: (_v, trip) => (
+        <span className="font-mono text-xs">
+          {trip.rating > 0 ? (
+            <span className="text-ink font-medium">
+              {trip.rating} <span className="text-mute font-sans">★</span>
+            </span>
+          ) : (
+            <span className="text-mute">—</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'payment_method', header: 'Payment',
+      render: (_v, trip) => (
+        <span className="text-[10px] font-medium text-body">{trip.payment_method}</span>
+      ),
+    },
+    {
+      key: 'tags', header: 'Tags',
+      render: (_v, trip) => {
+        const itemTags = tagsMap[trip.id] || [];
+        return (
+          <span onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap gap-1 max-w-[150px]">
+              {itemTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center bg-canvas-soft border border-canvas-soft text-mute text-[9px] h-4 px-1.5 rounded-pill font-mono"
+                >
+                  {tag}
+                </span>
+              ))}
+              {itemTags.length === 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedIds([trip.id]);
+                    setShowTagModal(true);
+                  }}
+                  className="text-[9px] text-mute hover:text-ink font-mono opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
+                >
+                  + add
+                </button>
+              )}
+            </div>
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
@@ -347,140 +468,20 @@ export const TripsList: React.FC = () => {
         </div>
       )}
 
-      {/* ---- Trips Table ---- */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-mute animate-pulse">Loading trips directory...</div>
-        ) : trips.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="text-sm font-semibold text-ink">No trips matches found</div>
-            <p className="text-xs text-mute mt-1">Try modifying your filter matrix or search terms</p>
+      {/* ---- Trips Table (DataTable hero component) ---- */}
+      <DataTable<TripItem>
+        columns={TRIP_COLUMNS}
+        data={trips}
+        loading={loading}
+        rowKey={(t) => t.id}
+        onRowClick={(t) => navigate(`/trips/${t.id}`)}
+        emptyState={
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="text-sm font-semibold text-ink">No trips matches found</span>
+            <span className="text-xs text-mute">Try modifying your filter matrix or search terms</span>
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-canvas-soft bg-canvas-soft">
-                <th className="p-4 w-10">
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 rounded border-canvas-soft text-ink focus:ring-0 focus:outline-none cursor-pointer"
-                    checked={selectedIds.length === trips.length && trips.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Trip ID</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Date</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Rider</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Driver</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">City & Type</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Status</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Fare</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Rating</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Payment</th>
-                <th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Tags</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-canvas-soft">
-              {trips.map((trip) => {
-                const isSelected = selectedIds.includes(trip.id);
-                const itemTags = tagsMap[trip.id] || [];
-
-                return (
-                  <tr
-                    key={trip.id}
-                    onClick={() => navigate(`/trips/${trip.id}`)}
-                    className={`hover:bg-canvas-softer cursor-pointer transition-colors ${
-                      isSelected ? 'bg-canvas-softer/50' : ''
-                    }`}
-                  >
-                    <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-canvas-soft text-ink focus:ring-0 focus:outline-none cursor-pointer"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(trip.id)}
-                      />
-                    </td>
-                    <td className="p-4 font-mono text-[11px] text-ink font-semibold">
-                      TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}
-                    </td>
-                    <td className="p-4 text-xs text-body font-mono">
-                      {new Date(trip.created_at).toLocaleString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="p-4 text-xs text-body">
-                      Rider-{trip.customer_id.substring(0, 4)}
-                    </td>
-                    <td className="p-4 text-xs text-body font-medium">
-                      {trip.driver_name}
-                      <span className="block text-[10px] text-mute font-mono">{trip.plate}</span>
-                    </td>
-                    <td className="p-4 text-xs text-body">
-                      <span className="block text-[10px] font-mono text-mute">{trip.city_prefix}</span>
-                      <span className="capitalize">{trip.trip_type}</span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider ${
-                          trip.status === 'COMPLETED'
-                            ? 'bg-canvas-soft text-ink border border-canvas-soft'
-                            : trip.status === 'CANCELLED'
-                            ? 'bg-canvas-soft text-mute'
-                            : 'bg-ink text-on-dark'
-                        }`}
-                      >
-                        {trip.status === 'ARRIVED_AT_PICKUP' ? 'Arrived' : trip.status.toLowerCase()}
-                      </span>
-                    </td>
-                    <td className="p-4 font-mono text-xs text-ink font-semibold">
-                      ₹{(trip.base_fare_paise / 100).toFixed(2)}
-                    </td>
-                    <td className="p-4 font-mono text-xs">
-                      {trip.rating > 0 ? (
-                        <span className="text-ink font-medium">
-                          {trip.rating} <span className="text-mute font-sans">★</span>
-                        </span>
-                      ) : (
-                        <span className="text-mute">—</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-[10px] font-medium text-body">
-                      {trip.payment_method}
-                    </td>
-                    <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap gap-1 max-w-[150px]">
-                        {itemTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center bg-canvas-soft border border-canvas-soft text-mute text-[9px] h-4 px-1.5 rounded-pill font-mono"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {itemTags.length === 0 && (
-                          <button
-                            onClick={() => {
-                              setSelectedIds([trip.id]);
-                              setShowTagModal(true);
-                            }}
-                            className="text-[9px] text-mute hover:text-ink font-mono opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
-                          >
-                            + add
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+        }
+      />
 
       {/* ---- Tag Modal ---- */}
       {showTagModal && (

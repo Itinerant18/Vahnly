@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 export interface Vehicle {
 	plate: string;
@@ -23,9 +24,149 @@ export interface Vehicle {
 	puc_expiry_date: string;
 	flagged_issues: string[];
 	reminder_sent_at?: string;
+	[key: string]: unknown; // satisfies DataTable's row constraint
 }
 
+// Preserve the page's specific document-status colors (VERIFIED / EXPIRING_SOON / EXPIRED).
+const getStatusDotColor = (status: string) => {
+	if (status === 'VERIFIED') return 'bg-status-online';
+	if (status === 'EXPIRING_SOON') return 'bg-status-warn';
+	return 'bg-status-alert';
+};
+
+const getStatusLabelColor = (status: string) => {
+	if (status === 'VERIFIED') return 'text-ink border-canvas-soft bg-canvas';
+	if (status === 'EXPIRING_SOON') return 'text-status-warn border-canvas-soft bg-canvas-soft';
+	return 'text-status-alert border-canvas-soft bg-canvas-soft';
+};
+
+const DocStatusCell: React.FC<{ status: string; expiry: string }> = ({ status, expiry }) => (
+	<>
+		<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${getStatusLabelColor(status)}`}>
+			<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(status)}`} />
+			{status.replace('_', ' ').toLowerCase()}
+		</span>
+		<span className="block text-[10px] text-mute font-mono mt-1">
+			Exp: {new Date(expiry).toLocaleDateString([], { year: 'numeric', month: 'short' })}
+		</span>
+	</>
+);
+
+// Column definitions for the DataTable hero component (built-in sort / loading / empty).
+const buildVehicleColumns = (
+	openOverrideModal: (v: Vehicle) => void,
+): ColumnDef<Vehicle>[] => [
+	{
+		key: 'plate', header: 'Plate', sortable: true,
+		render: (_v, v) => (
+			<Link
+				to={`/vehicles/${encodeURIComponent(v.plate)}`}
+				onClick={(e) => e.stopPropagation()}
+				className="font-mono text-mono-small font-bold text-content-accent hover:underline whitespace-nowrap"
+			>
+				{v.plate}
+			</Link>
+		),
+	},
+	{
+		key: 'model', header: 'Model & Type', sortable: true,
+		render: (_v, v) => (
+			<div>
+				<div className="font-semibold text-ink">{v.model}</div>
+				<div className="text-[10px] text-mute flex items-center space-x-1.5 font-semibold uppercase mt-0.5">
+					<span>{v.type}</span>
+					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span>{v.transmission}</span>
+					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span>{v.fuel}</span>
+					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span className="font-mono">{v.year}</span>
+				</div>
+			</div>
+		),
+	},
+	{
+		key: 'owner_name', header: 'Owner', sortable: true,
+		render: (_v, v) => (
+			<div>
+				{v.owner_type === 'DRIVER' ? (
+					<Link
+						to={`/drivers/${v.owner_id}`}
+						onClick={(e) => e.stopPropagation()}
+						className="hover:underline font-semibold text-ink"
+					>
+						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Driver</span>
+					</Link>
+				) : (
+					<Link
+						to={`/riders/${v.owner_id}`}
+						onClick={(e) => e.stopPropagation()}
+						className="hover:underline font-semibold text-ink"
+					>
+						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Rider</span>
+					</Link>
+				)}
+				<span className="block text-[10px] text-mute font-mono mt-0.5">{v.city} Shard</span>
+			</div>
+		),
+	},
+	{ key: 'trips_count', header: 'Trips', type: 'numeric', sortable: true },
+	{
+		key: 'rc_status', header: 'RC status', sortable: true,
+		render: (_v, v) => <DocStatusCell status={v.rc_status} expiry={v.rc_expiry_date} />,
+	},
+	{
+		key: 'insurance_status', header: 'Insurance status', sortable: true,
+		render: (_v, v) => <DocStatusCell status={v.insurance_status} expiry={v.insurance_expiry_date} />,
+	},
+	{
+		key: 'puc_status', header: 'PUC status', sortable: true,
+		render: (_v, v) => <DocStatusCell status={v.puc_status} expiry={v.puc_expiry_date} />,
+	},
+	{
+		key: 'flagged_issues', header: 'Flagged Issues',
+		render: (_v, v) => (
+			v.flagged_issues && v.flagged_issues.length > 0 ? (
+				<div className="relative group inline-block">
+					<span className="cursor-help underline decoration-dotted text-status-alert font-semibold">
+						{v.flagged_issues.length} {v.flagged_issues.length === 1 ? 'Issue' : 'Issues'}
+					</span>
+					<div className="hidden group-hover:block absolute z-20 bottom-full left-0 mb-2 w-64 bg-canvas border border-canvas-soft p-3 rounded-xl shadow-xl text-left">
+						<h4 className="text-[10px] uppercase font-bold tracking-wider text-mute mb-2">Driver Flagged Issues</h4>
+						<ul className="list-disc pl-4 space-y-1.5 text-[11px] text-ink font-sans">
+							{v.flagged_issues.map((issue, idx) => (
+								<li key={idx}>{issue}</li>
+							))}
+						</ul>
+					</div>
+				</div>
+			) : (
+				<span className="text-mute">—</span>
+			)
+		),
+	},
+	{
+		key: 'actions', header: 'Actions', type: 'actions',
+		render: (_v, v) => (
+			<>
+				<button
+					onClick={(e) => { e.stopPropagation(); openOverrideModal(v); }}
+					className="inline-flex items-center justify-center border border-canvas-soft hover:border-ink hover:bg-canvas-soft text-[10px] font-bold rounded-pill h-7 px-3 transition-colors"
+				>
+					Override
+				</button>
+				{v.reminder_sent_at && (
+					<span className="block text-[9px] text-mute mt-1 font-mono">
+						Alerted: {new Date(v.reminder_sent_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+					</span>
+				)}
+			</>
+		),
+	},
+];
+
 export const VehiclesList: React.FC = () => {
+	const navigate = useNavigate();
 	const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 	const [loading, setLoading] = useState<boolean>(true);
 	const [sendingReminders, setSendingReminders] = useState<boolean>(false);
@@ -178,17 +319,7 @@ export const VehiclesList: React.FC = () => {
 		}
 	};
 
-	const getStatusDotColor = (status: string) => {
-		if (status === 'VERIFIED') return 'bg-status-online';
-		if (status === 'EXPIRING_SOON') return 'bg-status-warn';
-		return 'bg-status-alert';
-	};
-
-	const getStatusLabelColor = (status: string) => {
-		if (status === 'VERIFIED') return 'text-ink border-canvas-soft bg-canvas';
-		if (status === 'EXPIRING_SOON') return 'text-status-warn border-canvas-soft bg-canvas-soft';
-		return 'text-status-alert border-canvas-soft bg-canvas-soft';
-	};
+	const columns = buildVehicleColumns(openOverrideModal);
 
 	return (
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
@@ -312,136 +443,20 @@ export const VehiclesList: React.FC = () => {
 				</div>
 			</div>
 
-			{/* ---- Vehicles Master Table ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-				{loading ? (
-					<div className="p-12 text-center text-xs text-mute animate-pulse">Loading vehicle directory...</div>
-				) : vehicles.length === 0 ? (
-					<div className="p-12 text-center">
-						<div className="text-sm font-semibold text-ink">No vehicles registered or found</div>
-						<p className="text-xs text-mute mt-1">Try modifying filter criteria or search query</p>
+			{/* ---- Vehicles Master Table (DataTable hero component) ---- */}
+			<DataTable<Vehicle>
+				columns={columns}
+				data={vehicles}
+				loading={loading}
+				rowKey={(v) => v.plate}
+				onRowClick={(v) => navigate(`/vehicles/${encodeURIComponent(v.plate)}`)}
+				emptyState={
+					<div className="flex flex-col items-center gap-1 text-center">
+						<span className="text-heading-medium text-content-secondary">No vehicles registered or found</span>
+						<span className="text-paragraph-small text-content-tertiary">Try modifying filter criteria or search query</span>
 					</div>
-				) : (
-					<table className="w-full text-left border-collapse">
-						<thead>
-							<tr className="border-b border-canvas-soft bg-canvas-soft">
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Plate</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Model & Type</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Owner</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center">Trips</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">RC status</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Insurance status</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">PUC status</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Flagged Issues</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-right">Actions</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-canvas-soft text-xs">
-							{vehicles.map((v) => (
-								<tr key={v.plate} className="hover:bg-canvas-softer transition-colors">
-									<td className="p-4 font-mono font-bold whitespace-nowrap">
-										<Link to={`/vehicles/${encodeURIComponent(v.plate)}`} className="text-content-accent hover:underline">
-											{v.plate}
-										</Link>
-									</td>
-									<td className="p-4">
-										<div className="font-semibold text-ink">{v.model}</div>
-										<div className="text-[10px] text-mute flex items-center space-x-1.5 font-semibold uppercase mt-0.5">
-											<span>{v.type}</span>
-											<span className="w-1 h-1 rounded-full bg-mute" />
-											<span>{v.transmission}</span>
-											<span className="w-1 h-1 rounded-full bg-mute" />
-											<span>{v.fuel}</span>
-											<span className="w-1 h-1 rounded-full bg-mute" />
-											<span className="font-mono">{v.year}</span>
-										</div>
-									</td>
-									<td className="p-4">
-										{v.owner_type === 'DRIVER' ? (
-											<Link
-												to={`/drivers/${v.owner_id}`}
-												className="hover:underline font-semibold text-ink"
-											>
-												{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Driver</span>
-											</Link>
-										) : (
-											<Link
-												to={`/riders/${v.owner_id}`}
-												className="hover:underline font-semibold text-ink"
-											>
-												{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Rider</span>
-											</Link>
-										)}
-										<span className="block text-[10px] text-mute font-mono mt-0.5">{v.city} Shard</span>
-									</td>
-									<td className="p-4 font-mono font-semibold text-ink text-center">
-										{v.trips_count}
-									</td>
-									<td className="p-4">
-										<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${getStatusLabelColor(v.rc_status)}`}>
-											<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(v.rc_status)}`} />
-											{v.rc_status.replace('_', ' ').toLowerCase()}
-										</span>
-										<span className="block text-[10px] text-mute font-mono mt-1">
-											Exp: {new Date(v.rc_expiry_date).toLocaleDateString([], { year: 'numeric', month: 'short' })}
-										</span>
-									</td>
-									<td className="p-4">
-										<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${getStatusLabelColor(v.insurance_status)}`}>
-											<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(v.insurance_status)}`} />
-											{v.insurance_status.replace('_', ' ').toLowerCase()}
-										</span>
-										<span className="block text-[10px] text-mute font-mono mt-1">
-											Exp: {new Date(v.insurance_expiry_date).toLocaleDateString([], { year: 'numeric', month: 'short' })}
-										</span>
-									</td>
-									<td className="p-4">
-										<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${getStatusLabelColor(v.puc_status)}`}>
-											<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(v.puc_status)}`} />
-											{v.puc_status.replace('_', ' ').toLowerCase()}
-										</span>
-										<span className="block text-[10px] text-mute font-mono mt-1">
-											Exp: {new Date(v.puc_expiry_date).toLocaleDateString([], { year: 'numeric', month: 'short' })}
-										</span>
-									</td>
-									<td className="p-4">
-										{v.flagged_issues && v.flagged_issues.length > 0 ? (
-											<div className="relative group inline-block">
-												<span className="cursor-help underline decoration-dotted text-status-alert font-semibold">
-													{v.flagged_issues.length} {v.flagged_issues.length === 1 ? 'Issue' : 'Issues'}
-												</span>
-												<div className="hidden group-hover:block absolute z-20 bottom-full left-0 mb-2 w-64 bg-canvas border border-canvas-soft p-3 rounded-xl shadow-xl text-left">
-													<h4 className="text-[10px] uppercase font-bold tracking-wider text-mute mb-2">Driver Flagged Issues</h4>
-													<ul className="list-disc pl-4 space-y-1.5 text-[11px] text-ink font-sans">
-														{v.flagged_issues.map((issue, idx) => (
-															<li key={idx}>{issue}</li>
-														))}
-													</ul>
-												</div>
-											</div>
-										) : (
-											<span className="text-mute">—</span>
-										)}
-									</td>
-									<td className="p-4 text-right">
-										<button
-											onClick={() => openOverrideModal(v)}
-											className="inline-flex items-center justify-center border border-canvas-soft hover:border-ink hover:bg-canvas-soft text-[10px] font-bold rounded-pill h-7 px-3 transition-colors"
-										>
-											Override
-										</button>
-										{v.reminder_sent_at && (
-											<span className="block text-[9px] text-mute mt-1 font-mono">
-												Alerted: {new Date(v.reminder_sent_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-											</span>
-										)}
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)}
-			</div>
+				}
+			/>
 
 			{/* Override Settings Modal */}
 			{selectedVehicle && (

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { getAdminRole } from '../auth';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 interface PromoCode {
   id: string;
@@ -18,6 +19,7 @@ interface PromoCode {
   valid_until: string | null;
   is_active: boolean;
   total_savings_paise: number;
+  [key: string]: unknown;
 }
 
 function rupees(paise: number): string {
@@ -30,6 +32,64 @@ function randomCode(): string {
   for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
+
+// Column definitions for the DataTable. Built as a factory so the actions column
+// can close over the role-gated toggle handler.
+const PROMO_COLUMNS = (
+  canCreate: boolean,
+  toggleActive: (p: PromoCode) => void,
+): ColumnDef<PromoCode>[] => [
+  {
+    key: 'code', header: 'Code',
+    render: (v) => <span className="font-mono text-mono-small font-semibold text-content-primary">{String(v)}</span>,
+  },
+  {
+    key: 'discount_type', header: 'Type',
+    render: (v) => <span className="text-paragraph-small text-content-secondary">{String(v)}</span>,
+  },
+  {
+    key: 'discount_value', header: 'Discount',
+    // FLAT discount_value is stored in paise; PERCENT is a raw percent.
+    render: (_v, r) => (
+      <span className="font-mono text-mono-small text-content-primary tabular-nums">
+        {r.discount_type === 'FLAT' ? rupees(r.discount_value) : `${r.discount_value}%`}
+      </span>
+    ),
+  },
+  {
+    key: 'total_redeemed', header: 'Uses', type: 'numeric',
+    render: (_v, r) => (
+      <span className="font-mono text-mono-small text-content-primary tabular-nums">
+        {r.total_redeemed}{r.max_redemptions ? ` / ${r.max_redemptions}` : ''}
+      </span>
+    ),
+  },
+  {
+    key: 'valid_until', header: 'Valid Until',
+    render: (v) => v
+      ? <span className="text-paragraph-small text-content-secondary">{new Date(String(v)).toLocaleDateString()}</span>
+      : <span className="text-content-tertiary">No expiry</span>,
+  },
+  {
+    key: 'is_active', header: 'Status', type: 'status',
+    render: (_v, r) => (
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-pill ${r.is_active ? 'text-status-online bg-status-online/10' : 'text-mute bg-canvas-soft'}`}>
+        {r.is_active ? 'Active' : 'Inactive'}
+      </span>
+    ),
+  },
+  {
+    key: 'actions', header: 'Actions', type: 'actions',
+    render: (_v, r) => canCreate ? (
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleActive(r); }}
+        className="text-[11px] font-semibold text-ink underline"
+      >
+        {r.is_active ? 'Deactivate' : 'Activate'}
+      </button>
+    ) : null,
+  },
+];
 
 export const PromoCodesManager: React.FC = () => {
   const [promos, setPromos] = useState<PromoCode[]>([]);
@@ -95,54 +155,17 @@ export const PromoCodesManager: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="border border-canvas-soft rounded-xl overflow-hidden bg-canvas">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-mute animate-pulse">Loading promo codes…</div>
-        ) : promos.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="text-sm font-semibold text-ink">No promo codes yet</div>
-            <p className="text-xs text-mute mt-1">Create your first code to get started.</p>
+      <DataTable<PromoCode>
+        columns={PROMO_COLUMNS(canCreate, toggleActive)}
+        data={promos}
+        loading={loading}
+        emptyState={
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="text-heading-medium text-content-secondary">No promo codes yet</span>
+            <span className="text-paragraph-small text-content-tertiary">Create your first code to get started.</span>
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-canvas-soft bg-canvas-soft">
-                {['Code', 'Type', 'Discount', 'Uses', 'Valid Until', 'Status', 'Actions'].map((c) => (
-                  <th key={c} className="p-3 text-[10px] font-semibold uppercase tracking-wider text-mute">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-canvas-soft">
-              {promos.map((p) => (
-                <tr key={p.id} className="hover:bg-canvas-softer transition-colors">
-                  <td className="p-3 font-mono text-xs font-semibold text-ink">{p.code}</td>
-                  <td className="p-3 text-xs text-mute">{p.discount_type}</td>
-                  <td className="p-3 text-xs text-ink">
-                    {p.discount_type === 'FLAT' ? rupees(p.discount_value) : `${p.discount_value}%`}
-                  </td>
-                  <td className="p-3 text-xs text-ink">
-                    {p.total_redeemed}
-                    {p.max_redemptions ? ` / ${p.max_redemptions}` : ''}
-                  </td>
-                  <td className="p-3 text-[11px] text-mute">{p.valid_until ? new Date(p.valid_until).toLocaleDateString() : 'No expiry'}</td>
-                  <td className="p-3">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-pill ${p.is_active ? 'text-status-online bg-status-online/10' : 'text-mute bg-canvas-soft'}`}>
-                      {p.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    {canCreate && (
-                      <button onClick={() => toggleActive(p)} className="text-[11px] font-semibold text-ink underline">
-                        {p.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        }
+      />
 
       {showModal && (
         <CreatePromoModal

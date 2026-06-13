@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -30,6 +31,7 @@ interface TenantOperator {
   role: string;
   is_active: boolean;
   created_at: string;
+  [key: string]: unknown;
 }
 
 const TENANT_STATUS_CLS: Record<string, string> = {
@@ -37,6 +39,27 @@ const TENANT_STATUS_CLS: Record<string, string> = {
   SUSPENDED: 'bg-surface-negative text-content-negative',
   PENDING: 'bg-surface-warning text-content-warning',
 };
+
+const OPERATOR_COLUMNS: ColumnDef<TenantOperator>[] = [
+  {
+    key: 'tenant_name', header: 'Tenant',
+    render: (v) => <span className="font-medium text-content-primary">{String(v)}</span>,
+  },
+  { key: 'admin_email', header: 'Email' },
+  {
+    key: 'role', header: 'Role',
+    render: (v) => <span className="text-xs text-content-primary">{String(v)}</span>,
+  },
+  {
+    key: 'is_active', header: 'Status', type: 'status',
+    render: (v) => (
+      <span className={`text-xs px-2 py-0.5 rounded ${v ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
+        {v ? 'Active' : 'Inactive'}
+      </span>
+    ),
+  },
+  { key: 'created_at', header: 'Created', type: 'date' },
+];
 
 export function FranchiseDashboard() {
   const [tab, setTab] = useState<'tenants' | 'operators'>('tenants');
@@ -175,24 +198,11 @@ export function FranchiseDashboard() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-background-secondary">
-                <tr>{['Tenant', 'Email', 'Role', 'Status', 'Created'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-border-opaque">
-                {operators.map(op => (
-                  <tr key={op.id} className="hover:bg-background-secondary">
-                    <td className="p-3 font-medium">{op.tenant_name}</td>
-                    <td className="p-3">{op.admin_email}</td>
-                    <td className="p-3 text-xs">{op.role}</td>
-                    <td className="p-3"><span className={`text-xs px-2 py-0.5 rounded ${op.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{op.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td className="p-3 text-xs text-content-secondary">{new Date(op.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<TenantOperator>
+            columns={OPERATOR_COLUMNS}
+            data={operators}
+            rowKey={(r) => r.id}
+          />
         </div>
       )}
     </div>
