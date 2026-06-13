@@ -115,16 +115,17 @@ func (s *SupplyAggregatorStream) GetAvailableDriverCount(ctx context.Context, ci
 	redisKey := fmt.Sprintf("surge:supply:{%s}:%s", cityPrefix, h3Cell)
 	now := time.Now().Unix()
 
-	// Clear out trailing stale records before counting
-	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now)).Result()
-
-	// Count the remaining valid members inside the ZSET matrix
-	count, err := s.clusterClient.ZCard(ctx, redisKey).Result()
-	if err != nil {
+	// Clear out trailing stale records, then count remaining members — batched into a
+	// single round-trip. Both commands hit the same key (same hash slot), so they are
+	// pipeline-safe on the cluster client.
+	pipe := s.clusterClient.Pipeline()
+	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now))
+	cardCmd := pipe.ZCard(ctx, redisKey)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return 0, err
 	}
 
-	return count, nil
+	return cardCmd.Val(), nil
 }
 
 func (s *SupplyAggregatorStream) Close() error {

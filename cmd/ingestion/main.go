@@ -44,7 +44,8 @@ func main() {
 	// Tune connection pools for low-latency concurrent operations
 	pgxConfig.MaxConns = 50
 	pgxConfig.MinConns = 10
-	pgxConfig.MaxConnIdleTime = 15 * time.Minute
+	pgxConfig.MaxConnLifetime = 1 * time.Hour
+	pgxConfig.MaxConnIdleTime = 30 * time.Minute
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
 	if err != nil {

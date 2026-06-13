@@ -2,9 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 import {
   getDriverEarnings, getEarningsStatementCsv,
   type DriverEarningsResponse, type EarningsPeriod,
@@ -13,6 +11,14 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { formatCurrency, formatCompactDate } from '@/lib/format';
 import { useCountUp } from '@/lib/useCountUp';
 import { saveAndShareCsv } from '@/lib/saveStatement';
+
+// Code-split recharts out of the initial earnings bundle; it only renders client-side.
+const EarningsChart = dynamic(() => import('./EarningsChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center text-[10px] font-mono text-zinc-600">Loading…</div>
+  ),
+});
 
 function KpiValue({ paise, className }: { paise: number; className: string }) {
   const v = useCountUp(paise);
@@ -151,22 +157,7 @@ export default function DriverEarningsPage() {
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">Daily Earnings (last 7 days)</h4>
         <div className="h-48">
           {mounted && chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <XAxis dataKey="label" stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#52525b" tick={{ fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false}
-                  tickFormatter={(v) => `₹${v}`} />
-                <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ background: '#09090b', border: '1px solid #27272a', borderRadius: 12, fontFamily: 'monospace', fontSize: 11 }}
-                  labelStyle={{ color: '#a1a1aa' }}
-                  formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`}
-                />
-                <Bar dataKey="rupees" radius={[4, 4, 0, 0]}>
-                  {chartData.map((_, i) => <Cell key={i} fill="#34d399" />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <EarningsChart data={chartData} />
           ) : (
             <div className="h-full flex items-center justify-center text-[10px] font-mono text-zinc-600">
               {loading ? 'Loading…' : 'No earnings in this period.'}

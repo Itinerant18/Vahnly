@@ -228,6 +228,8 @@ func (h *DriverFeaturesHandler) ListTraining(w http.ResponseWriter, r *http.Requ
 			modules = append(modules, m)
 		}
 	}
+	// Training catalogue is near-static and per-driver; allow short private caching.
+	w.Header().Set("Cache-Control", "private, max-age=300")
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{"modules": modules})
 }
 

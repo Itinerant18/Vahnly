@@ -63,7 +63,16 @@ func main() {
 
 	log.Printf("Bootstrapping Coordinated API Gateway on Port: %s", httpPort)
 
-	dbPool, err := pgxpool.New(mainCtx, postgresURL)
+	pgxConfig, err := pgxpool.ParseConfig(postgresURL)
+	if err != nil {
+		log.Fatalf("Unable to parse PostgreSQL connection string: %v", err)
+	}
+	pgxConfig.MaxConns = 20
+	pgxConfig.MinConns = 5
+	pgxConfig.MaxConnLifetime = 1 * time.Hour
+	pgxConfig.MaxConnIdleTime = 30 * time.Minute
+
+	dbPool, err := pgxpool.NewWithConfig(mainCtx, pgxConfig)
 	if err != nil {
 		log.Fatalf("PostgreSQL connection pool setup failed: %v", err)
 	}

@@ -57,7 +57,8 @@ func main() {
 	}
 	pgxConfig.MaxConns = 20
 	pgxConfig.MinConns = 4
-	pgxConfig.MaxConnIdleTime = 15 * time.Minute
+	pgxConfig.MaxConnLifetime = 1 * time.Hour
+	pgxConfig.MaxConnIdleTime = 30 * time.Minute
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
 	if err != nil {

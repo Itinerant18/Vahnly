@@ -12,6 +12,20 @@ const ANALYTICS = process.env.ANALYTICS_SSE_URL ?? 'http://localhost:8089';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy, independently-cacheable vendors out of the main chunk so a
+        // dashboard code change doesn't bust the cache for React/map/router bundles.
+        // (recharts is not a dependency of this admin app, so it is intentionally absent.)
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-map': ['leaflet', 'react-leaflet'],
+          'vendor-router': ['react-router-dom'],
+        },
+      },
+    },
+  },
   server: {
     port: 5000,
     proxy: {

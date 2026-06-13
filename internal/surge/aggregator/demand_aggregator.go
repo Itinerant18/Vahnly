@@ -120,16 +120,16 @@ func (s *DemandAggregatorStream) GetRecentDemandRate(ctx context.Context, cityPr
 	redisKey := fmt.Sprintf("surge:demand:{%s}:%s", cityPrefix, h3Cell)
 	now := time.Now().Unix()
 
-	// Proactively drop trailing stale entries prior to cardinal evaluation
-	_, _ = s.clusterClient.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now)).Result()
-
-	// Retrieve total distinct requests currently registered inside the Sorted Set
-	count, err := s.clusterClient.ZCard(ctx, redisKey).Result()
-	if err != nil {
+	// Drop trailing stale entries, then count remaining requests — batched into a single
+	// round-trip. Both commands target the same key/hash slot, so they pipeline cleanly.
+	pipe := s.clusterClient.Pipeline()
+	pipe.ZRemRangeByScore(ctx, redisKey, "-inf", fmt.Sprintf("(%d", now))
+	cardCmd := pipe.ZCard(ctx, redisKey)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return 0, fmt.Errorf("failed counting sliding demand matrix: %w", err)
 	}
 
-	return count, nil
+	return cardCmd.Val(), nil
 }
 
 // Close cleanly releases the underlying streaming broker connection state
