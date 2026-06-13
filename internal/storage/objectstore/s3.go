@@ -128,6 +128,56 @@ func (s *S3Store) PresignPut(key string, expiry time.Duration) (uploadURL, publi
 	return uploadURL, publicURL, nil
 }
 
+// PresignGet returns a time-limited, signed GET URL for an object key. Used to serve
+// PII documents (KYC images) to admins without exposing a public/permanent URL.
+func (s *S3Store) PresignGet(key string, expiry time.Duration) (string, error) {
+	if !s.enabled {
+		return "", fmt.Errorf("object store not configured")
+	}
+	scheme, host, basePath := s.base()
+	return s.signGetURL(scheme, host, s.canonicalURI(basePath, key), expiry), nil
+}
+
+// PresignGetFromURL re-signs a previously stored canonical object URL into a
+// time-limited GET URL. Returns the input unchanged if the store is disabled or the
+// URL host doesn't match this store (e.g. local-disk dev paths).
+func (s *S3Store) PresignGetFromURL(stored string, expiry time.Duration) string {
+	if !s.enabled || stored == "" {
+		return stored
+	}
+	u, err := url.Parse(stored)
+	if err != nil || u.Host == "" || u.Path == "" {
+		return stored
+	}
+	return s.signGetURL(u.Scheme, u.Host, u.EscapedPath(), expiry)
+}
+
+// signGetURL builds a SigV4 presigned GET URL for an already-escaped canonical URI.
+func (s *S3Store) signGetURL(scheme, host, canonicalURI string, expiry time.Duration) string {
+	now := time.Now().UTC()
+	amzDate := now.Format("20060102T150405Z")
+	dateStamp := now.Format("20060102")
+	scope := dateStamp + "/" + s.region + "/s3/aws4_request"
+
+	canonicalQuery := buildCanonicalQuery([][2]string{
+		{"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
+		{"X-Amz-Credential", s.accessKey + "/" + scope},
+		{"X-Amz-Date", amzDate},
+		{"X-Amz-Expires", strconv.Itoa(int(expiry.Seconds()))},
+		{"X-Amz-SignedHeaders", "host"},
+	})
+	canonicalHeaders := "host:" + host + "\n"
+	canonicalRequest := strings.Join([]string{
+		http.MethodGet, canonicalURI, canonicalQuery, canonicalHeaders, "host", "UNSIGNED-PAYLOAD",
+	}, "\n")
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256", amzDate, scope, sha256Hex([]byte(canonicalRequest)),
+	}, "\n")
+	signingKey := deriveSigningKey(s.secretKey, dateStamp, s.region, "s3")
+	signature := hex.EncodeToString(hmacSHA256(signingKey, stringToSign))
+	return scheme + "://" + host + canonicalURI + "?" + canonicalQuery + "&X-Amz-Signature=" + signature
+}
+
 // PutObject uploads bytes server-side with a SigV4 header-signed PUT and returns
 // the canonical object URL. Used by the multipart streaming upload path.
 func (s *S3Store) PutObject(ctx context.Context, key string, body []byte, contentType string) (publicURL string, err error) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { useSort, exportToCsv } from '../lib/tableTools';
 
 export interface DriverSummaryItem {
 	driver_id: string;
@@ -67,6 +68,24 @@ export const DriversList: React.FC = () => {
 		fetchDrivers();
 	}, [search, status, city, transmission, ratingMin, acceptanceMin, cancellationMax, tripsMin]);
 
+	const { sorted, toggleSort, indicator } = useSort<DriverSummaryItem>(drivers, null);
+
+	const handleExportCsv = () => {
+		exportToCsv<DriverSummaryItem>('drivers.csv', [
+			{ key: 'driver_id', label: 'Driver ID' },
+			{ key: 'name', label: 'Name' },
+			{ key: 'phone', label: 'Phone' },
+			{ key: 'city_prefix', label: 'City' },
+			{ key: 'transmission_capability', label: 'Transmission' },
+			{ key: 'total_trips', label: 'Trips' },
+			{ key: 'acceptance_rate', label: 'Acceptance' },
+			{ key: 'cancellation_rate', label: 'Cancellation' },
+			{ key: 'rating', label: 'Rating' },
+			{ key: 'status', label: 'Status' },
+			{ key: 'last_online', label: 'Last Online' },
+		], sorted);
+	};
+
 	const handleResetFilters = () => {
 		setSearch('');
 		setStatus('');
@@ -85,12 +104,21 @@ export const DriversList: React.FC = () => {
 					<h1 className="text-2xl font-bold tracking-tight text-ink">Drivers Directory</h1>
 					<p className="text-xs text-mute mt-1">Manage partner registrations, state triggers, performance metrics, and certifications</p>
 				</div>
-				<Link
-					to="/drivers/onboarding"
-					className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
-				>
-					Onboarding Queue →
-				</Link>
+				<div className="flex items-center gap-3">
+					<button
+						onClick={handleExportCsv}
+						disabled={drivers.length === 0}
+						className="inline-flex items-center justify-center border border-canvas-soft text-ink text-xs font-semibold rounded-pill h-9 px-4 hover:bg-canvas-soft transition-colors disabled:opacity-40"
+					>
+						Export CSV
+					</button>
+					<Link
+						to="/drivers/onboarding"
+						className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
+					>
+						Onboarding Queue →
+					</Link>
+				</div>
 			</div>
 
 			{/* ---- Filters Grid ---- */}
@@ -233,20 +261,20 @@ export const DriversList: React.FC = () => {
 				) : (
 					<table className="w-full text-left border-collapse">
 						<thead>
-							<tr className="border-b border-canvas-soft bg-canvas-soft">
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Photo / Name</th>
+							<tr className="border-b border-canvas-soft bg-canvas-soft select-none">
+								<th onClick={() => toggleSort('name')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Photo / Name{indicator('name')}</th>
 								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Phone</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">City & Exp</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center">Trips</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center">Acceptance</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center">Cancellation</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Rating</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Last Active</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Status</th>
+								<th onClick={() => toggleSort('city_prefix')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">City & Exp{indicator('city_prefix')}</th>
+								<th onClick={() => toggleSort('total_trips')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Trips{indicator('total_trips')}</th>
+								<th onClick={() => toggleSort('acceptance_rate')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Acceptance{indicator('acceptance_rate')}</th>
+								<th onClick={() => toggleSort('cancellation_rate')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Cancellation{indicator('cancellation_rate')}</th>
+								<th onClick={() => toggleSort('rating')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Rating{indicator('rating')}</th>
+								<th onClick={() => toggleSort('last_online')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Last Active{indicator('last_online')}</th>
+								<th onClick={() => toggleSort('status')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Status{indicator('status')}</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-canvas-soft">
-							{drivers.map((driver) => (
+							{sorted.map((driver) => (
 								<tr
 									key={driver.driver_id}
 									onClick={() => navigate(`/drivers/${driver.driver_id}`)}

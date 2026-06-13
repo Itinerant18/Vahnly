@@ -49,6 +49,9 @@ const PricingDashboard = lazy(() =>
 const PromotionsDashboard = lazy(() =>
   import('./pages/PromotionsDashboard').then((m) => ({ default: m.PromotionsDashboard }))
 );
+const ManualSurge = lazy(() =>
+  import('./pages/ManualSurge').then((m) => ({ default: m.ManualSurge }))
+);
 const FinanceDashboard = lazy(() =>
   import('./pages/FinanceDashboard').then((m) => ({ default: m.FinanceDashboard }))
 );
@@ -149,6 +152,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'vehicles/:id', element: <LazyWrap><VehicleDetail /></LazyWrap> },
   { path: 'dispatch', element: <LazyWrap><DispatchDashboard /></LazyWrap> },
   { path: 'pricing', element: <LazyWrap><PricingDashboard /></LazyWrap> },
+  { path: 'surge', element: <LazyWrap><ManualSurge /></LazyWrap> },
   { path: 'promotions', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
   { path: 'promos', element: <LazyWrap><PromotionsDashboard /></LazyWrap> },
   { path: 'promo-codes', element: <LazyWrap><PromoCodesManager /></LazyWrap> },
@@ -209,6 +213,7 @@ export const navItems: NavItem[] = [
   { key: 'car-issues', label: 'Car Issues', path: '/car-issues', icon: 'Vehicles', group: 'fleet' },
   { key: 'dispatch', label: 'Dispatch & Zones', path: '/dispatch', icon: 'Dispatch', group: 'fleet' },
   { key: 'pricing', label: 'Pricing & Surge', path: '/pricing', icon: 'Pricing', group: 'fleet' },
+  { key: 'surge', label: 'Manual Surge', path: '/surge', icon: 'Pricing', group: 'fleet' },
 
   // Finance
   { key: 'promotions', label: 'Promotions', path: '/promotions', icon: 'Promotions', group: 'finance' },

@@ -226,7 +226,8 @@ function encodeQuery(params: Record<string, string | number>): string {
 }
 
 export async function driverLogin(phone: string, password: string): Promise<DriverLoginResponse> {
-  return request<DriverLoginResponse>('/api/v1/auth/driver/login', {
+  // This is the REAL authentication endpoint, not the mock one at /auth/driver/login
+  return request<DriverLoginResponse>('/api/v1/driver/login', {
     method: 'POST',
     body: { phone, password },
   });

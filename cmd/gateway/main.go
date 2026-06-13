@@ -217,6 +217,7 @@ func main() {
 	adminTripHandler := adminHttp.NewAdminTripHandler(dbPool, redisClusterClient)
 	pricingLogger := log.New(os.Stdout, "[PRICING_ADMIN] ", log.LstdFlags)
 	pricingAdminHandler := adminHttp.NewPricingAdminHandler(dbPool, redisClusterClient, pricingLogger)
+	surgeHandler := adminHttp.NewSurgeHandler(dbPool, redisClusterClient, log.New(os.Stdout, "[SURGE_ADMIN] ", log.LstdFlags))
 	incidentLogger := log.New(os.Stdout, "[INCIDENT_ADMIN] ", log.LstdFlags)
 	incidentAdminHandler := adminHttp.NewIncidentAdminHandler(dbPool, redisClusterClient, brokersList, incidentLogger)
 
@@ -350,6 +351,7 @@ func main() {
 
 	driverLogger := log.New(os.Stdout, "[DRIVER_ADMIN] ", log.LstdFlags)
 	driverHandler := adminHttp.NewDriverHandler(dbPool, redisClusterClient, driverLogger)
+	driverHandler.SetObjectStore(objStore) // signed GET URLs for KYC docs (rule 1)
 
 	vehicleLogger := log.New(os.Stdout, "[VEHICLE_ADMIN] ", log.LstdFlags)
 	vehicleHandler := adminHttp.NewVehicleHandler(dbPool, redisClusterClient, vehicleLogger)
@@ -649,6 +651,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/orders/{id}/reassign", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}, adminTripHandler.HandleAdminReassignTrip))
 	mux.HandleFunc("POST /api/v1/admin/orders/{id}/fraud", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER"}, adminTripHandler.HandleAdminMarkFraud))
 	mux.HandleFunc("POST /api/v1/admin/orders/{id}/send-invoice", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT"}, adminTripHandler.HandleAdminSendInvoice))
+	mux.HandleFunc("POST /api/v1/admin/orders/{id}/adjust", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FINANCE", "FINANCIAL_AUDITOR"}, adminTripHandler.HandleAdminAdjustFare))
+	mux.HandleFunc("GET /api/v1/admin/orders/{id}/gps-trail", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "COMPLIANCE"}, adminTripHandler.HandleAdminGetGPSTrail))
 	mux.HandleFunc("GET /api/v1/admin/orders/{id}/odometer-audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR", "OPERATIONS_MANAGER", "COMPLIANCE"}, odometerHandler.HandleGetOdometerAudit))
 	mux.HandleFunc("PATCH /api/v1/admin/orders/{id}/odometer-audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, odometerHandler.HandlePatchOdometerAudit))
 	mux.HandleFunc("POST /api/v1/admin/pricing/freeze", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKET_CONTROLLER"}, pricingAdminHandler.HandleEnforcePriceCap))
@@ -660,6 +664,13 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/pricing/surge/rules", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandlePostSurgeRules))
 	mux.HandleFunc("GET /api/v1/admin/pricing/commission", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, pricingAdminHandler.HandleGetCommission))
 	mux.HandleFunc("POST /api/v1/admin/pricing/commission", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CITY_MANAGER", "FINANCE"}, pricingAdminHandler.HandlePostCommission))
+	// Manual surge zones (operator-drawn) + surge history.
+	mux.HandleFunc("POST /api/v1/admin/surge/manual", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER"}, surgeHandler.HandleCreateManualZone))
+	mux.HandleFunc("GET /api/v1/admin/surge/manual", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER", "FLEET_MANAGER", "AUDITOR"}, surgeHandler.HandleListManualZones))
+	mux.HandleFunc("DELETE /api/v1/admin/surge/manual/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER"}, surgeHandler.HandleDeleteManualZone))
+	mux.HandleFunc("GET /api/v1/admin/surge/history", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER", "FLEET_MANAGER", "ANALYTICS", "AUDITOR"}, surgeHandler.HandleGetSurgeHistory))
+	mux.HandleFunc("GET /api/v1/admin/surge/config/{city}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER", "FLEET_MANAGER", "AUDITOR"}, surgeHandler.HandleGetSurgeConfig))
+	mux.HandleFunc("PUT /api/v1/admin/surge/config/{city}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKET_CONTROLLER", "CITY_MANAGER"}, surgeHandler.HandlePutSurgeConfig))
 	mux.HandleFunc("GET /api/v1/admin/trips/stalled", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleGetStalledTrips))
 	mux.HandleFunc("POST /api/v1/admin/trips/recover", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleExecuteTripRecovery))
 	mux.HandleFunc("POST /api/v1/admin/trips/claim", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "SUPPORT_LEAD"}, incidentAdminHandler.HandleClaimIncident))
@@ -680,6 +691,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/drivers", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDrivers))
 	mux.HandleFunc("GET /api/v1/admin/drivers/onboarding", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDriverOnboarding))
 	mux.HandleFunc("GET /api/v1/admin/drivers/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, driverHandler.HandleGetDriverDetail))
+	// 3-segment path avoids the GET /drivers/pending/{driver_id} wildcard conflict.
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/kyc/documents", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "COMPLIANCE"}, driverHandler.HandleGetDriverDocuments))
 	mux.HandleFunc("POST /api/v1/admin/drivers/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, driverHandler.HandleDriverActions))
 
 	// Riders control endpoints
@@ -697,6 +710,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/riders/{id}/wallet/adjust", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCIAL_AUDITOR"}, adminRiderHandler.HandleAdjustRiderWallet))
 
 	// Phase 11 promo-codes
+	mux.HandleFunc("GET /api/v1/admin/promo-codes/generate", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKETING", "OPERATIONS_MANAGER"}, promoHandler.HandleGeneratePromoCode))
 	mux.HandleFunc("GET /api/v1/admin/promo-codes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "MARKETING", "ANALYTICS", "FINANCE"}, adminRiderHandler.HandleListPromoCodes))
 	mux.HandleFunc("POST /api/v1/admin/promo-codes", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKETING"}, adminRiderHandler.HandleCreatePromoCode))
 	mux.HandleFunc("PATCH /api/v1/admin/promo-codes/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "MARKETING"}, adminRiderHandler.HandleUpdatePromoCode))

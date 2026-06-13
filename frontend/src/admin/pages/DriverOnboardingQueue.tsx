@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 
+// Elapsed time since the applicant entered the pipeline (proxy for time-in-stage).
+const timeInPipeline = (iso: string): string => {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (isNaN(ms) || ms < 0) return '';
+  const days = Math.floor(ms / 86_400_000);
+  if (days > 0) return `${days}d in pipeline`;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours > 0) return `${hours}h in pipeline`;
+  return 'just applied';
+};
+
+interface SignedDoc {
+  document_type: string;
+  url: string;
+  status: string;
+}
+
 interface DriverKYCDocument {
 	name: string;
 	status: string;
@@ -28,6 +45,17 @@ export const DriverOnboardingQueue: React.FC = () => {
 	const [actionLoading, setActionLoading] = useState<boolean>(false);
 	const [rejectReason, setRejectReason] = useState<string>('');
 	const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
+	const [signedDocs, setSignedDocs] = useState<SignedDoc[]>([]);
+
+	// Load real KYC documents with time-limited signed URLs (rule 1) for the selected applicant.
+	useEffect(() => {
+		if (!selectedApplicant) { setSignedDocs([]); return; }
+		const role = localStorage.getItem('admin_role') || 'ADMIN';
+		fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/kyc/documents`, { headers: { 'X-Admin-Role': role } })
+			.then((r) => (r.ok ? r.json() : { documents: [] }))
+			.then((d) => setSignedDocs(d.documents || []))
+			.catch(() => setSignedDocs([]));
+	}, [selectedApplicant?.driver_id]);
 
 	const fetchQueue = async () => {
 		setLoading(true);
@@ -133,7 +161,7 @@ export const DriverOnboardingQueue: React.FC = () => {
 	};
 
 	// Group applicants by stages
-	const stages = ['APPLIED', 'DOCS_UPLOADED', 'BACKGROUND_CHECK', 'TRAINING', 'APPROVED'];
+	const stages = ['APPLIED', 'DOCS_UPLOADED', 'UNDER_REVIEW', 'BACKGROUND_CHECK', 'TRAINING', 'APPROVED'];
 	const getStageList = (stageName: string) => {
 		return applicants.filter((app) => app.stage.toUpperCase() === stageName);
 	};
@@ -179,6 +207,7 @@ export const DriverOnboardingQueue: React.FC = () => {
 												<span>Hub: {applicant.city_prefix}</span>
 												<span>{new Date(applicant.applied_at).toLocaleDateString()}</span>
 											</div>
+											<span className="text-[9px] font-mono text-status-warn">{timeInPipeline(applicant.applied_at)}</span>
 										</div>
 									))}
 									{list.length === 0 && (
@@ -247,6 +276,26 @@ export const DriverOnboardingQueue: React.FC = () => {
 									</div>
 								))}
 							</div>
+						</div>
+
+						{/* Real documents with time-limited signed URLs (rule 1 — PII) */}
+						<div className="space-y-3 border-t border-canvas-soft pt-4">
+							<h3 className="text-xs font-bold uppercase tracking-wider text-mute">Documents (signed, expire in 10 min)</h3>
+							{signedDocs.length === 0 ? (
+								<p className="text-[10px] text-mute font-mono">No uploaded documents on file.</p>
+							) : (
+								<div className="space-y-2">
+									{signedDocs.map((d) => (
+										<div key={d.document_type} className="flex justify-between items-center bg-canvas-softer border border-canvas-soft p-2.5 rounded-xl text-xs">
+											<span className="font-semibold text-ink">{d.document_type}</span>
+											<div className="flex items-center gap-2">
+												<span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${d.status === 'APPROVED' ? 'bg-status-online/10 text-status-online' : 'bg-status-warn/10 text-status-warn'}`}>{d.status}</span>
+												<a href={d.url} target="_blank" rel="noreferrer" className="text-[10px] underline text-mute hover:text-ink font-medium">View</a>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
 						</div>
 
 						{/* Stages Checklist */}

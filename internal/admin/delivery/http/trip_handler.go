@@ -962,3 +962,151 @@ func (h *AdminTripHandler) HandleAdminSendInvoice(w http.ResponseWriter, r *http
 		"message": "Invoice generated and queued for transmission successfully.",
 	})
 }
+
+// auditOrder writes an order-scoped admin action with before/after snapshots
+// (rule 2 — entity + before/after). admin_id defaults to the nil UUID when unknown.
+func (h *AdminTripHandler) auditOrder(ctx context.Context, email, action, orderID, details, ip, before, after string) {
+	_, _ = h.dbPool.Exec(ctx, `
+		INSERT INTO admin_audit_logs (admin_id, admin_email, action, details, ip_address, entity_type, entity_id, before_value, after_value)
+		VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, $3, $4, 'ORDER', $5, $6::jsonb, $7::jsonb)
+	`, email, action, details, ip, orderID, before, after)
+}
+
+var adjustmentTypes = map[string]bool{
+	"PARTIAL_REFUND": true, "FULL_REFUND": true, "WAIVE_FEE": true, "ADD_BONUS": true, "MARK_FRAUD": true,
+}
+
+// HandleAdminAdjustFare applies a fare adjustment (refund/waive/bonus/mark-fraud) to
+// an order. Each posts a financial_ledger_entries row (where applicable) and an
+// audited admin_audit_logs entry with before/after. POST /api/v1/admin/orders/{id}/adjust
+func (h *AdminTripHandler) HandleAdminAdjustFare(w http.ResponseWriter, r *http.Request) {
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		AdjustmentType string `json:"adjustment_type"`
+		AmountPaise    int64  `json:"amount_paise"`
+		Reason         string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+	req.AdjustmentType = strings.ToUpper(strings.TrimSpace(req.AdjustmentType))
+	if !adjustmentTypes[req.AdjustmentType] {
+		http.Error(w, "invalid_adjustment_type", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Reason) == "" {
+		http.Error(w, "reason_required", http.StatusBadRequest)
+		return
+	}
+	if req.AdjustmentType != "MARK_FRAUD" && req.AmountPaise <= 0 {
+		http.Error(w, "amount_must_be_positive", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var status, city string
+	var baseFare int64
+	var driverID *string
+	err := h.dbPool.QueryRow(ctx, `
+		SELECT status::text, city_prefix, base_fare_paise, assigned_driver_id::text FROM orders WHERE id = $1::uuid
+	`, orderID).Scan(&status, &city, &baseFare, &driverID)
+	if err != nil {
+		http.Error(w, "order_not_found", http.StatusNotFound)
+		return
+	}
+
+	adminEmail := r.Header.Get("X-Admin-Email")
+	if adminEmail == "" {
+		adminEmail = "admin@platform.com"
+	}
+	ip := getClientIP(r)
+	before := fmt.Sprintf(`{"status":%q,"base_fare_paise":%d}`, status, baseFare)
+	after := before // most adjustments don't mutate the order row itself
+
+	switch req.AdjustmentType {
+	case "PARTIAL_REFUND", "FULL_REFUND":
+		_, e := h.dbPool.Exec(ctx, `
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
+			VALUES ($1::uuid, $2, $2, 'RIDER_REFUND', 'DEBIT', $3, $4)
+		`, orderID, city, req.AmountPaise, "Admin refund: "+req.Reason)
+		if e != nil {
+			http.Error(w, "ledger_post_failed", http.StatusInternalServerError)
+			return
+		}
+	case "WAIVE_FEE":
+		_, e := h.dbPool.Exec(ctx, `
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description)
+			VALUES ($1::uuid, $2, $2, 'FEE_WAIVER', 'DEBIT', $3, $4)
+		`, orderID, city, req.AmountPaise, "Admin fee waiver: "+req.Reason)
+		if e != nil {
+			http.Error(w, "ledger_post_failed", http.StatusInternalServerError)
+			return
+		}
+	case "ADD_BONUS":
+		if driverID == nil || *driverID == "" {
+			http.Error(w, "no_driver_assigned", http.StatusConflict)
+			return
+		}
+		_, e := h.dbPool.Exec(ctx, `
+			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, driver_id)
+			VALUES ($1::uuid, $2, $2, 'DRIVER_EARNINGS', 'CREDIT', $3, $4, $5::uuid)
+		`, orderID, city, req.AmountPaise, "Admin bonus: "+req.Reason, *driverID)
+		if e != nil {
+			http.Error(w, "ledger_post_failed", http.StatusInternalServerError)
+			return
+		}
+	case "MARK_FRAUD":
+		_, _ = h.dbPool.Exec(ctx, "UPDATE orders SET status = 'CANCELLED', updated_at = NOW() WHERE id = $1::uuid", orderID)
+		after = fmt.Sprintf(`{"status":"CANCELLED","base_fare_paise":%d}`, baseFare)
+	}
+
+	h.auditOrder(ctx, adminEmail, "ORDER_FARE_"+req.AdjustmentType,
+		orderID, fmt.Sprintf("%s on order %s: %s (%d paise)", req.AdjustmentType, orderID, req.Reason, req.AmountPaise), ip, before, after)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"status": "SUCCESS", "adjustment_type": req.AdjustmentType})
+}
+
+// HandleAdminGetGPSTrail returns the recorded GPS breadcrumb trail for an order.
+// GET /api/v1/admin/orders/{id}/gps-trail
+func (h *AdminTripHandler) HandleAdminGetGPSTrail(w http.ResponseWriter, r *http.Request) {
+	orderID := r.PathValue("id")
+	if orderID == "" {
+		http.Error(w, "missing_order_id", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT latitude, longitude, captured_at, COALESCE(speed, 0), COALESCE(heading, 0)
+		FROM orders_gps_trail WHERE order_id = $1::uuid ORDER BY captured_at ASC
+	`, orderID)
+	if err != nil {
+		http.Error(w, "gps_trail_query_failed", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type point struct {
+		Lat        float64   `json:"lat"`
+		Lng        float64   `json:"lng"`
+		CapturedAt time.Time `json:"captured_at"`
+		Speed      float64   `json:"speed"`
+		Heading    float64   `json:"heading"`
+	}
+	trail := make([]point, 0)
+	for rows.Next() {
+		var p point
+		if rows.Scan(&p.Lat, &p.Lng, &p.CapturedAt, &p.Speed, &p.Heading) == nil {
+			trail = append(trail, p)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"trail": trail})
+}

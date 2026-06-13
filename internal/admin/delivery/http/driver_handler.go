@@ -14,12 +14,73 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
+	"github.com/platform/driver-delivery/internal/storage/objectstore"
 )
 
 type DriverHandler struct {
 	dbPool      *pgxpool.Pool
 	redisClient *redis.ClusterClient
 	logger      *log.Logger
+	store       *objectstore.S3Store
+}
+
+// SetObjectStore injects the document store so KYC images are served via
+// time-limited signed GET URLs (rule 1 — PII). Optional; nil falls back to raw URLs.
+func (h *DriverHandler) SetObjectStore(s *objectstore.S3Store) { h.store = s }
+
+// HandleGetDriverDocuments returns a driver's real KYC documents from driver_documents
+// with time-limited signed GET URLs (when object storage is configured). The access is
+// audit-logged. GET /api/v1/admin/drivers/{id}/documents
+func (h *DriverHandler) HandleGetDriverDocuments(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "missing_driver_id", http.StatusBadRequest)
+		return
+	}
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT id::text, document_type, COALESCE(storage_url, ''), status::text, reviewed_at
+		FROM driver_documents WHERE driver_id = $1::uuid ORDER BY document_type
+	`, id)
+	if err != nil {
+		http.Error(w, "documents_query_failed", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type docOut struct {
+		ID           string     `json:"id"`
+		DocumentType string     `json:"document_type"`
+		URL          string     `json:"url"` // time-limited signed GET URL when S3 is configured
+		Status       string     `json:"status"`
+		ReviewedAt   *time.Time `json:"reviewed_at"`
+	}
+	docs := make([]docOut, 0)
+	for rows.Next() {
+		var d docOut
+		var stored string
+		if rows.Scan(&d.ID, &d.DocumentType, &stored, &d.Status, &d.ReviewedAt) == nil {
+			if h.store != nil {
+				d.URL = h.store.PresignGetFromURL(stored, 10*time.Minute)
+			} else {
+				d.URL = stored
+			}
+			docs = append(docs, d)
+		}
+	}
+
+	// Audit the PII access.
+	h.recordAuditLog(ctx, "", r.Header.Get("X-Admin-Email"), "DRIVER_DOCS_VIEWED",
+		fmt.Sprintf("Admin viewed KYC documents for driver %s", id), ip, id)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"documents": docs})
 }
 
 func NewDriverHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient, logger *log.Logger) *DriverHandler {
@@ -572,8 +633,80 @@ func (h *DriverHandler) HandleGetDriverDetail(w http.ResponseWriter, r *http.Req
 
 	h.mergeDriverOverrides(ctx, &details)
 
+	// Replace the projected mock Earnings/Payouts/Notifications with real DB data.
+	details.Earnings = h.queryDriverEarnings(ctx, id)
+	details.Payouts = h.queryDriverPayouts(ctx, id)
+	details.Notifications = h.queryDriverNotifications(ctx, id)
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(details)
+}
+
+// queryDriverEarnings returns the driver's daily DRIVER_EARNINGS ledger aggregates.
+func (h *DriverHandler) queryDriverEarnings(ctx context.Context, driverID string) []DriverEarningRecord {
+	out := make([]DriverEarningRecord, 0)
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD'),
+		       COALESCE(SUM(CASE WHEN entry_type='CREDIT' THEN amount_paise ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN entry_type='CREDIT' AND description ILIKE '%incentive%' THEN amount_paise ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN entry_type='CREDIT' AND description ILIKE '%bonus%' THEN amount_paise ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN entry_type='DEBIT' THEN amount_paise ELSE 0 END), 0)
+		FROM financial_ledger_entries
+		WHERE driver_id = $1::uuid AND account_type = 'DRIVER_EARNINGS'
+		GROUP BY 1 ORDER BY 1 DESC LIMIT 14
+	`, driverID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e DriverEarningRecord
+		if rows.Scan(&e.Period, &e.GrossPaise, &e.Incentives, &e.Bonuses, &e.Deductions) == nil {
+			e.NetPaise = e.GrossPaise - e.Deductions
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// queryDriverPayouts returns the driver's payout_requests history.
+func (h *DriverHandler) queryDriverPayouts(ctx context.Context, driverID string) []DriverPayoutRecord {
+	out := make([]DriverPayoutRecord, 0)
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT id, amount_paise, status, COALESCE(bank_reference, ''), created_at
+		FROM payout_requests WHERE driver_id = $1::uuid ORDER BY created_at DESC LIMIT 50
+	`, driverID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p DriverPayoutRecord
+		if rows.Scan(&p.PayoutID, &p.AmountPaise, &p.Status, &p.BankDetails, &p.RequestedAt) == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// queryDriverNotifications returns the driver's notification log.
+func (h *DriverHandler) queryDriverNotifications(ctx context.Context, driverID string) []RiderNotificationLog {
+	out := make([]RiderNotificationLog, 0)
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT COALESCE(category, 'PUSH'), title || ' — ' || body, delivered_at
+		FROM driver_notifications WHERE driver_id = $1::uuid ORDER BY delivered_at DESC LIMIT 50
+	`, driverID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n RiderNotificationLog
+		if rows.Scan(&n.Type, &n.Payload, &n.Timestamp) == nil {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // HandleDriverActions acts on driver profiles (KYC, suspension, block, offline override, ratings adjustment, adjustments, GDPR delete)
@@ -625,7 +758,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		}
 		override.Status = "ACTIVE"
 		override.OnboardingStage = "APPROVED"
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_KYC_APPROVED", fmt.Sprintf("Admin (%s) approved KYC and verified driver %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_KYC_APPROVED", fmt.Sprintf("Admin (%s) approved KYC and verified driver %s", adminRole, id), ip, id)
 
 	case "reject-kyc":
 		type ReasonRequest struct {
@@ -637,7 +770,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		_, _ = h.dbPool.Exec(ctx, sqlQuery, id)
 		override.Status = "PENDING_KYC"
 		override.OnboardingStage = "APPLIED"
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_KYC_REJECTED", fmt.Sprintf("Admin (%s) rejected KYC for driver %s. Reason: %s", adminRole, id, req.Reason), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_KYC_REJECTED", fmt.Sprintf("Admin (%s) rejected KYC for driver %s. Reason: %s", adminRole, id, req.Reason), ip, id)
 
 	case "docs-update":
 		type DocUpdateRequest struct {
@@ -647,7 +780,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		var req DocUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.DocName != "" {
 			override.KYCDocuments[req.DocName] = req.Status
-			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_DOC_STATUS", fmt.Sprintf("Admin (%s) updated document '%s' to status '%s' for driver %s", adminRole, req.DocName, req.Status, id), ip)
+			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_DOC_STATUS", fmt.Sprintf("Admin (%s) updated document '%s' to status '%s' for driver %s", adminRole, req.DocName, req.Status, id), ip, id)
 
 			// Resolve admin reviewer id from email
 			var adminReviewerID *string
@@ -697,7 +830,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		var req StageRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Stage != "" {
 			override.OnboardingStage = req.Stage
-			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_ONBOARDING_STAGE", fmt.Sprintf("Admin (%s) transitioned driver %s onboarding stage to %s", adminRole, id, req.Stage), ip)
+			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_ONBOARDING_STAGE", fmt.Sprintf("Admin (%s) transitioned driver %s onboarding stage to %s", adminRole, id, req.Stage), ip, id)
 		}
 
 	case "suspend":
@@ -708,8 +841,9 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		}
 		// Revoke any live login session so outstanding JWTs stop working immediately.
 		_ = h.redisClient.Del(ctx, middleware.DriverSessionKey(id)).Err()
+		h.notifyDriver(ctx, id, "Account Suspended", "Your account has been temporarily suspended. Contact support for details.")
 		override.Status = "SUSPENDED"
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_SUSPENDED", fmt.Sprintf("Admin (%s) temporarily suspended driver %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_SUSPENDED", fmt.Sprintf("Admin (%s) temporarily suspended driver %s", adminRole, id), ip, id)
 
 	case "block":
 		if _, err := h.dbPool.Exec(ctx, "UPDATE drivers SET account_status = 'BLOCKED', current_state = 'OFFLINE', updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", id); err != nil {
@@ -717,16 +851,18 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		_ = h.redisClient.Del(ctx, middleware.DriverSessionKey(id)).Err()
+		h.notifyDriver(ctx, id, "Account Blocked", "Your account has been blocked. Contact support if you believe this is an error.")
 		override.Status = "BLOCKED"
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_BLOCKED", fmt.Sprintf("Admin (%s) permanently blocked driver %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_BLOCKED", fmt.Sprintf("Admin (%s) permanently blocked driver %s", adminRole, id), ip, id)
 
 	case "unblock":
 		if _, err := h.dbPool.Exec(ctx, "UPDATE drivers SET account_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid", id); err != nil {
 			http.Error(w, "unblock_update_failed", http.StatusInternalServerError)
 			return
 		}
+		h.notifyDriver(ctx, id, "Account Restored", "Your account has been reactivated. Welcome back — you can go online now.")
 		override.Status = "ACTIVE"
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_UNBLOCKED", fmt.Sprintf("Admin (%s) restored/unblocked account for driver %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_UNBLOCKED", fmt.Sprintf("Admin (%s) restored/unblocked account for driver %s", adminRole, id), ip, id)
 
 	case "force-offline":
 		sqlQuery := "UPDATE drivers SET current_state = 'OFFLINE' WHERE id = $1::uuid"
@@ -735,10 +871,33 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "force_offline_failed", http.StatusInternalServerError)
 			return
 		}
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_FORCE_OFFLINE", fmt.Sprintf("Admin (%s) forced driver %s state to OFFLINE", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_FORCE_OFFLINE", fmt.Sprintf("Admin (%s) forced driver %s state to OFFLINE", adminRole, id), ip, id)
+
+	case "message":
+		type MsgRequest struct {
+			Title string `json:"title"`
+			Body  string `json:"body"`
+		}
+		var req MsgRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Body) == "" {
+			http.Error(w, "message_body_required", http.StatusBadRequest)
+			return
+		}
+		if req.Title == "" {
+			req.Title = "Message from Support"
+		}
+		// Persist to the driver's notification log + enqueue for delivery.
+		_, _ = h.dbPool.Exec(ctx, `
+			INSERT INTO driver_notifications (id, driver_id, category, title, body, is_read, delivered_at)
+			VALUES (gen_random_uuid(), $1::uuid, 'ADMIN_MESSAGE', $2, $3, false, NOW())
+		`, id, req.Title, req.Body)
+		h.notifyDriver(ctx, id, req.Title, req.Body)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_MESSAGE_SENT", fmt.Sprintf("Admin (%s) sent message to driver %s: %s", adminRole, id, req.Title), ip, id)
+		_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))
+		return
 
 	case "reset-password":
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_PASSWORD_RESET", fmt.Sprintf("Admin (%s) reset authentication key credentials for driver %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_PASSWORD_RESET", fmt.Sprintf("Admin (%s) reset authentication key credentials for driver %s", adminRole, id), ip, id)
 		_, _ = w.Write([]byte(`{"status":"SUCCESS", "message":"Password reset token generated and sent."}`))
 		return
 
@@ -751,7 +910,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 			sqlQuery := "UPDATE drivers SET city_prefix = $1 WHERE id = $2::uuid"
 			_, _ = h.dbPool.Exec(ctx, sqlQuery, req.CityPrefix, id)
 			override.CityPrefix = req.CityPrefix
-			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_CITY_REASSIGNED", fmt.Sprintf("Admin (%s) reassigned driver %s to city hub %s", adminRole, id, req.CityPrefix), ip)
+			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_CITY_REASSIGNED", fmt.Sprintf("Admin (%s) reassigned driver %s to city hub %s", adminRole, id, req.CityPrefix), ip, id)
 		}
 
 	case "rating-adjust":
@@ -762,7 +921,7 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		var req RatingRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 			override.RatingAdjustment = req.Adjustment
-			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_RATING_ADJUSTED", fmt.Sprintf("Admin (%s) adjusted rating by %f for driver %s. Reason: %s", adminRole, req.Adjustment, id, req.Reason), ip)
+			h.recordAuditLog(ctx, "", adminEmail, "DRIVER_RATING_ADJUSTED", fmt.Sprintf("Admin (%s) adjusted rating by %f for driver %s. Reason: %s", adminRole, req.Adjustment, id, req.Reason), ip, id)
 		}
 
 	case "wallet":
@@ -812,13 +971,13 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 		if req.AmountPaise < 0 {
 			actionName = "DRIVER_DEDUCTION_MADE"
 		}
-		h.recordAuditLog(ctx, "", adminEmail, actionName, fmt.Sprintf("Admin (%s) posted wallet adjustment on driver %s by %d paise. Reason: %s", adminRole, id, req.AmountPaise, req.Description), ip)
+		h.recordAuditLog(ctx, "", adminEmail, actionName, fmt.Sprintf("Admin (%s) posted wallet adjustment on driver %s by %d paise. Reason: %s", adminRole, id, req.AmountPaise, req.Description), ip, id)
 
 	case "delete":
 		sqlQuery := "DELETE FROM drivers WHERE id = $1::uuid"
 		_, _ = h.dbPool.Exec(ctx, sqlQuery, id)
 		_ = h.redisClient.Del(ctx, overrideKey).Err()
-		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_GDPR_DELETED", fmt.Sprintf("Admin (%s) purged driver records for ID %s", adminRole, id), ip)
+		h.recordAuditLog(ctx, "", adminEmail, "DRIVER_GDPR_DELETED", fmt.Sprintf("Admin (%s) purged driver records for ID %s", adminRole, id), ip, id)
 
 	default:
 		http.Error(w, "invalid_action", http.StatusBadRequest)
@@ -835,14 +994,26 @@ func (h *DriverHandler) HandleDriverActions(w http.ResponseWriter, r *http.Reque
 	_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))
 }
 
-func (h *DriverHandler) recordAuditLog(ctx context.Context, adminID string, email string, action string, details string, ip string) {
+// recordAuditLog writes a driver-scoped admin action to admin_audit_logs. entity_type
+// is always DRIVER here; entityID is the target driver UUID (rule 2 — entity_type/entity_id).
+func (h *DriverHandler) recordAuditLog(ctx context.Context, adminID string, email string, action string, details string, ip string, entityID string) {
 	query := `
-		INSERT INTO admin_audit_logs (admin_id, admin_email, action, details, ip_address)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO admin_audit_logs (admin_id, admin_email, action, details, ip_address, entity_type, entity_id)
+		VALUES ($1, $2, $3, $4, $5, 'DRIVER', $6)
 	`
 	var idVal interface{} = adminID
 	if adminID == "" {
 		idVal = "00000000-0000-0000-0000-000000000000"
 	}
-	_, _ = h.dbPool.Exec(ctx, query, idVal, email, action, details, ip)
+	_, _ = h.dbPool.Exec(ctx, query, idVal, email, action, details, ip, entityID)
+}
+
+// notifyDriver enqueues a push/SMS to the driver app via the notification outbox
+// (rule 3 — suspend/block must notify the driver). Best-effort; never blocks the action.
+func (h *DriverHandler) notifyDriver(ctx context.Context, driverID, title, body string) {
+	payload, _ := json.Marshal(map[string]string{"type": "ACCOUNT_STATUS", "title": title})
+	_, _ = h.dbPool.Exec(ctx, `
+		INSERT INTO notification_outbox (user_id, title, body, payload, status)
+		VALUES ($1::uuid, $2, $3, $4::jsonb, 'PENDING')
+	`, driverID, title, body, string(payload))
 }

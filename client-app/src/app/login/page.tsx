@@ -185,17 +185,17 @@ function UnifiedLoginContent() {
         throw new Error('Password is required.');
       }
       const res = await driverLogin(cleanPhone, password);
-        login(res.token, {
-          id: res.user.id,
-          role: res.user.role,
-          name: res.user.name,
-          phone: cleanPhone,
-        });
-        void registerDriverPushNotifications(res.token).catch((pushErr) => {
-          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
-        });
-        addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role });
-        router.push('/driver');
+      login(res.token, {
+        id: res.driver_id,
+        role: res.role,
+        name: res.name,
+        phone: cleanPhone,
+      });
+      void registerDriverPushNotifications(res.token).catch((pushErr) => {
+        console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+      });
+      addAuditLog('LOGIN_SUCCESS', { userId: res.driver_id, role });
+      router.push('/driver');
       } else {
         // Rider login verifies the real OTP issued by /rider/auth/send-otp.
         const enteredOtp = otp.join('');

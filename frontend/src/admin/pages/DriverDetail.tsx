@@ -143,6 +143,24 @@ export const DriverDetail: React.FC = () => {
 		}
 	}, [id]);
 
+	// Lazy-load the driver's trips when the Trips tab is opened.
+	const [driverTrips, setDriverTrips] = useState<any[]>([]);
+	const [tripsLoading, setTripsLoading] = useState<boolean>(false);
+	useEffect(() => {
+		if (activeTab !== 'trips' || !id) return;
+		setTripsLoading(true);
+		const role = localStorage.getItem('admin_role') || 'ADMIN';
+		fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders?driver_id=${id}&limit=100`, { headers: { 'X-Admin-Role': role } })
+			.then((r) => (r.ok ? r.json() : []))
+			.then((d) => {
+				const list = Array.isArray(d) ? d : (d.orders || d.trips || []);
+				// Defensive client-side filter in case the API ignores driver_id.
+				setDriverTrips(list.filter((t: any) => !t.assigned_driver_id || t.assigned_driver_id === id));
+			})
+			.catch(() => setDriverTrips([]))
+			.finally(() => setTripsLoading(false));
+	}, [activeTab, id]);
+
 	const handleAction = async (actionSlug: string, body?: any) => {
 		setActionLoading(true);
 		try {
@@ -489,9 +507,37 @@ export const DriverDetail: React.FC = () => {
 								<span className="text-xs font-bold text-ink">Trip Reservations List</span>
 								<span className="text-xs font-mono text-body font-semibold">{data.trips_count} Total Bookings</span>
 							</div>
-							<div className="p-12 text-center text-xs text-mute font-mono">
-								No trip logs matches found for driver ID {data.driver_id}.
-							</div>
+							{tripsLoading ? (
+								<div className="p-12 text-center text-xs text-mute font-mono animate-pulse">Loading trips…</div>
+							) : driverTrips.length === 0 ? (
+								<div className="p-12 text-center text-xs text-mute font-mono">No trips found for this driver.</div>
+							) : (
+								<table className="w-full text-left text-xs">
+									<thead>
+										<tr className="border-b border-canvas-soft bg-canvas-softer text-[10px] uppercase tracking-wider text-mute">
+											<th className="p-3">Order ID</th>
+											<th className="p-3">Status</th>
+											<th className="p-3 text-right">Fare</th>
+											<th className="p-3">Date</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-canvas-soft">
+										{driverTrips.map((t: any) => {
+											const oid = t.trip_id || t.id || t.order_id || '';
+											const farePaise = t.fare_paise ?? t.total_fare_paise ?? t.base_fare_paise ?? 0;
+											const when = t.created_at || t.completed_at;
+											return (
+												<tr key={oid} onClick={() => navigate(`/trips/${oid}`)} className="hover:bg-canvas-softer cursor-pointer">
+													<td className="p-3 font-mono text-ink">{String(oid).slice(0, 12)}</td>
+													<td className="p-3"><span className="text-[10px] font-bold uppercase">{t.status}</span></td>
+													<td className="p-3 text-right font-mono text-ink">₹{(farePaise / 100).toFixed(2)}</td>
+													<td className="p-3 font-mono text-body">{when ? new Date(when).toLocaleDateString() : '—'}</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+							)}
 						</div>
 					)}
 
@@ -938,7 +984,7 @@ export const DriverDetail: React.FC = () => {
 							</button>
 							<button
 								onClick={() => {
-									alert(`Broadcasting payload body message successfully:\n"${messageText}"`);
+									handleAction('message', { title: 'Message from Support', body: messageText });
 									setShowMsgModal(false);
 									setMessageText('');
 								}}

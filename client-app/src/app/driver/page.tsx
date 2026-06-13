@@ -78,12 +78,13 @@ function h3CellToSvgPoints(cell: string): string {
 export default function DriverTerminalPage() {
   const router = useRouter();
   const { user, token } = useAuthStore();
-  const [kycPending, setKycPending] = useState(false);
+  const [profile, setProfile] = useState<Awaited<ReturnType<typeof getDriverProfile>> | null>(null);
+  const [kycPending, setKycPending] = useState(true); // Assume pending until profile loads
   
   // Account settings matching session or sandbox defaults
-  const driverID = user?.id || 'drv-aniket-7602';
-  const driverName = user?.name || 'Aniket Karmakar';
-  const cityPrefix = 'KOL'; // Regional Hub KOL
+  const driverID = user?.id || 'd-placeholder-id';
+  const driverName = profile?.name || user?.name || 'Driver...';
+  const cityPrefix = profile?.city_prefix || 'KOL'; // Regional Hub KOL
 
   const { dutyState, setDutyState, forceMatched } = useDriverDutyStore();
   const [activeTrip, setActiveTrip] = useState<ActiveOrderAssignment | null>(null);
@@ -108,11 +109,11 @@ export default function DriverTerminalPage() {
 
   // Statistics polling state
   const [stats, setStats] = useState({
-    trips_count: 4,
-    earnings_rupees: 2840,
-    online_hours: 5.2,
-    acceptance_rate: 96,
-    rating: 4.92,
+    trips_count: 0,
+    earnings_rupees: 0,
+    online_hours: 0,
+    acceptance_rate: 100,
+    rating: 5.0,
   });
 
   // SOS hold to confirm trigger states
@@ -464,38 +465,52 @@ export default function DriverTerminalPage() {
   };
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      router.push('/login?role=driver');
+      return;
+    };
 
     let cancelled = false;
     getDriverProfile(token)
-      .then((profile) => {
+      .then((fetchedProfile) => {
         if (cancelled) return;
+        
+        setProfile(fetchedProfile);
 
         // Redirect based on KYC / Verification status
-        const status = profile.verification_status || 'ONBOARDING';
+        const status = fetchedProfile.verification_status || 'ONBOARDING';
         if (status === 'ONBOARDING' || status === 'REJECTED') {
           router.push('/driver-onboarding');
           return;
         }
-        if (status === 'PENDING') {
-          setKycPending(true);
-          return;
-        }
+        
+        setKycPending(status === 'PENDING');
 
-        // Proceed to load terminal dashboard for VERIFIED drivers
-        setKycPending(false);
-        if (profile.current_state === 'ONLINE_AVAILABLE') {
+        // Set initial duty state from profile
+        if (fetchedProfile.current_state === 'ONLINE_AVAILABLE') {
           setDutyState('ONLINE');
           openOnlineStreams();
-        } else if (profile.current_state === 'ONLINE_EN_ROUTE') {
+        } else if (fetchedProfile.current_state === 'ONLINE_EN_ROUTE') {
           setDutyState('EN_ROUTE');
-        } else if (profile.current_state === 'ONLINE_DELIVERING') {
+        } else if (fetchedProfile.current_state === 'ONLINE_DELIVERING') {
           setDutyState('DELIVERING');
         } else {
           setDutyState('OFFLINE');
         }
+
+        // Set initial stats from profile
+        setStats(prev => ({
+          ...prev,
+          trips_count: fetchedProfile.total_trips || 0,
+          acceptance_rate: fetchedProfile.acceptance_rate * 100,
+          cancellation_rate: fetchedProfile.cancellation_rate * 100,
+        }));
       })
-      .catch((err) => console.warn('[DRIVER_PROFILE] Initial hydration failed:', err));
+      .catch((err) => {
+        console.warn('[DRIVER_PROFILE] Initial hydration failed:', err);
+        // If profile fails, logout to force re-authentication
+        useAuthStore.getState().logout();
+      });
 
     return () => {
       cancelled = true;

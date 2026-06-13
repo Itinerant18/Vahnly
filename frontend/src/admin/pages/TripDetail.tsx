@@ -1,6 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { API_GATEWAY_BASE_URL } from '../../config';
+
+interface GpsPoint {
+  lat: number;
+  lng: number;
+  captured_at: string;
+  speed: number;
+}
+
+// Mask a phone for display: keep the last 4 digits only.
+const maskPhone = (p: string): string => (p && p.length > 4 ? `•••• •••• ${p.slice(-4)}` : p || '—');
+const copyText = (v: string) => { try { void navigator.clipboard.writeText(v); } catch { /* clipboard unavailable */ } };
 
 interface TimelineEvent {
   event: string;
@@ -116,6 +129,28 @@ export const TripDetail: React.FC = () => {
   const [reassignDriverId, setReassignDriverId] = useState<string>('');
   const [adjustmentAmt, setAdjustmentAmt] = useState<string>('');
   const [adjustmentType, setAdjustmentType] = useState<string>('refund');
+  const [adjustmentReason, setAdjustmentReason] = useState<string>('');
+  const [gpsTrail, setGpsTrail] = useState<GpsPoint[]>([]);
+
+  useEffect(() => {
+    const role = localStorage.getItem('admin_role') || 'ADMIN';
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/gps-trail`, { headers: { 'X-Admin-Role': role } })
+      .then((r) => (r.ok ? r.json() : { trail: [] }))
+      .then((d) => setGpsTrail(d.trail || []))
+      .catch(() => setGpsTrail([]));
+  }, [id]);
+
+  // Resolve map geometry: prefer real GPS breadcrumbs, fall back to trip pickup/drop.
+  const mapData = useMemo(() => {
+    const t = data?.trip;
+    const trailPos = gpsTrail.map((p) => [p.lat, p.lng] as [number, number]);
+    const validPickup = t && t.pickup_lat && t.pickup_lng ? ([t.pickup_lat, t.pickup_lng] as [number, number]) : null;
+    const validDrop = t && t.dropoff_lat && t.dropoff_lng ? ([t.dropoff_lat, t.dropoff_lng] as [number, number]) : null;
+    const pickup = validPickup ?? trailPos[0] ?? null;
+    const drop = validDrop ?? trailPos[trailPos.length - 1] ?? null;
+    const center = pickup ?? ([22.5726, 88.3639] as [number, number]);
+    return { trailPos, pickup, drop, center, hasGeo: Boolean(pickup || trailPos.length) };
+  }, [data, gpsTrail]);
 
   const fetchTripDetail = async () => {
     setLoading(true);
@@ -178,26 +213,29 @@ export const TripDetail: React.FC = () => {
     setReassignDriverId('');
   };
 
-  const handleApplyAdjustment = () => {
-    if (!adjustmentAmt.trim() || isNaN(Number(adjustmentAmt))) {
-      alert('Please enter a valid numeric amount.');
+  const ADJUSTMENT_TYPE_MAP: Record<string, string> = {
+    refund: 'PARTIAL_REFUND',
+    waive: 'WAIVE_FEE',
+    bonus: 'ADD_BONUS',
+  };
+
+  const handleApplyAdjustment = async () => {
+    const amt = Number(adjustmentAmt);
+    if (!adjustmentAmt.trim() || isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid positive amount.');
       return;
     }
-    // Simulate transaction correction log
-    alert(`Adjustment recorded: ${adjustmentType.toUpperCase()} of ₹${adjustmentAmt} applied.`);
-    if (data) {
-      const updatedAudit = [
-        {
-          timestamp: new Date().toISOString(),
-          action: "Manual Adjustment",
-          actor: "Admin",
-          details: `Applied ${adjustmentType} of ₹${Number(adjustmentAmt).toFixed(2)}`
-        },
-        ...data.audit_logs
-      ];
-      setData({ ...data, audit_logs: updatedAudit });
+    if (!adjustmentReason.trim()) {
+      alert('A reason is required for any fare adjustment.');
+      return;
     }
+    await handleAdminAction('adjust', {
+      adjustment_type: ADJUSTMENT_TYPE_MAP[adjustmentType],
+      amount_paise: Math.round(amt * 100),
+      reason: adjustmentReason,
+    });
     setAdjustmentAmt('');
+    setAdjustmentReason('');
   };
 
   if (loading) {
@@ -283,41 +321,38 @@ export const TripDetail: React.FC = () => {
               <span className="text-xs font-bold text-ink uppercase tracking-wider">Route Trajectory</span>
               <span className="text-[10px] text-mute font-mono">H3 Cell: {trip.pickup_h3_cell}</span>
             </div>
-            <div className="h-64 bg-canvas-soft relative flex items-center justify-center p-4">
-              {/* Custom SVG Route Representation */}
-              <svg className="w-full h-full border border-canvas-soft/30 rounded-lg bg-canvas" viewBox="0 0 400 200">
-                {/* Grid */}
-                <defs>
-                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f3f3f3" strokeWidth="1" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-
-                {/* Polyline Path */}
-                <path
-                  d="M 50 150 Q 150 50, 250 120 T 350 50"
-                  fill="none"
-                  stroke="#000"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeDasharray="4 4"
-                  className="animate-[dash_10s_linear_infinite]"
-                />
-
-                {/* Breadcrumbs Driver Location Dot */}
-                <circle cx="218" cy="118" r="6" fill="#000" />
-                <circle cx="218" cy="118" r="12" fill="none" stroke="#000" strokeWidth="1" className="animate-ping" />
-
-                {/* Markers */}
-                {/* Pickup marker */}
-                <circle cx="50" cy="150" r="8" fill="#138000" />
-                <text x="50" y="145" fontSize="8" fontWeight="bold" textAnchor="middle" fill="#138000" fontFamily="monospace">PICKUP</text>
-                
-                {/* Dropoff marker */}
-                <circle cx="350" cy="50" r="8" fill="#b00020" />
-                <text x="350" y="45" fontSize="8" fontWeight="bold" textAnchor="middle" fill="#b00020" fontFamily="monospace">DROP</text>
-              </svg>
+            <div className="h-72 relative">
+              {mapData.hasGeo ? (
+                <MapContainer
+                  key={`${id}-${gpsTrail.length}`}
+                  center={mapData.center}
+                  zoom={14}
+                  scrollWheelZoom={false}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    attribution='&copy; OpenStreetMap'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {mapData.trailPos.length > 1 && (
+                    <Polyline positions={mapData.trailPos} pathOptions={{ color: '#0073E6', weight: 4 }} />
+                  )}
+                  {mapData.pickup && (
+                    <CircleMarker center={mapData.pickup} radius={8} pathOptions={{ color: '#138000', fillColor: '#138000', fillOpacity: 1 }}>
+                      <Popup>Pickup</Popup>
+                    </CircleMarker>
+                  )}
+                  {mapData.drop && (
+                    <CircleMarker center={mapData.drop} radius={8} pathOptions={{ color: '#b00020', fillColor: '#b00020', fillOpacity: 1 }}>
+                      <Popup>Drop-off</Popup>
+                    </CircleMarker>
+                  )}
+                </MapContainer>
+              ) : (
+                <div className="h-full bg-canvas-soft flex items-center justify-center text-xs text-mute">
+                  No GPS breadcrumbs recorded for this trip.
+                </div>
+              )}
             </div>
           </div>
 
@@ -365,7 +400,10 @@ export const TripDetail: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-ink">{rider.name}</h4>
-                  <p className="text-[11px] text-mute font-mono">{rider.phone}</p>
+                  <p className="text-[11px] text-mute font-mono flex items-center gap-1.5">
+                    {maskPhone(rider.phone)}
+                    <button onClick={() => copyText(rider.phone)} title="Copy phone" className="text-[10px] hover:text-ink">⧉</button>
+                  </p>
                 </div>
               </div>
               <div className="border-t border-canvas-soft pt-2.5 flex justify-between text-[11px]">
@@ -389,7 +427,10 @@ export const TripDetail: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-ink">{driver.name}</h4>
-                      <p className="text-[11px] text-mute font-mono">{driver.phone}</p>
+                      <p className="text-[11px] text-mute font-mono flex items-center gap-1.5">
+                        {maskPhone(driver.phone)}
+                        <button onClick={() => copyText(driver.phone)} title="Copy phone" className="text-[10px] hover:text-ink">⧉</button>
+                      </p>
                     </div>
                   </div>
                   <div className="border-t border-canvas-soft pt-2.5 flex justify-between text-[11px]">
@@ -531,11 +572,22 @@ export const TripDetail: React.FC = () => {
                   onChange={(e) => setAdjustmentAmt(e.target.value)}
                 />
               </div>
+              <div>
+                <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Reason (required, audited)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rider overcharged on surge"
+                  className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink"
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                />
+              </div>
               <button
                 onClick={handleApplyAdjustment}
-                className="w-full bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 hover:bg-black-elevated transition-colors"
+                disabled={actionLoading}
+                className="w-full bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 hover:bg-black-elevated transition-colors disabled:opacity-40"
               >
-                Apply Adjustment
+                {actionLoading ? 'Applying…' : 'Apply Adjustment'}
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -690,4 +691,40 @@ func (h *PromoHandler) recordAuditLog(ctx context.Context, adminID string, email
 		idVal = "00000000-0000-0000-0000-000000000000"
 	}
 	_, _ = h.dbPool.Exec(ctx, query, idVal, email, action, details, ip)
+}
+
+// promoCharset excludes ambiguous chars (0/O, 1/I/L) for readable codes.
+const promoCharset = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+// HandleGeneratePromoCode returns a unique 8-char alphanumeric promo code, checking
+// the promo_codes table for collisions before returning (rule 3 — uniqueness).
+// GET /api/v1/admin/promo-codes/generate
+func (h *PromoHandler) HandleGeneratePromoCode(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	var code string
+	for attempt := 0; attempt < 12; attempt++ {
+		buf := make([]byte, 8)
+		if _, err := rand.Read(buf); err != nil {
+			http.Error(w, "code_generation_failed", http.StatusInternalServerError)
+			return
+		}
+		b := make([]byte, 8)
+		for i := range buf {
+			b[i] = promoCharset[int(buf[i])%len(promoCharset)]
+		}
+		code = string(b)
+		var exists bool
+		if err := h.dbPool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM promo_codes WHERE code = $1)", code).Scan(&exists); err != nil {
+			http.Error(w, "uniqueness_check_failed", http.StatusInternalServerError)
+			return
+		}
+		if !exists {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"code": code})
+			return
+		}
+	}
+	http.Error(w, "could_not_generate_unique_code", http.StatusInternalServerError)
 }
