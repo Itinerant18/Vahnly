@@ -881,26 +881,26 @@ export default function DriverTerminalPage() {
   };
   if (kycPending) {
     return (
-      <div className="min-h-screen bg-black text-white p-6 sm:p-12 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
-        <header className="border-b border-zinc-900 pb-6 text-left">
-          <h1 className="text-xl font-bold tracking-tight text-white font-mono uppercase">DRIVERS-FOR-U</h1>
+      <div className="min-h-screen bg-background-primary text-content-primary p-6 sm:p-12 font-body flex flex-col justify-between">
+        <header className="border-b border-border-opaque pb-6 text-left">
+          <h1 className="text-heading-large font-mono tracking-tight uppercase">DRIVERS-FOR-U</h1>
         </header>
 
         <main className="flex-grow flex flex-col items-center justify-center max-w-md mx-auto text-center space-y-6">
-          <div className="h-16 w-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xl animate-pulse">
+          <div className="h-16 w-16 rounded-pill bg-background-secondary border border-border-opaque flex items-center justify-center text-2xl animate-pulse">
             ⏳
           </div>
-          <div className="space-y-2">
-            <span className="bg-zinc-900 text-zinc-400 font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-zinc-850">
+          <div className="space-y-3">
+            <span className="badge badge-neutral">
               KYC Compliance Review
             </span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white font-move">Application Pending Verification</h2>
-            <p className="text-zinc-500 text-xs leading-relaxed">
-              Your onboarding documents (Aadhaar, DL, Police Verification) are being validated by our regional compliance team. This normally takes 12-24 hours. You will receive a push notification once approved.
+            <h2 className="text-heading-xl text-content-primary">Application Pending Verification</h2>
+            <p className="text-paragraph-medium text-content-secondary max-w-sm">
+              Your onboarding documents (Aadhaar, DL, Police Verification) are being validated by our regional compliance team. This normally takes 12–24 hours.
             </p>
           </div>
 
-          <div className="w-full space-y-2 pt-4">
+          <div className="w-full space-y-3 pt-2">
             <button
               onClick={() => {
                 if (token) {
@@ -910,30 +910,35 @@ export default function DriverTerminalPage() {
                         setKycPending(false);
                         window.location.reload();
                       } else {
-                        alert("Your application is still under review. Please wait or contact support.");
+                        alert('Your application is still under review. Please wait or contact support.');
                       }
                     })
-                    .catch(() => alert("Failed to check status. Try again later."));
+                    .catch(() => alert('Failed to check status. Try again later.'));
                 }
               }}
-              className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono"
+              className="w-full h-14 rounded-sm bg-interactive-primary text-interactive-primary-text
+                text-label-large font-medium cursor-pointer transition-base
+                hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              🔄 Refresh Verification Status
+              🔄 Refresh Status
             </button>
             <button
               onClick={() => {
                 useAuthStore.getState().logout();
                 router.push('/login?role=driver');
               }}
-              className="w-full bg-zinc-950 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-400 border border-zinc-900 font-bold py-3 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono"
+              className="w-full h-12 rounded-sm bg-background-secondary border border-border-opaque
+                text-label-medium text-content-secondary cursor-pointer transition-base
+                hover:bg-background-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
-              🚪 Sign Out of Session
+              Sign Out
             </button>
           </div>
         </main>
 
-        <footer className="text-center text-[8px] font-mono text-zinc-600 uppercase tracking-wider pt-6 border-t border-zinc-900">
-          Security Node ID: KYC_COMPLIANCE_PENDING_GATEWAY
+        <footer className="text-center text-label-small text-content-tertiary font-mono pt-6 border-t border-border-opaque">
+          KYC_COMPLIANCE_PENDING_GATEWAY
         </footer>
       </div>
     );
@@ -964,18 +969,18 @@ export default function DriverTerminalPage() {
       {/* 2. SOS EMERGENCY PULSE TRIGGER MODAL */}
       <SosModal />
 
-      {/* FORCE-MATCH BANNER: a trip was assigned by dispatch (not accepted from an offer) */}
+      {/* FORCE-MATCH BANNER */}
       {forceMatched && dutyState !== 'ONLINE' && dutyState !== 'OFFLINE' && (
-        <div className="fixed top-0 inset-x-0 z-[100001] bg-amber-500 text-black px-4 py-2.5 flex items-center justify-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider shadow-lg">
+        <div className="fixed top-0 inset-x-0 z-[100001] bg-surface-warning px-4 py-2.5 flex items-center justify-center gap-2 font-mono text-label-small text-content-warning shadow-elevation-1">
           <span className="animate-pulse">●</span>
           Assigned by dispatch — proceed to pickup. This trip was force-matched to you.
         </div>
       )}
 
-      {/* CONNECTIVITY DEGRADED BANNER: dispatch stream is reconnecting — pause new work */}
+      {/* CONNECTIVITY DEGRADED BANNER */}
       {connectionStatus === 'RECONNECTING' && dutyState !== 'OFFLINE' && (
-        <div className="fixed top-0 inset-x-0 z-[100000] bg-zinc-800 text-zinc-300 px-4 py-2 flex items-center justify-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider shadow">
-          <span className="h-2 w-2 rounded-full border-[1.5px] border-amber-500 border-t-transparent animate-spin"></span>
+        <div className="fixed top-0 inset-x-0 z-[100000] bg-background-secondary border-b border-border-opaque px-4 py-2 flex items-center justify-center gap-2 font-mono text-label-small text-content-secondary shadow">
+          <span className="h-2 w-2 rounded-full border border-content-warning border-t-transparent animate-spin" />
           Reconnecting to dispatch — you won&apos;t receive new offers until the link is restored.
         </div>
       )}
@@ -985,61 +990,61 @@ export default function DriverTerminalPage() {
 
       {/* CANCEL ALLOCATION PICKER OVERLAY */}
       {showCancelModal && activeTrip && (
-        <div className="fixed inset-0 z-[100000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl w-full max-w-sm space-y-4 text-left font-mono">
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Cancel Allocation</h3>
-              <p className="text-[9px] text-zinc-500">Select a cancellation reason. Penalty charges may apply.</p>
+        <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-background-primary border border-border-opaque p-6 rounded-lg w-full max-w-sm space-y-4 text-left shadow-elevation-3">
+            <div>
+              <h3 className="text-heading-small text-content-primary">Cancel Allocation</h3>
+              <p className="text-paragraph-small text-content-secondary mt-1">Select a reason. Penalty charges may apply.</p>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {[
                 { label: 'Rider No Show', value: 'RIDER_NO_SHOW' },
                 { label: 'Wrong Address', value: 'WRONG_ADDRESS' },
                 { label: 'Vehicle Breakdown', value: 'VEHICLE_BREAKDOWN' },
                 { label: 'Safety Concerns', value: 'SAFETY' },
-                { label: 'Other Options', value: 'OTHER' }
+                { label: 'Other', value: 'OTHER' },
               ].map((reason) => (
                 <button
                   key={reason.value}
                   type="button"
                   onClick={() => setSelectedCancelReason(reason.value)}
-                  className={`w-full text-left py-2.5 px-3 rounded-xl border text-[10px] uppercase font-bold tracking-wide transition cursor-pointer ${
+                  className={[
+                    'w-full text-left h-11 px-4 rounded-sm border text-label-medium transition-base cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400',
                     selectedCancelReason === reason.value
-                      ? 'bg-red-950/40 border-red-800 text-red-400'
-                      : 'bg-zinc-900/60 border-zinc-850 text-zinc-400 hover:text-white'
-                  }`}
+                      ? 'bg-surface-negative border-negative-300 text-content-negative'
+                      : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-content-primary',
+                  ].join(' ')}
                 >
                   {reason.label}
                 </button>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowCancelModal(false);
-                  setSelectedCancelReason('');
-                }}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[10px] font-bold uppercase py-3 rounded-xl text-zinc-400 text-center transition cursor-pointer"
+                onClick={() => { setShowCancelModal(false); setSelectedCancelReason(''); }}
+                className="h-11 rounded-sm bg-background-secondary border border-border-opaque
+                  text-label-medium text-content-secondary cursor-pointer hover:bg-background-tertiary
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
                 Close
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  if (!selectedCancelReason) {
-                    alert('Please select a reason.');
-                    return;
-                  }
+                  if (!selectedCancelReason) { alert('Please select a reason.'); return; }
                   logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id, reason: selectedCancelReason });
                   setActiveTrip(null);
                   setDutyState('ONLINE');
                   setShowCancelModal(false);
                   setSelectedCancelReason('');
                 }}
-                className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase py-3 rounded-xl text-center transition cursor-pointer"
+                className="h-11 rounded-sm bg-negative-400 text-white text-label-medium font-medium
+                  cursor-pointer hover:bg-negative-500 transition-base
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
               >
                 Confirm Cancel
               </button>
@@ -1048,22 +1053,24 @@ export default function DriverTerminalPage() {
         </div>
       )}
 
-      {/* TOP HEADER MENU CONTROL */}
-      <header className="bg-zinc-950 border-b border-zinc-900 p-4 sticky top-0 z-50 flex justify-between items-center w-full text-left">
+      {/* TOP HEADER */}
+      <header className="bg-background-primary border-b border-border-opaque px-4 py-3 sticky top-0 z-50 flex justify-between items-center w-full">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => setIsDrawerOpen(true)}
-            className="h-9 w-9 bg-zinc-900 hover:bg-zinc-850 rounded-xl border border-zinc-800 flex items-center justify-center text-sm cursor-pointer transition active:scale-95"
+            className="h-11 w-11 bg-background-secondary hover:bg-background-tertiary rounded-sm border border-border-opaque
+              flex items-center justify-center text-content-primary cursor-pointer transition-base active:scale-95
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             aria-label="Open Navigation Drawer"
           >
             ☰
           </button>
           <div>
-            <h1 className="text-xs font-bold tracking-tight text-white font-mono uppercase">DRIVERS-FOR-U</h1>
-            <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-mono text-zinc-500">
+            <h1 className="text-label-large font-mono tracking-tight uppercase text-content-primary">DRIVERS-FOR-U</h1>
+            <div className="flex items-center gap-1.5 mt-0.5 font-mono text-label-small text-content-tertiary">
               <span>HUB: {cityPrefix}</span>
-              <span>●</span>
-              <span>STATE: {dutyState}</span>
+              <span>·</span>
+              <span>{dutyState}</span>
             </div>
           </div>
         </div>
@@ -1074,37 +1081,42 @@ export default function DriverTerminalPage() {
               <button
                 type="button"
                 onClick={reconnect}
-                className="bg-red-950/60 text-red-400 border border-red-900 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:bg-red-900/50 transition active:scale-95"
+                className="badge badge-negative cursor-pointer hover:opacity-80 min-h-[36px] px-3
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
-                Offline · Tap to retry
+                <span className="status-dot status-dot-negative" />
+                <span className="ml-1">Offline · Retry</span>
               </button>
             ) : connectionStatus === 'CONNECTED' ? (
-              <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                Connected
+              <span className="badge badge-positive">
+                <span className="status-dot status-dot-online" />
+                <span className="ml-1">Connected</span>
               </span>
             ) : (
-              <span className="bg-amber-950/40 text-amber-400 border border-amber-900/60 px-2.5 py-1.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full border-[1.5px] border-amber-500 border-t-transparent animate-spin"></span>
-                Reconnecting
+              <span className="badge badge-warning">
+                <span className="status-dot status-dot-pending" />
+                <span className="ml-1">Reconnecting</span>
               </span>
             )
           )}
 
-          {/* Emergency SOS red trigger with 2-second hold confirmation */}
+          {/* SOS — 2-second hold */}
           <button
             onMouseDown={startSosHold}
             onMouseUp={cancelSosHold}
             onMouseLeave={cancelSosHold}
             onTouchStart={startSosHold}
             onTouchEnd={cancelSosHold}
-            className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition-all cursor-pointer active:scale-95 flex items-center gap-1 border border-red-500 relative overflow-hidden select-none"
-            style={{ minWidth: '85px' }}
+            className="relative overflow-hidden bg-negative-400 hover:bg-negative-500
+              text-white text-label-small font-medium
+              h-9 px-3 rounded-pill
+              cursor-pointer select-none transition-base
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
+            style={{ minWidth: '80px' }}
           >
-            {sosHolding ? (
-              <span className="absolute inset-0 bg-red-800 transition-all duration-100" style={{ width: `${sosProgress}%`, opacity: 0.8 }} />
-            ) : null}
+            {sosHolding && (
+              <span className="absolute inset-0 bg-negative-600 transition-none" style={{ width: `${sosProgress}%` }} />
+            )}
             <span className="relative z-10">🚨 SOS {sosHolding ? `${Math.round(sosProgress)}%` : '(Hold)'}</span>
           </button>
         </div>
@@ -1112,19 +1124,21 @@ export default function DriverTerminalPage() {
 
       {/* CORE AREA: MAP LAYOUT AND VIEWS */}
       <main className="flex-1 flex flex-col relative min-h-[350px]">
-        {/* Stylized background custom map simulation */}
-        <div className="absolute inset-0 bg-zinc-950 z-0 overflow-hidden flex items-center justify-center" style={{ filter: dutyState === 'OFFLINE' ? 'grayscale(1)' : 'none' }}>
+        <div
+          className="absolute inset-0 bg-background-primary z-0 overflow-hidden flex items-center justify-center"
+          style={{ filter: dutyState === 'OFFLINE' ? 'grayscale(1) opacity(0.6)' : 'none' }}
+        >
           {dutyState === 'OFFLINE' ? (
-            <svg className="w-full h-full opacity-35 transition duration-500" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222" strokeWidth="1" />
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" className="text-border-opaque" />
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#grid)" />
             </svg>
           ) : (
-            <div className="w-full h-full p-0 bg-black">
+            <div className="w-full h-full">
               <MapInterpolated
                 drivers={mapDrivers}
                 pickup={activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : null}
@@ -1135,61 +1149,58 @@ export default function DriverTerminalPage() {
             </div>
           )}
 
-          {/* Turn-by-Turn Navigation Floating Panel */}
+          {/* Turn-by-Turn Navigation panel */}
           {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
-            <div className="absolute top-16 left-4 z-20 bg-zinc-950/90 border border-zinc-800 p-3 rounded-xl font-mono text-[10px] space-y-1 max-w-xs shadow-lg animate-fadeIn text-left">
-              <span className="text-[8px] font-bold text-zinc-505 uppercase tracking-widest block">Simulation Route Navigation</span>
-              <div className="text-white font-bold flex items-center gap-1.5">
+            <div className="absolute top-4 left-4 z-20 bg-background-primary/90 border border-border-opaque p-3 rounded-md font-mono text-label-small space-y-1 max-w-xs shadow-elevation-2 text-left animate-enter">
+              <span className="text-label-small text-content-tertiary uppercase tracking-wider block">Navigation</span>
+              <div className="text-content-primary font-medium flex items-center gap-1.5">
                 <span>🛞</span>
-                <span>{dutyState === 'EN_ROUTE' ? 'Drive to Pickup Location' : 'Drive to Dropoff Location'}</span>
+                <span>{dutyState === 'EN_ROUTE' ? 'Drive to Pickup' : 'Drive to Dropoff'}</span>
               </div>
-              <div className="text-zinc-400">
-                {dutyState === 'EN_ROUTE' 
-                  ? `Next: Turn Left onto Howrah Bridge Rd in ${(150 - mapGlideProgress * 1.5).toFixed(0)}m`
-                  : `Next: Turn Right onto E.M. Bypass in ${(200 - mapGlideProgress * 2).toFixed(0)}m`
-                }
-              </div>
-              <div className="text-zinc-505 text-[8px] uppercase tracking-wider">
-                Current speed: {42 + Math.floor(Math.random() * 8)} km/h · GPS Lock Active
+              <div className="text-content-secondary">
+                {dutyState === 'EN_ROUTE'
+                  ? `Turn Left — Howrah Bridge Rd in ${(150 - mapGlideProgress * 1.5).toFixed(0)}m`
+                  : `Turn Right — E.M. Bypass in ${(200 - mapGlideProgress * 2).toFixed(0)}m`}
               </div>
             </div>
           )}
 
-          {/* Offline Map Overlay message */}
+          {/* Offline overlay */}
           {dutyState === 'OFFLINE' && (
-            <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center p-6">
-              <div className="text-center space-y-2">
-                <span className="text-3xl block">📡</span>
-                <h3 className="text-xs font-mono uppercase font-bold tracking-widest text-zinc-500">Duty Terminal Offline</h3>
-                <p className="text-[10px] text-zinc-600 max-w-xs font-mono">
-                  Ingestion loops and websocket pipelines disconnected. Go Online below to hook coordinate streaming.
+            <div className="absolute inset-0 bg-black/60 z-10 flex items-center justify-center p-6">
+              <div className="text-center space-y-3">
+                <span className="text-4xl block">📡</span>
+                <h3 className="text-heading-small text-content-secondary">Terminal Offline</h3>
+                <p className="text-paragraph-small text-content-tertiary max-w-xs">
+                  Go Online to connect to dispatch and start receiving trip offers.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Interactive Heatmap toggle indicator */}
+          {/* Heatmap toggle */}
           {dutyState !== 'OFFLINE' && (
-            <div className="absolute top-4 left-4 z-10 space-y-2 text-left">
+            <div className="absolute top-4 right-4 z-10 space-y-2">
               <button
                 type="button"
                 onClick={() => setShowHeatmap(!showHeatmap)}
-                className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 rounded-full hover:bg-zinc-900 transition flex items-center gap-1.5"
+                className="bg-background-primary/90 border border-border-opaque text-label-small text-content-secondary
+                  py-1.5 px-3 rounded-pill hover:bg-background-secondary transition-base flex items-center gap-1.5
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                🔥 Heatmap: {showHeatmap ? 'VISIBLE' : 'HIDDEN'}
+                🔥 {showHeatmap ? 'Heatmap ON' : 'Heatmap OFF'}
               </button>
               {heatmapData && (
-                <div className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono text-zinc-400 py-1.5 px-3 rounded-full">
-                  {heatmapData.region} · {Object.keys(heatmapData.cell_data).length} live cells
+                <div className="bg-background-primary/90 border border-border-opaque text-label-small text-content-tertiary py-1.5 px-3 rounded-pill">
+                  {heatmapData.region} · {Object.keys(heatmapData.cell_data).length} cells
                 </div>
               )}
             </div>
           )}
-
         </div>
 
-        {/* BOTTOM ACTIVE CONTROL SHEET CARD DRAWER */}
-        <div className="mt-auto w-full z-10 bg-zinc-950/90 border-t border-zinc-900 p-4 sm:p-6 space-y-4 max-w-xl mx-auto rounded-t-2xl shadow-xl backdrop-blur-md">
+        {/* BOTTOM CONTROL SHEET */}
+        <div className="mt-auto w-full z-10 bg-background-primary/95 border-t border-border-opaque p-4 sm:p-6 space-y-4 max-w-xl mx-auto rounded-t-lg shadow-elevation-3 backdrop-blur-sm">
           <DriverTripManager
             activeTrip={activeTrip}
             stats={stats}
@@ -1241,19 +1252,20 @@ export default function DriverTerminalPage() {
         </div>
       </main>
 
-      {/* DETAILED TELETEMETRY LOGGING VISUAL TERMINAL SHEET FOR SANDBOX VALIDATION */}
+      {/* TELEMETRY LOG CONSOLE */}
       {auditLogs.length > 0 && (
-        <div className="w-full bg-zinc-950 border-t border-zinc-900 p-4 text-left max-w-xl mx-auto z-10 font-mono relative">
+        <div className="w-full bg-background-secondary border-t border-border-opaque p-4 text-left max-w-xl mx-auto z-10">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Real-time Telemetry logs console:</span>
+            <span className="text-label-small text-content-tertiary font-mono uppercase tracking-wider">Telemetry logs</span>
             <button
               onClick={() => setAuditLogs([])}
-              className="text-[7px] text-zinc-600 hover:text-zinc-400 uppercase font-bold tracking-widest cursor-pointer"
+              className="text-label-small text-content-tertiary hover:text-content-secondary cursor-pointer
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
-              Clear Logs
+              Clear
             </button>
           </div>
-          <div className="bg-black border border-zinc-900 rounded-xl p-3 max-h-24 overflow-y-auto font-mono text-[8px] text-zinc-500 space-y-0.5 scrollbar-thin">
+          <div className="bg-background-primary border border-border-opaque rounded-sm p-3 max-h-24 overflow-y-auto font-mono text-label-small text-content-tertiary space-y-0.5">
             {auditLogs.map((log, index) => (
               <div key={index} className="truncate select-all leading-relaxed">{log}</div>
             ))}
@@ -1261,9 +1273,8 @@ export default function DriverTerminalPage() {
         </div>
       )}
 
-      {/* static footer details */}
-      <footer className="bg-black p-3 text-center text-[8px] font-mono text-zinc-700 border-t border-zinc-950 select-none">
-        ENCRYPTED SECURE WS LAYER • TELEMETRY FLUSH ACTIVE
+      <footer className="bg-background-primary border-t border-border-opaque p-3 text-center text-label-small font-mono text-content-tertiary select-none">
+        D4U · ENCRYPTED WS · TELEMETRY ACTIVE
       </footer>
     </div>
   );

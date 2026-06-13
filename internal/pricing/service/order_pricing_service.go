@@ -209,13 +209,18 @@ func (s *OrderPricingService) GetFareQuote(ctx context.Context, city string, h3C
 	// Clamp to any active admin freeze cap before pricing.
 	multiplier = s.applyFreezeCap(ctx, city, h3Cell, multiplier)
 
-	// Calculate base operational costs before applying multiplier modifiers
-	distanceCost := float64(s.perMeterPaise) * distanceMeters
-	rawTotalFare := float64(s.baseFarePaise) + distanceCost
-	finalSurgeFare := rawTotalFare * multiplier
+	// Apply the live multiplier to (base + distance) and round to whole paise.
+	// Extracted into computeFarePaise so the money formula is unit-testable without
+	// a live Redis cluster — the multiplier read above is the only infra dependency.
+	return computeFarePaise(s.baseFarePaise, s.perMeterPaise, distanceMeters, multiplier), multiplier, nil
+}
 
-	// Enforce 64-bit integer tracking boundaries (Paise) to eliminate floating point accuracy drift
-	return int64(math.Round(finalSurgeFare)), multiplier, nil
+// computeFarePaise is the pure fare formula: (base + perMeter*distance) * multiplier,
+// rounded to whole paise. Side-effect-free so the pricing math can be unit-tested with
+// no Redis. Callers resolve `multiplier` from the live surge cache separately.
+func computeFarePaise(baseFarePaise, perMeterPaise int64, distanceMeters, multiplier float64) int64 {
+	rawTotalFare := float64(baseFarePaise) + float64(perMeterPaise)*distanceMeters
+	return int64(math.Round(rawTotalFare * multiplier))
 }
 
 // Close cleanly releases network stream context resources

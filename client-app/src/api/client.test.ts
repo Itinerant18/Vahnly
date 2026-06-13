@@ -18,7 +18,9 @@ import {
   updateDriverLocation,
 } from './client';
 
-const baseUrl = 'http://localhost:8080';
+// Must match client.ts BASE_URL default (gateway moved 8080 → 8085); otherwise
+// every request misses its msw handler and onUnhandledRequest:'error' throws.
+const baseUrl = 'http://localhost:8085';
 const server = setupServer();
 
 interface CapturedRequest {
@@ -59,7 +61,7 @@ afterAll(() => server.close());
 
 describe('driver API client smoke tests', () => {
   it('posts driver login credentials', async () => {
-    server.use(http.post(`${baseUrl}/api/v1/auth/driver/login`, async ({ request }) => {
+    server.use(http.post(`${baseUrl}/api/v1/driver/login`, async ({ request }) => {
       await capture(request);
       return HttpResponse.json({
         token: 'jwt',
@@ -71,7 +73,7 @@ describe('driver API client smoke tests', () => {
 
     expect(captured).toMatchObject({
       method: 'POST',
-      pathname: '/api/v1/auth/driver/login',
+      pathname: '/api/v1/driver/login',
       region: 'KOL',
       body: { phone: '999', password: 'secret' },
     });

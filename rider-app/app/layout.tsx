@@ -1,6 +1,26 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/lib/providers/ThemeProvider";
+
+// ── Inter — display, body, labels ──────────────────────────────────────────
+// RULE: Inter for ALL prose, headings, labels, addresses, phone numbers.
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
+// ── JetBrains Mono — fares, ETAs, distances, IDs ONLY ─────────────────────
+// RULE: Never use font-mono for addresses or phone numbers.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500"],
+});
 
 export const metadata: Metadata = {
   title: "Drivers-for-u",
@@ -11,13 +31,24 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#0A0E27",
+  // Rider app: light mode default (white background)
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+    <html
+      lang="en"
+      data-theme="light"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body
+        className="bg-background-primary text-content-primary"
+        suppressHydrationWarning
+      >
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

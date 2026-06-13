@@ -20,6 +20,23 @@ const (
 	odoExtraKmRatePaiseGW = 1200 // ₹12.00 / km provisional corrective rate
 )
 
+// odometerVariancePct returns the percent deviation of the driver-reported distance
+// from the expected road distance (straight-line × road factor). Positive = the driver
+// reported more km than expected. Pure so the auto-flag threshold logic is unit-testable.
+func odometerVariancePct(reportedKm, straightKm float64) float64 {
+	expectedKm := straightKm * odoRoadFactorGW
+	if expectedKm <= 0 {
+		return 0
+	}
+	return (reportedKm - expectedKm) / expectedKm * 100
+}
+
+// odometerFlagged reports whether a variance percent breaches the auto-flag tolerance.
+// At exactly the tolerance the trip is NOT flagged (inclusive band).
+func odometerFlagged(variancePct float64) bool {
+	return math.Abs(variancePct) > odoTolerancePctGW
+}
+
 // HandleDriverOdometerCheckpoint is the driver-facing POST handler that captures
 // odometer/fuel checkpoints at trip START and END. It serves as the single point
 // of truth for physical asset state, writing to trip_odometer_checkpoints and
@@ -264,8 +281,8 @@ func (h *GatewayHandler) autoReconcileVariance(ctx context.Context, orderID stri
 		return
 	}
 	reported := endReading - startReading
-	variancePct := (float64(reported) - expectedKm) / expectedKm * 100
-	if math.Abs(variancePct) <= odoTolerancePctGW {
+	variancePct := odometerVariancePct(float64(reported), straightKm)
+	if !odometerFlagged(variancePct) {
 		return // within tolerance — auto-reconciled, financial_status stays CLEARED
 	}
 

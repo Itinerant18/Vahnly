@@ -4,76 +4,125 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useOfferStore } from '@/store/useOfferStore';
 
-function formatRupees(paise: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(paise / 100);
-}
+// ── Slide-to-Accept ───────────────────────────────────────────────────────────
+// Uses DS tokens only — no hardcoded hex values.
 
 interface SlideToAcceptProps {
   onAccept: () => void;
+  variant?: 'accept' | 'end';
 }
 
-function SlideToAccept({ onAccept }: SlideToAcceptProps) {
+function SlideToAccept({ onAccept, variant = 'accept' }: SlideToAcceptProps) {
   const [sliderVal, setSliderVal] = useState(0);
   const sliderRef = useRef<HTMLDivElement | null>(null);
+  const isDragging = useRef(false);
+
+  const trackCls =
+    variant === 'accept'
+      ? 'bg-surface-positive border border-positive-300'
+      : 'bg-surface-negative border border-negative-300';
+  const thumbCls =
+    variant === 'accept'
+      ? 'bg-status-online'
+      : 'bg-status-negative';
+  const labelCls =
+    variant === 'accept'
+      ? 'text-content-positive'
+      : 'text-content-negative';
+  const label = variant === 'accept' ? 'Slide to accept →' : 'Slide to end trip →';
 
   const handleMove = (clientX: number) => {
-    if (!sliderRef.current) return;
+    if (!sliderRef.current || !isDragging.current) return;
     const rect = sliderRef.current.getBoundingClientRect();
-    const width = rect.width - 48; // handle size
-    const relativeX = clientX - rect.left - 24;
+    const width = rect.width - 52;
+    const relativeX = clientX - rect.left - 26;
     const val = Math.max(0, Math.min(100, (relativeX / width) * 100));
     setSliderVal(val);
-
     if (val >= 90) {
+      isDragging.current = false;
       onAccept();
       setSliderVal(0);
     }
   };
 
   const handleEnd = () => {
-    if (sliderVal < 90) {
-      setSliderVal(0);
-    }
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (e.touches[0]) {
-      handleMove(e.touches[0].clientX);
-    }
-  };
-
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (e.buttons === 1) {
-      handleMove(e.clientX);
-    }
+    isDragging.current = false;
+    if (sliderVal < 90) setSliderVal(0);
   };
 
   return (
     <div
       ref={sliderRef}
-      className="relative h-12 w-full select-none overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 p-1 flex items-center justify-center"
+      className={`relative h-14 w-full select-none overflow-hidden rounded-pill flex items-center justify-center ${trackCls}`}
       onMouseUp={handleEnd}
       onMouseLeave={handleEnd}
       onTouchEnd={handleEnd}
     >
-      <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-zinc-500 pointer-events-none animate-pulse">
-        {sliderVal > 10 ? '' : '➔ Slide to accept'}
-      </span>
-      <div
-        className="absolute left-1 h-10 w-10 cursor-grab active:cursor-grabbing rounded-lg bg-white shadow-lg flex items-center justify-center text-black font-bold text-xs"
-        style={{ left: `calc(${sliderVal}% * (100% - 44px) / 100 + 2px)` }}
-        onTouchMove={onTouchMove}
-        onMouseMove={onMouseMove}
+      {/* Label — fades as thumb moves */}
+      <span
+        className={`text-label-medium font-body pointer-events-none transition-opacity duration-100 ${labelCls}`}
+        style={{ opacity: Math.max(0, 1 - sliderVal / 40) }}
       >
-        ➔
+        {label}
+      </span>
+
+      {/* Draggable thumb */}
+      <div
+        className={`absolute left-1 w-12 h-12 rounded-pill ${thumbCls} shadow-elevation-2 flex items-center justify-center text-white cursor-grab active:cursor-grabbing z-10 transition-none`}
+        style={{ left: `calc(${sliderVal}% * (100% - 52px) / 100 + 2px)` }}
+        onMouseDown={(e) => { e.preventDefault(); isDragging.current = true; }}
+        onMouseMove={(e) => handleMove(e.clientX)}
+        onTouchStart={() => { isDragging.current = true; }}
+        onTouchMove={(e) => e.touches[0] && handleMove(e.touches[0].clientX)}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </div>
     </div>
   );
 }
+
+// ── Countdown Ring ────────────────────────────────────────────────────────────
+
+interface CountdownRingProps {
+  remaining: number; // seconds
+  total?: number;    // default 15
+}
+
+function CountdownRing({ remaining, total = 15 }: CountdownRingProps) {
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const progress = Math.max(0, Math.min(1, remaining / total));
+  const offset = circ * (1 - progress);
+
+  // warning-400 until 5s, then negative-400
+  const strokeClass = remaining > 5 ? 'text-status-pending' : 'text-status-negative';
+
+  return (
+    <div className="relative flex-shrink-0 w-14 h-14 flex items-center justify-center">
+      <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+        {/* Track */}
+        <circle cx="28" cy="28" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-border-opaque" />
+        {/* Progress */}
+        <circle
+          cx="28" cy="28" r={r}
+          fill="none" stroke="currentColor" strokeWidth="3"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={`${strokeClass} transition-[stroke-dashoffset] duration-100 linear`}
+        />
+      </svg>
+      {/* Center number */}
+      <span className={`absolute font-mono text-mono-medium font-bold ${strokeClass}`}>
+        {remaining}s
+      </span>
+    </div>
+  );
+}
+
+// ── OfferPopup ────────────────────────────────────────────────────────────────
 
 export function OfferPopup() {
   const { token, user } = useAuthStore();
@@ -81,39 +130,29 @@ export function OfferPopup() {
   const [remaining, setRemaining] = useState(15);
   const [showDeclinePicker, setShowDeclinePicker] = useState(false);
   const expiredRef = useRef(false);
+  const driverID = user?.id || 'drv-placeholder';
 
-  const driverID = user?.id || 'drv-aniket-7602';
-
-  // On a fresh offer (incl. a remount after WS reconnect), reconcile against the server
-  // so a stale OFFER_PENDING left by a dropped connection is cleared, not hung.
+  // Reconcile on mount if pending
   useEffect(() => {
     if (status === 'OFFER_PENDING') {
       expiredRef.current = false;
       setShowDeclinePicker(false);
-      if (token) {
-        reconcilePendingOffer(token);
-      }
+      if (token) reconcilePendingOffer(token);
     }
   }, [currentOffer?.orderId, status, token, reconcilePendingOffer]);
 
-  // Clock-based countdown: each tick derives the remaining time from the absolute expiry,
-  // so backgrounding the tab (which throttles timers) or a remount cannot stall the
-  // auto-decline — on resume the next tick sees time has elapsed and fires TIMEOUT.
+  // Clock-accurate countdown
   useEffect(() => {
     if (status !== 'OFFER_PENDING') return;
-
     const tick = () => {
       const expiry = offerExpiresAt ?? Date.now() + 15000;
       const secs = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
       setRemaining(secs);
       if (secs <= 0 && !expiredRef.current) {
         expiredRef.current = true;
-        if (token) {
-          declineOffer(token, driverID, 'TIMEOUT');
-        }
+        if (token) declineOffer(token, driverID, 'TIMEOUT');
       }
     };
-
     tick();
     const interval = window.setInterval(tick, 500);
     return () => window.clearInterval(interval);
@@ -121,174 +160,187 @@ export function OfferPopup() {
 
   if (status !== 'OFFER_PENDING' || !currentOffer) return null;
 
-  const progress = Math.max(0, Math.min(1, remaining / 15));
-  const ringStyle = {
-    background: `conic-gradient(#ffffff ${progress * 360}deg, #27272a 0deg)`,
-  };
-
   const handleAccept = async () => {
-    if (token) {
-      await acceptOffer(token, driverID);
-    }
+    if (token) await acceptOffer(token, driverID);
   };
 
-  const handleDeclineSelect = async (reason: string) => {
+  const handleDecline = async (reason: string) => {
     if (token) {
       await declineOffer(token, driverID, reason);
       setShowDeclinePicker(false);
-      alert('Offer declined. A 30-second matching cooldown has been applied.');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl space-y-4 animate-scaleUp">
-        
-        {/* HEADER BLOCK */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="text-left">
-            <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-zinc-500">
-              Incoming Job Match
-            </span>
-            <h3 className="mt-0.5 text-lg font-extrabold flex items-center gap-1.5">
-              👤 {currentOffer.riderName}
-              <span className="text-xs bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded text-amber-500 font-mono font-bold">
-                ★ {currentOffer.riderRating.toFixed(2)}
-              </span>
-            </h3>
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className="text-[8px] font-mono font-bold bg-zinc-900 border border-zinc-850 px-2 py-0.5 rounded uppercase tracking-wider text-zinc-400">
-                🏷️ {currentOffer.tripType}
-              </span>
-              {currentOffer.d4mCareOptIn && (
-                <span className="text-[8px] font-mono font-bold bg-zinc-900 border border-zinc-800 text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                  🛡️ D4M Care Protection
+    <>
+      {/* ── Full-screen backdrop ── */}
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end">
+
+        {/* ── Sheet ── */}
+        <div
+          className="w-full bg-background-primary rounded-t-lg shadow-elevation-3 animate-enter"
+          style={{ maxHeight: '92dvh', overflowY: 'auto' }}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-300 pb-400">
+            <div className="w-9 h-1 rounded-pill bg-border-opaque" />
+          </div>
+
+          <div className="px-500 pb-500 space-y-500">
+
+            {/* ── Header row: rider info + countdown ── */}
+            <div className="flex items-start justify-between gap-400">
+              <div className="flex-1 min-w-0">
+                <span className="text-label-small text-content-tertiary uppercase tracking-wider">
+                  Incoming Job Match
                 </span>
-              )}
-            </div>
-          </div>
+                <h2 className="text-heading-xl text-content-primary mt-1 flex items-center gap-300">
+                  {currentOffer.riderName}
+                  <span className="font-mono text-mono-small text-content-secondary tabular-nums">
+                    ★ {currentOffer.riderRating.toFixed(2)}
+                  </span>
+                </h2>
 
-          {/* TIMER PROGRESS CIRCLE */}
-          <div
-            className="grid h-12 w-12 place-items-center rounded-full p-0.5 shadow-md flex-shrink-0"
-            style={ringStyle}
-            aria-label={`${remaining} seconds remaining`}
-          >
-            <div className="grid h-full w-full place-items-center rounded-full bg-zinc-950 font-mono text-[11px] font-bold">
-              {remaining}s
-            </div>
-          </div>
-        </div>
+                {/* Chips row */}
+                <div className="flex flex-wrap gap-200 mt-300">
+                  <span className="badge badge-neutral text-label-small">
+                    {currentOffer.tripType}
+                  </span>
+                  {currentOffer.d4mCareOptIn && (
+                    <span className="badge badge-accent text-label-small">
+                      🛡 Insured Trip
+                    </span>
+                  )}
+                </div>
+              </div>
 
-        {/* RIDER CAR CONTEXT (Phase 10) */}
-        {(currentOffer.carMake || currentOffer.carModel) && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-1.5 text-left">
-            <p className="text-sm font-bold text-white">
-              Driving their{' '}
-              {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel]
-                .filter(Boolean)
-                .join(' ')}
-            </p>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-              ({currentOffer.carType || 'CAR'} · {currentOffer.carTransmission || 'Any'})
-            </p>
-            {currentOffer.transmissionMatch === false && (
-              <div className="mt-1 rounded-lg border border-amber-600/40 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-400">
-                ⚠ Requested: {currentOffer.carTransmission || 'Manual'} — doesn&apos;t match your expertise
+              <CountdownRing remaining={remaining} />
+            </div>
+
+            {/* ── Car context card ── */}
+            {(currentOffer.carMake || currentOffer.carModel) && (
+              <div className="bg-background-secondary rounded-md p-500 space-y-200">
+                <p className="text-heading-small text-content-primary">
+                  {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel].filter(Boolean).join(' ')}
+                </p>
+                <p className="text-paragraph-small text-content-secondary">
+                  {currentOffer.carType || 'Car'} · {currentOffer.carTransmission || 'Any'}
+                </p>
+
+                {/* Transmission mismatch warning */}
+                {currentOffer.transmissionMatch === false && (
+                  <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
+                    <span className="text-content-warning text-label-medium">⚠</span>
+                    <p className="text-paragraph-small text-content-warning">
+                      Car needs {currentOffer.carTransmission || 'Manual'} — check your expertise match
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-            <p className="text-[10px] text-zinc-500">For {currentOffer.riderName}</p>
-          </div>
-        )}
 
-        {/* TRIP INFO GRID */}
-        <div className="border-t border-b border-zinc-900 py-3 space-y-2.5 text-xs text-left">
-          <div>
-            <span className="font-mono text-[8px] font-bold uppercase tracking-wider text-zinc-500 block">Pickup Address</span>
-            <p className="text-zinc-200 mt-0.5 font-sans truncate">{currentOffer.pickup.address}</p>
-          </div>
-          <div>
-            <span className="font-mono text-[8px] font-bold uppercase tracking-wider text-zinc-500 block">Drop Address</span>
-            <p className="text-zinc-200 mt-0.5 font-sans truncate">{currentOffer.drop.address}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 border-t border-zinc-900/60 pt-2 text-[10px] font-mono text-zinc-400">
-            <div>
-              Car requested: <strong className="text-white">{currentOffer.carTypeRequested || 'SEDAN'}</strong>
-            </div>
-            <div>
-              Transmission: <strong className="text-white">{currentOffer.transmissionRequired || 'ANY'}</strong>
-            </div>
-            <div>
-              Est. Distance: <strong className="text-white">{currentOffer.distanceKm ? `${currentOffer.distanceKm.toFixed(1)} km` : '4.5 km'}</strong>
-            </div>
-            <div>
-              Est. Duration: <strong className="text-white">{currentOffer.durationMinutes ? `${currentOffer.durationMinutes} mins` : '12 mins'}</strong>
-            </div>
-          </div>
-        </div>
+            {/* ── Trip details grid ── */}
+            <div className="grid grid-cols-2 gap-300">
+              {/* Pickup distance */}
+              <div className="bg-background-secondary rounded-sm p-400">
+                <span className="text-label-small text-content-tertiary block mb-1">Pickup distance</span>
+                <span className="font-mono text-mono-medium text-content-primary tabular-nums">
+                  {currentOffer.distanceKm ? `${currentOffer.distanceKm.toFixed(1)} km` : '—'}
+                </span>
+              </div>
 
-        {/* NOTES ROW */}
-        {currentOffer.notes && (
-          <div className="bg-zinc-900/30 border border-zinc-900 p-2.5 rounded-lg text-left">
-            <span className="font-mono text-[8px] font-bold uppercase tracking-wider text-zinc-500 block">Special client instructions</span>
-            <p className="text-[10px] text-zinc-400 italic mt-0.5 font-sans">"{currentOffer.notes}"</p>
-          </div>
-        )}
+              {/* ETA */}
+              <div className="bg-background-secondary rounded-sm p-400">
+                <span className="text-label-small text-content-tertiary block mb-1">Est. duration</span>
+                <span className="font-mono text-mono-medium text-content-primary tabular-nums">
+                  {currentOffer.durationMinutes ? `${currentOffer.durationMinutes} min` : '—'}
+                </span>
+              </div>
 
-        {/* BOTTOM FARE & CONFIRM CONTROLS */}
-        <div className="flex items-center justify-between border-t border-zinc-900 pt-3.5 gap-4">
-          <div className="text-left flex-shrink-0">
-            <span className="font-mono text-[8px] font-bold uppercase tracking-wider text-zinc-500 block">Est. Payout</span>
-            <span className="text-xl font-extrabold text-white font-mono">{formatRupees(currentOffer.fareEstimate)}</span>
-          </div>
+              {/* Pickup address */}
+              <div className="col-span-2 bg-background-secondary rounded-sm p-400">
+                <span className="text-label-small text-content-tertiary block mb-1">Pickup</span>
+                <p className="text-paragraph-medium text-content-primary truncate">
+                  {currentOffer.pickup.address}
+                </p>
+              </div>
 
-          <div className="flex-1 flex gap-2 items-center">
+              {/* Drop address */}
+              <div className="col-span-2 bg-background-secondary rounded-sm p-400">
+                <span className="text-label-small text-content-tertiary block mb-1">Drop</span>
+                <p className="text-paragraph-medium text-content-primary truncate">
+                  {currentOffer.drop.address}
+                </p>
+              </div>
+            </div>
+
+            {/* Special notes */}
+            {currentOffer.notes && (
+              <div className="bg-surface-warning rounded-sm p-400">
+                <span className="text-label-small text-content-warning block mb-1">Client notes</span>
+                <p className="text-paragraph-small text-content-primary">"{currentOffer.notes}"</p>
+              </div>
+            )}
+
+            {/* ── Fare row ── */}
+            <div className="flex items-center justify-between border-t border-border-opaque pt-400">
+              <div>
+                <span className="text-label-small text-content-tertiary block">Est. Payout</span>
+                <span className="font-mono text-display-medium text-content-primary tabular-nums font-bold">
+                  ₹{(currentOffer.fareEstimate / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                </span>
+              </div>
+              <span className="badge badge-neutral">{currentOffer.tripType}</span>
+            </div>
+
+            {/* ── Slide to accept ── */}
+            <SlideToAccept onAccept={handleAccept} />
+
+            {/* ── Decline ── */}
             <button
               type="button"
               onClick={() => setShowDeclinePicker(true)}
-              className="bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-white border border-zinc-800 px-4 py-3 rounded-xl font-mono text-[9px] font-bold uppercase tracking-wider transition cursor-pointer"
+              className="w-full text-center text-label-medium text-content-tertiary py-300 min-h-[44px] cursor-pointer hover:text-content-secondary transition-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
             >
               Decline
             </button>
-            <div className="flex-1">
-              <SlideToAccept onAccept={handleAccept} />
-            </div>
           </div>
         </div>
-
       </div>
 
-      {/* Decline Reason Picker Modal Overlay */}
+      {/* ── Decline reason sheet ── */}
       {showDeclinePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl text-left space-y-4 animate-scaleUp">
-            <div>
-              <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-zinc-400">Decline Reason</h4>
-              <p className="text-[10px] text-zinc-500 font-sans mt-0.5">Please indicate why you are declining this job offer to help optimize dispatch algorithms.</p>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-end">
+          <div className="w-full bg-background-primary rounded-t-lg shadow-elevation-3 px-500 pt-400 pb-[calc(var(--space-500)+env(safe-area-inset-bottom,0px))] animate-enter">
+            <div className="flex justify-center mb-400">
+              <div className="w-9 h-1 rounded-pill bg-border-opaque" />
             </div>
-            
-            <div className="flex flex-col gap-2">
+            <h3 className="text-heading-small text-content-primary mb-200">Why are you declining?</h3>
+            <p className="text-paragraph-small text-content-secondary mb-500">
+              Your feedback helps optimize dispatch algorithms.
+            </p>
+            <div className="space-y-200">
               {['Too far', 'Need a break', 'Vehicle issue', 'Other'].map((reason) => (
                 <button
                   key={reason}
-                  onClick={() => handleDeclineSelect(reason.toUpperCase().replace(/ /g, '_'))}
-                  className="w-full text-left bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 py-3 px-4 rounded-xl text-xs font-mono transition text-zinc-300 hover:text-white cursor-pointer"
+                  type="button"
+                  onClick={() => handleDecline(reason.toUpperCase().replace(/ /g, '_'))}
+                  className="w-full text-left bg-background-secondary hover:bg-background-tertiary border border-border-opaque rounded-sm px-500 py-400 text-label-large text-content-primary transition-base min-h-[44px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
                 >
                   {reason}
                 </button>
               ))}
             </div>
-
             <button
+              type="button"
               onClick={() => setShowDeclinePicker(false)}
-              className="w-full bg-zinc-950 border border-zinc-900 text-[10px] font-mono font-bold uppercase py-2 rounded-lg text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
+              className="w-full mt-400 text-label-medium text-content-tertiary py-300 min-h-[44px] cursor-pointer hover:text-content-secondary transition-base"
             >
               Cancel
             </button>
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }

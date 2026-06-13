@@ -402,27 +402,27 @@ export const ControlRoomDashboard: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
 
         {/* LEFT SIDEBAR */}
-        <aside className="w-[300px] bg-canvas-softer border-r border-canvas-soft overflow-y-auto flex-shrink-0">
+        <aside className="w-[300px] bg-background-secondary border-r border-border-opaque overflow-y-auto flex-shrink-0">
           <div className="p-6 space-y-4">
             {canFleet && (
               <>
                 <div className="grid grid-cols-1 gap-3">
-                  <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                    <div className="text-xs font-medium text-body mb-1">Fleet online</div>
-                    <div className="text-2xl font-bold text-ink">{fleetKpis ? `${fleetKpis.online} / ${fleetKpis.total}` : '—'}</div>
-                    <div className="text-xs text-mute mt-1 font-mono">
+                  <div className="card">
+                    <div className="text-label-small text-content-secondary uppercase tracking-wider mb-1">Fleet online</div>
+                    <div className="text-heading-xl font-mono text-content-primary">{fleetKpis ? `${fleetKpis.online} / ${fleetKpis.total}` : '—'}</div>
+                    <div className="font-mono text-mono-small text-content-tertiary mt-1">
                       {fleetKpis && fleetKpis.total > 0 ? `${Math.round((fleetKpis.online / fleetKpis.total) * 100)}% utilization` : '—'}
                     </div>
                   </div>
-                  <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                    <div className="text-xs font-medium text-body mb-1">Orders today</div>
-                    <div className="text-2xl font-bold text-ink">{fleetKpis ? fleetKpis.trips.toLocaleString('en-IN') : '—'}</div>
-                    <div className="text-xs text-mute mt-1 font-mono">Today</div>
+                  <div className="card">
+                    <div className="text-label-small text-content-secondary uppercase tracking-wider mb-1">Orders today</div>
+                    <div className="text-heading-xl font-mono text-content-primary">{fleetKpis ? fleetKpis.trips.toLocaleString('en-IN') : '—'}</div>
+                    <div className="font-mono text-mono-small text-content-tertiary mt-1">Today</div>
                   </div>
-                  <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                    <div className="text-xs font-medium text-body mb-1">Revenue today</div>
-                    <div className="text-2xl font-bold text-ink">{fleetKpis ? `₹${fleetKpis.revenue.toLocaleString('en-IN')}` : '—'}</div>
-                    <div className="text-xs text-mute mt-1 font-mono">Today</div>
+                  <div className="card">
+                    <div className="text-label-small text-content-secondary uppercase tracking-wider mb-1">Revenue today</div>
+                    <div className="text-heading-xl font-mono text-content-primary">{fleetKpis ? `₹${fleetKpis.revenue.toLocaleString('en-IN')}` : '—'}</div>
+                    <div className="font-mono text-mono-small text-content-tertiary mt-1">Today</div>
                   </div>
                 </div>
 
@@ -435,17 +435,17 @@ export const ControlRoomDashboard: React.FC = () => {
             )}
 
             {!canFleet && (
-              <div className="bg-canvas rounded-xl border border-canvas-soft p-5 text-sm text-body">
-                Fleet controls unavailable for this role.
+              <div className="card">
+                <p className="text-paragraph-medium text-content-secondary">Fleet controls unavailable for this role.</p>
               </div>
             )}
           </div>
         </aside>
 
         {/* MAP */}
-        <main className="flex-1 relative bg-canvas-soft overflow-hidden">
+        <main className="flex-1 relative bg-background-secondary overflow-hidden">
           {canFleet && !heatmapLive && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-black px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-surface-warning border border-warning-400 px-3 py-1.5 rounded-sm text-label-small text-content-warning uppercase tracking-wider shadow-elevation-2 flex items-center gap-1.5">
               <span className="animate-pulse">●</span>
               Live heatmap disconnected — supply density may be stale
             </div>
@@ -453,29 +453,29 @@ export const ControlRoomDashboard: React.FC = () => {
           {canFleet ? (
             <div ref={mapContainerRef} className="w-full h-full">
               {!isMapSdkLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-mute">
-                  Loading spatial map...
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-paragraph-small text-content-tertiary">Loading spatial map…</p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-mute">
-              Map view restricted to fleet operations roles.
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-paragraph-small text-content-tertiary">Map view restricted to fleet operations roles.</p>
             </div>
           )}
         </main>
 
         {/* RIGHT DRAWER */}
         {canFleet && (
-          <aside className="w-[340px] bg-canvas border-l border-canvas-soft overflow-y-auto flex-shrink-0">
+          <aside className="w-[340px] bg-background-primary border-l border-border-opaque overflow-y-auto flex-shrink-0">
             {selectedCellToken ? (
               <FleetDrillDownDrawer
                 cellToken={selectedCellToken}
                 onClose={() => setSelectedCellToken(null)}
               />
             ) : (
-              <div className="p-8 text-center text-sm text-mute">
-                Select a hex cell on the map to inspect local fleet density.
+              <div className="p-8 text-center">
+                <p className="text-paragraph-small text-content-tertiary">Select a hex cell on the map to inspect local fleet density.</p>
               </div>
             )}
           </aside>
@@ -483,16 +483,16 @@ export const ControlRoomDashboard: React.FC = () => {
       </div>
 
       {/* BOTTOM PANEL */}
-      <section className="h-[280px] bg-canvas border-t border-canvas-soft flex flex-col flex-shrink-0">
-        <div className="flex border-b border-canvas-soft px-2">
+      <section className="h-[280px] bg-background-primary border-t border-border-opaque flex flex-col flex-shrink-0">
+        <div className="flex border-b border-border-opaque px-2">
           {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setBottomTab(tab.key)}
-              className={`px-5 py-4 text-sm font-medium transition ${
+              className={`px-5 py-4 text-label-medium transition-base cursor-pointer ${
                 activeTab === tab.key
-                  ? 'text-ink border-b-2 border-ink'
-                  : 'text-body hover:text-ink'
+                  ? 'text-content-primary border-b-2 border-interactive-primary'
+                  : 'text-content-secondary hover:text-content-primary'
               }`}
             >
               {tab.label}

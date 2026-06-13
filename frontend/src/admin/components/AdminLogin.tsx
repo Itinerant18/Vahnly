@@ -6,9 +6,9 @@ interface AdminLoginProps {
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [email,        setEmail]        = useState<string>('');
+  const [password,     setPassword]     = useState<string>('');
+  const [isLoading,    setIsLoading]    = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -25,7 +25,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
 
       if (response.ok) {
         const data = await response.json();
-        // The server sets the HttpOnly session cookie; never store the JWT in localStorage.
         if (data.role) localStorage.setItem('admin_role', data.role);
         onLoginSuccess(data.token);
       } else if (response.status === 401) {
@@ -33,7 +32,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
       } else {
         setErrorMessage('Server Error: Access gateway rejected handshake parameters.');
       }
-    } catch (err) {
+    } catch {
       setErrorMessage('Network Error: Unable to establish communication with auth gateway.');
     } finally {
       setIsLoading(false);
@@ -41,21 +40,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white text-ink flex items-center justify-center p-6 font-sans selection:bg-black selection:text-white">
-      <div className="w-full max-w-md bg-canvas-softer rounded-xl p-8 border border-canvas-soft shadow-sm relative overflow-hidden">
-        <div className="text-center mb-8 relative">
-          <h1 className="text-3xl font-bold tracking-tight text-ink font-move">drivers-for-u</h1>
-          <p className="text-body text-xs mt-2 font-medium">Operations Dashboard Security Gateway</p>
+    <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center p-6 font-sans">
+      <div className="w-full max-w-md bg-background-secondary rounded-md p-8 border border-border-opaque shadow-elevation-2 relative overflow-hidden">
+
+        {/* Brand */}
+        <div className="text-center mb-8">
+          <h1 className="text-display-small text-content-primary tracking-tight">drivers-for-u</h1>
+          <p className="text-label-medium text-content-secondary mt-2">Operations Dashboard Security Gateway</p>
         </div>
 
-        <form onSubmit={handleSignIn} className="space-y-5 relative">
+        <form onSubmit={handleSignIn} className="space-y-5">
+          {/* Email */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">
+            <label className="block text-label-small text-content-secondary uppercase tracking-wider mb-2">
               Corporate Email Address
             </label>
             <input
               type="email"
-              className="w-full bg-white border border-canvas-soft focus:border-ink rounded-xl p-3 text-xs text-ink placeholder-mute focus:outline-none focus:ring-1 focus:ring-ink transition"
+              className="w-full bg-background-primary border border-border-opaque
+                focus:border-border-accent rounded-sm p-3
+                text-paragraph-medium text-content-primary placeholder:text-content-tertiary
+                focus:outline-none focus:ring-2 focus:ring-accent-400
+                transition-base disabled:opacity-40"
               placeholder="name@kolkatadrivers.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -64,13 +70,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
             />
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">
+            <label className="block text-label-small text-content-secondary uppercase tracking-wider mb-2">
               Secure Access Password
             </label>
             <input
               type="password"
-              className="w-full bg-white border border-canvas-soft focus:border-ink rounded-xl p-3 text-xs text-ink placeholder-mute focus:outline-none focus:ring-1 focus:ring-ink transition"
+              className="w-full bg-background-primary border border-border-opaque
+                focus:border-border-accent rounded-sm p-3
+                text-paragraph-medium text-content-primary placeholder:text-content-tertiary
+                focus:outline-none focus:ring-2 focus:ring-accent-400
+                transition-base disabled:opacity-40"
               placeholder="••••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -79,18 +90,23 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
             />
           </div>
 
+          {/* Error banner */}
           {errorMessage && (
-            <div className="p-3 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-wider text-center">
-              {errorMessage}
+            <div className="p-3 bg-surface-negative border border-negative-200 rounded-sm">
+              <p className="text-label-small text-content-negative uppercase tracking-wider text-center">
+                {errorMessage}
+              </p>
             </div>
           )}
 
+          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-black hover:bg-black-elevated disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-full transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+            className="btn-primary w-full rounded-pill h-12 text-label-medium uppercase tracking-wider
+              active:scale-[0.98] cursor-pointer transition-base"
           >
-            {isLoading ? 'Verifying Credentials...' : 'Unlock Control Room'}
+            {isLoading ? 'Verifying Credentials…' : 'Unlock Control Room'}
           </button>
         </form>
       </div>

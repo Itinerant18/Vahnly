@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { SideDrawer } from '../../components/ds/SideDrawer';
+import { AdminBadge } from '../../components/ds/AdminBadge';
 
-// Elapsed time since the applicant entered the pipeline (proxy for time-in-stage).
 const timeInPipeline = (iso: string): string => {
   const ms = Date.now() - new Date(iso).getTime();
   if (isNaN(ms) || ms < 0) return '';
@@ -12,396 +13,412 @@ const timeInPipeline = (iso: string): string => {
   return 'just applied';
 };
 
-interface SignedDoc {
-  document_type: string;
-  url: string;
-  status: string;
-}
-
-interface DriverKYCDocument {
-	name: string;
-	status: string;
-	url: string;
-	uploaded_at: string;
-	expiry_date: string;
-}
-
+interface SignedDoc { document_type: string; url: string; status: string; }
+interface DriverKYCDocument { name: string; status: string; url: string; uploaded_at: string; expiry_date: string; }
 interface OnboardingApplicant {
-	driver_id: string;
-	name: string;
-	phone: string;
-	city_prefix: string;
-	stage: string; // APPLIED, DOCS_UPLOADED, BACKGROUND_CHECK, TRAINING, APPROVED
-	kyc_documents_checklist: DriverKYCDocument[];
-	applied_at: string;
-	background_status: string;
-	training_completed: boolean;
+  driver_id: string; name: string; phone: string; city_prefix: string;
+  stage: string; kyc_documents_checklist: DriverKYCDocument[];
+  applied_at: string; background_status: string; training_completed: boolean;
+}
+
+const STAGES = [
+  { key: 'APPLIED',           label: 'Applied' },
+  { key: 'DOCS_UPLOADED',     label: 'Docs Uploaded' },
+  { key: 'BACKGROUND_CHECK',  label: 'Background Check' },
+  { key: 'TRAINING',          label: 'Training' },
+  { key: 'APPROVED',          label: 'Approved' },
+];
+
+// ── Doc completeness bar ──────────────────────────────────────────────
+function DocBar({ docs }: { docs: DriverKYCDocument[] }) {
+  const approved = docs.filter((d) => d.status === 'approved').length;
+  const total    = docs.length || 1;
+  const pct      = Math.round((approved / total) * 100);
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-label-small text-content-secondary">{approved}/{total} docs</span>
+        <span className="font-mono text-mono-small text-content-tertiary">{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-pill bg-background-tertiary overflow-hidden">
+        <div
+          className="h-full rounded-pill bg-accent-400 transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Kanban card ───────────────────────────────────────────────────────
+function ApplicantCard({
+  applicant,
+  onClick,
+}: {
+  applicant: OnboardingApplicant;
+  onClick: () => void;
+}) {
+  const initials = applicant.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const showDocs = applicant.stage === 'DOCS_UPLOADED';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left bg-background-primary rounded-md shadow-elevation-1 p-4 mb-3 hover:shadow-elevation-2 transition-base cursor-pointer border border-border-opaque focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+    >
+      <div className="flex items-start gap-3">
+        {/* Avatar */}
+        <div className="w-10 h-10 rounded-pill bg-background-tertiary border border-border-opaque flex items-center justify-center flex-shrink-0">
+          <span className="text-label-small text-content-secondary">{initials}</span>
+        </div>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="text-label-medium text-content-primary truncate">{applicant.name}</div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="badge badge-neutral">{applicant.city_prefix}</span>
+            <span className="font-mono text-mono-small text-content-tertiary">{timeInPipeline(applicant.applied_at)}</span>
+          </div>
+        </div>
+      </div>
+      {showDocs && <DocBar docs={applicant.kyc_documents_checklist} />}
+    </button>
+  );
+}
+
+// ── Reject Modal ──────────────────────────────────────────────────────
+function RejectModal({
+  name,
+  reason,
+  onReasonChange,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  name: string;
+  reason: string;
+  onReasonChange: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-background-primary rounded-md border border-border-opaque shadow-elevation-3 p-600 w-full max-w-md">
+        <h3 className="text-heading-small text-content-primary mb-2">Reject applicant</h3>
+        <p className="text-paragraph-medium text-content-secondary mb-4">
+          You are rejecting <strong className="text-content-primary">{name}</strong>. This will remove them from the pipeline.
+        </p>
+        <label className="block text-label-small text-content-secondary uppercase tracking-wider mb-2">Reason</label>
+        <textarea
+          className="w-full bg-background-secondary border border-border-opaque rounded-sm px-4 py-3 text-paragraph-medium text-content-primary placeholder:text-content-tertiary outline-none focus:ring-2 focus:ring-accent-400 resize-none transition-base"
+          rows={3}
+          placeholder="Enter rejection reason…"
+          value={reason}
+          onChange={(e) => onReasonChange(e.target.value)}
+        />
+        <div className="flex gap-3 mt-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-sm bg-background-secondary border border-border-opaque py-2.5 text-label-medium text-content-secondary hover:bg-background-tertiary transition-base cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!reason.trim() || loading}
+            className="flex-1 rounded-sm bg-negative-400 text-white py-2.5 text-label-medium font-medium hover:opacity-90 transition-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Rejecting…' : 'Reject applicant'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const DriverOnboardingQueue: React.FC = () => {
-	const [applicants, setApplicants] = useState<OnboardingApplicant[]>([]);
-	const [loading, setLoading] = useState<boolean>(true);
-	const [selectedApplicant, setSelectedApplicant] = useState<OnboardingApplicant | null>(null);
-	const [actionLoading, setActionLoading] = useState<boolean>(false);
-	const [rejectReason, setRejectReason] = useState<string>('');
-	const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
-	const [signedDocs, setSignedDocs] = useState<SignedDoc[]>([]);
+  const [applicants,        setApplicants]        = useState<OnboardingApplicant[]>([]);
+  const [loading,           setLoading]           = useState<boolean>(true);
+  const [selectedApplicant, setSelectedApplicant] = useState<OnboardingApplicant | null>(null);
+  const [actionLoading,     setActionLoading]     = useState<boolean>(false);
+  const [rejectReason,      setRejectReason]      = useState<string>('');
+  const [showRejectModal,   setShowRejectModal]   = useState<boolean>(false);
+  const [signedDocs,        setSignedDocs]        = useState<SignedDoc[]>([]);
+  const [activeDocIdx,      setActiveDocIdx]      = useState<number>(0);
 
-	// Load real KYC documents with time-limited signed URLs (rule 1) for the selected applicant.
-	useEffect(() => {
-		if (!selectedApplicant) { setSignedDocs([]); return; }
-		const role = localStorage.getItem('admin_role') || 'ADMIN';
-		fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/kyc/documents`, { headers: { 'X-Admin-Role': role } })
-			.then((r) => (r.ok ? r.json() : { documents: [] }))
-			.then((d) => setSignedDocs(d.documents || []))
-			.catch(() => setSignedDocs([]));
-	}, [selectedApplicant?.driver_id]);
+  useEffect(() => {
+    if (!selectedApplicant) { setSignedDocs([]); return; }
+    const role = localStorage.getItem('admin_role') || 'ADMIN';
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/kyc/documents`, {
+      headers: { 'X-Admin-Role': role },
+    })
+      .then((r) => (r.ok ? r.json() : { documents: [] }))
+      .then((d) => setSignedDocs(d.documents || []))
+      .catch(() => setSignedDocs([]));
+  }, [selectedApplicant?.driver_id]);
 
-	const fetchQueue = async () => {
-		setLoading(true);
-		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
+  const fetchQueue = async () => {
+    setLoading(true);
+    try {
+      const role = localStorage.getItem('admin_role') || 'ADMIN';
+      const res  = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/onboarding`, {
+        headers: { 'X-Admin-Role': role },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setApplicants(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch onboarding queue', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/onboarding`, {
-				headers: {
-					'X-Admin-Role': role,
-				},
-			});
+  useEffect(() => { fetchQueue(); }, []);
 
-			if (res.ok) {
-				const data = await res.json();
-				setApplicants(data || []);
-			}
-		} catch (err) {
-			console.error('Failed to fetch onboarding queue', err);
-		} finally {
-			setLoading(false);
-		}
-	};
+  const advanceStage = async () => {
+    if (!selectedApplicant) return;
+    setActionLoading(true);
+    const role  = localStorage.getItem('admin_role') || 'ADMIN';
+    const stages = STAGES.map((s) => s.key);
+    const nextStage = stages[stages.indexOf(selectedApplicant.stage) + 1];
+    if (!nextStage) { setActionLoading(false); return; }
+    try {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/onboarding/advance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role },
+        body: JSON.stringify({ stage: nextStage }),
+      });
+      await fetchQueue();
+      setSelectedApplicant(null);
+    } catch (err) {
+      console.error('Failed to advance stage', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-	useEffect(() => {
-		fetchQueue();
-	}, []);
+  const rejectApplicant = async () => {
+    if (!selectedApplicant || !rejectReason.trim()) return;
+    setActionLoading(true);
+    const role = localStorage.getItem('admin_role') || 'ADMIN';
+    try {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/onboarding/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role },
+        body: JSON.stringify({ reason: rejectReason }),
+      });
+      await fetchQueue();
+      setShowRejectModal(false);
+      setSelectedApplicant(null);
+      setRejectReason('');
+    } catch (err) {
+      console.error('Failed to reject applicant', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-	const handleAction = async (actionSlug: string, body?: any) => {
-		if (!selectedApplicant) return;
-		// Confirm the irreversible onboarding decisions; status-only refreshes pass through.
-		const confirmMsgs: Record<string, string> = {
-			'verify-kyc': `Approve KYC and verify driver ${selectedApplicant.driver_id}? This activates them for dispatch.`,
-			'reject-kyc': `Reject this applicant's KYC? They will be unable to onboard without resubmitting.`,
-			'mark-bg-clear': `Mark background check as cleared for ${selectedApplicant.driver_id}?`,
-		};
-		if (confirmMsgs[actionSlug] && !window.confirm(confirmMsgs[actionSlug])) {
-			return;
-		}
-		setActionLoading(true);
-		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
-			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
+  const stageLabel: Record<string, string> = Object.fromEntries(STAGES.map((s) => [s.key, s.label]));
+  const nextStageLabel = selectedApplicant
+    ? stageLabel[STAGES[STAGES.findIndex((s) => s.key === selectedApplicant.stage) + 1]?.key] ?? null
+    : null;
 
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/${actionSlug}`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Admin-Role': role,
-					'X-Admin-Email': email,
-				},
-				body: body ? JSON.stringify(body) : undefined,
-			});
+  return (
+    <div className="w-full h-full flex flex-col bg-background-primary overflow-hidden">
+      {/* Page header */}
+      <div className="flex-shrink-0 px-700 py-500 border-b border-border-opaque flex items-center justify-between">
+        <div>
+          <h1 className="text-heading-xl text-content-primary">Driver Onboarding Queue</h1>
+          <p className="text-paragraph-small text-content-secondary mt-0.5">{applicants.length} applicants in pipeline</p>
+        </div>
+        <button type="button" onClick={fetchQueue} className="btn-primary flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M1 4v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3.51 15a9 9 0 102.13-9.36L1 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Refresh
+        </button>
+      </div>
 
-			if (res.ok) {
-				alert(`Onboarding update '${actionSlug}' recorded successfully.`);
-				setShowRejectModal(false);
-				setSelectedApplicant(null);
-				fetchQueue();
-			} else {
-				const msg = await res.text();
-				alert(`Failed: ${msg}`);
-			}
-		} catch (err) {
-			console.error(err);
-			alert('Network request execution failure.');
-		} finally {
-			setActionLoading(false);
-		}
-	};
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden px-700 py-500">
+        {loading ? (
+          <div className="flex gap-4">
+            {STAGES.map((s) => (
+              <div key={s.key} className="min-w-[280px] flex-shrink-0">
+                <div className="h-9 rounded-sm bg-background-tertiary animate-pulse mb-3" />
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 rounded-md bg-background-secondary animate-pulse mb-3" />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-4 h-full">
+            {STAGES.map((stage) => {
+              const cards = applicants.filter((a) => a.stage === stage.key);
+              return (
+                <div key={stage.key} className="min-w-[280px] flex-shrink-0 flex flex-col">
+                  {/* Column header */}
+                  <div className="flex items-center justify-between bg-background-secondary rounded-sm px-4 py-2.5 mb-3">
+                    <span className="text-label-small text-content-secondary uppercase tracking-wider">{stage.label}</span>
+                    <span className="badge badge-neutral font-mono">{cards.length}</span>
+                  </div>
+                  {/* Cards */}
+                  <div className="flex-1 overflow-y-auto">
+                    {cards.length === 0 ? (
+                      <div className="flex items-center justify-center h-20 rounded-md border border-dashed border-border-opaque">
+                        <span className="text-paragraph-small text-content-tertiary">Empty</span>
+                      </div>
+                    ) : (
+                      cards.map((applicant) => (
+                        <ApplicantCard
+                          key={applicant.driver_id}
+                          applicant={applicant}
+                          onClick={() => { setSelectedApplicant(applicant); setActiveDocIdx(0); }}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-	const handleDocUpdate = async (docName: string, docStatus: string) => {
-		if (!selectedApplicant) return;
-		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
-			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
+      {/* Detail SideDrawer */}
+      <SideDrawer
+        isOpen={!!selectedApplicant}
+        onClose={() => setSelectedApplicant(null)}
+        title={selectedApplicant?.name ?? ''}
+        footer={
+          selectedApplicant && selectedApplicant.stage !== 'APPROVED' ? (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRejectModal(true)}
+                className="flex-1 rounded-sm bg-surface-negative border border-negative-200 py-2.5 text-label-medium text-content-negative font-medium hover:opacity-80 transition-base cursor-pointer"
+              >
+                Reject
+              </button>
+              {nextStageLabel && (
+                <button
+                  type="button"
+                  onClick={advanceStage}
+                  disabled={actionLoading}
+                  className="flex-1 rounded-sm bg-positive-400 text-white py-2.5 text-label-medium font-medium hover:opacity-90 transition-base cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoading ? 'Advancing…' : `Advance to ${nextStageLabel}`}
+                </button>
+              )}
+            </div>
+          ) : null
+        }
+      >
+        {selectedApplicant && (
+          <div className="space-y-5">
+            {/* Info rows */}
+            {[
+              { label: 'Driver ID', value: selectedApplicant.driver_id, mono: true },
+              { label: 'Phone',     value: selectedApplicant.phone },
+              { label: 'City',      value: selectedApplicant.city_prefix },
+              { label: 'Applied',   value: timeInPipeline(selectedApplicant.applied_at), mono: true },
+            ].map(({ label, value, mono }) => (
+              <div key={label} className="flex items-center justify-between border-b border-border-opaque pb-3">
+                <span className="text-label-small text-content-secondary uppercase tracking-wider">{label}</span>
+                <span className={`text-paragraph-medium text-content-primary ${mono ? 'font-mono' : ''}`}>{value}</span>
+              </div>
+            ))}
 
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/docs-update`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Admin-Role': role,
-					'X-Admin-Email': email,
-				},
-				body: JSON.stringify({ doc_name: docName, status: docStatus }),
-			});
+            {/* Stage badge */}
+            <div className="flex items-center justify-between border-b border-border-opaque pb-3">
+              <span className="text-label-small text-content-secondary uppercase tracking-wider">Stage</span>
+              <AdminBadge label={stageLabel[selectedApplicant.stage] ?? selectedApplicant.stage} variant="accent" />
+            </div>
 
-			if (res.ok) {
-				// Inline update in detail view
-				const updatedDocs = selectedApplicant.kyc_documents_checklist.map((doc) =>
-					doc.name === docName ? { ...doc, status: docStatus } : doc
-				);
-				setSelectedApplicant({ ...selectedApplicant, kyc_documents_checklist: updatedDocs });
-				fetchQueue();
-			}
-		} catch (err) {
-			console.error(err);
-		}
-	};
+            {/* Background check */}
+            {selectedApplicant.background_status && (
+              <div className="flex items-center justify-between border-b border-border-opaque pb-3">
+                <span className="text-label-small text-content-secondary uppercase tracking-wider">Background</span>
+                <AdminBadge label={selectedApplicant.background_status} />
+              </div>
+            )}
 
-	const handleScheduleTraining = () => {
-		alert(`Scheduling training session for candidate: ${selectedApplicant?.name}.\nEmail invitation sent successfully.`);
-		handleAction('onboarding-stage', { stage: 'TRAINING' });
-	};
+            {/* KYC Documents */}
+            {signedDocs.length > 0 && (
+              <div>
+                <div className="text-label-small text-content-secondary uppercase tracking-wider mb-3">KYC Documents</div>
+                {/* Doc tabs */}
+                <div className="flex gap-2 flex-wrap mb-4">
+                  {signedDocs.map((doc, idx) => (
+                    <button
+                      key={doc.document_type}
+                      type="button"
+                      onClick={() => setActiveDocIdx(idx)}
+                      className={`rounded-pill px-3 py-1 text-label-small transition-base cursor-pointer ${
+                        activeDocIdx === idx
+                          ? 'bg-interactive-primary text-interactive-primary-text'
+                          : 'bg-background-secondary border border-border-opaque text-content-secondary hover:text-content-primary'
+                      }`}
+                    >
+                      {doc.document_type.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                </div>
+                {/* Image viewer */}
+                {signedDocs[activeDocIdx]?.url && (
+                  <div className="rounded-md overflow-hidden bg-background-tertiary border border-border-opaque">
+                    <img
+                      src={signedDocs[activeDocIdx].url}
+                      alt={signedDocs[activeDocIdx].document_type}
+                      className="w-full max-h-[380px] object-contain"
+                    />
+                  </div>
+                )}
+                {/* Per-doc actions */}
+                <div className="flex gap-2 mt-3">
+                  <button className="flex-1 rounded-sm bg-positive-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer">✓ Approve</button>
+                  <button className="flex-1 rounded-sm bg-negative-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer">✗ Reject</button>
+                  <button className="flex-1 rounded-sm bg-background-secondary border border-border-opaque text-content-secondary py-2 text-label-small hover:bg-background-tertiary transition-base cursor-pointer">↗ Request Reupload</button>
+                </div>
+              </div>
+            )}
 
-	// Group applicants by stages
-	const stages = ['APPLIED', 'DOCS_UPLOADED', 'UNDER_REVIEW', 'BACKGROUND_CHECK', 'TRAINING', 'APPROVED'];
-	const getStageList = (stageName: string) => {
-		return applicants.filter((app) => app.stage.toUpperCase() === stageName);
-	};
+            {/* KYC checklist */}
+            {selectedApplicant.kyc_documents_checklist.length > 0 && (
+              <div>
+                <div className="text-label-small text-content-secondary uppercase tracking-wider mb-3">Checklist</div>
+                <div className="space-y-2">
+                  {selectedApplicant.kyc_documents_checklist.map((doc) => (
+                    <div key={doc.name} className="flex items-center justify-between py-2 border-b border-border-opaque last:border-none">
+                      <span className="text-paragraph-medium text-content-primary">{doc.name.replace(/_/g, ' ')}</span>
+                      <AdminBadge label={doc.status} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </SideDrawer>
 
-	// Compliance gate: KYC can only be verified once every uploaded document has been
-	// reviewed and approved. An empty checklist also blocks approval.
-	const kycDocs = selectedApplicant?.kyc_documents_checklist ?? [];
-	const pendingDocs = kycDocs.filter((doc) => doc.status !== 'APPROVED');
-	const allDocsApproved = kycDocs.length > 0 && pendingDocs.length === 0;
-
-	return (
-		<div className="w-full h-full flex flex-col overflow-hidden p-6 space-y-6 bg-canvas">
-			<div>
-				<h1 className="text-2xl font-bold tracking-tight text-ink">Onboarding Pipeline</h1>
-				<p className="text-xs text-mute mt-1">Audit verification queue pipelines, background clearances, and training certifications</p>
-			</div>
-
-			{/* ---- Pipeline Board ---- */}
-			{loading ? (
-				<div className="flex-1 flex items-center justify-center text-xs text-mute animate-pulse">Loading onboarding columns...</div>
-			) : (
-				<div className="flex-1 flex overflow-x-auto gap-4 items-stretch select-none">
-					{stages.map((stage) => {
-						const list = getStageList(stage);
-						return (
-							<div key={stage} className="flex-1 min-w-[240px] bg-canvas-softer border border-canvas-soft rounded-xl p-4 flex flex-col space-y-4">
-								<div className="flex justify-between items-center border-b border-canvas-soft pb-2">
-									<span className="text-[10px] font-bold text-ink uppercase tracking-wider">{stage.replace('_', ' ')}</span>
-									<span className="font-mono text-xs bg-canvas text-ink px-2 py-0.5 rounded font-semibold border border-canvas-soft">{list.length}</span>
-								</div>
-
-								{/* Cards area */}
-								<div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
-									{list.map((applicant) => (
-										<div
-											key={applicant.driver_id}
-											onClick={() => setSelectedApplicant(applicant)}
-											className="bg-canvas border border-canvas-soft rounded-xl p-3.5 hover:border-ink transition-colors cursor-pointer space-y-2 shadow-sm"
-										>
-											<span className="font-semibold text-ink text-xs block">{applicant.name}</span>
-											<span className="font-mono text-[10px] text-body block">{applicant.phone}</span>
-											<div className="flex justify-between items-center text-[9px] text-mute pt-1 border-t border-canvas-soft">
-												<span>Hub: {applicant.city_prefix}</span>
-												<span>{new Date(applicant.applied_at).toLocaleDateString()}</span>
-											</div>
-											<span className="text-[9px] font-mono text-status-warn">{timeInPipeline(applicant.applied_at)}</span>
-										</div>
-									))}
-									{list.length === 0 && (
-										<div className="py-10 text-center text-[10px] text-mute font-mono">No candidates</div>
-									)}
-								</div>
-							</div>
-						);
-					})}
-				</div>
-			)}
-
-			{/* ---- Applicant Detail Overlay / Drawer ---- */}
-			{selectedApplicant && (
-				<div className="fixed inset-0 bg-black/45 flex justify-end z-40 animate-fade-in">
-					<div className="w-full max-w-md bg-canvas h-full border-l border-canvas-soft p-6 flex flex-col overflow-y-auto space-y-6 animate-slide-in">
-						<div className="flex justify-between items-start">
-							<div>
-								<h2 className="text-base font-bold text-ink">{selectedApplicant.name}</h2>
-								<span className="font-mono text-xs text-mute mt-1 block">{selectedApplicant.driver_id}</span>
-							</div>
-							<button
-								onClick={() => setSelectedApplicant(null)}
-								className="text-xs text-body hover:text-ink font-semibold"
-							>
-								✕ Close
-							</button>
-						</div>
-
-						{/* Document Checklist verification */}
-						<div className="space-y-4">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-mute">KYC Document Approvals</h3>
-							<div className="space-y-3">
-								{selectedApplicant.kyc_documents_checklist.map((doc) => (
-									<div key={doc.name} className="bg-canvas-softer border border-canvas-soft p-3 rounded-xl space-y-2">
-										<div className="flex justify-between items-center text-xs">
-											<span className="font-semibold text-ink">{doc.name}</span>
-											<span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${doc.status === 'APPROVED' ? 'bg-status-online/10 text-status-online' : 'bg-status-alert/10 text-status-alert'}`}>
-												{doc.status}
-											</span>
-										</div>
-										<div className="flex justify-between items-center border-t border-canvas-soft/60 pt-2 text-[10px]">
-											<a
-												href={doc.url}
-												target="_blank"
-												rel="noreferrer"
-												className="underline text-mute hover:text-ink font-medium"
-											>
-												Preview PDF
-											</a>
-											<div className="flex space-x-1.5">
-												<button
-													onClick={() => handleDocUpdate(doc.name, 'APPROVED')}
-													className="bg-ink text-on-dark font-semibold px-2 py-0.5 rounded-full"
-												>
-													Approve
-												</button>
-												<button
-													onClick={() => handleDocUpdate(doc.name, 'REJECTED')}
-													className="text-status-alert bg-status-alert/5 hover:bg-status-alert/10 font-semibold px-2 py-0.5 rounded-full"
-												>
-													Reject
-												</button>
-											</div>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-
-						{/* Real documents with time-limited signed URLs (rule 1 — PII) */}
-						<div className="space-y-3 border-t border-canvas-soft pt-4">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-mute">Documents (signed, expire in 10 min)</h3>
-							{signedDocs.length === 0 ? (
-								<p className="text-[10px] text-mute font-mono">No uploaded documents on file.</p>
-							) : (
-								<div className="space-y-2">
-									{signedDocs.map((d) => (
-										<div key={d.document_type} className="flex justify-between items-center bg-canvas-softer border border-canvas-soft p-2.5 rounded-xl text-xs">
-											<span className="font-semibold text-ink">{d.document_type}</span>
-											<div className="flex items-center gap-2">
-												<span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${d.status === 'APPROVED' ? 'bg-status-online/10 text-status-online' : 'bg-status-warn/10 text-status-warn'}`}>{d.status}</span>
-												<a href={d.url} target="_blank" rel="noreferrer" className="text-[10px] underline text-mute hover:text-ink font-medium">View</a>
-											</div>
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-
-						{/* Stages Checklist */}
-						<div className="space-y-4 border-t border-canvas-soft pt-4">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-mute">Onboarding Clearances</h3>
-							<div className="space-y-2 text-xs">
-								<div className="flex justify-between items-center bg-canvas-softer p-2.5 rounded-xl">
-									<span>Background Check Status:</span>
-									<span className="font-mono font-bold uppercase">{selectedApplicant.background_status}</span>
-								</div>
-								<div className="flex justify-between items-center bg-canvas-softer p-2.5 rounded-xl">
-									<span>Safety Training Status:</span>
-									<span className="font-mono font-bold uppercase">
-										{selectedApplicant.training_completed ? 'COMPLETED' : 'INCOMPLETE'}
-									</span>
-								</div>
-							</div>
-						</div>
-
-						{/* Administrative update actions */}
-						<div className="border-t border-canvas-soft pt-4 space-y-3.5">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-mute">Workflow Controls</h3>
-							
-							<div className="flex flex-wrap gap-2">
-								<button
-									onClick={() => handleAction('verify-kyc')}
-									className="flex-1 bg-ink hover:bg-black-elevated text-on-dark text-xs font-semibold rounded-pill h-9 px-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-ink"
-									disabled={actionLoading || !allDocsApproved}
-									title={!allDocsApproved ? 'All KYC documents must be approved before verifying' : undefined}
-								>
-									Approve KYC & Verify
-								</button>
-								<button
-									onClick={() => setShowRejectModal(true)}
-									className="flex-1 text-status-alert bg-status-alert/5 hover:bg-status-alert/10 text-xs font-semibold rounded-pill h-9 px-4 transition-colors"
-									disabled={actionLoading}
-								>
-									Reject Applicant
-								</button>
-							</div>
-
-							{!allDocsApproved && (
-								<p className="text-[10px] text-status-alert font-medium">
-									{kycDocs.length === 0
-										? 'No documents uploaded yet — cannot verify KYC.'
-										: `${pendingDocs.length} document(s) pending review before KYC can be approved.`}
-								</p>
-							)}
-
-							<div className="flex gap-2">
-								<button
-									onClick={() => handleAction('onboarding-stage', { stage: 'BACKGROUND_CHECK' })}
-									className="flex-1 bg-canvas-soft hover:bg-surface-pressed text-ink text-xs font-semibold rounded-pill h-8 px-3 transition-colors"
-								>
-									Mark BG Clear
-								</button>
-								<button
-									onClick={handleScheduleTraining}
-									className="flex-1 bg-canvas-soft hover:bg-surface-pressed text-ink text-xs font-semibold rounded-pill h-8 px-3 transition-colors"
-								>
-									Schedule Training
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* Rejection Reason Modal */}
-			{showRejectModal && (
-				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
-					<div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-sm w-full space-y-4 shadow-xl">
-						<div>
-							<h3 className="text-sm font-bold text-ink font-sans text-status-alert">Reject Applicant</h3>
-							<p className="text-[11px] text-mute mt-1">Specify audit verification rejection reason for candidate profile</p>
-						</div>
-						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Audit Rejection Reason</label>
-							<input
-								type="text"
-								placeholder="e.g. Inconsistent document upload details"
-								className="w-full h-9 rounded-md bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-semibold"
-								value={rejectReason}
-								onChange={(e) => setRejectReason(e.target.value)}
-							/>
-						</div>
-						<div className="flex justify-end space-x-2 border-t border-canvas-soft pt-3">
-							<button
-								onClick={() => setShowRejectModal(false)}
-								className="text-xs text-body hover:text-ink px-3"
-								disabled={actionLoading}
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => handleAction('reject-kyc', { reason: rejectReason })}
-								className="bg-status-alert text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-status-alert/90 transition-colors"
-								disabled={actionLoading || !rejectReason.trim()}
-							>
-								{actionLoading ? 'Rejecting...' : 'Reject applicant'}
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
-
-		</div>
-	);
+      {/* Reject Modal */}
+      {showRejectModal && selectedApplicant && (
+        <RejectModal
+          name={selectedApplicant.name}
+          reason={rejectReason}
+          onReasonChange={setRejectReason}
+          onConfirm={rejectApplicant}
+          onCancel={() => { setShowRejectModal(false); setRejectReason(''); }}
+          loading={actionLoading}
+        />
+      )}
+    </div>
+  );
 };

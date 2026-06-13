@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- PLACEHOLDER — replace with actual brand icon before app store submission -->
+  <rect width="1024" height="1024" rx="224" fill="#0073E6"/>
+  <!-- Steering wheel symbol -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="white" stroke-width="60"/>
+  <circle cx="512" cy="512" r="80" fill="white"/>
+  <line x1="512" y1="192" x2="512" y2="432" stroke="white" stroke-width="50" stroke-linecap="round"/>
+  <line x1="512" y1="592" x2="512" y2="832" stroke="white" stroke-width="50" stroke-linecap="round"/>
+  <line x1="192" y1="512" x2="432" y2="512" stroke="white" stroke-width="50" stroke-linecap="round"/>
+  <line x1="592" y1="512" x2="832" y2="512" stroke="white" stroke-width="50" stroke-linecap="round"/>
+</svg>

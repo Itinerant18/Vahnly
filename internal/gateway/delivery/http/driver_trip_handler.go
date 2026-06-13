@@ -843,12 +843,7 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 	// commission credit. Previously tolls/parking were debited from the rider but credited
 	// to no account, so the double-entry did not balance and the driver was not reimbursed.
 	takeRatePct := h.resolveDriverTakeRatePct(ctx, tx, driverID)
-	platformCommissionPaise := (nonTollFarePaise * takeRatePct) / 100
-	netDriverSharePaise := nonTollFarePaise - platformCommissionPaise
-	driverEarningsPaise := netDriverSharePaise + tollsPaise + parkingPaise
-	if driverEarningsPaise < 0 {
-		driverEarningsPaise = 0
-	}
+	driverEarningsPaise, platformCommissionPaise := driverLedgerSplit(nonTollFarePaise, tollsPaise, parkingPaise, takeRatePct)
 
 	ledgerInsertQuery := `
 		INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
@@ -942,6 +937,13 @@ func (h *GatewayHandler) resolveDriverTakeRatePct(ctx context.Context, tx pgx.Tx
 	if err != nil {
 		return 20 // safe default on lookup failure
 	}
+	return takeRatePctForCompletedTrips(completed)
+}
+
+// takeRatePctForCompletedTrips maps a driver's completed-trip count to the platform
+// take-rate percent under the default tiered commission model (0-15: 20%, 16-50: 15%,
+// 51+: 12%). Pure + side-effect-free so the tier boundaries are unit-testable.
+func takeRatePctForCompletedTrips(completed int64) int64 {
 	switch {
 	case completed <= 15:
 		return 20
@@ -950,4 +952,22 @@ func (h *GatewayHandler) resolveDriverTakeRatePct(ctx context.Context, tx pgx.Tx
 	default:
 		return 12
 	}
+}
+
+// driverLedgerSplit computes the driver payout and platform commission for a completed
+// trip. Commission is taken only on the non-toll fare; tolls + parking pass through to
+// the driver in full. By construction the split balances the double-entry ledger:
+//
+//	driverEarnings + platformCommission == nonTollFare + tolls + parking == totalFare
+//
+// Integer division floors the commission, so any sub-paise remainder accrues to the
+// driver — the ledger still balances exactly. Pure so the money formula is testable
+// without a DB.
+func driverLedgerSplit(nonTollFarePaise, tollsPaise, parkingPaise, takeRatePct int64) (driverEarningsPaise, platformCommissionPaise int64) {
+	platformCommissionPaise = (nonTollFarePaise * takeRatePct) / 100
+	driverEarningsPaise = (nonTollFarePaise - platformCommissionPaise) + tollsPaise + parkingPaise
+	if driverEarningsPaise < 0 {
+		driverEarningsPaise = 0
+	}
+	return driverEarningsPaise, platformCommissionPaise
 }

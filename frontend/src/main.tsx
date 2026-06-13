@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AdminShell } from './admin/AdminShell';
+// Design system tokens must be imported before index.css so CSS custom
+// properties are defined before Tailwind utilities reference them.
+import './styles/tokens.css';
 import './index.css';
 
 // Auth rides entirely on the HttpOnly `admin_session` cookie — the JWT is never in

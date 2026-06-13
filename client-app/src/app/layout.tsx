@@ -1,21 +1,31 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { ThemeProvider } from "@/lib/providers/ThemeProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// ── Inter — display, body, labels ──────────────────────────────────────────
+// RULE: Inter for ALL prose, headings, labels, addresses, phone numbers.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// ── JetBrains Mono — fares, ETAs, distances, IDs ONLY ─────────────────────
+// RULE: Never use font-mono for addresses or phone numbers.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
   title: "Drivers-For-U | Unified Dispatch Platform",
-  description: "High-performance, secure dynamic ride dispatch matching ecosystem client application.",
+  description:
+    "High-performance, secure dynamic ride dispatch matching ecosystem client application.",
 };
 
 export default function RootLayout({
@@ -26,10 +36,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <LocaleProvider>{children}</LocaleProvider>
+      <body className="min-h-full flex flex-col bg-background-primary text-content-primary">
+        <LocaleProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

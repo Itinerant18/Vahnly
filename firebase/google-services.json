@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "10934049772",
+    "project_id": "drivers-for-u",
+    "storage_bucket": "drivers-for-u.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10934049772:android:084594cdec16b1605bfec9",
+        "android_client_info": {
+          "package_name": "com.driversforu.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxicXWKeNkZ8Oek5w5TGa388nwtRy7Wr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10934049772:android:5107a0f402b004df5bfec9",
+        "android_client_info": {
+          "package_name": "com.driversforu.rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxicXWKeNkZ8Oek5w5TGa388nwtRy7Wr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -4,5 +4,8 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+  // Existing node tests live in __tests__/*.test.ts; component tests are *.test.tsx
+  // and opt into jsdom via a per-file `@jest-environment jsdom` docblock.
+  testMatch: ['**/__tests__/**/*.test.ts', '**/*.test.tsx'],
 };

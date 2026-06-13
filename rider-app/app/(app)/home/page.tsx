@@ -9,7 +9,7 @@ import { useBookingStore } from "@/lib/store/bookingStore";
 // Leaflet must be lazily loaded — no SSR
 const RiderMap = dynamic(() => import("@/components/map/RiderMap"), {
   ssr: false,
-  loading: () => <div className="h-full w-full bg-[#0A0A0A]" />,
+  loading: () => <div className="h-full w-full bg-background-secondary" />,
 });
 
 interface NearbyDriver {
@@ -19,7 +19,7 @@ interface NearbyDriver {
 }
 
 export default function HomePage() {
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation]  = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyDrivers] = useState<NearbyDriver[]>([
     { id: "d1", lat: 22.575, lng: 88.367 },
     { id: "d2", lat: 22.570, lng: 88.360 },
@@ -38,7 +38,6 @@ export default function HomePage() {
         setPickup({ ...loc, address: "Current location" });
       },
       () => {
-        // Fallback to Kolkata
         const fallback = { lat: 22.5726, lng: 88.3639 };
         setMapCenter(fallback);
         setPickup({ ...fallback, address: "Kolkata, West Bengal" });
@@ -52,7 +51,7 @@ export default function HomePage() {
   }, [userLocation]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#0A0A0A]">
+    <div className="relative h-screen w-full overflow-hidden bg-background-secondary">
       {/* Map — full screen behind everything */}
       <div className="absolute inset-0 z-0">
         <RiderMap
