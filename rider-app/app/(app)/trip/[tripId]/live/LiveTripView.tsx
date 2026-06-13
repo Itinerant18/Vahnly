@@ -79,17 +79,17 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
 
       {rideCheck && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6">
-          <div className="w-full max-w-sm rounded-xl bg-[#1A1F3A] p-5">
+          <div className="w-full max-w-sm rounded-xl bg-background-secondary p-5">
             <h2 className="text-lg font-semibold">Everything OK?</h2>
-            <p className="mt-1 text-sm text-slate-400">{rideCheck}</p>
+            <p className="mt-1 text-sm text-content-secondary">{rideCheck}</p>
             <div className="mt-4 flex gap-3">
               <button
-                className="flex-1 rounded-lg bg-[#10B981]/20 py-2 text-[#10B981]"
+                className="flex-1 rounded-lg bg-surface-positive py-2 text-content-positive"
                 onClick={() => setRideCheck(null)}
               >
                 I&apos;m OK
               </button>
-              <button className="flex-1 rounded-lg bg-[#EF4444]/20 py-2 text-[#EF4444]">
+              <button className="flex-1 rounded-lg bg-surface-negative py-2 text-content-negative">
                 Get help
               </button>
             </div>

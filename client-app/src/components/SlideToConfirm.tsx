@@ -25,9 +25,9 @@ export function SlideToConfirm({
   const threshold = trackWidth - thumbWidth; // Must drag to 80%+
 
   const colorMap = {
-    emerald: 'bg-emerald-500 hover:bg-emerald-600',
-    red: 'bg-red-500 hover:bg-red-600',
-    blue: 'bg-blue-500 hover:bg-blue-600',
+    emerald: 'bg-positive-400 hover:bg-positive-400',
+    red: 'bg-negative-400 hover:bg-negative-400',
+    blue: 'bg-accent-400 hover:bg-accent-400',
   };
 
   const handleDragEnd = async () => {
@@ -99,14 +99,14 @@ export function SlideToConfirm({
         >
           {/* Inner indicator */}
           <div className="absolute inset-2 flex items-center justify-center">
-            <div className="text-sm font-bold text-gray-800">{'→'}</div>
+            <div className="text-sm font-bold text-content-secondary">{'→'}</div>
           </div>
         </motion.div>
       </motion.div>
 
       {/* Progress indicator text */}
       {dragX > 0 && (
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-content-secondary mt-2">
           {Math.round(progress * 100)}% — {Math.round(Math.max(0, threshold * 0.8 - dragX))}px to go
         </p>
       )}

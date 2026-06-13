@@ -285,11 +285,15 @@ function LiveTripContent() {
     let animId = 0;
 
     const draw = () => {
-      ctx.fillStyle = '#09090b';
+      // Resolve design-system tokens once per frame (canvas can't take var())
+      const css = getComputedStyle(document.documentElement);
+      const v = (name: string) => css.getPropertyValue(name).trim();
+
+      ctx.fillStyle = v('--background-primary');
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Faint city grid matrix
-      ctx.strokeStyle = '#18181b';
+      ctx.strokeStyle = v('--background-secondary');
       ctx.lineWidth = 1;
       const size = 40;
       for (let x = 0; x < canvas.width; x += size) {
@@ -336,7 +340,7 @@ function LiveTripContent() {
       ctx.stroke();
 
       // Central streets
-      ctx.strokeStyle = '#27272a';
+      ctx.strokeStyle = v('--background-tertiary');
       ctx.lineWidth = 4 * Math.pow(1.3, mapZoom - 14);
 
       // Central Ave
@@ -370,7 +374,7 @@ function LiveTripContent() {
       ctx.stroke();
 
       // Howrah Bridge
-      ctx.strokeStyle = '#3f3f46';
+      ctx.strokeStyle = v('--background-tertiary');
       ctx.beginPath();
       pt1 = toScreen(22.5850, 88.3300);
       pt2 = toScreen(22.5830, 88.3620);
@@ -379,7 +383,7 @@ function LiveTripContent() {
       ctx.stroke();
 
       // Active state route line vectors
-      ctx.strokeStyle = '#3b82f6';
+      ctx.strokeStyle = v('--accent-400');
       ctx.lineWidth = 4;
       ctx.setLineDash([6, 6]);
       ctx.beginPath();
@@ -404,35 +408,35 @@ function LiveTripContent() {
 
       // Draw Pickup point Pin
       const pLoc = toScreen(pickupCoords.lat, pickupCoords.lng);
-      ctx.fillStyle = '#10b981'; // Green pickup
+      ctx.fillStyle = v('--positive-400'); // Green pickup
       ctx.beginPath();
       ctx.arc(pLoc.x, pLoc.y, 8, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = v('--content-primary');
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // Draw Dropoff point Pin
       const dLoc = toScreen(dropoffCoords.lat, dropoffCoords.lng);
-      ctx.fillStyle = '#ef4444'; // Red dropoff
+      ctx.fillStyle = v('--negative-400'); // Red dropoff
       ctx.beginPath();
       ctx.arc(dLoc.x, dLoc.y, 8, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = v('--content-primary');
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // Draw Driver vehicle position node (interpolating)
       const dCoords = toScreen(driverCoords.lat, driverCoords.lng);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = v('--content-primary');
       ctx.beginPath();
       ctx.arc(dCoords.x, dCoords.y, 7, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = '#1d4ed8'; // Blue trace border
+      ctx.strokeStyle = v('--accent-400'); // Blue trace border
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.fillStyle = '#1d4ed8';
+      ctx.fillStyle = v('--accent-400');
       ctx.beginPath();
       ctx.arc(dCoords.x, dCoords.y, 3, 0, 2 * Math.PI);
       ctx.fill();
@@ -445,11 +449,11 @@ function LiveTripContent() {
         const stopLng = pickupCoords.lng + (dropoffCoords.lng - pickupCoords.lng) * progress + 0.003;
         const sLoc = toScreen(stopLat, stopLng);
 
-        ctx.fillStyle = '#f59e0b'; // Amber stop
+        ctx.fillStyle = v('--warning-400'); // Amber stop
         ctx.beginPath();
         ctx.arc(sLoc.x, sLoc.y, 6, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = v('--content-primary');
         ctx.lineWidth = 1.5;
         ctx.stroke();
       });
@@ -655,22 +659,22 @@ function LiveTripContent() {
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-hidden relative">
       
       {/* ==================== STATEFUL PROGRESS BANNER HORIZON ==================== */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex flex-col backdrop-blur-md border-b border-zinc-900/60">
-        <div className="bg-zinc-950/80 p-4 flex justify-between items-center text-xs font-mono">
+      <header className="fixed top-0 left-0 right-0 z-50 flex flex-col backdrop-blur-md border-b border-border-opaque/60">
+        <div className="bg-background-primary/80 p-4 flex justify-between items-center text-xs font-mono">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-            <h1 className="font-bold text-[10px] uppercase tracking-widest text-zinc-300">Live Journey Tracking</h1>
+            <span className="h-2 w-2 bg-positive-400 rounded-full animate-pulse" />
+            <h1 className="font-bold text-[10px] uppercase tracking-widest text-content-secondary">Live Journey Tracking</h1>
           </div>
-          <span className="text-[8px] text-zinc-500 font-bold uppercase">ID: {tripId.slice(0, 10)}</span>
+          <span className="text-[8px] text-content-tertiary font-bold uppercase">ID: {tripId.slice(0, 10)}</span>
         </div>
 
         {/* Dynamic linear status progression ribbon */}
-        <div className="grid grid-cols-5 text-[8px] font-mono text-center font-bold uppercase tracking-wider border-t border-zinc-900 select-none bg-zinc-950">
-          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'ARRIVING' ? 'bg-blue-600 text-white animate-pulse' : 'text-zinc-600'}`}>Arriving</div>
-          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'ARRIVED' ? 'bg-amber-600 text-white animate-pulse' : 'text-zinc-600'}`}>Arrived</div>
-          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'IN_TRANSIT' && mapGlide < 20 ? 'bg-emerald-600 text-white animate-pulse' : 'text-zinc-600'}`}>Started</div>
-          <div className={`py-2 border-r border-zinc-900 ${tripStatus === 'IN_TRANSIT' && mapGlide >= 20 ? 'bg-emerald-600 text-white animate-pulse' : 'text-zinc-600'}`}>En Route</div>
-          <div className={`py-2 ${tripStatus === 'COMPLETED' ? 'bg-zinc-100 text-black' : 'text-zinc-600'}`}>Ending</div>
+        <div className="grid grid-cols-5 text-[8px] font-mono text-center font-bold uppercase tracking-wider border-t border-border-opaque select-none bg-background-primary">
+          <div className={`py-2 border-r border-border-opaque ${tripStatus === 'ARRIVING' ? 'bg-accent-400 text-white animate-pulse' : 'text-content-tertiary'}`}>Arriving</div>
+          <div className={`py-2 border-r border-border-opaque ${tripStatus === 'ARRIVED' ? 'bg-warning-400 text-white animate-pulse' : 'text-content-tertiary'}`}>Arrived</div>
+          <div className={`py-2 border-r border-border-opaque ${tripStatus === 'IN_TRANSIT' && mapGlide < 20 ? 'bg-positive-400 text-white animate-pulse' : 'text-content-tertiary'}`}>Started</div>
+          <div className={`py-2 border-r border-border-opaque ${tripStatus === 'IN_TRANSIT' && mapGlide >= 20 ? 'bg-positive-400 text-white animate-pulse' : 'text-content-tertiary'}`}>En Route</div>
+          <div className={`py-2 ${tripStatus === 'COMPLETED' ? 'bg-background-tertiary text-black' : 'text-content-tertiary'}`}>Ending</div>
         </div>
       </header>
 
@@ -683,7 +687,7 @@ function LiveTripContent() {
       <div className="absolute top-24 right-4 z-20">
         <button
           onClick={handleSOS}
-          className="h-10 w-10 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center shadow-lg border border-red-500 animate-pulse transition cursor-pointer active:scale-95 text-xs"
+          className="h-10 w-10 bg-negative-400 hover:bg-negative-400 text-white font-bold rounded-xl flex items-center justify-center shadow-lg border border-negative-400 animate-pulse transition cursor-pointer active:scale-95 text-xs"
         >
           🚨
         </button>
@@ -693,7 +697,7 @@ function LiveTripContent() {
       <div className="absolute top-24 left-4 z-20">
         <button
           onClick={handleGenerateShareLink}
-          className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono font-bold uppercase py-1.5 px-3 rounded-full tracking-wider shadow-md cursor-pointer hover:bg-zinc-900 transition flex items-center gap-1 backdrop-blur-sm"
+          className="bg-background-primary/80 border border-border-opaque text-[8px] font-mono font-bold uppercase py-1.5 px-3 rounded-full tracking-wider shadow-md cursor-pointer hover:bg-background-secondary transition flex items-center gap-1 backdrop-blur-sm"
         >
           🔗 Share Live Status
         </button>
@@ -703,13 +707,13 @@ function LiveTripContent() {
       <div className="absolute bottom-[22vh] right-4 z-20 flex flex-col gap-1 font-mono font-bold text-xs select-none">
         <button
           onClick={() => setMapZoom(z => Math.min(18, z + 1))}
-          className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+          className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
         >
           +
         </button>
         <button
           onClick={() => setMapZoom(z => Math.max(10, z - 1))}
-          className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+          className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
         >
           -
         </button>
@@ -718,14 +722,14 @@ function LiveTripContent() {
       {/* ==================== LAYER 2 (Z-INDEX: 30): COLLAPSIBLE JOURNEY CONTEXT SHEET ==================== */}
       <div
         style={{ height: isExpanded ? '460px' : '180px' }}
-        className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/95 border-t border-zinc-900 shadow-2xl backdrop-blur-md rounded-t-3xl overflow-hidden flex flex-col transition-all duration-300"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-background-primary/95 border-t border-border-opaque shadow-2xl backdrop-blur-md rounded-t-3xl overflow-hidden flex flex-col transition-all duration-300"
       >
         {/* Swipe Toggle handle */}
         <div
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full py-3 flex items-center justify-center cursor-pointer border-b border-zinc-900/50 select-none shrink-0"
+          className="w-full py-3 flex items-center justify-center cursor-pointer border-b border-border-opaque/50 select-none shrink-0"
         >
-          <div className="w-12 h-1 bg-zinc-800 hover:bg-zinc-600 rounded-full transition" />
+          <div className="w-12 h-1 bg-background-tertiary hover:bg-background-tertiary rounded-full transition" />
         </div>
 
         {/* Scrollable details panel */}
@@ -735,8 +739,8 @@ function LiveTripContent() {
           {tripStatus !== 'IN_TRANSIT' ? (
             <div className="space-y-4">
               {/* LARGE TYPE OTP HANDOVER CODE */}
-              <div className="bg-zinc-900/50 border border-zinc-900 rounded-2xl p-4 text-center space-y-2 animate-fadeIn">
-                <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">SECURITY HANDOVER PASSCODE</span>
+              <div className="bg-background-secondary/50 border border-border-opaque rounded-2xl p-4 text-center space-y-2 animate-fadeIn">
+                <span className="text-content-tertiary text-[8px] font-mono font-bold uppercase tracking-widest block">SECURITY HANDOVER PASSCODE</span>
                 <div className="flex justify-center items-center gap-3">
                   <span className="text-3xl font-mono font-extrabold tracking-widest text-white animate-pulse">
                     5829
@@ -746,25 +750,25 @@ function LiveTripContent() {
                       navigator.clipboard.writeText('5829');
                       alert('Passcode copied.');
                     }}
-                    className="bg-zinc-800 text-zinc-400 hover:text-white px-2 py-1 rounded text-[8px] font-mono uppercase"
+                    className="bg-background-tertiary text-content-secondary hover:text-white px-2 py-1 rounded text-[8px] font-mono uppercase"
                   >
                     Copy
                   </button>
                 </div>
-                <p className="text-[9px] text-zinc-400 font-sans leading-normal max-w-xs mx-auto">
+                <p className="text-[9px] text-content-secondary font-sans leading-normal max-w-xs mx-auto">
                   ⚠️ IMPORTANT: Share this security code with Aniket only when handing over your car keys.
                 </p>
               </div>
 
               {/* LOCKOUT INTERCEPTION PANEL */}
-              <div className="p-3 bg-zinc-950/60 border border-red-950/40 text-red-400/80 rounded-xl font-mono text-[8px] uppercase tracking-wider text-center">
+              <div className="p-3 bg-background-primary/60 border border-negative-400/40 text-content-negative/80 rounded-xl font-mono text-[8px] uppercase tracking-wider text-center">
                 ⛔ Trip telemetry and mid-route adjustments locked until key handoff verify
               </div>
 
               {/* Sandbox verification starts */}
               <button
                 onClick={handleStartTripSimulated}
-                className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider transition"
+                className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider transition"
               >
                 🔄 Verify Handshake & Start Journey (Simulate)
               </button>
@@ -775,19 +779,19 @@ function LiveTripContent() {
               
               {/* Collapsed minimal state metadata summary */}
               {!isExpanded && (
-                <div className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-3.5 rounded-xl text-xs font-mono">
+                <div className="flex justify-between items-center bg-background-secondary/30 border border-border-opaque p-3.5 rounded-xl text-xs font-mono">
                   <div className="flex items-center gap-3">
                     <span className="text-xl">👨🏽‍✈️</span>
                     <div>
                       <span className="text-white font-sans font-bold block">{driverSpecs.name}</span>
-                      <span className="text-[8px] text-zinc-500 block uppercase mt-0.5">{driverSpecs.plate}</span>
+                      <span className="text-[8px] text-content-tertiary block uppercase mt-0.5">{driverSpecs.plate}</span>
                     </div>
                   </div>
                   <div className="text-right space-y-0.5">
-                    <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-bold block uppercase w-max ml-auto">
+                    <span className="bg-surface-positive/20 text-content-positive border border-positive-400 px-2 py-0.5 rounded text-[8px] font-bold block uppercase w-max ml-auto">
                       48 KM/H
                     </span>
-                    <span className="text-[8px] text-zinc-500 block uppercase">ETA: 8 Mins</span>
+                    <span className="text-[8px] text-content-tertiary block uppercase">ETA: 8 Mins</span>
                   </div>
                 </div>
               )}
@@ -796,14 +800,14 @@ function LiveTripContent() {
               {isExpanded && (
                 <div className="space-y-4">
                   {/* Address timeline inputs */}
-                  <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 font-sans text-xs">
+                  <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-3 font-sans text-xs">
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Meetup Point</label>
+                      <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">Meetup Point</label>
                       <input
                         type="text"
                         disabled
                         value="Salt Lake Sector V Tech Hub, Kolkata"
-                        className="w-full bg-zinc-950 border border-zinc-900/60 rounded-lg p-2.5 text-zinc-500 outline-none text-xs cursor-not-allowed"
+                        className="w-full bg-background-primary border border-border-opaque/60 rounded-lg p-2.5 text-content-tertiary outline-none text-xs cursor-not-allowed"
                       />
                     </div>
 
@@ -811,19 +815,19 @@ function LiveTripContent() {
                     {stops.map((stop, i) => (
                       <div key={i} className="flex gap-2 items-center animate-fadeIn">
                         <div className="flex-1">
-                          <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Waypoint stop {i + 1}</label>
+                          <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">Waypoint stop {i + 1}</label>
                           <input
                             type="text"
                             value={stop}
                             onChange={(e) => handleStopChange(i, e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500 text-xs"
+                            className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-white outline-none focus:border-border-opaque text-xs"
                             placeholder="Enter stop address"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveStop(i)}
-                          className="bg-zinc-950 hover:bg-zinc-900 text-red-500 border border-zinc-850 h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
+                          className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                         >
                           ✕
                         </button>
@@ -832,15 +836,15 @@ function LiveTripContent() {
 
                     {/* Dropoff Address */}
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">Final Destination Address</label>
+                      <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">Final Destination Address</label>
                       <input
                         type="text"
                         value={dropoffText}
                         onChange={(e) => setDropoffText(e.target.value)}
-                        className={`w-full bg-zinc-950 border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
+                        className={`w-full bg-background-primary border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
                           dropoffInputFlash 
-                            ? 'border-red-500 ring-2 ring-red-500/20 animate-shake' 
-                            : 'border-zinc-850 focus:border-zinc-500'
+                            ? 'border-negative-400 ring-2 ring-negative-400/20 animate-shake' 
+                            : 'border-border-opaque focus:border-border-opaque'
                         }`}
                         placeholder="Enter dropoff location"
                       />
@@ -849,19 +853,19 @@ function LiveTripContent() {
                     <button
                       type="button"
                       onClick={handleAddStop}
-                      className="text-[8px] font-mono font-bold uppercase text-zinc-500 hover:text-white flex items-center gap-1 cursor-pointer"
+                      className="text-[8px] font-mono font-bold uppercase text-content-tertiary hover:text-white flex items-center gap-1 cursor-pointer"
                     >
                       ➕ Add Waypoint Stop (Max 3)
                     </button>
                   </div>
 
                   {/* Pricing estimate display */}
-                  <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-3.5 rounded-xl font-mono text-xs">
+                  <div className="flex justify-between items-center bg-background-primary border border-border-opaque p-3.5 rounded-xl font-mono text-xs">
                     <div>
-                      <span className="text-zinc-500 block text-[8px] uppercase">MID-TRIP ESTIMATED FARE</span>
+                      <span className="text-content-tertiary block text-[8px] uppercase">MID-TRIP ESTIMATED FARE</span>
                       <span className="text-base font-bold text-white block mt-0.5">₹{estimatedFare.toFixed(2)}</span>
                     </div>
-                    <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
+                    <span className="bg-background-secondary text-content-secondary border border-border-opaque text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
                       Surge floor active
                     </span>
                   </div>
@@ -871,7 +875,7 @@ function LiveTripContent() {
                     <button
                       type="button"
                       onClick={() => setShowIssueModal(true)}
-                      className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-400 hover:text-white text-center cursor-pointer"
+                      className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary hover:text-white text-center cursor-pointer"
                     >
                       ⚠️ Report safety concern
                     </button>
@@ -881,7 +885,7 @@ function LiveTripContent() {
                         setEstimatedFare(f => f + 100);
                         alert('Journey duration extended by 1 hour (₹100 charge applied).');
                       }}
-                      className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-300 text-center cursor-pointer"
+                      className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary text-center cursor-pointer"
                     >
                       📅 Extend Duration (+1h)
                     </button>
@@ -892,7 +896,7 @@ function LiveTripContent() {
               {/* End simulated matches */}
               <button
                 onClick={handleEndTripSimulated}
-                className="w-full bg-red-600 text-white hover:bg-red-700 py-3.5 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider border border-red-500 cursor-pointer text-center"
+                className="w-full bg-negative-400 text-white hover:bg-negative-400 py-3.5 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider border border-negative-400 cursor-pointer text-center"
               >
                 🏁 Arrived at drop: Complete Transit (Simulate)
               </button>
@@ -901,7 +905,7 @@ function LiveTripContent() {
 
         </div>
 
-        <footer className="bg-black py-2 text-center text-[7px] font-mono text-zinc-700 border-t border-zinc-950 select-none">
+        <footer className="bg-black py-2 text-center text-[7px] font-mono text-content-tertiary border-t border-border-opaque select-none">
           MUTATION ENGINE: ONLINE • SHA-256 SECURE NETWORK
         </footer>
       </div>
@@ -909,20 +913,20 @@ function LiveTripContent() {
       {/* ==================== MOCK INCIDENT REPORT MODAL SHEET ==================== */}
       {showIssueModal && (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl w-full max-w-sm text-left space-y-4">
-            <h3 className="text-xs font-bold font-mono text-white uppercase tracking-widest border-b border-zinc-900 pb-2">
+          <div className="bg-background-primary border border-border-opaque p-6 rounded-2xl w-full max-w-sm text-left space-y-4">
+            <h3 className="text-xs font-bold font-mono text-white uppercase tracking-widest border-b border-border-opaque pb-2">
               Report Route Safety Issue
             </h3>
             
             <form onSubmit={handleReportIssue} className="space-y-4 font-mono text-xs">
               <div>
-                <label className="block text-[8px] font-bold text-zinc-500 uppercase mb-1">Provide details</label>
+                <label className="block text-[8px] font-bold text-content-tertiary uppercase mb-1">Provide details</label>
                 <textarea
                   value={issueText}
                   onChange={(e) => setIssueText(e.target.value)}
                   rows={3}
                   placeholder="Rash driving, route deviation, safety concerns..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-zinc-500 font-sans"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-white focus:outline-none focus:border-border-opaque font-sans"
                   required
                 />
               </div>
@@ -931,13 +935,13 @@ function LiveTripContent() {
                 <button
                   type="button"
                   onClick={() => setShowIssueModal(false)}
-                  className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-zinc-500 py-2.5 rounded-lg border border-zinc-850 cursor-pointer"
+                  className="flex-1 bg-background-secondary hover:bg-background-tertiary text-content-tertiary py-2.5 rounded-lg border border-border-opaque cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-white hover:bg-zinc-200 text-black font-bold py-2.5 rounded-lg cursor-pointer"
+                  className="flex-1 bg-white hover:bg-background-tertiary text-black font-bold py-2.5 rounded-lg cursor-pointer"
                 >
                   Submit
                 </button>
@@ -949,17 +953,17 @@ function LiveTripContent() {
 
       {/* ==================== ANOMALY CHECK OVERLAY "Everything OK?" ==================== */}
       {showAnomalyOverlay && (
-        <div className="fixed inset-x-4 top-24 z-[99999] bg-zinc-950 border border-amber-900 rounded-2xl p-5 text-left shadow-2xl animate-bounce">
+        <div className="fixed inset-x-4 top-24 z-[99999] bg-background-primary border border-warning-400 rounded-2xl p-5 text-left shadow-2xl animate-bounce">
           <div className="space-y-2">
-            <div className="flex justify-between items-center text-[8px] font-mono font-bold text-amber-500 uppercase">
+            <div className="flex justify-between items-center text-[8px] font-mono font-bold text-content-warning uppercase">
               <span>Ride Check Anomaly Interceptor</span>
-              <span className="text-amber-600 animate-pulse">{anomalyTimer}s remaining</span>
+              <span className="text-content-warning animate-pulse">{anomalyTimer}s remaining</span>
             </div>
             
             {anomalyEscalated ? (
               <div className="space-y-3">
-                <h3 className="text-xs font-bold text-red-500 font-mono uppercase">🚨 SILENCE CRITICAL THRESHOLD EXCEEDED</h3>
-                <p className="text-[9px] text-zinc-400 font-sans leading-normal">
+                <h3 className="text-xs font-bold text-content-negative font-mono uppercase">🚨 SILENCE CRITICAL THRESHOLD EXCEEDED</h3>
+                <p className="text-[9px] text-content-secondary font-sans leading-normal">
                   Inactivity detected for more than 30 seconds. A distress notification has been dispatched to admin control rooms. Live support loop initiated.
                 </p>
                 <button
@@ -967,7 +971,7 @@ function LiveTripContent() {
                     setShowAnomalyOverlay(false);
                     setAnomalyEscalated(false);
                   }}
-                  className="bg-zinc-900 text-zinc-300 border border-zinc-850 px-3 py-1.5 rounded-lg font-mono text-[8px] uppercase cursor-pointer"
+                  className="bg-background-secondary text-content-secondary border border-border-opaque px-3 py-1.5 rounded-lg font-mono text-[8px] uppercase cursor-pointer"
                 >
                   Dismiss & Clear logs
                 </button>
@@ -975,7 +979,7 @@ function LiveTripContent() {
             ) : (
               <div className="space-y-3">
                 <h3 className="text-xs font-bold text-white font-mono uppercase">Everything OK?</h3>
-                <p className="text-[9px] text-zinc-400 font-sans leading-normal">
+                <p className="text-[9px] text-content-secondary font-sans leading-normal">
                   Our sensors detected an unscheduled stop or route deviation. Please confirm your safety to prevent escalating alarms.
                 </p>
                 <div className="flex gap-2">
@@ -990,7 +994,7 @@ function LiveTripContent() {
                   </button>
                   <button
                     onClick={handleSOS}
-                    className="flex-grow-0 bg-red-600 text-white border border-red-500 px-4 py-2 rounded-lg font-mono font-bold text-[8px] uppercase cursor-pointer"
+                    className="flex-grow-0 bg-negative-400 text-white border border-negative-400 px-4 py-2 rounded-lg font-mono font-bold text-[8px] uppercase cursor-pointer"
                   >
                     Dial 112
                   </button>
@@ -1007,7 +1011,7 @@ function LiveTripContent() {
 export default function LiveTripPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-zinc-500 font-mono text-xs uppercase animate-pulse">
+      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-content-tertiary font-mono text-xs uppercase animate-pulse">
         Initializing Live Journey Monitor...
       </div>
     }>

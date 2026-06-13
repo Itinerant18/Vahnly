@@ -14,7 +14,7 @@ export function PickupDropInput() {
   return (
     <div className="space-y-2">
       <input
-        className="w-full rounded-lg bg-[#252D48] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#0073E6]"
+        className="w-full rounded-lg bg-background-tertiary px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-border-accent"
         placeholder="Pickup location"
         value={pickup?.address ?? ""}
         onChange={(e) =>
@@ -22,7 +22,7 @@ export function PickupDropInput() {
         }
       />
       <input
-        className="w-full rounded-lg bg-[#252D48] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#0073E6]"
+        className="w-full rounded-lg bg-background-tertiary px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-border-accent"
         placeholder="Drop location (optional)"
         value={dropoff?.address ?? ""}
         onChange={(e) =>

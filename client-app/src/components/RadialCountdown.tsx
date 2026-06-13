@@ -37,9 +37,9 @@ export function RadialCountdown({ expiresAt, onExpire }: RadialCountdownProps) {
   const strokeDashoffset = circumference * (1 - progress);
 
   // Color gradient: Green → Amber → Red
-  let color = '#10B981'; // Emerald
-  if (remaining < 10000) color = '#F59E0B'; // Amber
-  if (remaining < 5000) color = '#EF4444'; // Red
+  let color = 'var(--positive-400)'; // Emerald
+  if (remaining < 10000) color = 'var(--warning-400)'; // Amber
+  if (remaining < 5000) color = 'var(--negative-400)'; // Red
 
   const seconds = Math.ceil(remaining / 1000);
 
@@ -52,7 +52,7 @@ export function RadialCountdown({ expiresAt, onExpire }: RadialCountdownProps) {
           cy="75"
           r={radius}
           fill="none"
-          stroke="#E5E7EB"
+          stroke="var(--border-opaque)"
           strokeWidth="4"
         />
 
@@ -89,7 +89,7 @@ export function RadialCountdown({ expiresAt, onExpire }: RadialCountdownProps) {
         </text>
       </svg>
 
-      <p className="text-sm text-gray-600">Time remaining to accept offer</p>
+      <p className="text-sm text-content-secondary">Time remaining to accept offer</p>
     </div>
   );
 }

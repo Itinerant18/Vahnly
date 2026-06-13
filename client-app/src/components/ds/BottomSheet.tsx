@@ -148,7 +148,7 @@ export function BottomSheet({
         {/* Handle */}
         {showHandle && (
           <div className="flex-shrink-0 flex justify-center pt-300 pb-500 cursor-grab active:cursor-grabbing">
-            <div className="w-9 h-1 rounded-pill bg-gray-300" />
+            <div className="w-9 h-1 rounded-pill bg-background-tertiary" />
           </div>
         )}
 

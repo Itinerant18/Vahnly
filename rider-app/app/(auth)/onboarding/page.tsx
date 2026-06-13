@@ -45,23 +45,23 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#0A0A0A] px-6 pt-16">
+    <main className="flex min-h-screen flex-col bg-background-primary px-6 pt-16">
       {step === "profile" ? (
         <>
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">Tell us about you</h1>
-            <p className="mt-1 text-sm text-[#9CA3AF]">
+            <h1 className="text-2xl font-bold text-content-primary">Tell us about you</h1>
+            <p className="mt-1 text-sm text-content-secondary">
               Your driver uses your name at pickup. Email is optional.
             </p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[#9CA3AF]">
+              <label className="mb-1.5 block text-xs font-medium text-content-secondary">
                 Full Name
               </label>
               <input
-                className="w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-[#9CA3AF] focus:ring-2 focus:ring-[#FF6B35]"
+                className="w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none ring-1 ring-border-opaque placeholder:text-content-tertiary focus:ring-2 focus:ring-border-accent"
                 placeholder="e.g. Aniket Karmakar"
                 value={name}
                 maxLength={100}
@@ -74,11 +74,11 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[#9CA3AF]">
-                Email <span className="text-[#6B7280]">(optional)</span>
+              <label className="mb-1.5 block text-xs font-medium text-content-secondary">
+                Email <span className="text-content-tertiary">(optional)</span>
               </label>
               <input
-                className="w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-[#9CA3AF] focus:ring-2 focus:ring-[#FF6B35]"
+                className="w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none ring-1 ring-border-opaque placeholder:text-content-tertiary focus:ring-2 focus:ring-border-accent"
                 placeholder="you@example.com"
                 type="email"
                 inputMode="email"
@@ -88,13 +88,13 @@ export default function OnboardingPage() {
             </div>
 
             <button
-              className="mt-2 flex h-14 w-full items-center justify-center rounded-xl bg-[#FF6B35] text-base font-bold text-white shadow-lg shadow-[#FF6B35]/20 disabled:opacity-50"
+              className="mt-2 flex h-14 w-full items-center justify-center rounded-xl bg-interactive-primary text-base font-bold text-interactive-primary-text shadow-elevation-2 disabled:opacity-50"
               disabled={saving || name.trim().length < 2}
               onClick={onSaveProfile}
             >
               {saving ? (
                 <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeDasharray="40 20" />
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
                 </svg>
               ) : (
                 "Continue"
@@ -103,7 +103,7 @@ export default function OnboardingPage() {
           </div>
 
           {error && (
-            <div className="mt-4 rounded-xl bg-[#EF4444]/10 px-4 py-3 text-sm text-[#EF4444]">
+            <div className="mt-4 rounded-xl bg-surface-negative px-4 py-3 text-sm text-content-negative">
               {error}
             </div>
           )}
@@ -111,21 +111,21 @@ export default function OnboardingPage() {
       ) : (
         <>
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">Add your car</h1>
-            <p className="mt-1 text-sm text-[#9CA3AF]">
+            <h1 className="text-2xl font-bold text-content-primary">Add your car</h1>
+            <p className="mt-1 text-sm text-content-secondary">
               You hire a driver for your own car. Add it now, or later from your
               account.
             </p>
           </div>
 
           <button
-            className="flex h-14 w-full items-center justify-center rounded-xl bg-[#FF6B35] text-base font-bold text-white shadow-lg shadow-[#FF6B35]/20"
+            className="flex h-14 w-full items-center justify-center rounded-xl bg-interactive-primary text-base font-bold text-interactive-primary-text shadow-elevation-2"
             onClick={() => router.replace("/account/garage")}
           >
             Add my car
           </button>
           <button
-            className="mt-3 w-full py-3 text-sm text-[#9CA3AF]"
+            className="mt-3 w-full py-3 text-sm text-content-secondary"
             onClick={() => router.replace("/home")}
           >
             Skip for now

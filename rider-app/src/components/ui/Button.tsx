@@ -5,9 +5,9 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "secondary" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-[#0073E6] text-white",
-  secondary: "bg-[#252D48] text-slate-200",
-  danger: "bg-[#EF4444]/20 text-[#EF4444]",
+  primary: "bg-interactive-primary text-interactive-primary-text",
+  secondary: "bg-interactive-secondary text-content-primary",
+  danger: "bg-surface-negative text-content-negative",
 };
 
 export function Button({

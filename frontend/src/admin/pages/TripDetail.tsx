@@ -335,15 +335,15 @@ export const TripDetail: React.FC = () => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   {mapData.trailPos.length > 1 && (
-                    <Polyline positions={mapData.trailPos} pathOptions={{ color: '#0073E6', weight: 4 }} />
+                    <Polyline positions={mapData.trailPos} pathOptions={{ color: 'var(--accent-400)', weight: 4 }} />
                   )}
                   {mapData.pickup && (
-                    <CircleMarker center={mapData.pickup} radius={8} pathOptions={{ color: '#138000', fillColor: '#138000', fillOpacity: 1 }}>
+                    <CircleMarker center={mapData.pickup} radius={8} pathOptions={{ color: 'var(--positive-400)', fillColor: 'var(--positive-400)', fillOpacity: 1 }}>
                       <Popup>Pickup</Popup>
                     </CircleMarker>
                   )}
                   {mapData.drop && (
-                    <CircleMarker center={mapData.drop} radius={8} pathOptions={{ color: '#b00020', fillColor: '#b00020', fillOpacity: 1 }}>
+                    <CircleMarker center={mapData.drop} radius={8} pathOptions={{ color: 'var(--negative-400)', fillColor: 'var(--negative-400)', fillOpacity: 1 }}>
                       <Popup>Drop-off</Popup>
                     </CircleMarker>
                   )}
@@ -437,9 +437,9 @@ export const TripDetail: React.FC = () => {
                     <span className="text-mute">Verification</span>
                     <span className="font-mono text-ink font-semibold">
                       {driver.is_verified ? (
-                        <span className="text-[#138000]">Verified</span>
+                        <span className="text-content-positive">Verified</span>
                       ) : (
-                        <span className="text-[#a06000]">Pending KYC</span>
+                        <span className="text-content-warning">Pending KYC</span>
                       )}
                     </span>
                   </div>
@@ -608,7 +608,7 @@ export const TripDetail: React.FC = () => {
                     <span className="font-mono block text-ink font-semibold">₹{attempt.amount.toFixed(2)}</span>
                     <span
                       className={`text-[9px] uppercase font-bold tracking-wider ${
-                        attempt.status === 'SUCCEEDED' ? 'text-[#138000]' : 'text-[#b00020]'
+                        attempt.status === 'SUCCEEDED' ? 'text-content-positive' : 'text-content-negative'
                       }`}
                     >
                       {attempt.status.toLowerCase()}
@@ -628,7 +628,7 @@ export const TripDetail: React.FC = () => {
                   <div key={issue.id} className="bg-canvas-soft border border-canvas-soft rounded-lg p-3 space-y-1.5">
                     <div className="flex justify-between items-center text-[10px] font-mono">
                       <span className="font-bold text-ink">{issue.id}</span>
-                      <span className="text-[#b00020] font-bold uppercase">{issue.severity}</span>
+                      <span className="text-content-negative font-bold uppercase">{issue.severity}</span>
                     </div>
                     <h4 className="text-xs font-bold text-ink">{issue.title}</h4>
                     <div className="flex justify-between text-[10px] text-mute">

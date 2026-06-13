@@ -356,12 +356,16 @@ export default function RiderDashboardPage() {
     const renderLoop = () => {
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Resolve design-system tokens once per frame (canvas can't take var())
+        const css = getComputedStyle(document.documentElement);
+        const v = (name: string) => css.getPropertyValue(name).trim();
+
         // Draw complete vector simulation
-        ctx.fillStyle = '#09090b';
+        ctx.fillStyle = v('--background-primary');
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Grid overlay
-        ctx.strokeStyle = '#18181b';
+        ctx.strokeStyle = v('--background-secondary');
         ctx.lineWidth = 1;
         const gridSize = 40;
         for (let x = 0; x < canvas.width; x += gridSize) {
@@ -401,7 +405,7 @@ export default function RiderDashboardPage() {
         ctx.stroke();
 
         // City streets
-        ctx.strokeStyle = '#27272a';
+        ctx.strokeStyle = v('--background-tertiary');
         ctx.lineWidth = 4 * Math.pow(1.3, mapZoom - 14);
 
         // Central Avenue
@@ -436,7 +440,7 @@ export default function RiderDashboardPage() {
         ctx.stroke();
 
         // Howrah Bridge structure
-        ctx.strokeStyle = '#3f3f46';
+        ctx.strokeStyle = v('--background-tertiary');
         ctx.lineWidth = 6 * Math.pow(1.3, mapZoom - 14);
         ctx.beginPath();
         pt1 = toScreen(22.5850, 88.3300, canvas.width, canvas.height, mapCenter, mapZoom);
@@ -447,7 +451,7 @@ export default function RiderDashboardPage() {
 
         // Draw Route connector vectors if dropoff configured
         if (dropoffCoords) {
-          ctx.strokeStyle = '#3b82f6';
+          ctx.strokeStyle = v('--accent-400');
           ctx.lineWidth = 4;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
@@ -482,45 +486,45 @@ export default function RiderDashboardPage() {
         ctx.stroke();
 
         // Pickup Anchor Point
-        ctx.fillStyle = '#3b82f6';
+        ctx.fillStyle = v('--accent-400');
         ctx.beginPath();
         ctx.arc(pScreen.x, pScreen.y, 9, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = v('--content-primary');
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = v('--content-primary');
         ctx.beginPath();
         ctx.arc(pScreen.x, pScreen.y, 3, 0, 2 * Math.PI);
         ctx.fill();
 
         // Pickup text estimation tag
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#000000';
+        ctx.fillStyle = v('--content-primary');
+        ctx.strokeStyle = v('--background-primary');
         ctx.font = 'bold 9px monospace';
         const txt = `DRIVERS: ${closestDriverEta} MIN`;
         const txtWidth = ctx.measureText(txt).width;
-        ctx.fillStyle = '#09090b';
+        ctx.fillStyle = v('--background-primary');
         ctx.fillRect(pScreen.x - txtWidth / 2 - 6, pScreen.y - 25, txtWidth + 12, 16);
-        ctx.strokeStyle = '#3b82f6';
+        ctx.strokeStyle = v('--accent-400');
         ctx.lineWidth = 1;
         ctx.strokeRect(pScreen.x - txtWidth / 2 - 6, pScreen.y - 25, txtWidth + 12, 16);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = v('--content-primary');
         ctx.fillText(txt, pScreen.x - txtWidth / 2, pScreen.y - 14);
 
         // Draw Dropoff Anchor Pin if configured
         if (dropoffCoords) {
           const dScreen = toScreen(dropoffCoords.lat, dropoffCoords.lng, canvas.width, canvas.height, mapCenter, mapZoom);
-          ctx.fillStyle = '#ef4444';
+          ctx.fillStyle = v('--negative-400');
           ctx.beginPath();
           ctx.arc(dScreen.x, dScreen.y, 9, 0, 2 * Math.PI);
           ctx.fill();
-          ctx.strokeStyle = '#ffffff';
+          ctx.strokeStyle = v('--content-primary');
           ctx.lineWidth = 2.5;
           ctx.stroke();
 
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = v('--content-primary');
           ctx.beginPath();
           ctx.arc(dScreen.x, dScreen.y, 3, 0, 2 * Math.PI);
           ctx.fill();
@@ -541,12 +545,12 @@ export default function RiderDashboardPage() {
           ctx.translate(screen.x, screen.y);
           ctx.rotate(driver.bearing * Math.PI / 180);
 
-          ctx.fillStyle = '#eab308';
+          ctx.fillStyle = v('--warning-400');
           ctx.fillRect(-5, -8, 10, 16);
-          ctx.fillStyle = '#000000';
+          ctx.fillStyle = v('--background-primary');
           ctx.fillRect(-3, -5, 6, 3);
           ctx.fillRect(-3, 2, 6, 2);
-          ctx.fillStyle = '#ef4444';
+          ctx.fillStyle = v('--negative-400');
           ctx.fillRect(-2, -1, 4, 1);
 
           ctx.restore();
@@ -877,11 +881,11 @@ export default function RiderDashboardPage() {
       `}</style>
 
       {/* ==================== LAYER 3 (Z-INDEX: 50): TOP NAVIGATION HEADER BAR ==================== */}
-      <header className="bg-zinc-950/80 border-b border-zinc-900/60 p-4 fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full backdrop-blur-md">
+      <header className="bg-background-primary/80 border-b border-border-opaque/60 p-4 fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDrawerOpen(true)}
-            className="h-9 w-9 bg-zinc-900 hover:bg-zinc-850 rounded-xl border border-zinc-800 flex items-center justify-center text-sm cursor-pointer transition active:scale-95"
+            className="h-9 w-9 bg-background-secondary hover:bg-background-tertiary rounded-xl border border-border-opaque flex items-center justify-center text-sm cursor-pointer transition active:scale-95"
             aria-label={t('openNavigationDrawer')}
           >
             ☰
@@ -892,7 +896,7 @@ export default function RiderDashboardPage() {
             <select
               value={currentCity}
               onChange={(e) => setCurrentCity(e.target.value)}
-              className="bg-transparent text-[9px] font-mono font-bold text-zinc-500 uppercase outline-none cursor-pointer mt-0.5"
+              className="bg-transparent text-[9px] font-mono font-bold text-content-tertiary uppercase outline-none cursor-pointer mt-0.5"
             >
               <option value="Kolkata">{t('cityKolkata')}</option>
               <option value="Bangalore">{t('cityBangalore')}</option>
@@ -906,11 +910,11 @@ export default function RiderDashboardPage() {
           {/* Notification bell and SOS red triggers */}
           <Link
             href="/account/notifications"
-            className="h-9 w-9 bg-zinc-900 hover:bg-zinc-850 rounded-xl border border-zinc-800 flex items-center justify-center relative transition hover:text-white"
+            className="h-9 w-9 bg-background-secondary hover:bg-background-tertiary rounded-xl border border-border-opaque flex items-center justify-center relative transition hover:text-white"
           >
             🔔
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white font-mono font-bold text-[8px] h-4 w-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-negative-400 text-white font-mono font-bold text-[8px] h-4 w-4 rounded-full flex items-center justify-center">
                 {unreadCount}
               </span>
             )}
@@ -918,7 +922,7 @@ export default function RiderDashboardPage() {
 
           <button
             onClick={() => setShowSosModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition cursor-pointer border border-red-500"
+            className="bg-negative-400 hover:bg-negative-400 text-white font-mono font-bold text-[9px] px-3.5 py-1.5 rounded-full animate-pulse transition cursor-pointer border border-negative-400"
           >
             {t('sosButton')}
           </button>
@@ -939,7 +943,7 @@ export default function RiderDashboardPage() {
         {/* Map UI overlays */}
         <div className="absolute top-20 left-4 z-20 flex flex-col gap-2">
           {/* Pulsing Supply Badge */}
-          <div className="bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono font-bold uppercase py-1 px-2.5 rounded-full tracking-wider select-none backdrop-blur-sm">
+          <div className="bg-background-primary/80 border border-border-opaque text-[8px] font-mono font-bold uppercase py-1 px-2.5 rounded-full tracking-wider select-none backdrop-blur-sm">
             {t('nearestDriver', { eta: closestDriverEta })}
           </div>
         </div>
@@ -948,13 +952,13 @@ export default function RiderDashboardPage() {
         <div className="absolute bottom-[20vh] right-4 z-20 flex flex-col gap-1.5 font-mono font-bold text-xs select-none">
           <button
             onClick={handleZoomIn}
-            className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+            className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
           >
             +
           </button>
           <button
             onClick={handleZoomOut}
-            className="h-8 w-8 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-center text-white hover:bg-zinc-900 transition backdrop-blur-sm cursor-pointer"
+            className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
           >
             -
           </button>
@@ -964,7 +968,7 @@ export default function RiderDashboardPage() {
       {/* ==================== LAYER 2 (Z-INDEX: 30): GESTURE SNAPPING BOTTOM SHEET ==================== */}
       <div
         style={{ height: `${sheetHeight}vh` }}
-        className={`fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/95 border-t border-zinc-900/60 shadow-2xl backdrop-blur-md rounded-t-3xl overflow-hidden flex flex-col transition-all duration-300 ${
+        className={`fixed bottom-0 left-0 right-0 z-30 bg-background-primary/95 border-t border-border-opaque/60 shadow-2xl backdrop-blur-md rounded-t-3xl overflow-hidden flex flex-col transition-all duration-300 ${
           isDraggingSheet ? 'transition-none' : ''
         }`}
       >
@@ -973,9 +977,9 @@ export default function RiderDashboardPage() {
           onPointerDown={handleSheetPointerDown}
           onPointerMove={handleSheetPointerMove}
           onPointerUp={handleSheetPointerUp}
-          className="w-full py-3.5 flex items-center justify-center cursor-ns-resize select-none border-b border-zinc-900/40"
+          className="w-full py-3.5 flex items-center justify-center cursor-ns-resize select-none border-b border-border-opaque/40"
         >
-          <div className="w-12 h-1 bg-zinc-800 hover:bg-zinc-600 rounded-full transition-colors" />
+          <div className="w-12 h-1 bg-background-tertiary hover:bg-background-tertiary rounded-full transition-colors" />
         </div>
 
         {/* Dynamic State Scroll Body */}
@@ -987,17 +991,17 @@ export default function RiderDashboardPage() {
               {/* Fake Search Input bar */}
               <div
                 onClick={() => setSheetHeight(45)}
-                className="w-full bg-zinc-900/80 border border-zinc-850 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:border-zinc-700 transition"
+                className="w-full bg-background-secondary/80 border border-border-opaque rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:border-border-opaque transition"
               >
-                <span className="text-zinc-500">🔍</span>
-                <span className="text-xs text-zinc-400 font-mono">{t('searchPrompt')}</span>
+                <span className="text-content-tertiary">🔍</span>
+                <span className="text-xs text-content-secondary font-mono">{t('searchPrompt')}</span>
               </div>
 
               {/* Quick Tiles grid shortcuts */}
-              <div className="grid grid-cols-4 gap-2 font-mono text-[8px] font-bold text-zinc-500 uppercase">
+              <div className="grid grid-cols-4 gap-2 font-mono text-[8px] font-bold text-content-tertiary uppercase">
                 <Link
                   href="/account/garage"
-                  className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
+                  className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
                   <span>🚗</span>
                   <span className="truncate">{t('tileMyGarage')}</span>
@@ -1012,21 +1016,21 @@ export default function RiderDashboardPage() {
                     setSheetHeight(85);
                     alert(t('rebookLoadedAlert'));
                   }}
-                  className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition cursor-pointer text-zinc-400 hover:text-white"
+                  className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition cursor-pointer text-content-secondary hover:text-white"
                 >
                   <span>🔄</span>
                   <span className="truncate">{t('tileRebookLast')}</span>
                 </button>
                 <Link
                   href="/account/rewards"
-                  className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
+                  className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
                   <span>🎁</span>
                   <span className="truncate">{t('tileOffers')}</span>
                 </Link>
                 <Link
                   href="/account/refer"
-                  className="bg-zinc-900 hover:bg-zinc-850 p-2.5 rounded-xl border border-zinc-850 text-center flex flex-col items-center gap-1 transition no-underline text-zinc-400 hover:text-white"
+                  className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
                   <span>🏆</span>
                   <span className="truncate">{t('tileReferEarn')}</span>
@@ -1039,7 +1043,7 @@ export default function RiderDashboardPage() {
           {sheetHeight > 25 && sheetHeight <= 55 && (
             <div className="space-y-4 animate-fadeIn">
               {/* Segmented Trip Type Tab switches */}
-              <div className="flex bg-zinc-900/60 p-1 rounded-xl border border-zinc-900 font-mono text-[9px] uppercase font-bold text-zinc-500">
+              <div className="flex bg-background-secondary/60 p-1 rounded-xl border border-border-opaque font-mono text-[9px] uppercase font-bold text-content-tertiary">
                 {[
                   { id: 'CITY_ROUND', label: t('tripTypeRoundTrip') },
                   { id: 'CITY_ONEWAY', label: t('tripTypeOneWay') },
@@ -1060,14 +1064,14 @@ export default function RiderDashboardPage() {
               </div>
 
               {/* Autocomplete Input Forms */}
-              <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 font-sans text-xs">
+              <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-3 font-sans text-xs">
                 <div>
-                  <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('pickupLocationLabel')}</label>
+                  <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">{t('pickupLocationLabel')}</label>
                   <input
                     type="text"
                     value={pickupText}
                     onChange={(e) => setPickupText(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white focus:outline-none focus:border-zinc-500 text-xs"
+                    className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-white focus:outline-none focus:border-border-opaque text-xs"
                     placeholder={t('pickupAddressPlaceholder')}
                   />
                   <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -1075,7 +1079,7 @@ export default function RiderDashboardPage() {
                       <button
                         key={f.label}
                         onClick={() => handleSetFavoriteLocation('PICKUP', f)}
-                        className="bg-zinc-900 text-zinc-400 hover:text-white px-2 py-1 rounded text-[8px] font-mono border border-zinc-850"
+                        className="bg-background-secondary text-content-secondary hover:text-white px-2 py-1 rounded text-[8px] font-mono border border-border-opaque"
                       >
                         {f.label}
                       </button>
@@ -1087,19 +1091,19 @@ export default function RiderDashboardPage() {
                 {stops.map((stop, i) => (
                   <div key={i} className="flex gap-2 items-center animate-fadeIn">
                     <div className="flex-1">
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('stopLabel', { number: i + 1 })}</label>
+                      <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">{t('stopLabel', { number: i + 1 })}</label>
                       <input
                         type="text"
                         value={stop}
                         onChange={(e) => handleStopChange(i, e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-white focus:outline-none focus:border-zinc-500 text-xs"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2 text-white focus:outline-none focus:border-border-opaque text-xs"
                         placeholder={t('stopAddressPlaceholder')}
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveStop(i)}
-                      className="bg-zinc-950 hover:bg-zinc-900 text-red-500 border border-zinc-850 h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
+                      className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                     >
                       ✕
                     </button>
@@ -1109,15 +1113,15 @@ export default function RiderDashboardPage() {
                 {/* Dropoff Address */}
                 {tripType !== 'CITY_ROUND' && (
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('destinationAddressLabel')}</label>
+                    <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">{t('destinationAddressLabel')}</label>
                     <input
                       type="text"
                       value={dropoffText}
                       onChange={(e) => setDropoffText(e.target.value)}
-                      className={`w-full bg-zinc-950 border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
+                      className={`w-full bg-background-primary border rounded-lg p-2.5 text-white focus:outline-none text-xs transition-all ${
                         dropoffInputFlash
-                          ? 'border-red-500 ring-2 ring-red-500/20 animate-shake'
-                          : 'border-zinc-850 focus:border-zinc-500'
+                          ? 'border-negative-400 ring-2 ring-negative-400/20 animate-shake'
+                          : 'border-border-opaque focus:border-border-opaque'
                       }`}
                       placeholder={t('searchPrompt')}
                     />
@@ -1126,7 +1130,7 @@ export default function RiderDashboardPage() {
                         <button
                           key={f.label}
                           onClick={() => handleSetFavoriteLocation('DROPOFF', f)}
-                          className="bg-zinc-900 text-zinc-400 hover:text-white px-2 py-1 rounded text-[8px] font-mono border border-zinc-850"
+                          className="bg-background-secondary text-content-secondary hover:text-white px-2 py-1 rounded text-[8px] font-mono border border-border-opaque"
                         >
                           {f.label}
                         </button>
@@ -1139,7 +1143,7 @@ export default function RiderDashboardPage() {
                   <button
                     type="button"
                     onClick={handleAddStop}
-                    className="text-[8px] font-mono font-bold uppercase text-zinc-500 hover:text-white flex items-center gap-1 cursor-pointer"
+                    className="text-[8px] font-mono font-bold uppercase text-content-tertiary hover:text-white flex items-center gap-1 cursor-pointer"
                   >
                     {t('addStopButton')}
                   </button>
@@ -1158,7 +1162,7 @@ export default function RiderDashboardPage() {
                   }
                   setSheetHeight(85);
                 }}
-                className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider transition hover:bg-zinc-200"
+                className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider transition hover:bg-background-tertiary"
               >
                 {t('proceedToAssetCta')}
               </button>
@@ -1169,24 +1173,24 @@ export default function RiderDashboardPage() {
           {sheetHeight > 55 && sheetHeight <= 95 && (
             <div className="space-y-4 animate-fadeIn">
               {/* Route Summary bar */}
-              <div className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-3.5 rounded-xl font-mono text-[9px]">
+              <div className="flex justify-between items-center bg-background-secondary/30 border border-border-opaque p-3.5 rounded-xl font-mono text-[9px]">
                 <div className="truncate pr-4">
-                  <span className="text-zinc-500 block uppercase">{t('routeLabel')}</span>
+                  <span className="text-content-tertiary block uppercase">{t('routeLabel')}</span>
                   <span className="text-white font-sans block truncate text-xs font-semibold">{pickupText} ➔ {tripType === 'CITY_ROUND' ? t('roundPack') : dropoffText}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSheetHeight(45)}
-                  className="text-zinc-400 hover:text-white uppercase font-bold text-[8px]"
+                  className="text-content-secondary hover:text-white uppercase font-bold text-[8px]"
                 >
                   {t('editButton')}
                 </button>
               </div>
 
               {/* Garage Vehicle Selector matrix */}
-              <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-3 text-xs">
-                <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-500 uppercase font-mono font-bold text-[8px]">{t('selectVehicleFromGarage')}</span>
+              <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-3 text-xs">
+                <div className="flex justify-between items-center border-b border-border-opaque pb-2">
+                  <span className="text-content-tertiary uppercase font-mono font-bold text-[8px]">{t('selectVehicleFromGarage')}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1195,7 +1199,7 @@ export default function RiderDashboardPage() {
                         setSheetHeight(100); // Pull up fully to present input overrides
                       }
                     }}
-                    className="text-[8px] font-mono font-bold text-zinc-400 hover:text-white uppercase"
+                    className="text-[8px] font-mono font-bold text-content-secondary hover:text-white uppercase"
                   >
                     {useOneTimeCar ? t('useGarageToggle') : t('oneTimeOverrideToggle')}
                   </button>
@@ -1204,7 +1208,7 @@ export default function RiderDashboardPage() {
                 {!useOneTimeCar ? (
                   <div className="space-y-2 text-xs font-mono">
                     {garageCars.map((car) => (
-                      <label key={car.id} className="flex items-center justify-between p-2.5 bg-zinc-950 border border-zinc-850 rounded-xl cursor-pointer">
+                      <label key={car.id} className="flex items-center justify-between p-2.5 bg-background-primary border border-border-opaque rounded-xl cursor-pointer">
                         <div className="flex items-center gap-3">
                           <input
                             type="radio"
@@ -1215,11 +1219,11 @@ export default function RiderDashboardPage() {
                           />
                           <div>
                             <span className="text-white font-sans font-medium block">{car.make} {car.model}</span>
-                            <span className="text-[8px] text-zinc-500 block uppercase mt-0.5">{car.plate} • {car.transmission} • {car.type}</span>
+                            <span className="text-[8px] text-content-tertiary block uppercase mt-0.5">{car.plate} • {car.transmission} • {car.type}</span>
                           </div>
                         </div>
                         {car.isDefault && (
-                          <span className="bg-zinc-900 text-zinc-400 border border-zinc-850 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
+                          <span className="bg-background-secondary text-content-secondary border border-border-opaque text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
                             {t('defaultBadge')}
                           </span>
                         )}
@@ -1227,14 +1231,14 @@ export default function RiderDashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl flex justify-between items-center font-mono text-xs">
+                  <div className="p-3 bg-background-primary border border-border-opaque rounded-xl flex justify-between items-center font-mono text-xs">
                     <div>
                       <span className="text-white block font-sans font-semibold">{oneTimeMake || t('overrideFallbackMake')} {oneTimeModel || t('overrideFallbackModel')}</span>
-                      <span className="text-[8px] text-zinc-500 block uppercase mt-0.5">{oneTimeTransmission} • {oneTimeTier}</span>
+                      <span className="text-[8px] text-content-tertiary block uppercase mt-0.5">{oneTimeTransmission} • {oneTimeTier}</span>
                     </div>
                     <button
                       onClick={() => setSheetHeight(100)}
-                      className="text-zinc-400 hover:text-white text-[8px] font-bold uppercase"
+                      className="text-content-secondary hover:text-white text-[8px] font-bold uppercase"
                     >
                       {t('configButton')}
                     </button>
@@ -1243,15 +1247,15 @@ export default function RiderDashboardPage() {
               </div>
 
               {/* Schedule control */}
-              <div className="flex justify-between items-center bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl text-xs">
+              <div className="flex justify-between items-center bg-background-secondary/40 p-3 border border-border-opaque rounded-xl text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider block">{t('departureScheduleLabel')}</span>
+                  <span className="text-[8px] font-mono text-content-tertiary uppercase tracking-wider block">{t('departureScheduleLabel')}</span>
                   <span className="font-bold text-white text-xs">{scheduleLater ? t('scheduledFor', { date: scheduleDate, time: scheduleTime }) : t('immediateDeparture')}</span>
                 </div>
 
                 <button
                   onClick={() => setScheduleLater(!scheduleLater)}
-                  className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-[9px] font-mono font-bold uppercase py-1.5 px-3 rounded-xl text-zinc-300 cursor-pointer"
+                  className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque text-[9px] font-mono font-bold uppercase py-1.5 px-3 rounded-xl text-content-secondary cursor-pointer"
                 >
                   {scheduleLater ? t('scheduleNow') : t('scheduleLater')}
                 </button>
@@ -1263,24 +1267,24 @@ export default function RiderDashboardPage() {
                     type="date"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-white outline-none"
+                    className="bg-background-primary border border-border-opaque rounded-lg p-2 text-white outline-none"
                   />
                   <input
                     type="time"
                     value={scheduleTime}
                     onChange={(e) => setScheduleTime(e.target.value)}
-                    className="bg-zinc-950 border border-zinc-850 rounded-lg p-2 text-white outline-none"
+                    className="bg-background-primary border border-border-opaque rounded-lg p-2 text-white outline-none"
                   />
                 </div>
               )}
 
               {/* Duration adjustments sliders */}
               {(tripType === 'CITY_ROUND' || tripType === 'OUTSTATION') && (
-                <div className="bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl space-y-2 text-xs font-mono">
+                <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-2 text-xs font-mono">
                   {tripType === 'CITY_ROUND' ? (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500 uppercase font-bold text-[8px]">{t('jobDuration')}</span>
+                        <span className="text-content-tertiary uppercase font-bold text-[8px]">{t('jobDuration')}</span>
                         <span className="text-white font-bold">{t('hoursPackage', { hours: durationHours })}</span>
                       </div>
                       <input
@@ -1295,7 +1299,7 @@ export default function RiderDashboardPage() {
                   ) : (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500 uppercase font-bold text-[8px]">{t('outstationDays')}</span>
+                        <span className="text-content-tertiary uppercase font-bold text-[8px]">{t('outstationDays')}</span>
                         <span className="text-white font-bold">{t('daysPackage', { days: durationDays })}</span>
                       </div>
                       <input
@@ -1313,62 +1317,62 @@ export default function RiderDashboardPage() {
 
               {/* Surcharges steps grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="flex justify-between items-center bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl">
-                  <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase">{t('passengersLabel')}</span>
+                <div className="flex justify-between items-center bg-background-secondary/40 p-3.5 border border-border-opaque rounded-xl">
+                  <span className="text-[8px] font-mono font-bold text-content-tertiary uppercase">{t('passengersLabel')}</span>
                   <div className="flex gap-3 items-center font-mono font-bold">
                     <button
                       onClick={() => setPassengersCount(c => Math.max(1, c - 1))}
-                      className="h-6 w-6 bg-zinc-950 border border-zinc-800 rounded flex items-center justify-center"
+                      className="h-6 w-6 bg-background-primary border border-border-opaque rounded flex items-center justify-center"
                     >
                       -
                     </button>
                     <span>{passengersCount}</span>
                     <button
                       onClick={() => setPassengersCount(c => Math.min(8, c + 1))}
-                      className="h-6 w-6 bg-zinc-950 border border-zinc-800 rounded flex items-center justify-center"
+                      className="h-6 w-6 bg-background-primary border border-border-opaque rounded flex items-center justify-center"
                     >
                       +
                     </button>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl">
+                <div className="flex justify-between items-center bg-background-secondary/40 p-3.5 border border-border-opaque rounded-xl">
                   <div>
-                    <span className="text-[8px] font-mono font-bold text-zinc-500 uppercase block">{t('d4mCareSurcharge')}</span>
-                    <span className="text-[9px] text-zinc-400 block mt-0.5">{t('d4mCareDetail')}</span>
+                    <span className="text-[8px] font-mono font-bold text-content-tertiary uppercase block">{t('d4mCareSurcharge')}</span>
+                    <span className="text-[9px] text-content-secondary block mt-0.5">{t('d4mCareDetail')}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setD4mCareEnabled(!d4mCareEnabled)}
-                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${d4mCareEnabled ? 'bg-white' : 'bg-zinc-800'}`}
+                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${d4mCareEnabled ? 'bg-white' : 'bg-background-tertiary'}`}
                   >
-                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${d4mCareEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${d4mCareEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
                   </button>
                 </div>
               </div>
 
               {/* Promos */}
-              <div className="bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl text-xs">
-                <label className="block text-[8px] font-mono font-bold text-zinc-500 uppercase mb-1">{t('promoCouponCodeLabel')}</label>
+              <div className="bg-background-secondary/40 p-3 border border-border-opaque rounded-xl text-xs">
+                <label className="block text-[8px] font-mono font-bold text-content-tertiary uppercase mb-1">{t('promoCouponCodeLabel')}</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     placeholder={t('promoCodePlaceholder')}
-                    className="flex-grow bg-zinc-950 border border-zinc-850 rounded-xl p-2.5 text-white focus:outline-none font-mono text-xs uppercase"
+                    className="flex-grow bg-background-primary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none font-mono text-xs uppercase"
                   />
                   <button
                     type="button"
                     onClick={handleApplyPromo}
-                    className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-850 rounded-xl px-4 text-[9px] font-mono font-bold uppercase tracking-wider transition cursor-pointer"
+                    className="bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque rounded-xl px-4 text-[9px] font-mono font-bold uppercase tracking-wider transition cursor-pointer"
                   >
                     {t('applyButton')}
                   </button>
                 </div>
                 {promoApplied && (
                   <span className={`text-[8px] font-mono block mt-1.5 uppercase font-bold ${
-                    promoApplied === 'SUCCESS' ? 'text-emerald-400' : 'text-red-500'
+                    promoApplied === 'SUCCESS' ? 'text-content-positive' : 'text-content-negative'
                   }`}>
                     {promoApplied === 'SUCCESS' ? t('promoSuccess') : t('promoError')}
                   </span>
@@ -1376,15 +1380,15 @@ export default function RiderDashboardPage() {
               </div>
 
               {/* Payment methods */}
-              <div className="flex justify-between items-center bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl text-xs">
+              <div className="flex justify-between items-center bg-background-secondary/40 p-4 border border-border-opaque rounded-xl text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">{t('paymentMethodLabel')}</span>
+                  <span className="text-[8px] font-mono text-content-tertiary uppercase tracking-widest block">{t('paymentMethodLabel')}</span>
                   <span className="font-bold text-white text-xs">{t('paymentWallet', { method: paymentMethod })}</span>
                 </div>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-850 rounded-xl p-2 font-mono text-[9px] font-bold text-zinc-300 outline-none cursor-pointer"
+                  className="bg-background-primary border border-border-opaque rounded-xl p-2 font-mono text-[9px] font-bold text-content-secondary outline-none cursor-pointer"
                 >
                   <option value="UPI">{t('paymentUpi')}</option>
                   <option value="CASH">{t('paymentCash')}</option>
@@ -1395,16 +1399,16 @@ export default function RiderDashboardPage() {
 
               {/* Dynamic Surge Matrix Banner */}
               {surgeMultiplier > 1.0 && (
-                <div className="bg-amber-950/80 border border-amber-900 text-amber-200 p-3 rounded-xl font-mono text-[9px] uppercase tracking-wider flex items-center justify-between animate-pulse">
+                <div className="bg-surface-warning/80 border border-warning-400 text-content-warning p-3 rounded-xl font-mono text-[9px] uppercase tracking-wider flex items-center justify-between animate-pulse">
                   <span>{t('surgeActive')}</span>
-                  <span className="font-extrabold text-amber-300">{t('surgeMultiplier', { multiplier: surgeMultiplier })}</span>
+                  <span className="font-extrabold text-content-warning">{t('surgeMultiplier', { multiplier: surgeMultiplier })}</span>
                 </div>
               )}
 
               {/* Pricing breakdown summary */}
-              <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-4 rounded-xl font-mono text-xs border-dashed">
+              <div className="flex justify-between items-center bg-background-primary border border-border-opaque p-4 rounded-xl font-mono text-xs border-dashed">
                 <div>
-                  <span className="text-zinc-500 block text-[8px] uppercase">{t('estimatedFareLabel')}</span>
+                  <span className="text-content-tertiary block text-[8px] uppercase">{t('estimatedFareLabel')}</span>
                   <span className="text-2xl font-bold text-white block mt-0.5">
                     {isQuoteLoading ? t('fareCalculating') : `₹${estimatedFare.toFixed(2)}`}
                   </span>
@@ -1412,7 +1416,7 @@ export default function RiderDashboardPage() {
                 <button
                   type="button"
                   onClick={() => alert(t('billingBreakdown', { surge: surgeMultiplier, promo: promoApplied === 'SUCCESS' ? '₹100' : '₹0', care: d4mCareEnabled ? '₹49' : '₹0' }))}
-                  className="text-zinc-500 hover:text-white text-[8px] font-bold uppercase tracking-wider block"
+                  className="text-content-tertiary hover:text-white text-[8px] font-bold uppercase tracking-wider block"
                 >
                   {t('breakdownButton')}
                 </button>
@@ -1421,15 +1425,15 @@ export default function RiderDashboardPage() {
               {/* ==================== SLIDE TO CONFIRM DISPATCH GESTURE WIDGET ==================== */}
               <div 
                 ref={sliderTrackRef}
-                className="relative w-full h-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center overflow-hidden select-none"
+                className="relative w-full h-16 bg-background-secondary border border-border-opaque rounded-2xl flex items-center justify-center overflow-hidden select-none"
               >
                 {/* Drag progress highlight background */}
                 <div 
-                  className="absolute left-0 top-0 bottom-0 bg-emerald-500/20 transition-all"
+                  className="absolute left-0 top-0 bottom-0 bg-positive-400/20 transition-all"
                   style={{ width: `${slideX + 28}px` }}
                 />
 
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 pointer-events-none z-10">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-content-secondary pointer-events-none z-10">
                   {isSliding ? t('slideToConfirm') : t('slideToBookPilot')}
                 </span>
 
@@ -1438,7 +1442,7 @@ export default function RiderDashboardPage() {
                   onPointerMove={handleSliderPointerMove}
                   onPointerUp={handleSliderPointerUp}
                   style={{ transform: `translateX(${slideX}px)` }}
-                  className="absolute left-2 w-12 h-12 bg-white hover:bg-zinc-200 text-black rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-20 transition-colors"
+                  className="absolute left-2 w-12 h-12 bg-white hover:bg-background-tertiary text-black rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-20 transition-colors"
                 >
                   <span className="text-lg font-bold">➔</span>
                 </div>
@@ -1449,12 +1453,12 @@ export default function RiderDashboardPage() {
           {/* ==================== STATE D: EXPANDED_FULL (95vh - 100vh) ==================== */}
           {sheetHeight > 95 && (
             <div className="space-y-5 animate-fadeIn">
-              <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
+              <div className="flex justify-between items-center border-b border-border-opaque pb-3">
                 <h3 className="text-sm font-mono font-bold uppercase text-white">{t('oneTimeCarConfigHeading')}</h3>
                 <button
                   type="button"
                   onClick={() => setSheetHeight(85)}
-                  className="text-xs text-zinc-500 hover:text-white uppercase font-bold"
+                  className="text-xs text-content-tertiary hover:text-white uppercase font-bold"
                 >
                   {t('cancelButton')}
                 </button>
@@ -1462,50 +1466,50 @@ export default function RiderDashboardPage() {
 
               <form onSubmit={handleBindOneTimeCar} className="space-y-4 font-sans text-xs">
                 {oneTimeError && (
-                  <div className="bg-red-950/60 border border-red-900 text-red-200 p-3 rounded-lg font-mono text-[9px] uppercase">
+                  <div className="bg-surface-negative/60 border border-negative-400 text-content-negative p-3 rounded-lg font-mono text-[9px] uppercase">
                     {oneTimeError}
                   </div>
                 )}
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('manufacturerMakeLabel')}</label>
+                    <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">{t('manufacturerMakeLabel')}</label>
                     <input
                       type="text"
                       value={oneTimeMake}
                       onChange={(e) => setOneTimeMake(e.target.value)}
                       placeholder={t('manufacturerMakePlaceholder')}
-                      className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500"
+                      className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-white outline-none focus:border-border-opaque"
                     />
                   </div>
                   <div>
-                    <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1 font-mono">{t('modelNameLabel')}</label>
+                    <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1 font-mono">{t('modelNameLabel')}</label>
                     <input
                       type="text"
                       value={oneTimeModel}
                       onChange={(e) => setOneTimeModel(e.target.value)}
                       placeholder={t('modelNamePlaceholder')}
-                      className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-white outline-none focus:border-zinc-500"
+                      className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-white outline-none focus:border-border-opaque"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3 font-mono text-xs">
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">{t('transmissionLabel')}</label>
+                      <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1">{t('transmissionLabel')}</label>
                       <select
                         value={oneTimeTransmission}
                         onChange={(e) => setOneTimeTransmission(e.target.value as any)}
-                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-zinc-300 outline-none"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-content-secondary outline-none"
                       >
                         <option value="AUTOMATIC">AUTOMATIC</option>
                         <option value="MANUAL">MANUAL</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">{t('pricingTierLabel')}</label>
+                      <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1">{t('pricingTierLabel')}</label>
                       <select
                         value={oneTimeTier}
                         onChange={(e) => setOneTimeTier(e.target.value as any)}
-                        className="w-full bg-zinc-950 border border-zinc-850 rounded-lg p-2.5 text-zinc-300 outline-none"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-content-secondary outline-none"
                       >
                         <option value="HATCHBACK">HATCHBACK</option>
                         <option value="PREMIUM_SUV">PREMIUM_SUV</option>
@@ -1517,7 +1521,7 @@ export default function RiderDashboardPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider hover:bg-zinc-200 mt-2"
+                  className="w-full bg-white text-black font-mono font-bold text-[10px] py-3.5 rounded-xl uppercase tracking-wider hover:bg-background-tertiary mt-2"
                 >
                   {t('bindOverrideButton')}
                 </button>
@@ -1527,32 +1531,32 @@ export default function RiderDashboardPage() {
 
         </div>
 
-        <footer className="bg-black py-2.5 text-center text-[7px] font-mono text-zinc-700 border-t border-zinc-950 select-none">
+        <footer className="bg-black py-2.5 text-center text-[7px] font-mono text-content-tertiary border-t border-border-opaque select-none">
           {t('footerShard', { shard: currentCity.toUpperCase() })}
         </footer>
       </div>
 
       {/* ==================== SOS SAFETY INCIDENT OVERLAY PANEL ==================== */}
       {showSosModal && (
-        <div className="fixed inset-0 z-[999999] bg-red-950/95 backdrop-blur-md flex flex-col justify-center items-center p-6 text-center animate-fadeIn">
+        <div className="fixed inset-0 z-[999999] bg-surface-negative/95 backdrop-blur-md flex flex-col justify-center items-center p-6 text-center animate-fadeIn">
           <div className="max-w-md space-y-6">
             <span className="text-5xl block animate-bounce">🚨</span>
             <h2 className="text-3xl font-extrabold tracking-tight text-white font-mono uppercase">{t('emergencySosLockout')}</h2>
-            <p className="text-red-200 text-xs leading-relaxed font-mono">
+            <p className="text-content-negative text-xs leading-relaxed font-mono">
               {t('sosModalDescription', { name: riderName })}
             </p>
             <div className="flex gap-4 max-w-xs mx-auto">
               <button
                 type="button"
                 onClick={() => setShowSosModal(false)}
-                className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                className="flex-1 bg-background-secondary hover:bg-background-tertiary text-content-secondary py-3 rounded-full text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
                 {t('cancelButton')}
               </button>
               <button
                 type="button"
                 onClick={triggerSOS}
-                className="flex-1 bg-white hover:bg-zinc-200 text-red-600 font-bold py-3 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95 animate-pulse"
+                className="flex-1 bg-white hover:bg-background-tertiary text-content-negative font-bold py-3 rounded-full text-xs uppercase tracking-wider transition cursor-pointer active:scale-95 animate-pulse"
               >
                 {t('dial112Button')}
               </button>
@@ -1564,17 +1568,17 @@ export default function RiderDashboardPage() {
       {/* ==================== NAVIGATION HAMBURGER DRAWER PANEL ==================== */}
       {isDrawerOpen && (
         <div className="fixed inset-0 z-[99999] flex bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="w-80 bg-zinc-950 border-r border-zinc-900 h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
+          <div className="w-80 bg-background-primary border-r border-border-opaque h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
             <div>
-              <div className="flex items-center gap-3 border-b border-zinc-900 pb-6 mb-6">
-                <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-850 flex items-center justify-center text-lg">
+              <div className="flex items-center gap-3 border-b border-border-opaque pb-6 mb-6">
+                <div className="h-12 w-12 rounded-xl bg-background-secondary border border-border-opaque flex items-center justify-center text-lg">
                   👤
                 </div>
                 <div>
                   <h4 className="text-sm font-bold tracking-tight text-white">{riderName}</h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] text-zinc-500 font-mono">{t('passengerAccount')}</span>
-                    <span className="bg-zinc-900 text-emerald-400 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
+                    <span className="text-[10px] text-content-tertiary font-mono">{t('passengerAccount')}</span>
+                    <span className="bg-background-secondary text-content-positive px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                       {t('verifiedBadge')}
                     </span>
                   </div>
@@ -1599,7 +1603,7 @@ export default function RiderDashboardPage() {
                     key={item.label}
                     href={item.href}
                     onClick={() => setIsDrawerOpen(false)}
-                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent hover:border-zinc-850 transition-all font-mono uppercase tracking-wider"
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-white hover:bg-background-secondary border border-transparent hover:border-border-opaque transition-all font-mono uppercase tracking-wider"
                   >
                     <span>{item.icon}</span>
                     <span>{item.label}</span>
@@ -1608,14 +1612,14 @@ export default function RiderDashboardPage() {
               </nav>
             </div>
 
-            <div className="border-t border-zinc-900 pt-6">
+            <div className="border-t border-border-opaque pt-6">
               <button
                 type="button"
                 onClick={() => {
                   useAuthStore.getState().logout();
                   window.location.href = '/login';
                 }}
-                className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-white rounded-xl py-3.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer font-mono border border-zinc-800"
+                className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-white rounded-xl py-3.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer font-mono border border-border-opaque"
               >
                 {t('logoutButton')}
               </button>

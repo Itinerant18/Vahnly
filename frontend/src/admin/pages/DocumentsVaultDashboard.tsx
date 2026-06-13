@@ -19,10 +19,10 @@ const DOC_TYPES = ['DRIVING_LICENSE','RC_BOOK','INSURANCE','PUC','ID_PROOF','ADD
 const ENTITY_TYPES = ['DRIVER','RIDER','VEHICLE','ORDER','SYSTEM'];
 
 const STATUS_STYLES: Record<string, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  EXPIRED: 'bg-red-100 text-red-700',
-  SUPERSEDED: 'bg-slate-100 text-slate-500',
-  DELETED: 'bg-red-50 text-red-400',
+  ACTIVE: 'bg-surface-positive text-content-positive',
+  EXPIRED: 'bg-surface-negative text-content-negative',
+  SUPERSEDED: 'bg-background-secondary text-content-secondary',
+  DELETED: 'bg-surface-negative text-content-negative',
 };
 
 const MIME_ICONS: Record<string, string> = {
@@ -230,7 +230,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
                         <div>
                           <div className="text-xs text-body">{doc.expiry_date}</div>
                           {expDays !== null && (
-                            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-red-600' : expDays <= 30 ? 'text-yellow-600' : 'text-mute'}`}>
+                            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-content-negative' : expDays <= 30 ? 'text-content-warning' : 'text-mute'}`}>
                               {expDays <= 0 ? 'EXPIRED' : `${expDays}d`}
                             </div>
                           )}
@@ -322,7 +322,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
                       {editingTags.map(t => (
                         <span key={t} className="flex items-center gap-1 text-[11px] border border-canvas-soft rounded px-1.5 py-0.5 text-body">
                           {t}
-                          <button onClick={() => setEditingTags(editingTags.filter(x => x !== t))} className="text-red-400 hover:text-red-600 leading-none">×</button>
+                          <button onClick={() => setEditingTags(editingTags.filter(x => x !== t))} className="text-content-negative hover:text-content-negative leading-none">×</button>
                         </span>
                       ))}
                     </div>
@@ -352,7 +352,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
                       <div key={e.id} className="flex items-center justify-between text-[11px]">
                         <div>
                           <span className="text-body">{e.accessed_by_email.split('@')[0]}</span>
-                          <span className={`ml-1 font-mono ${e.access_type === 'DELETE' ? 'text-red-500' : 'text-mute'}`}>{e.access_type}</span>
+                          <span className={`ml-1 font-mono ${e.access_type === 'DELETE' ? 'text-content-negative' : 'text-mute'}`}>{e.access_type}</span>
                         </div>
                         <div className="text-mute">{new Date(e.created_at).toLocaleDateString('en-IN')}</div>
                       </div>
@@ -363,7 +363,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
 
               {/* Delete */}
               <button onClick={() => deleteDoc(selected.id)}
-                className="w-full text-center border border-red-200 rounded-lg px-4 py-2 text-sm text-red-500 hover:bg-red-50">
+                className="w-full text-center border border-negative-400 rounded-lg px-4 py-2 text-sm text-content-negative hover:bg-surface-negative">
                 Soft Delete
               </button>
             </>

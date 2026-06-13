@@ -18,8 +18,8 @@ type NavApp = 'GOOGLE' | 'MAPS' | 'WAZE';
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`h-5 w-10 rounded-full transition relative p-0.5 ${on ? 'bg-white' : 'bg-zinc-800'}`}>
-      <div className={`h-4 w-4 rounded-full transition-transform ${on ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+    <button onClick={onClick} className={`h-5 w-10 rounded-full transition relative p-0.5 ${on ? 'bg-white' : 'bg-background-tertiary'}`}>
+      <div className={`h-4 w-4 rounded-full transition-transform ${on ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
     </button>
   );
 }
@@ -106,16 +106,16 @@ export default function DriverSettingsPage() {
     <div className="space-y-6 text-left pb-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
-        {savedFlash && <span className="text-[10px] font-mono text-emerald-400">{t('saved')}</span>}
+        {savedFlash && <span className="text-[10px] font-mono text-content-positive">{t('saved')}</span>}
       </div>
 
       {/* Language */}
-      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('language')}</h4>
         <div className="flex gap-2">
           {SUPPORTED_LOCALES.map((l) => (
             <button key={l.code} onClick={() => onLanguage(l.code)}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono ${locale === l.code ? 'bg-white text-black font-bold' : 'bg-zinc-900 text-zinc-400'}`}>
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${locale === l.code ? 'bg-white text-black font-bold' : 'bg-background-secondary text-content-secondary'}`}>
               {l.label}
             </button>
           ))}
@@ -123,23 +123,23 @@ export default function DriverSettingsPage() {
       </section>
 
       {/* Notification preferences */}
-      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('notifications')}</h4>
         {([['trip_offers', t('tripOffers')], ['earnings', t('earnings')], ['promotions', t('promotions')], ['safety', t('safety')]] as const).map(([key, label]) => (
           <div key={key} className="flex justify-between items-center">
-            <span className="text-xs font-mono text-zinc-300">{label}</span>
+            <span className="text-xs font-mono text-content-secondary">{label}</span>
             <Toggle on={prefs[key]} onClick={() => savePrefs({ ...prefs, [key]: !prefs[key] })} />
           </div>
         ))}
       </section>
 
       {/* Navigation app */}
-      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('navApp')}</h4>
         <div className="flex gap-2">
           {navOptions.map((app) => (
             <button key={app} onClick={() => onNav(app)}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono ${navApp === app ? 'bg-white text-black font-bold' : 'bg-zinc-900 text-zinc-400'}`}>
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${navApp === app ? 'bg-white text-black font-bold' : 'bg-background-secondary text-content-secondary'}`}>
               {app}
             </button>
           ))}
@@ -147,35 +147,35 @@ export default function DriverSettingsPage() {
       </section>
 
       {/* Biometric */}
-      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 flex justify-between items-center">
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 flex justify-between items-center">
         <div>
-          <span className="text-xs font-mono text-zinc-300 block">{t('biometric')}</span>
-          {!bioAvailable && <span className="text-[9px] font-mono text-zinc-600">{t('biometricUnavailable')}</span>}
+          <span className="text-xs font-mono text-content-secondary block">{t('biometric')}</span>
+          {!bioAvailable && <span className="text-[9px] font-mono text-content-tertiary">{t('biometricUnavailable')}</span>}
         </div>
         <Toggle on={bioEnabled && bioAvailable} onClick={onBiometric} />
       </section>
 
       {/* Change password */}
-      <section className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
         <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('changePassword')}</h4>
         <form onSubmit={onChangePassword} className="space-y-3">
           <input type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} placeholder={t('currentPassword')} required
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
           <input type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} placeholder={t('newPassword')} required minLength={8}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
-          {pwdMsg && <p className="text-[10px] font-mono text-zinc-400">{pwdMsg}</p>}
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
+          {pwdMsg && <p className="text-[10px] font-mono text-content-secondary">{pwdMsg}</p>}
           <button type="submit" className="w-full bg-white text-black rounded-xl py-2.5 text-[10px] font-bold uppercase">{t('save')}</button>
         </form>
       </section>
 
       {/* Danger zone */}
-      <section className="bg-red-500/5 border border-red-500/30 rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-red-300 font-mono uppercase tracking-wider">{t('dangerZone')}</h4>
-        <p className="text-[10px] font-mono text-zinc-400 leading-relaxed">{t('deleteWarning')}</p>
+      <section className="bg-negative-400/5 border border-negative-400/30 rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-content-negative font-mono uppercase tracking-wider">{t('dangerZone')}</h4>
+        <p className="text-[10px] font-mono text-content-secondary leading-relaxed">{t('deleteWarning')}</p>
         <input value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder={t('typeDelete')}
-          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-white font-mono" />
+          className="w-full bg-background-primary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
         <button onClick={onDelete} disabled={deleteText !== 'DELETE'}
-          className="w-full bg-red-500/20 text-red-300 border border-red-500/40 rounded-xl py-2.5 text-[10px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed">
+          className="w-full bg-negative-400/20 text-content-negative border border-negative-400/40 rounded-xl py-2.5 text-[10px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed">
           {t('confirmDelete')}
         </button>
       </section>

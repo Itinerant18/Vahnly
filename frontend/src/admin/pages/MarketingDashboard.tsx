@@ -889,9 +889,9 @@ export const MarketingDashboard: React.FC = () => {
 																<h3 className="text-sm font-bold text-ink">{c.name}</h3>
 																<span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border ${
 																	c.status === 'ACTIVE' 
-																		? 'bg-green-50 text-green-700 border-green-200' 
+																		? 'bg-surface-positive text-content-positive border-positive-400' 
 																		: c.status === 'PAUSED' 
-																		? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+																		? 'bg-surface-warning text-content-warning border-warning-400'
 																		: 'bg-canvas-soft text-mute border-canvas-soft'
 																}`}>
 																	{c.status}
@@ -913,14 +913,14 @@ export const MarketingDashboard: React.FC = () => {
 															{c.status === 'ACTIVE' ? (
 																<button
 																	onClick={() => updateCampaignStatus(c.id, 'PAUSED')}
-																	className="bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 border border-rose-500/20 px-2 py-1 rounded transition"
+																	className="bg-surface-negative0/10 text-content-negative hover:bg-surface-negative0/20 border border-negative-400/20 px-2 py-1 rounded transition"
 																>
 																	Pause
 																</button>
 															) : (
 																<button
 																	onClick={() => updateCampaignStatus(c.id, 'ACTIVE')}
-																	className="bg-green-600/10 text-green-700 hover:bg-green-600/20 border border-green-600/20 px-2 py-1 rounded transition"
+																	className="bg-positive-400/10 text-content-positive hover:bg-positive-400/20 border border-positive-400/20 px-2 py-1 rounded transition"
 																>
 																	Launch
 																</button>
@@ -968,7 +968,7 @@ export const MarketingDashboard: React.FC = () => {
 																					</button>
 																					<button
 																						onClick={() => simulateConversion(c.id, v.id || 0, 'BOOKING')}
-																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold text-green-700"
+																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold text-content-positive"
 																					>
 																						Book
 																					</button>
@@ -989,7 +989,7 @@ export const MarketingDashboard: React.FC = () => {
 																					<span className="text-[8px] text-mute uppercase">Clicks ({clickRate}%)</span>
 																				</div>
 																				<div className="bg-canvas-softer p-1 rounded">
-																					<span className="block font-bold text-ink text-green-700">{metric.booking}</span>
+																					<span className="block font-bold text-ink text-content-positive">{metric.booking}</span>
 																					<span className="text-[8px] text-mute uppercase">Book ({bookingRate}%)</span>
 																				</div>
 																			</div>
@@ -1114,9 +1114,9 @@ export const MarketingDashboard: React.FC = () => {
 								</div>
 
 								{estimatedSize !== null && (
-									<div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
-										<span className="text-[10px] uppercase font-bold text-green-700 block tracking-wider">Estimated Audience Size</span>
-										<span className="text-xl font-extrabold text-green-700 font-mono">~{estimatedSize} users</span>
+									<div className="mt-3 p-3 bg-surface-positive0/10 border border-positive-400/20 rounded-lg text-center">
+										<span className="text-[10px] uppercase font-bold text-content-positive block tracking-wider">Estimated Audience Size</span>
+										<span className="text-xl font-extrabold text-content-positive font-mono">~{estimatedSize} users</span>
 									</div>
 								)}
 							</div>
@@ -1289,7 +1289,7 @@ export const MarketingDashboard: React.FC = () => {
 												<h3 className="font-bold text-ink text-sm">{b.title}</h3>
 												<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-canvas border border-canvas-soft">{b.placement}</span>
 												{b.segment_name && (
-													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-green-500/10 text-green-700 border border-green-500/20">{b.segment_name}</span>
+													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-positive0/10 text-content-positive border border-positive-400/20">{b.segment_name}</span>
 												)}
 											</div>
 											<p className="text-body font-mono text-[11px] leading-relaxed max-w-xl">"{b.body}"</p>
@@ -1301,7 +1301,7 @@ export const MarketingDashboard: React.FC = () => {
 
 										<div className="flex items-center gap-2">
 											<span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-												b.status === 'ACTIVE' ? 'bg-green-500/10 text-green-700 border border-green-500/20' : 'bg-canvas-soft text-mute border border-canvas-soft'
+												b.status === 'ACTIVE' ? 'bg-surface-positive0/10 text-content-positive border border-positive-400/20' : 'bg-canvas-soft text-mute border border-canvas-soft'
 											}`}>
 												{b.status}
 											</span>
@@ -1514,7 +1514,7 @@ export const MarketingDashboard: React.FC = () => {
 												"{t.approved_content}"
 											</p>
 											<div className="flex justify-between items-center text-[9px]">
-												<span className="text-green-700 bg-green-500/10 border border-green-500/20 px-1 rounded font-bold uppercase">{t.status}</span>
+												<span className="text-content-positive bg-surface-positive0/10 border border-positive-400/20 px-1 rounded font-bold uppercase">{t.status}</span>
 												<span className="text-mute font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
 											</div>
 										</div>
@@ -1585,20 +1585,20 @@ export const MarketingDashboard: React.FC = () => {
 											<div className="flex items-center gap-2">
 												<h3 className="font-bold text-ink text-sm font-mono">{d.domain}</h3>
 												{d.verified ? (
-													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-green-500/10 text-green-700 border border-green-500/20">Verified</span>
+													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-positive0/10 text-content-positive border border-positive-400/20">Verified</span>
 												) : (
-													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-700 border border-yellow-500/20">DNS Pending</span>
+													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-warning0/10 text-content-warning border border-warning-400/20">DNS Pending</span>
 												)}
 											</div>
 											
 											<div className="grid grid-cols-2 gap-4 text-[10px] font-mono">
 												<div className="bg-canvas border border-canvas-soft px-3 py-1.5 rounded flex justify-between items-center w-48">
 													<span className="text-mute font-bold uppercase text-[8px]">DKIM:</span>
-													<span className={d.dkim_status === 'VERIFIED' ? 'text-green-700 font-bold' : 'text-yellow-700 font-bold'}>{d.dkim_status}</span>
+													<span className={d.dkim_status === 'VERIFIED' ? 'text-content-positive font-bold' : 'text-content-warning font-bold'}>{d.dkim_status}</span>
 												</div>
 												<div className="bg-canvas border border-canvas-soft px-3 py-1.5 rounded flex justify-between items-center w-48">
 													<span className="text-mute font-bold uppercase text-[8px]">SPF:</span>
-													<span className={d.spf_status === 'VERIFIED' ? 'text-green-700 font-bold' : 'text-yellow-700 font-bold'}>{d.spf_status}</span>
+													<span className={d.spf_status === 'VERIFIED' ? 'text-content-positive font-bold' : 'text-content-warning font-bold'}>{d.spf_status}</span>
 												</div>
 											</div>
 										</div>

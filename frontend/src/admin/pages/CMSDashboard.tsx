@@ -27,9 +27,9 @@ const PAGE_TYPE_ICONS: Record<string, string> = {
   POLICY: '📜', FAQ: '❓', HELP_ARTICLE: '💡', ONBOARDING: '👋', BANNER: '📢', SPLASH: '🎨',
 };
 const STATUS_COLORS: Record<string, string> = {
-  PUBLISHED: 'bg-emerald-100 text-emerald-700',
-  DRAFT: 'bg-yellow-100 text-yellow-700',
-  ARCHIVED: 'bg-slate-100 text-slate-500',
+  PUBLISHED: 'bg-surface-positive text-content-positive',
+  DRAFT: 'bg-surface-warning text-content-warning',
+  ARCHIVED: 'bg-background-secondary text-content-secondary',
 };
 
 type Tab = 'pages' | 'i18n' | 'assets';
@@ -180,7 +180,7 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                     History
                   </button>
                   {selected.status !== 'PUBLISHED' && (
-                    <button onClick={publishPage} className="text-xs bg-emerald-500 text-white rounded px-3 py-1 hover:bg-emerald-600">
+                    <button onClick={publishPage} className="text-xs bg-surface-positive0 text-white rounded px-3 py-1 hover:bg-positive-400">
                       Publish
                     </button>
                   )}
@@ -212,7 +212,7 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                   className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 disabled:opacity-50">
                   {saving ? 'Saving…' : 'Save Version'}
                 </button>
-                {msg && <span className={`text-sm ${msg.startsWith('Error') ? 'text-red-600' : 'text-emerald-600'}`}>{msg}</span>}
+                {msg && <span className={`text-sm ${msg.startsWith('Error') ? 'text-content-negative' : 'text-content-positive'}`}>{msg}</span>}
               </div>
             </div>
 
@@ -473,7 +473,7 @@ const AssetsTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =
               <div className="text-[10px] text-mute mt-0.5">{a.asset_type} · {a.platform}</div>
               {a.min_app_version && <div className="text-[10px] text-mute">v{a.min_app_version}+</div>}
               <div className="flex items-center justify-between mt-2">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                   {a.status}
                 </span>
                 <button onClick={() => toggleStatus(a.id, a.status)} className="text-[11px] text-accent hover:underline">

@@ -12,22 +12,22 @@ interface ActionMeta { action: string; module: string; count: number; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const MODULE_COLORS: Record<string, string> = {
-  auth: 'bg-emerald-100 text-emerald-700',
-  compliance: 'bg-blue-100 text-blue-700',
-  dispatch: 'bg-violet-100 text-violet-700',
-  finance: 'bg-yellow-100 text-yellow-700',
-  config: 'bg-indigo-100 text-indigo-700',
-  support: 'bg-sky-100 text-sky-700',
-  drivers: 'bg-orange-100 text-orange-700',
-  safety: 'bg-red-100 text-red-700',
+  auth: 'bg-surface-positive text-content-positive',
+  compliance: 'bg-surface-accent text-content-accent',
+  dispatch: 'bg-surface-accent text-content-accent',
+  finance: 'bg-surface-warning text-content-warning',
+  config: 'bg-surface-accent text-content-accent',
+  support: 'bg-surface-accent text-content-accent',
+  drivers: 'bg-surface-warning text-content-warning',
+  safety: 'bg-surface-negative text-content-negative',
   marketing: 'bg-pink-100 text-pink-700',
 };
 const ACTION_COLORS: Record<string, string> = {
-  LOGIN: 'bg-emerald-100 text-emerald-700', LOGOUT: 'bg-slate-100 text-slate-500',
-  KYC_APPROVE: 'bg-blue-100 text-blue-700', KYC_REJECT: 'bg-red-100 text-red-700',
-  FORCE_MATCH: 'bg-violet-100 text-violet-700', DRIVER_SUSPEND: 'bg-orange-100 text-orange-700',
-  PAYOUT_APPROVED: 'bg-yellow-100 text-yellow-700', FLAG_UPDATED: 'bg-indigo-100 text-indigo-700',
-  TICKET_RESOLVED: 'bg-sky-100 text-sky-700',
+  LOGIN: 'bg-surface-positive text-content-positive', LOGOUT: 'bg-background-secondary text-content-secondary',
+  KYC_APPROVE: 'bg-surface-accent text-content-accent', KYC_REJECT: 'bg-surface-negative text-content-negative',
+  FORCE_MATCH: 'bg-surface-accent text-content-accent', DRIVER_SUSPEND: 'bg-surface-warning text-content-warning',
+  PAYOUT_APPROVED: 'bg-surface-warning text-content-warning', FLAG_UPDATED: 'bg-surface-accent text-content-accent',
+  TICKET_RESOLVED: 'bg-surface-accent text-content-accent',
 };
 
 function moduleBadge(module: string) {
@@ -137,22 +137,22 @@ export const AuditLogsDashboard: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <button onClick={exportCSV} className="px-3 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">↓ Export CSV</button>
-          {isSuperAdmin && <button onClick={() => setShowRetention(!showRetention)} className="px-3 py-1.5 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50">Retention</button>}
+          {isSuperAdmin && <button onClick={() => setShowRetention(!showRetention)} className="px-3 py-1.5 border border-negative-400 text-content-negative rounded-lg text-sm hover:bg-surface-negative">Retention</button>}
         </div>
       </div>
 
       {/* Retention panel */}
       {showRetention && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
-          <div className="text-sm font-semibold text-red-700">Retention Policy Cleanup</div>
+        <div className="bg-surface-negative border border-negative-400 rounded-xl p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-negative">Retention Policy Cleanup</div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-body">Delete logs older than</span>
             <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={90}
-              className="w-24 border border-red-200 rounded px-3 py-1.5 text-sm bg-white text-ink focus:outline-none" />
+              className="w-24 border border-negative-400 rounded px-3 py-1.5 text-sm bg-white text-ink focus:outline-none" />
             <span className="text-sm text-body">days</span>
-            <button onClick={runCleanup} className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Delete</button>
+            <button onClick={runCleanup} className="px-4 py-1.5 bg-negative-400 text-white rounded-lg text-sm font-medium hover:bg-negative-400">Delete</button>
           </div>
-          {cleanupMsg && <div className="text-sm text-red-700">{cleanupMsg}</div>}
+          {cleanupMsg && <div className="text-sm text-content-negative">{cleanupMsg}</div>}
         </div>
       )}
 

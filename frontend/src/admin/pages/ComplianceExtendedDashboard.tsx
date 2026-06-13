@@ -20,15 +20,15 @@ interface PrivacyRequest {
 type Tab = 'kyc' | 'expiry' | 'privacy' | 'regulatory';
 
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  UNDER_REVIEW: 'bg-blue-100 text-blue-700',
-  APPROVED: 'bg-emerald-100 text-emerald-700',
-  REJECTED: 'bg-red-100 text-red-700',
-  PROCESSING: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  OPEN: 'bg-yellow-100 text-yellow-700',
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  EXPIRED: 'bg-red-100 text-red-700',
+  PENDING: 'bg-surface-warning text-content-warning',
+  UNDER_REVIEW: 'bg-surface-accent text-content-accent',
+  APPROVED: 'bg-surface-positive text-content-positive',
+  REJECTED: 'bg-surface-negative text-content-negative',
+  PROCESSING: 'bg-surface-accent text-content-accent',
+  COMPLETED: 'bg-surface-positive text-content-positive',
+  OPEN: 'bg-surface-warning text-content-warning',
+  ACTIVE: 'bg-surface-positive text-content-positive',
+  EXPIRED: 'bg-surface-negative text-content-negative',
 };
 
 function badge(status: string) {
@@ -115,7 +115,7 @@ const KYCTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div className="space-y-3">
-        {msg && <div className={`rounded-lg px-4 py-2.5 text-sm ${msg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{msg}</div>}
+        {msg && <div className={`rounded-lg px-4 py-2.5 text-sm ${msg.startsWith('Error') ? 'bg-surface-negative text-content-negative' : 'bg-surface-positive text-content-positive'}`}>{msg}</div>}
         <div className="flex gap-1 flex-wrap">
           {['ALL', 'PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
@@ -195,7 +195,7 @@ const KYCTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => {
                       className="w-full border border-canvas-soft rounded-lg px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none" />
                     <div className="flex gap-2">
                       <button onClick={() => doVerify('REJECT', rejectReason)} disabled={!rejectReason.trim()}
-                        className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40">
+                        className="flex-1 bg-surface-negative0 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40">
                         Confirm Reject
                       </button>
                       <button onClick={() => setShowReject(false)} className="px-4 py-2 border border-canvas-soft rounded-lg text-sm text-body">Cancel</button>
@@ -203,8 +203,8 @@ const KYCTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => {
                   </>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => doVerify('APPROVE')} className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600">✓ Approve</button>
-                    <button onClick={() => { setShowReject(true); setRejectReason(''); }} className="flex-1 bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100">✗ Reject</button>
+                    <button onClick={() => doVerify('APPROVE')} className="flex-1 bg-surface-positive0 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-positive-400">✓ Approve</button>
+                    <button onClick={() => { setShowReject(true); setRejectReason(''); }} className="flex-1 bg-surface-negative text-content-negative border border-negative-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-surface-negative">✗ Reject</button>
                   </div>
                 )}
               </div>
@@ -254,7 +254,7 @@ const ExpiryTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =
         )}
         {docs.map(doc => {
           const d = daysUntil(doc.expiry_date);
-          const urgency = d !== null && d <= 14 ? 'border-red-200 bg-red-50' : d !== null && d <= 30 ? 'border-yellow-200 bg-yellow-50' : 'border-canvas-soft bg-canvas';
+          const urgency = d !== null && d <= 14 ? 'border-negative-400 bg-surface-negative' : d !== null && d <= 30 ? 'border-warning-400 bg-surface-warning' : 'border-canvas-soft bg-canvas';
           return (
             <div key={doc.id} className={`rounded-xl border p-4 flex items-center justify-between gap-4 ${urgency}`}>
               <div>
@@ -268,7 +268,7 @@ const ExpiryTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =
                 {doc.expiry_date && (
                   <>
                     <div className="text-sm font-mono text-ink">{doc.expiry_date}</div>
-                    <div className={`text-xs font-medium ${d !== null && d <= 14 ? 'text-red-600' : d !== null && d <= 30 ? 'text-yellow-600' : 'text-mute'}`}>
+                    <div className={`text-xs font-medium ${d !== null && d <= 14 ? 'text-content-negative' : d !== null && d <= 30 ? 'text-content-warning' : 'text-mute'}`}>
                       {d !== null ? (d <= 0 ? 'EXPIRED' : `${d}d left`) : ''}
                     </div>
                   </>
@@ -380,7 +380,7 @@ const PrivacyTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) 
           <div className="flex gap-2">
             {(['COMPLETE', 'REJECT'] as const).map(a => (
               <button key={a} onClick={() => setProcessAction(a)}
-                className={`px-3 py-1.5 rounded-lg text-xs border ${processAction === a ? (a === 'COMPLETE' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white') : 'bg-canvas border-canvas-soft text-body'}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs border ${processAction === a ? (a === 'COMPLETE' ? 'bg-surface-positive0 text-white' : 'bg-surface-negative0 text-white') : 'bg-canvas border-canvas-soft text-body'}`}>
                 {a}
               </button>
             ))}
@@ -413,7 +413,7 @@ const PrivacyTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) 
               </div>
               <div className="text-right shrink-0 space-y-1">
                 {deadline !== null && req.status === 'PENDING' && (
-                  <div className={`text-xs font-medium ${deadline <= 7 ? 'text-red-600' : 'text-mute'}`}>{deadline}d left</div>
+                  <div className={`text-xs font-medium ${deadline <= 7 ? 'text-content-negative' : 'text-mute'}`}>{deadline}d left</div>
                 )}
                 <div className="text-xs text-mute">{new Date(req.created_at).toLocaleDateString('en-IN')}</div>
                 {(req.status === 'PENDING' || req.status === 'PROCESSING') && (

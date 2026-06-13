@@ -117,19 +117,23 @@ export default function MapInterpolated({
 
       const now = Date.now();
 
+      // Resolve design-system tokens once per render (canvas can't take var()).
+      const css = getComputedStyle(document.documentElement);
+      const v = (name: string) => css.getPropertyValue(name).trim();
+
       const isDark = theme === 'dark';
-      const bgColor = isDark ? '#09090b' : '#f3f3f3';
-      const gridColor = isDark ? '#18181b' : '#e2e2e2';
-      const highwayColor = isDark ? '#27272a' : '#d4d4d4';
-      const routeColor = isDark ? '#3b82f6' : '#000000';
-      const pinOutlineColor = isDark ? '#ffffff' : '#000000';
-      const pinLabelColor = isDark ? '#ffffff' : '#000000';
-      const vehicleColor = isDark ? '#ffffff' : '#000000';
-      const vehicleOutlineColor = isDark ? '#000000' : '#ffffff';
+      const bgColor = isDark ? v('--background-primary') : v('--border-opaque');
+      const gridColor = isDark ? v('--background-secondary') : v('--border-opaque');
+      const highwayColor = isDark ? v('--background-tertiary') : v('--border-opaque');
+      const routeColor = isDark ? v('--accent-400') : v('--background-primary');
+      const pinOutlineColor = isDark ? v('--content-primary') : v('--background-primary');
+      const pinLabelColor = isDark ? v('--content-primary') : v('--background-primary');
+      const vehicleColor = isDark ? v('--content-primary') : v('--background-primary');
+      const vehicleOutlineColor = isDark ? v('--background-primary') : v('--content-primary');
       const vehicleTailColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
       const h3FillColor = isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(0, 0, 0, 0.04)';
       const h3StrokeColor = isDark ? 'rgba(239, 68, 68, 0.22)' : 'rgba(0, 0, 0, 0.15)';
-      const h3LabelColor = isDark ? '#ef4444' : '#5e5e5e';
+      const h3LabelColor = isDark ? v('--negative-400') : v('--background-tertiary');
 
       // Clear with background color
       ctx.fillStyle = bgColor;
@@ -239,7 +243,7 @@ export default function MapInterpolated({
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#22c55e';
+        ctx.fillStyle = v('--positive-400');
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -254,7 +258,7 @@ export default function MapInterpolated({
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = v('--negative-400');
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -344,7 +348,7 @@ export default function MapInterpolated({
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-2xl border border-slate-800 shadow-2xl bg-slate-950 select-none">
+    <div className="relative w-full h-full overflow-hidden rounded-2xl border border-border-opaque shadow-2xl bg-background-tertiary select-none">
       <canvas
         ref={canvasRef}
         width={750}
@@ -358,24 +362,24 @@ export default function MapInterpolated({
       />
 
       {/* Glassmorphic Map Control Overlays */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2 p-1.5 rounded-xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-md shadow-xl">
+      <div className="absolute bottom-4 right-4 flex flex-col gap-2 p-1.5 rounded-xl border border-border-opaque/80 bg-background-secondary/60 backdrop-blur-md shadow-xl">
         <button
           onClick={() => setZoomLevel((z) => Math.min(18, z + 1))}
-          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-slate-700/80 active:bg-slate-600 transition"
+          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           +
         </button>
         <button
           onClick={() => setZoomLevel((z) => Math.max(13, z - 1))}
-          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-slate-700/80 active:bg-slate-600 transition"
+          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           −
         </button>
       </div>
 
-      <div className="absolute top-4 left-4 p-2.5 rounded-xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md shadow-lg flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+      <div className="absolute top-4 left-4 p-2.5 rounded-xl border border-border-opaque/80 bg-background-secondary/70 backdrop-blur-md shadow-lg flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-positive-400 animate-pulse" />
+        <span className="text-[11px] font-semibold text-content-secondary uppercase tracking-wider">
           Live Vector Grid (Kolkata)
         </span>
       </div>

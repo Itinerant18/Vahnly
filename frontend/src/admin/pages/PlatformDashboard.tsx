@@ -73,15 +73,15 @@ interface ChatStats {
 }
 
 const STATUS_CLS: Record<string, string> = {
-  ACTIVE: 'bg-yellow-100 text-yellow-700',
-  RESOLVED: 'bg-green-100 text-green-700',
-  INVESTIGATING: 'bg-red-100 text-red-700',
+  ACTIVE: 'bg-surface-warning text-content-warning',
+  RESOLVED: 'bg-surface-positive text-content-positive',
+  INVESTIGATING: 'bg-surface-negative text-content-negative',
 };
 
 const EXP_CLS: Record<string, string> = {
-  RUNNING: 'bg-blue-100 text-blue-700',
-  PAUSED: 'bg-gray-100 text-gray-600',
-  CONCLUDED: 'bg-green-100 text-green-700',
+  RUNNING: 'bg-surface-accent text-content-accent',
+  PAUSED: 'bg-background-secondary text-content-secondary',
+  CONCLUDED: 'bg-surface-positive text-content-positive',
 };
 
 export function PlatformDashboard() {
@@ -191,12 +191,12 @@ export function PlatformDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Platform Engineering</h1>
+      <h1 className="text-2xl font-bold text-content-primary">Platform Engineering</h1>
 
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-border-opaque">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium -mb-px ${tab === t.key ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-4 py-2 text-sm font-medium -mb-px ${tab === t.key ? 'border-b-2 border-border-accent text-content-accent' : 'text-content-secondary hover:text-content-primary'}`}>
             {t.label}
           </button>
         ))}
@@ -206,14 +206,14 @@ export function PlatformDashboard() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {services.map(s => (
-              <div key={s.service_name} className={`p-4 rounded-lg border ${s.error_rate_pct > 1 ? 'border-red-300 bg-red-50' : s.uptime_pct < 99.9 ? 'border-yellow-300 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
+              <div key={s.service_name} className={`p-4 rounded-lg border ${s.error_rate_pct > 1 ? 'border-negative-400 bg-surface-negative' : s.uptime_pct < 99.9 ? 'border-warning-400 bg-surface-warning' : 'border-positive-400 bg-surface-positive'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold text-sm text-gray-900">{s.service_name}</p>
-                  <span className={`w-2 h-2 rounded-full ${s.error_rate_pct > 1 ? 'bg-red-500' : 'bg-green-500'}`} />
+                  <p className="font-semibold text-sm text-content-primary">{s.service_name}</p>
+                  <span className={`w-2 h-2 rounded-full ${s.error_rate_pct > 1 ? 'bg-surface-negative0' : 'bg-surface-positive0'}`} />
                 </div>
-                <p className="text-lg font-bold text-gray-800">{s.uptime_pct.toFixed(2)}%</p>
-                <p className="text-xs text-gray-500">uptime</p>
-                <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                <p className="text-lg font-bold text-content-primary">{s.uptime_pct.toFixed(2)}%</p>
+                <p className="text-xs text-content-secondary">uptime</p>
+                <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-content-secondary">
                   <span>p50: {s.p50_latency_ms}ms</span>
                   <span>p95: {s.p95_latency_ms}ms</span>
                   <span>Errors: {s.error_rate_pct.toFixed(2)}%</span>
@@ -224,14 +224,14 @@ export function PlatformDashboard() {
           </div>
 
           <div className="flex justify-end">
-            <button onClick={() => setShowIncident(v => !v)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+            <button onClick={() => setShowIncident(v => !v)} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">
               {showIncident ? 'Cancel' : 'Report Incident'}
             </button>
           </div>
 
           {showIncident && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-              <p className="font-medium text-blue-800">Report Service Incident</p>
+            <div className="p-4 bg-surface-accent border border-border-accent rounded-lg space-y-3">
+              <p className="font-medium text-content-accent">Report Service Incident</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input value={newIncident.service_name} onChange={e => setNewIncident(p => ({ ...p, service_name: e.target.value }))} placeholder="Service name (e.g. payment-gateway)" className="border rounded px-3 py-1.5 text-sm" />
                 <select value={newIncident.severity} onChange={e => setNewIncident(p => ({ ...p, severity: e.target.value }))} className="border rounded px-3 py-1.5 text-sm">
@@ -240,28 +240,28 @@ export function PlatformDashboard() {
                 <input value={newIncident.title} onChange={e => setNewIncident(p => ({ ...p, title: e.target.value }))} placeholder="Title" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
                 <textarea value={newIncident.impact_description} onChange={e => setNewIncident(p => ({ ...p, impact_description: e.target.value }))} placeholder="Impact description" className="border rounded px-3 py-1.5 text-sm md:col-span-2" rows={2} />
               </div>
-              <button onClick={createIncident} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+              <button onClick={createIncident} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">Create</button>
             </div>
           )}
 
           {incidents.length > 0 && (
             <div>
-              <h3 className="font-semibold text-gray-700 mb-3">Incidents</h3>
+              <h3 className="font-semibold text-content-primary mb-3">Incidents</h3>
               <div className="space-y-2">
                 {incidents.map(inc => (
-                  <div key={inc.id} className="p-4 bg-white border border-gray-200 rounded-lg">
+                  <div key={inc.id} className="p-4 bg-white border border-border-opaque rounded-lg">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded ${STATUS_CLS[inc.status] ?? 'bg-gray-100'}`}>{inc.status}</span>
-                          <span className="text-xs text-gray-500">{inc.severity}</span>
-                          <span className="text-sm font-medium text-gray-900">{inc.title}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${STATUS_CLS[inc.status] ?? 'bg-background-secondary'}`}>{inc.status}</span>
+                          <span className="text-xs text-content-secondary">{inc.severity}</span>
+                          <span className="text-sm font-medium text-content-primary">{inc.title}</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">{inc.service_name} | {new Date(inc.started_at).toLocaleString()}</p>
-                        {inc.root_cause && <p className="text-xs text-gray-600 mt-1">Root cause: {inc.root_cause}</p>}
+                        <p className="text-xs text-content-secondary mt-1">{inc.service_name} | {new Date(inc.started_at).toLocaleString()}</p>
+                        {inc.root_cause && <p className="text-xs text-content-secondary mt-1">Root cause: {inc.root_cause}</p>}
                       </div>
                       {inc.status !== 'RESOLVED' && (
-                        <button onClick={() => resolveIncident(inc.id)} className="text-xs text-blue-600 hover:underline whitespace-nowrap ml-4">Mark Resolved</button>
+                        <button onClick={() => resolveIncident(inc.id)} className="text-xs text-content-accent hover:underline whitespace-nowrap ml-4">Mark Resolved</button>
                       )}
                     </div>
                   </div>
@@ -275,54 +275,54 @@ export function PlatformDashboard() {
       {tab === 'experiments' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setShowExperiment(v => !v)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+            <button onClick={() => setShowExperiment(v => !v)} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">
               {showExperiment ? 'Cancel' : '+ New Experiment'}
             </button>
           </div>
 
           {showExperiment && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-              <p className="font-medium text-blue-800">New Experiment</p>
+            <div className="p-4 bg-surface-accent border border-border-accent rounded-lg space-y-3">
+              <p className="font-medium text-content-accent">New Experiment</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input value={newExperiment.name} onChange={e => setNewExperiment(p => ({ ...p, name: e.target.value }))} placeholder="Experiment name" className="border rounded px-3 py-1.5 text-sm" />
                 <input value={newExperiment.metric} onChange={e => setNewExperiment(p => ({ ...p, metric: e.target.value }))} placeholder="Primary metric" className="border rounded px-3 py-1.5 text-sm" />
                 <input value={newExperiment.hypothesis} onChange={e => setNewExperiment(p => ({ ...p, hypothesis: e.target.value }))} placeholder="Hypothesis" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
                 <input value={newExperiment.target_cities} onChange={e => setNewExperiment(p => ({ ...p, target_cities: e.target.value }))} placeholder="Cities (blank = all)" className="border rounded px-3 py-1.5 text-sm md:col-span-2" />
               </div>
-              <p className="text-xs text-gray-500">Created as DRAFT with control/treatment 50-50 split.</p>
-              <button onClick={createExperiment} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+              <p className="text-xs text-content-secondary">Created as DRAFT with control/treatment 50-50 split.</p>
+              <button onClick={createExperiment} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">Create</button>
             </div>
           )}
 
           {experiments.map(exp => {
             const expResults = resultsByExp(exp.id);
             return (
-              <div key={exp.id} className="p-4 bg-white border border-gray-200 rounded-lg">
+              <div key={exp.id} className="p-4 bg-white border border-border-opaque rounded-lg">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded ${EXP_CLS[exp.status] ?? 'bg-gray-100'}`}>{exp.status}</span>
-                      <h3 className="font-semibold text-gray-900">{exp.name}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded ${EXP_CLS[exp.status] ?? 'bg-background-secondary'}`}>{exp.status}</span>
+                      <h3 className="font-semibold text-content-primary">{exp.name}</h3>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">{exp.hypothesis}</p>
-                    <p className="text-xs text-gray-400 mt-1">Metric: {exp.metric} | Cities: {exp.target_cities.join(', ') || 'All'}</p>
+                    <p className="text-sm text-content-secondary mt-1">{exp.hypothesis}</p>
+                    <p className="text-xs text-content-tertiary mt-1">Metric: {exp.metric} | Cities: {exp.target_cities.join(', ') || 'All'}</p>
                   </div>
                 </div>
                 {expResults.length > 0 && (
                   <div className="mt-3 overflow-x-auto">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50">
-                        <tr>{['Variant', 'Sample', 'Conversion', 'Avg Metric', 'p-value', ''].map(h => <th key={h} className="text-left p-2 font-medium text-gray-500">{h}</th>)}</tr>
+                      <thead className="bg-background-secondary">
+                        <tr>{['Variant', 'Sample', 'Conversion', 'Avg Metric', 'p-value', ''].map(h => <th key={h} className="text-left p-2 font-medium text-content-secondary">{h}</th>)}</tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-border-opaque">
                         {expResults.map(res => (
-                          <tr key={res.variant_name} className={res.is_winner ? 'bg-green-50' : ''}>
+                          <tr key={res.variant_name} className={res.is_winner ? 'bg-surface-positive' : ''}>
                             <td className="p-2 font-medium">{res.variant_name}</td>
                             <td className="p-2">{res.sample_size.toLocaleString()}</td>
                             <td className="p-2">{(res.conversion_rate * 100).toFixed(1)}%</td>
                             <td className="p-2">{res.avg_metric_value.toFixed(2)}</td>
                             <td className="p-2">{res.p_value != null ? res.p_value.toFixed(3) : '—'}</td>
-                            <td className="p-2">{res.is_winner && <span className="text-green-600 font-semibold">Winner</span>}</td>
+                            <td className="p-2">{res.is_winner && <span className="text-content-positive font-semibold">Winner</span>}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -344,48 +344,48 @@ export function PlatformDashboard() {
               ['Escalated', chatStats.escalated],
               ['Deflection Rate', `${chatStats.deflection_rate_pct.toFixed(1)}%`],
             ] as const).map(([label, val]) => (
-              <div key={label} className="bg-blue-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-blue-700">{val}</p>
-                <p className="text-sm text-blue-500">{label}</p>
+              <div key={label} className="bg-surface-accent rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-content-accent">{val}</p>
+                <p className="text-sm text-content-accent">{label}</p>
               </div>
             ))}
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-700">Intents</h3>
-              <button onClick={() => setShowIntent(v => !v)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              <h3 className="font-semibold text-content-primary">Intents</h3>
+              <button onClick={() => setShowIntent(v => !v)} className="px-3 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">
                 {showIntent ? 'Cancel' : '+ New Intent'}
               </button>
             </div>
 
             {showIntent && (
-              <div className="p-4 mb-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+              <div className="p-4 mb-3 bg-surface-accent border border-border-accent rounded-lg space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input value={newIntent.intent_name} onChange={e => setNewIntent(p => ({ ...p, intent_name: e.target.value }))} placeholder="Intent name (e.g. trip_cancellation)" className="border rounded px-3 py-1.5 text-sm" />
-                  <label className="text-xs text-gray-500 flex items-center gap-2">
+                  <label className="text-xs text-content-secondary flex items-center gap-2">
                     Confidence ≥
                     <input type="number" step="0.05" min="0" max="1" value={newIntent.confidence_threshold} onChange={e => setNewIntent(p => ({ ...p, confidence_threshold: Number(e.target.value) }))} className="border rounded px-3 py-1.5 text-sm w-24" />
                   </label>
                   <textarea value={newIntent.response_template} onChange={e => setNewIntent(p => ({ ...p, response_template: e.target.value }))} placeholder="Response template" className="border rounded px-3 py-1.5 text-sm md:col-span-2" rows={2} />
-                  <label className="text-xs text-gray-600 flex items-center gap-2">
+                  <label className="text-xs text-content-secondary flex items-center gap-2">
                     <input type="checkbox" checked={newIntent.fallback_to_human} onChange={e => setNewIntent(p => ({ ...p, fallback_to_human: e.target.checked }))} />
                     Fall back to human agent
                   </label>
                 </div>
-                <button onClick={createIntent} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Create</button>
+                <button onClick={createIntent} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">Create</button>
               </div>
             )}
 
             <div className="space-y-2">
               {intents.map(intent => (
-                <div key={intent.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded">
+                <div key={intent.id} className="flex items-center justify-between p-3 bg-white border border-border-opaque rounded">
                   <div>
-                    <p className="font-medium text-sm text-gray-900">{intent.intent_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Triggered {intent.trigger_count}× | Confidence ≥{(intent.confidence_threshold * 100).toFixed(0)}% | Fallback: {intent.fallback_to_human ? 'Yes' : 'No'}</p>
+                    <p className="font-medium text-sm text-content-primary">{intent.intent_name}</p>
+                    <p className="text-xs text-content-secondary mt-0.5">Triggered {intent.trigger_count}× | Confidence ≥{(intent.confidence_threshold * 100).toFixed(0)}% | Fallback: {intent.fallback_to_human ? 'Yes' : 'No'}</p>
                   </div>
                   <button onClick={() => toggleIntent(intent)}
-                    className={`text-xs px-3 py-1 rounded ${intent.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    className={`text-xs px-3 py-1 rounded ${intent.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                     {intent.is_active ? 'Active' : 'Inactive'}
                   </button>
                 </div>

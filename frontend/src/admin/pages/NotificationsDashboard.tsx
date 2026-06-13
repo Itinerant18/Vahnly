@@ -70,17 +70,17 @@ const ALERT_ICONS: Record<string, string> = {
 };
 
 const SEVERITY_CLS: Record<string, string> = {
-  CRITICAL: 'bg-red-100 text-red-800 border border-red-200',
-  HIGH: 'bg-orange-100 text-orange-800 border border-orange-200',
-  MEDIUM: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-  LOW: 'bg-blue-100 text-blue-800 border border-blue-200',
+  CRITICAL: 'bg-surface-negative text-content-negative border border-negative-400',
+  HIGH: 'bg-surface-warning text-content-warning border border-warning-400',
+  MEDIUM: 'bg-surface-warning text-content-warning border border-warning-400',
+  LOW: 'bg-surface-accent text-content-accent border border-border-accent',
 };
 
 const STATUS_CLS: Record<string, string> = {
-  UNREAD: 'bg-indigo-100 text-indigo-800',
-  READ: 'bg-gray-100 text-gray-500',
-  ACKNOWLEDGED: 'bg-amber-100 text-amber-800',
-  RESOLVED: 'bg-green-100 text-green-800',
+  UNREAD: 'bg-surface-accent text-content-accent',
+  READ: 'bg-background-secondary text-content-secondary',
+  ACKNOWLEDGED: 'bg-surface-warning text-content-warning',
+  RESOLVED: 'bg-surface-positive text-content-positive',
 };
 
 const CHANNELS = ['EMAIL', 'SLACK', 'SMS'];
@@ -89,17 +89,17 @@ const ALERT_TYPES = ['SOS', 'HIGH_CANCELLATION', 'SURGE_CAP', 'PAYMENT_GW_DOWN',
 // ── Helper components ─────────────────────────────────────────────────────────
 
 const SeverityBadge = ({ s }: { s: string }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_CLS[s] ?? 'bg-gray-100 text-gray-600'}`}>{s}</span>
+  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_CLS[s] ?? 'bg-background-secondary text-content-secondary'}`}>{s}</span>
 );
 
 const StatusBadge = ({ s }: { s: string }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[s] ?? 'bg-gray-100 text-gray-600'}`}>{s}</span>
+  <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[s] ?? 'bg-background-secondary text-content-secondary'}`}>{s}</span>
 );
 
 const Toggle = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
   <button
     onClick={onChange}
-    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-green-500' : 'bg-gray-300'}`}
+    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? 'bg-surface-positive0' : 'bg-background-tertiary'}`}
   >
     <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
   </button>
@@ -344,9 +344,9 @@ export function NotificationsDashboard() {
 
             {/* Bulk action bar */}
             {checkedIds.size > 0 && (
-              <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
-                <span className="text-xs text-indigo-700">{checkedIds.size} selected</span>
-                <button onClick={bulkAck} className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">
+              <div className="px-3 py-1.5 bg-surface-accent border-b border-border-accent flex items-center justify-between">
+                <span className="text-xs text-content-accent">{checkedIds.size} selected</span>
+                <button onClick={bulkAck} className="text-xs bg-accent-400 text-white px-3 py-1 rounded hover:bg-accent-400">
                   Bulk Acknowledge
                 </button>
               </div>
@@ -361,7 +361,7 @@ export function NotificationsDashboard() {
                 <div
                   key={n.id}
                   onClick={() => openNotif(n)}
-                  className={`flex items-start gap-2 px-3 py-3 border-b border-border cursor-pointer hover:bg-canvas-soft transition ${selectedNotif?.id === n.id ? 'bg-canvas-soft' : ''} ${n.status === 'UNREAD' ? 'bg-blue-50/40' : ''}`}
+                  className={`flex items-start gap-2 px-3 py-3 border-b border-border cursor-pointer hover:bg-canvas-soft transition ${selectedNotif?.id === n.id ? 'bg-canvas-soft' : ''} ${n.status === 'UNREAD' ? 'bg-surface-accent/40' : ''}`}
                 >
                   <input
                     type="checkbox"
@@ -418,7 +418,7 @@ export function NotificationsDashboard() {
                   <p className="text-xs font-medium text-mute mb-2">Delivery Status</p>
                   <div className="flex gap-2 flex-wrap">
                     {Object.entries(selectedNotif.delivery_status ?? {}).map(([ch, st]) => (
-                      <span key={ch} className={`px-2 py-1 rounded text-xs font-medium ${st === 'SENT' ? 'bg-green-100 text-green-800' : st === 'FAILED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                      <span key={ch} className={`px-2 py-1 rounded text-xs font-medium ${st === 'SENT' ? 'bg-surface-positive text-content-positive' : st === 'FAILED' ? 'bg-surface-negative text-content-negative' : 'bg-background-secondary text-content-secondary'}`}>
                         {ch}: {st}
                       </span>
                     ))}
@@ -428,12 +428,12 @@ export function NotificationsDashboard() {
                 {/* Actions */}
                 <div className="flex gap-2">
                   {!['ACKNOWLEDGED','RESOLVED'].includes(selectedNotif.status) && (
-                    <button onClick={() => acknowledge(selectedNotif.id)} className="px-4 py-1.5 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 font-medium">
+                    <button onClick={() => acknowledge(selectedNotif.id)} className="px-4 py-1.5 bg-surface-warning0 text-white text-sm rounded hover:bg-warning-400 font-medium">
                       Acknowledge
                     </button>
                   )}
                   {selectedNotif.status !== 'RESOLVED' && (
-                    <button onClick={() => resolve(selectedNotif.id)} className="px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 font-medium">
+                    <button onClick={() => resolve(selectedNotif.id)} className="px-4 py-1.5 bg-positive-400 text-white text-sm rounded hover:bg-positive-400 font-medium">
                       Resolve
                     </button>
                   )}
@@ -508,7 +508,7 @@ export function NotificationsDashboard() {
                       <Toggle checked={rule.is_enabled} onChange={() => toggleRule(rule.id)} />
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setEditingRule(rule)} className="text-xs text-blue-600 hover:underline">Edit</button>
+                      <button onClick={() => setEditingRule(rule)} className="text-xs text-content-accent hover:underline">Edit</button>
                     </td>
                   </tr>
                 ))}
@@ -607,7 +607,7 @@ export function NotificationsDashboard() {
                         <td className="px-4 py-2.5 text-xs text-mute">{rec.phone || '—'}</td>
                         <td className="px-4 py-2.5 text-xs text-mute">{rec.slack_user_id || '—'}</td>
                         <td className="px-4 py-2.5">
-                          <button onClick={() => removeRecipient(rec.id)} className="text-xs text-red-600 hover:underline">Remove</button>
+                          <button onClick={() => removeRecipient(rec.id)} className="text-xs text-content-negative hover:underline">Remove</button>
                         </td>
                       </tr>
                     ))}
@@ -648,7 +648,7 @@ export function NotificationsDashboard() {
               const fields = channelFields[ch.channel] ?? [];
 
               return (
-                <div key={ch.channel} className={`border rounded-lg p-5 bg-canvas ${isEnabled ? 'border-green-300' : 'border-border'}`}>
+                <div key={ch.channel} className={`border rounded-lg p-5 bg-canvas ${isEnabled ? 'border-positive-400' : 'border-border'}`}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-ink text-sm">{channelLabels[ch.channel] ?? ch.channel}</h3>
                     <Toggle

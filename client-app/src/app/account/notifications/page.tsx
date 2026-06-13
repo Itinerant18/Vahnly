@@ -40,15 +40,15 @@ export default function RiderNotificationsPage() {
   return (
     <div className="space-y-6 text-left">
       {/* Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+      <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={handleMarkAllRead}
-          className="text-zinc-400 hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider"
+          className="text-content-secondary hover:text-white text-[9px] font-mono font-bold uppercase tracking-wider"
         >
           {t('markAllRead')}
         </button>
@@ -59,31 +59,31 @@ export default function RiderNotificationsPage() {
         {/* Alerts Inbox list (Left 2 columns on desktop) */}
         <div className="md:col-span-2 space-y-3">
           {notifications.length === 0 ? (
-            <div className="py-8 text-center text-xs text-zinc-500 italic font-mono">
+            <div className="py-8 text-center text-xs text-content-tertiary italic font-mono">
               {t('inboxEmpty')}
             </div>
           ) : (
             notifications.map((item) => (
               <div
                 key={item.id}
-                className={`bg-zinc-950 border border-zinc-900 p-5 rounded-2xl flex justify-between gap-4 transition-all relative ${
+                className={`bg-background-primary border border-border-opaque p-5 rounded-2xl flex justify-between gap-4 transition-all relative ${
                   !item.read ? 'border-l-4 border-l-white' : ''
                 }`}
               >
-                <div className="space-y-1.5 text-xs text-zinc-400 leading-relaxed max-w-[85%] font-sans">
+                <div className="space-y-1.5 text-xs text-content-secondary leading-relaxed max-w-[85%] font-sans">
                   <div className="flex items-center gap-2 font-mono text-[9px]">
-                    <span className="bg-zinc-900 text-zinc-500 px-2 py-0.5 rounded uppercase tracking-wider">
+                    <span className="bg-background-secondary text-content-tertiary px-2 py-0.5 rounded uppercase tracking-wider">
                       {item.type}
                     </span>
-                    <span className="text-zinc-650">{item.date}</span>
+                    <span className="text-content-tertiary">{item.date}</span>
                   </div>
                   <h4 className="font-bold text-white text-xs font-sans">{item.title}</h4>
-                  <p className="text-[11px] text-zinc-400 font-sans leading-normal">{item.body}</p>
+                  <p className="text-[11px] text-content-secondary font-sans leading-normal">{item.body}</p>
                 </div>
 
                 <button
                   onClick={() => handleDelete(item.id, item.title)}
-                  className="text-zinc-600 hover:text-zinc-400 font-mono text-[8px] uppercase tracking-widest cursor-pointer self-start border border-zinc-900 hover:border-zinc-800 p-1.5 rounded"
+                  className="text-content-tertiary hover:text-content-secondary font-mono text-[8px] uppercase tracking-widest cursor-pointer self-start border border-border-opaque hover:border-border-opaque p-1.5 rounded"
                 >
                   {t('dismiss')}
                 </button>
@@ -93,42 +93,42 @@ export default function RiderNotificationsPage() {
         </div>
 
         {/* Preferences settings */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 h-max">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 h-max">
+          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
             {t('alertPreferences')}
           </h4>
 
-          <div className="space-y-4 text-xs font-mono text-zinc-400">
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+          <div className="space-y-4 text-xs font-mono text-content-secondary">
+            <div className="flex justify-between items-center border-b border-border-opaque pb-2">
               <span className="text-white font-sans font-medium">{t('pushNotifications')}</span>
               <button
                 type="button"
                 onClick={() => setPushTrip(!pushTrip)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 ${pushTrip ? 'bg-white' : 'bg-zinc-800'}`}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 ${pushTrip ? 'bg-white' : 'bg-background-tertiary'}`}
               >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${pushTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${pushTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
               </button>
             </div>
 
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+            <div className="flex justify-between items-center border-b border-border-opaque pb-2">
               <span className="text-white font-sans font-medium">{t('smsTextCodes')}</span>
               <button
                 type="button"
                 onClick={() => setSmsTrip(!smsTrip)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 ${smsTrip ? 'bg-white' : 'bg-zinc-800'}`}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 ${smsTrip ? 'bg-white' : 'bg-background-tertiary'}`}
               >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${smsTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${smsTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
               </button>
             </div>
 
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+            <div className="flex justify-between items-center border-b border-border-opaque pb-2">
               <span className="text-white font-sans font-medium">{t('emailNewsletter')}</span>
               <button
                 type="button"
                 onClick={() => setEmailTrip(!emailTrip)}
-                className={`h-5 w-10 rounded-full transition relative p-0.5 ${emailTrip ? 'bg-white' : 'bg-zinc-800'}`}
+                className={`h-5 w-10 rounded-full transition relative p-0.5 ${emailTrip ? 'bg-white' : 'bg-background-tertiary'}`}
               >
-                <div className={`h-4 w-4 rounded-full shadow transition-transform ${emailTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-zinc-400'}`} />
+                <div className={`h-4 w-4 rounded-full shadow transition-transform ${emailTrip ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
               </button>
             </div>
           </div>
@@ -138,9 +138,9 @@ export default function RiderNotificationsPage() {
 
       {/* Audit Log preview */}
       {logs.length > 0 && (
-        <div className="border-t border-zinc-900 pt-4 text-left font-mono">
-          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">{t('deliveryAudit')}</span>
-          <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 max-h-24 overflow-y-auto text-[8px] text-zinc-500 space-y-1 scrollbar-thin">
+        <div className="border-t border-border-opaque pt-4 text-left font-mono">
+          <span className="text-[8px] font-bold text-content-tertiary uppercase tracking-widest block mb-2">{t('deliveryAudit')}</span>
+          <div className="bg-background-primary border border-border-opaque rounded-xl p-3 max-h-24 overflow-y-auto text-[8px] text-content-tertiary space-y-1 scrollbar-thin">
             {logs.map((lg, i) => (
               <div key={i} className="truncate select-all leading-normal">{lg}</div>
             ))}

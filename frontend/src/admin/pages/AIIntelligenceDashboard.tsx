@@ -67,12 +67,12 @@ interface VoCSample {
 }
 
 const SCORE_CLS = (s: number) =>
-  s >= 80 ? 'text-red-600 font-bold' : s >= 50 ? 'text-yellow-600 font-semibold' : 'text-green-600';
+  s >= 80 ? 'text-content-negative font-bold' : s >= 50 ? 'text-content-warning font-semibold' : 'text-content-positive';
 
 const SENT_CLS: Record<string, string> = {
-  POSITIVE: 'bg-green-100 text-green-700',
-  NEGATIVE: 'bg-red-100 text-red-700',
-  NEUTRAL: 'bg-gray-100 text-gray-700',
+  POSITIVE: 'bg-surface-positive text-content-positive',
+  NEGATIVE: 'bg-surface-negative text-content-negative',
+  NEUTRAL: 'bg-background-secondary text-content-primary',
 };
 
 export function AIIntelligenceDashboard() {
@@ -144,12 +144,12 @@ export function AIIntelligenceDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">AI Intelligence</h1>
+      <h1 className="text-2xl font-bold text-content-primary">AI Intelligence</h1>
 
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-border-opaque">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium -mb-px ${tab === t.key ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-4 py-2 text-sm font-medium -mb-px ${tab === t.key ? 'border-b-2 border-border-accent text-content-accent' : 'text-content-secondary hover:text-content-primary'}`}>
             {t.label}
           </button>
         ))}
@@ -169,7 +169,7 @@ export function AIIntelligenceDashboard() {
           <div className="flex gap-2">
             {(['events', 'rules'] as const).map(t => (
               <button key={t} onClick={() => setFraudTab(t)}
-                className={`px-3 py-1.5 text-sm rounded ${fraudTab === t ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                className={`px-3 py-1.5 text-sm rounded ${fraudTab === t ? 'bg-accent-400 text-white' : 'bg-background-secondary text-content-primary hover:bg-background-tertiary'}`}>
                 {t === 'events' ? 'Events' : 'Rules'}
               </button>
             ))}
@@ -178,22 +178,22 @@ export function AIIntelligenceDashboard() {
           {fraudTab === 'events' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>{['Entity', 'Type', 'Score', 'Status', 'Created', 'Actions'].map(h => <th key={h} className="text-left p-3 font-medium text-gray-600">{h}</th>)}</tr>
+                <thead className="bg-background-secondary">
+                  <tr>{['Entity', 'Type', 'Score', 'Status', 'Created', 'Actions'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border-opaque">
                   {events.map(e => (
-                    <tr key={e.id} className="hover:bg-gray-50">
+                    <tr key={e.id} className="hover:bg-background-secondary">
                       <td className="p-3 font-mono text-xs">{e.entity_type}/{e.entity_id}</td>
                       <td className="p-3">{e.fraud_type}</td>
                       <td className={`p-3 ${SCORE_CLS(e.score)}`}>{e.score.toFixed(1)}</td>
-                      <td className="p-3"><span className="px-2 py-0.5 rounded text-xs bg-gray-100">{e.status}</span></td>
-                      <td className="p-3 text-gray-500 text-xs">{new Date(e.created_at).toLocaleDateString()}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded text-xs bg-background-secondary">{e.status}</span></td>
+                      <td className="p-3 text-content-secondary text-xs">{new Date(e.created_at).toLocaleDateString()}</td>
                       <td className="p-3 space-x-2">
                         {e.status === 'OPEN' && (
                           <>
-                            <button onClick={() => updateFraud(e.id, 'CONFIRMED')} className="text-xs text-red-600 hover:underline">Confirm</button>
-                            <button onClick={() => updateFraud(e.id, 'DISMISSED')} className="text-xs text-gray-500 hover:underline">Dismiss</button>
+                            <button onClick={() => updateFraud(e.id, 'CONFIRMED')} className="text-xs text-content-negative hover:underline">Confirm</button>
+                            <button onClick={() => updateFraud(e.id, 'DISMISSED')} className="text-xs text-content-secondary hover:underline">Dismiss</button>
                           </>
                         )}
                       </td>
@@ -207,14 +207,14 @@ export function AIIntelligenceDashboard() {
           {fraudTab === 'rules' && (
             <div className="space-y-2">
               {rules.map(rule => (
-                <div key={rule.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                <div key={rule.id} className="flex items-center justify-between p-4 bg-white border border-border-opaque rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">{rule.rule_name}</p>
-                    <p className="text-sm text-gray-500">{rule.description}</p>
-                    <p className="text-xs text-gray-400 mt-1">Action: {rule.action} | Threshold: {rule.threshold} | Triggers today: {rule.triggers_today}</p>
+                    <p className="font-medium text-content-primary">{rule.rule_name}</p>
+                    <p className="text-sm text-content-secondary">{rule.description}</p>
+                    <p className="text-xs text-content-tertiary mt-1">Action: {rule.action} | Threshold: {rule.threshold} | Triggers today: {rule.triggers_today}</p>
                   </div>
                   <button onClick={() => toggleRule(rule)}
-                    className={`px-3 py-1 rounded text-sm ${rule.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    className={`px-3 py-1 rounded text-sm ${rule.is_enabled ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                     {rule.is_enabled ? 'Enabled' : 'Disabled'}
                   </button>
                 </div>
@@ -228,22 +228,22 @@ export function AIIntelligenceDashboard() {
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <input value={cityFilter} onChange={e => setCityFilter(e.target.value)} placeholder="Filter by city (e.g. KOL)" className="border rounded px-3 py-1.5 text-sm w-48" />
-            <button onClick={loadForecasts} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Apply</button>
+            <button onClick={loadForecasts} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">Apply</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>{['City', 'Zone', 'Hour', 'Demand', 'Supply', 'Gap', 'Surge', 'Confidence'].map(h => <th key={h} className="text-left p-3 font-medium text-gray-600">{h}</th>)}</tr>
+              <thead className="bg-background-secondary">
+                <tr>{['City', 'Zone', 'Hour', 'Demand', 'Supply', 'Gap', 'Surge', 'Confidence'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border-opaque">
                 {forecasts.map(f => (
-                  <tr key={f.id} className={`hover:bg-gray-50 ${f.gap > 10 ? 'bg-red-50' : ''}`}>
+                  <tr key={f.id} className={`hover:bg-background-secondary ${f.gap > 10 ? 'bg-surface-negative' : ''}`}>
                     <td className="p-3 font-medium">{f.city}</td>
                     <td className="p-3">{f.zone_name}</td>
-                    <td className="p-3 text-xs text-gray-500">{new Date(f.forecast_hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="p-3 text-xs text-content-secondary">{new Date(f.forecast_hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="p-3">{f.predicted_demand}</td>
                     <td className="p-3">{f.current_supply}</td>
-                    <td className={`p-3 font-semibold ${f.gap > 0 ? 'text-red-600' : 'text-green-600'}`}>{f.gap > 0 ? `+${f.gap}` : f.gap}</td>
+                    <td className={`p-3 font-semibold ${f.gap > 0 ? 'text-content-negative' : 'text-content-positive'}`}>{f.gap > 0 ? `+${f.gap}` : f.gap}</td>
                     <td className="p-3">{f.surge_predicted.toFixed(1)}x</td>
                     <td className="p-3">{f.confidence_pct}%</td>
                   </tr>
@@ -257,33 +257,33 @@ export function AIIntelligenceDashboard() {
       {tab === 'voc' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Trending Topics</h3>
+            <h3 className="font-semibold text-content-primary mb-3">Trending Topics</h3>
             <div className="space-y-3">
               {topics.map(t => (
-                <div key={t.id} className="p-4 bg-white border border-gray-200 rounded-lg">
+                <div key={t.id} className="p-4 bg-white border border-border-opaque rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900">{t.topic}</span>
-                    {t.trending && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Trending</span>}
+                    <span className="font-medium text-content-primary">{t.topic}</span>
+                    {t.trending && <span className="text-xs bg-surface-warning text-content-warning px-2 py-0.5 rounded">Trending</span>}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Source: {t.source} | {t.mention_count} mentions | Sentiment: {(t.sentiment_score * 100).toFixed(0)}%</p>
+                  <p className="text-xs text-content-secondary mt-1">Source: {t.source} | {t.mention_count} mentions | Sentiment: {(t.sentiment_score * 100).toFixed(0)}%</p>
                   <div className="flex gap-2 mt-2 text-xs">
-                    <span className="text-green-600">+{t.positive_count} positive</span>
-                    <span className="text-red-600">-{t.negative_count} negative</span>
+                    <span className="text-content-positive">+{t.positive_count} positive</span>
+                    <span className="text-content-negative">-{t.negative_count} negative</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Recent Samples</h3>
+            <h3 className="font-semibold text-content-primary mb-3">Recent Samples</h3>
             <div className="space-y-2">
               {samples.map(s => (
-                <div key={s.id} className="p-3 bg-white border border-gray-200 rounded">
+                <div key={s.id} className="p-3 bg-white border border-border-opaque rounded">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-500">{s.entity_type}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${SENT_CLS[s.sentiment] ?? 'bg-gray-100'}`}>{s.sentiment}</span>
+                    <span className="text-xs text-content-secondary">{s.entity_type}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${SENT_CLS[s.sentiment] ?? 'bg-background-secondary'}`}>{s.sentiment}</span>
                   </div>
-                  <p className="text-sm text-gray-800">{s.content}</p>
+                  <p className="text-sm text-content-primary">{s.content}</p>
                 </div>
               ))}
             </div>

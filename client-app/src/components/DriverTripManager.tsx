@@ -203,7 +203,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
 
       {/* ── Rider mini-card ── */}
       <div className="card flex items-center gap-4">
-        <div className="w-12 h-12 rounded-pill bg-gray-200 flex items-center justify-center text-heading-medium text-content-secondary flex-shrink-0">
+        <div className="w-12 h-12 rounded-pill bg-background-tertiary flex items-center justify-center text-heading-medium text-content-secondary flex-shrink-0">
           {activeTrip.customer_name?.[0]?.toUpperCase() ?? '?'}
         </div>
         <div className="flex-1 min-w-0">

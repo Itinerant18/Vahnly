@@ -21,7 +21,7 @@ export function TripTypeSelector() {
           key={t.value}
           onClick={() => setTripType(t.value)}
           className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${
-            tripType === t.value ? "bg-[#0073E6] text-white" : "bg-[#252D48] text-slate-300"
+            tripType === t.value ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
           }`}
         >
           {t.label}

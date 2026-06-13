@@ -72,7 +72,7 @@ function SosConsole() {
     return (
       <div className="min-h-[100dvh] bg-black text-white flex flex-col items-center justify-center p-6 text-center gap-6 font-sans">
         <h1 className="text-2xl font-bold tracking-tight">Alert cancelled</h1>
-        <p className="text-zinc-500 text-sm max-w-xs">No emergency dispatch was sent. Stay safe.</p>
+        <p className="text-content-tertiary text-sm max-w-xs">No emergency dispatch was sent. Stay safe.</p>
         <Link href="/driver" className="bg-white text-black font-bold py-3 px-8 rounded-full text-sm uppercase tracking-wider">
           Back to duty console
         </Link>
@@ -83,7 +83,7 @@ function SosConsole() {
   const dispatched = state === 'DISPATCHED';
 
   return (
-    <div className={`min-h-[100dvh] flex flex-col justify-between p-6 sm:p-10 font-sans text-white transition-colors ${dispatched ? 'bg-red-950' : 'bg-red-700'}`}>
+    <div className={`min-h-[100dvh] flex flex-col justify-between p-6 sm:p-10 font-sans text-white transition-colors ${dispatched ? 'bg-surface-negative' : 'bg-negative-400'}`}>
       {/* Header */}
       <div className="flex justify-between items-center">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-white/70">
@@ -98,7 +98,7 @@ function SosConsole() {
       <div className="flex flex-col items-center text-center gap-6">
         <div className="relative h-40 w-40 flex items-center justify-center">
           <span className={`absolute inset-0 rounded-full ${dispatched ? 'bg-white/10' : 'bg-white/20 animate-ping'}`} />
-          <div className="relative h-32 w-32 rounded-full bg-white text-red-700 flex flex-col items-center justify-center">
+          <div className="relative h-32 w-32 rounded-full bg-white text-content-negative flex flex-col items-center justify-center">
             <span className="text-4xl font-bold leading-none">SOS</span>
             {!dispatched && <span className="text-xs font-mono font-bold mt-1">{countdown}s</span>}
           </div>
@@ -132,7 +132,7 @@ function SosConsole() {
       <div className="flex flex-col gap-3 max-w-md w-full mx-auto">
         <a
           href="tel:112"
-          className="w-full bg-white text-red-700 font-bold py-4 rounded-full text-sm uppercase tracking-wider text-center active:scale-[0.98] transition"
+          className="w-full bg-white text-content-negative font-bold py-4 rounded-full text-sm uppercase tracking-wider text-center active:scale-[0.98] transition"
         >
           Call 112 now
         </a>

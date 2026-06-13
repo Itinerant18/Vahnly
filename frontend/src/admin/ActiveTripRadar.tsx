@@ -271,7 +271,7 @@ export const ActiveTripRadar: React.FC = () => {
   const renderStreamStatus = (order: ActiveOrderRecord) => {
     if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-zinc-500 bg-zinc-50 border border-zinc-200 select-none">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-content-secondary bg-background-secondary border border-border-opaque select-none">
           ● Inactive
         </span>
       );
@@ -281,33 +281,33 @@ export const ActiveTripRadar: React.FC = () => {
     switch (status) {
       case 'CONNECTED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-200 select-none">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-content-positive bg-surface-positive border border-positive-400 select-none">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-positive-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-surface-positive0"></span>
             </span>
             Live Tracking
           </span>
         );
       case 'RECONNECTING':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-amber-600 bg-amber-50 border border-amber-200 select-none">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-content-warning bg-surface-warning border border-warning-400 select-none">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-surface-warning0"></span>
             </span>
             Reconnecting
           </span>
         );
       case 'DISCONNECTED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-rose-600 bg-rose-50 border border-rose-200 select-none">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-content-negative bg-surface-negative border border-negative-400 select-none">
             ● Offline
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-zinc-500 bg-zinc-50 border border-zinc-200 select-none">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold font-sans uppercase tracking-wider text-content-secondary bg-background-secondary border border-border-opaque select-none">
             ● Standby
           </span>
         );
@@ -336,8 +336,8 @@ export const ActiveTripRadar: React.FC = () => {
       </div>
 
       {stagnantOrders.size > 0 && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-bold uppercase tracking-wider">
-          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-surface-warning border border-warning-400 text-content-warning text-[11px] font-bold uppercase tracking-wider">
+          <span className="h-2 w-2 rounded-full bg-surface-warning0 animate-pulse" />
           {stagnantOrders.size} stagnant asset{stagnantOrders.size > 1 ? 's' : ''} — no telemetry for &gt;{STAGNANT_THRESHOLD_MS / 1000}s. Verify driver connectivity.
         </div>
       )}
@@ -366,7 +366,7 @@ export const ActiveTripRadar: React.FC = () => {
               </tr>
             ) : (
               orders.map((order) => (
-                <tr key={order.id} className={`transition ${stagnantOrders.has(order.id) ? 'bg-amber-50 hover:bg-amber-100/70' : 'hover:bg-canvas-softer/50'}`}>
+                <tr key={order.id} className={`transition ${stagnantOrders.has(order.id) ? 'bg-surface-warning hover:bg-surface-warning/70' : 'hover:bg-canvas-softer/50'}`}>
                   <td className="p-4 text-body select-all">
                     <div>{order.id.slice(0, 18)}...</div>
                     {(order.status !== 'COMPLETED' && order.status !== 'CANCELLED') && (
@@ -385,16 +385,16 @@ export const ActiveTripRadar: React.FC = () => {
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                         order.status === 'CREATED'
-                          ? 'bg-amber-100 text-amber-800'
+                          ? 'bg-surface-warning text-content-warning'
                           : order.status === 'ASSIGNED' || order.status === 'EN_ROUTE_TO_PICKUP'
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'bg-surface-accent text-content-accent'
                           : order.status === 'DELIVERING'
                           ? 'bg-black text-white'
                           : 'bg-canvas-soft text-ink'
                       }`}
                     >
                       {order.status === 'CREATED' && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-surface-warning0 animate-pulse" />
                       )}
                       {order.status}
                     </span>
@@ -418,7 +418,7 @@ export const ActiveTripRadar: React.FC = () => {
                     {renderStreamStatus(order)}
                     {stagnantOrders.has(order.id) && (
                       <div className="mt-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-300 animate-pulse select-none">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider text-content-warning bg-surface-warning border border-warning-400 animate-pulse select-none">
                           ⚠ Stagnant
                         </span>
                       </div>

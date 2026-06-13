@@ -214,12 +214,12 @@ export const PayoutsDashboard: React.FC = () => {
 
 	const getStatusColor = (status: string) => {
 		switch (status) {
-			case 'PENDING': return 'text-amber-600 bg-amber-50 border-amber-200';
-			case 'APPROVED': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-			case 'PROCESSING': return 'text-blue-700 bg-blue-50 border-blue-200';
-			case 'PAID': return 'text-slate-900 bg-slate-100 border-slate-300';
-			case 'FAILED': return 'text-red-700 bg-red-50 border-red-200';
-			case 'HELD': return 'text-purple-700 bg-purple-50 border-purple-200';
+			case 'PENDING': return 'text-content-warning bg-surface-warning border-warning-400';
+			case 'APPROVED': return 'text-content-positive bg-surface-positive border-positive-400';
+			case 'PROCESSING': return 'text-content-accent bg-surface-accent border-border-accent';
+			case 'PAID': return 'text-content-primary bg-background-secondary border-border-opaque';
+			case 'FAILED': return 'text-content-negative bg-surface-negative border-negative-400';
+			case 'HELD': return 'text-content-accent bg-surface-accent border-border-accent';
 			default: return 'text-mute bg-canvas-soft border-canvas-soft';
 		}
 	};
@@ -272,22 +272,22 @@ export const PayoutsDashboard: React.FC = () => {
 					<span className="text-[10px] text-mute font-mono mt-1">Requires manual validation</span>
 				</div>
 				<div className="bg-canvas border border-canvas-soft rounded-xl p-5 flex flex-col justify-between shadow-sm font-semibold">
-					<span className="text-[11px] font-semibold text-mute uppercase tracking-wider font-semibold text-emerald-700">Ready for Batch Export</span>
-					<span className="text-2xl font-bold font-mono text-emerald-700 mt-2">
+					<span className="text-[11px] font-semibold text-mute uppercase tracking-wider font-semibold text-content-positive">Ready for Batch Export</span>
+					<span className="text-2xl font-bold font-mono text-content-positive mt-2">
 						{payouts.filter(p => p.status === 'APPROVED').length}
 					</span>
 					<span className="text-[10px] text-mute font-mono mt-1">Eligible, approved payout runs</span>
 				</div>
 				<div className="bg-canvas border border-canvas-soft rounded-xl p-5 flex flex-col justify-between shadow-sm">
 					<span className="text-[11px] font-semibold text-mute uppercase tracking-wider">Failed Settlements</span>
-					<span className="text-2xl font-bold font-mono text-red-600 mt-2">
+					<span className="text-2xl font-bold font-mono text-content-negative mt-2">
 						{payouts.filter(p => p.status === 'FAILED').length}
 					</span>
 					<span className="text-[10px] text-mute font-mono mt-1">Requires review/bank retry</span>
 				</div>
 				<div className="bg-canvas border border-canvas-soft rounded-xl p-5 flex flex-col justify-between shadow-sm">
 					<span className="text-[11px] font-semibold text-mute uppercase tracking-wider">Held Funds</span>
-					<span className="text-2xl font-bold font-mono text-purple-700 mt-2">
+					<span className="text-2xl font-bold font-mono text-content-accent mt-2">
 						₹{((payouts.filter(p => p.status === 'HELD').reduce((acc, curr) => acc + curr.amount_paise, 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
 					</span>
 					<span className="text-[10px] text-mute font-mono mt-1">Flagged due to fraud/dispute</span>
@@ -327,7 +327,7 @@ export const PayoutsDashboard: React.FC = () => {
 				</div>
 			</div>
 
-			{error && <div className="p-4 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">{error}</div>}
+			{error && <div className="p-4 bg-surface-negative text-content-negative text-xs rounded-lg border border-negative-400">{error}</div>}
 
 			{/* ---- Datagrid Table ---- */}
 			<div className="bg-canvas border border-canvas-soft rounded-xl overflow-hidden shadow-sm">
@@ -397,7 +397,7 @@ export const PayoutsDashboard: React.FC = () => {
 												<span
 													title={elig.kyc ? "KYC Complete" : "KYC Pending"}
 													className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-														elig.kyc ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+														elig.kyc ? 'bg-surface-positive text-content-positive' : 'bg-surface-warning text-content-warning'
 													}`}
 												>
 													K
@@ -405,7 +405,7 @@ export const PayoutsDashboard: React.FC = () => {
 												<span
 													title={elig.bank ? "Bank Verified" : "Bank Unverified"}
 													className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-														elig.bank ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+														elig.bank ? 'bg-surface-positive text-content-positive' : 'bg-surface-negative text-content-negative'
 													}`}
 												>
 													B
@@ -413,7 +413,7 @@ export const PayoutsDashboard: React.FC = () => {
 												<span
 													title={elig.hold ? "No Payout Holds" : "Payout On Hold"}
 													className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-														elig.hold ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+														elig.hold ? 'bg-surface-positive text-content-positive' : 'bg-surface-accent text-content-accent'
 													}`}
 												>
 													H
@@ -439,7 +439,7 @@ export const PayoutsDashboard: React.FC = () => {
 												{p.status === 'PENDING' && (
 													<button
 														onClick={() => setHoldPayoutId(p.id)}
-														className="px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200 transition"
+														className="px-2.5 py-1 bg-surface-accent text-content-accent hover:bg-surface-accent rounded text-[10px] font-bold border border-border-accent transition"
 													>
 														Hold
 													</button>
@@ -447,7 +447,7 @@ export const PayoutsDashboard: React.FC = () => {
 												{p.status === 'HELD' && (
 													<button
 														onClick={() => handleRelease(p.id)}
-														className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-[10px] font-bold border border-emerald-200 transition"
+														className="px-2.5 py-1 bg-surface-positive text-content-positive hover:bg-surface-positive rounded text-[10px] font-bold border border-positive-400 transition"
 													>
 														Release
 													</button>
@@ -522,7 +522,7 @@ export const PayoutsDashboard: React.FC = () => {
 										<div className="font-mono text-mute">IFSC: {selectedPayout.bank_ifsc}</div>
 									</>
 								) : (
-									<div className="text-red-600 font-semibold">Missing Bank Details</div>
+									<div className="text-content-negative font-semibold">Missing Bank Details</div>
 								)}
 							</div>
 
@@ -533,11 +533,11 @@ export const PayoutsDashboard: React.FC = () => {
 									<span>Gross Amount:</span>
 									<span>₹{(selectedPayout.amount_paise / 100).toFixed(2)}</span>
 								</div>
-								<div className="flex justify-between text-red-700">
+								<div className="flex justify-between text-content-negative">
 									<span>TDS Tax Deduction (1%):</span>
 									<span>- ₹{(selectedPayout.tds_paise / 100).toFixed(2)}</span>
 								</div>
-								<div className="flex justify-between text-red-700">
+								<div className="flex justify-between text-content-negative">
 									<span>Professional Commission Fee:</span>
 									<span>- ₹{(selectedPayout.professional_fees_paise / 100).toFixed(2)}</span>
 								</div>
@@ -549,13 +549,13 @@ export const PayoutsDashboard: React.FC = () => {
 
 							{/* Failure / Hold reasons */}
 							{selectedPayout.failure_reason && (
-								<div className="col-span-2 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
+								<div className="col-span-2 p-3 bg-surface-negative text-content-negative rounded-lg border border-negative-400">
 									<span className="block text-[9px] uppercase tracking-wider font-semibold mb-1">Failure Log Reason</span>
 									<p className="font-sans leading-snug">{selectedPayout.failure_reason}</p>
 								</div>
 							)}
 							{selectedPayout.hold_reason && (
-								<div className="col-span-2 p-3 bg-purple-50 text-purple-700 rounded-lg border border-purple-200">
+								<div className="col-span-2 p-3 bg-surface-accent text-content-accent rounded-lg border border-border-accent">
 									<span className="block text-[9px] uppercase tracking-wider font-semibold mb-1">Hold Investigation Log</span>
 									<p className="font-sans leading-snug">{selectedPayout.hold_reason}</p>
 								</div>

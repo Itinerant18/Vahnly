@@ -29,9 +29,9 @@ interface StatusIncident {
 type Tab = 'keys' | 'webhooks' | 'logs' | 'sandbox' | 'status';
 
 const SCOPES_ALL = ['trips:read', 'trips:write', 'drivers:read', 'payments:read', 'payments:write', 'analytics:read', 'riders:read'];
-const SEVERITY_COLORS: Record<string, string> = { MINOR: 'bg-yellow-100 text-yellow-700', MAJOR: 'bg-orange-100 text-orange-700', CRITICAL: 'bg-red-100 text-red-700' };
-const INCIDENT_STATUS: Record<string, string> = { INVESTIGATING: 'bg-red-100 text-red-700', IDENTIFIED: 'bg-orange-100 text-orange-700', MONITORING: 'bg-yellow-100 text-yellow-700', RESOLVED: 'bg-emerald-100 text-emerald-700' };
-const HTTP_COLORS = (code: number) => code < 300 ? 'text-emerald-600' : code < 400 ? 'text-blue-600' : code < 500 ? 'text-yellow-600' : 'text-red-600';
+const SEVERITY_COLORS: Record<string, string> = { MINOR: 'bg-surface-warning text-content-warning', MAJOR: 'bg-surface-warning text-content-warning', CRITICAL: 'bg-surface-negative text-content-negative' };
+const INCIDENT_STATUS: Record<string, string> = { INVESTIGATING: 'bg-surface-negative text-content-negative', IDENTIFIED: 'bg-surface-warning text-content-warning', MONITORING: 'bg-surface-warning text-content-warning', RESOLVED: 'bg-surface-positive text-content-positive' };
+const HTTP_COLORS = (code: number) => code < 300 ? 'text-content-positive' : code < 400 ? 'text-content-accent' : code < 500 ? 'text-content-warning' : 'text-content-negative';
 
 function relTime(iso: string | null) {
   if (!iso) return '—';
@@ -122,11 +122,11 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
       </div>
 
       {createdKey && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
-          <div className="text-sm font-semibold text-emerald-700">✓ Key created — copy it now, it won't be shown again!</div>
-          <div className="bg-white border border-emerald-200 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdKey}</div>
+        <div className="bg-surface-positive border border-positive-400 rounded-xl p-4 space-y-2">
+          <div className="text-sm font-semibold text-content-positive">✓ Key created — copy it now, it won't be shown again!</div>
+          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdKey}</div>
           <button onClick={() => { navigator.clipboard.writeText(createdKey); setCreatedKey(null); }}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700">Copy & Dismiss</button>
+            className="px-3 py-1.5 bg-positive-400 text-white rounded text-xs font-medium hover:bg-positive-400">Copy & Dismiss</button>
         </div>
       )}
 
@@ -167,7 +167,7 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-sm text-ink">{k.name}</span>
                 <span className="font-mono text-xs bg-canvas-soft px-2 py-0.5 rounded text-mute">{k.key_prefix}…</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${k.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{k.is_active ? 'ACTIVE' : 'REVOKED'}</span>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${k.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{k.is_active ? 'ACTIVE' : 'REVOKED'}</span>
                 <span className="text-xs text-mute">{k.owner_name}</span>
               </div>
               <div className="flex gap-3 mt-1 text-xs text-mute flex-wrap">
@@ -182,7 +182,7 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
             {isSuperAdmin && (
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => toggleKey(k)} className="text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft">{k.is_active ? 'Disable' : 'Enable'}</button>
-                <button onClick={() => revokeKey(k.id)} className="text-xs border border-red-200 text-red-500 rounded px-2 py-1 hover:bg-red-50">Revoke</button>
+                <button onClick={() => revokeKey(k.id)} className="text-xs border border-negative-400 text-content-negative rounded px-2 py-1 hover:bg-surface-negative">Revoke</button>
               </div>
             )}
           </div>
@@ -232,11 +232,11 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
       </div>
 
       {createdSecret && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
-          <div className="text-sm font-semibold text-emerald-700">✓ Webhook created — save the signing secret!</div>
-          <div className="bg-white border border-emerald-200 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdSecret}</div>
+        <div className="bg-surface-positive border border-positive-400 rounded-xl p-4 space-y-2">
+          <div className="text-sm font-semibold text-content-positive">✓ Webhook created — save the signing secret!</div>
+          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdSecret}</div>
           <button onClick={() => { navigator.clipboard.writeText(createdSecret); setCreatedSecret(null); }}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700">Copy & Dismiss</button>
+            className="px-3 py-1.5 bg-positive-400 text-white rounded text-xs font-medium hover:bg-positive-400">Copy & Dismiss</button>
         </div>
       )}
 
@@ -270,8 +270,8 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm text-ink">{wh.name}</span>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${wh.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{wh.is_active ? 'ACTIVE' : 'PAUSED'}</span>
-                  {wh.failure_count > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">{wh.failure_count} failures</span>}
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${wh.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{wh.is_active ? 'ACTIVE' : 'PAUSED'}</span>
+                  {wh.failure_count > 0 && <span className="text-[10px] bg-surface-negative text-content-negative px-1.5 py-0.5 rounded">{wh.failure_count} failures</span>}
                 </div>
                 <div className="text-xs font-mono text-mute mt-0.5 truncate max-w-md">{wh.endpoint_url}</div>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
@@ -349,7 +349,7 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
             {logs.map(log => (
               <tr key={log.id} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
                 <td className="px-4 py-2 text-xs text-mute">{relTime(log.created_at)}</td>
-                <td className="px-4 py-2 font-mono text-xs text-body">{log.key_prefix}{log.is_sandbox && <span className="ml-1 text-[10px] bg-yellow-100 text-yellow-600 px-1 rounded">sandbox</span>}</td>
+                <td className="px-4 py-2 font-mono text-xs text-body">{log.key_prefix}{log.is_sandbox && <span className="ml-1 text-[10px] bg-surface-warning text-content-warning px-1 rounded">sandbox</span>}</td>
                 <td className="px-4 py-2 text-xs font-mono font-medium text-body">{log.method}</td>
                 <td className="px-4 py-2 text-xs text-mute font-mono truncate max-w-xs">{log.path}</td>
                 <td className={`px-4 py-2 text-xs font-mono font-medium text-right ${HTTP_COLORS(log.status_code)}`}>{log.status_code}</td>
@@ -384,9 +384,9 @@ const SandboxTab: React.FC<{ base: string; headers: Record<string, string>; isSu
 
   return (
     <div className="space-y-5">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-        <div className="text-sm font-semibold text-yellow-700 mb-1">🧪 Sandbox Environment</div>
-        <p className="text-sm text-yellow-700">Sandbox keys operate against a separate copy of the platform with seeded test data. Trips, payments, and driver state changes made in sandbox do not affect production data.</p>
+      <div className="bg-surface-warning border border-warning-400 rounded-xl p-5">
+        <div className="text-sm font-semibold text-content-warning mb-1">🧪 Sandbox Environment</div>
+        <p className="text-sm text-content-warning">Sandbox keys operate against a separate copy of the platform with seeded test data. Trips, payments, and driver state changes made in sandbox do not affect production data.</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[['Base URL', `${API_GATEWAY_BASE_URL}/api/v1`], ['Auth', 'X-API-Key: {your-sandbox-key}'], ['Trip Webhook', 'Fires to your endpoint but does not charge real users'], ['Rate Limits', '1000 req/min in sandbox (vs prod limits)']].map(([k, v]) => (
@@ -441,10 +441,10 @@ const StatusPageTab: React.FC<{ base: string; headers: Record<string, string>; i
 
   return (
     <div className="space-y-5">
-      <div className={`rounded-xl p-4 flex items-center gap-3 ${systemOK ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+      <div className={`rounded-xl p-4 flex items-center gap-3 ${systemOK ? 'bg-surface-positive border border-positive-400' : 'bg-surface-negative border border-negative-400'}`}>
         <span className="text-2xl">{systemOK ? '✅' : '⚠️'}</span>
         <div>
-          <div className={`font-semibold text-sm ${systemOK ? 'text-emerald-700' : 'text-red-700'}`}>
+          <div className={`font-semibold text-sm ${systemOK ? 'text-content-positive' : 'text-content-negative'}`}>
             {systemOK ? 'All Systems Operational' : `${openIncidents.length} Active Incident${openIncidents.length > 1 ? 's' : ''}`}
           </div>
           <div className="text-xs text-mute">Updated {new Date().toLocaleTimeString('en-IN')}</div>
@@ -504,7 +504,7 @@ const StatusPageTab: React.FC<{ base: string; headers: Record<string, string>; i
               </div>
               <div className="text-right shrink-0">
                 <div className="text-xs text-mute">{relTime(inc.started_at)}</div>
-                {inc.resolved_at && <div className="text-xs text-emerald-600">Resolved {relTime(inc.resolved_at)}</div>}
+                {inc.resolved_at && <div className="text-xs text-content-positive">Resolved {relTime(inc.resolved_at)}</div>}
                 {isSuperAdmin && <button onClick={() => setEditing(inc)} className="text-xs text-accent hover:underline mt-1">Update</button>}
               </div>
             </div>

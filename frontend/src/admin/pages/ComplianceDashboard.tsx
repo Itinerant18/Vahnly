@@ -30,10 +30,10 @@ type StatusFilter = 'ALL' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
 
 function statusBadge(s: string) {
   const map: Record<string, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-700',
-    UNDER_REVIEW: 'bg-blue-100 text-blue-700',
-    APPROVED: 'bg-emerald-100 text-emerald-700',
-    REJECTED: 'bg-red-100 text-red-700',
+    PENDING: 'bg-surface-warning text-content-warning',
+    UNDER_REVIEW: 'bg-surface-accent text-content-accent',
+    APPROVED: 'bg-surface-positive text-content-positive',
+    REJECTED: 'bg-surface-negative text-content-negative',
   };
   const cls = map[s] ?? 'bg-canvas-soft text-body';
   return <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>{s}</span>;
@@ -123,7 +123,7 @@ export const ComplianceDashboard: React.FC = () => {
       </div>
 
       {actionMsg && (
-        <div className={`rounded-lg px-4 py-2.5 text-sm ${actionMsg.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+        <div className={`rounded-lg px-4 py-2.5 text-sm ${actionMsg.startsWith('Error') ? 'bg-surface-negative text-content-negative border border-negative-400' : 'bg-surface-positive text-content-positive border border-positive-400'}`}>
           {actionMsg}
         </div>
       )}
@@ -246,14 +246,14 @@ export const ComplianceDashboard: React.FC = () => {
                         placeholder="Rejection reason (required)…"
                         value={rejectReason}
                         onChange={e => setRejectReason(e.target.value)}
-                        className="w-full border border-canvas-soft rounded-lg px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none focus:ring-1 focus:ring-red-300"
+                        className="w-full border border-canvas-soft rounded-lg px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none focus:ring-1 focus:ring-negative-400"
                         rows={2}
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => { if (rejectReason.trim()) doVerify(selected.id, 'REJECT', rejectReason); }}
                           disabled={!rejectReason.trim()}
-                          className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                          className="flex-1 bg-surface-negative0 hover:bg-negative-400 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
                         >
                           Confirm Reject
                         </button>
@@ -266,13 +266,13 @@ export const ComplianceDashboard: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => doVerify(selected.id, 'APPROVE')}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 bg-surface-positive0 hover:bg-positive-400 text-white px-4 py-2 rounded-lg text-sm font-medium"
                       >
                         ✓ Approve KYC
                       </button>
                       <button
                         onClick={() => { setShowRejectInput(true); setRejectReason(''); }}
-                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 bg-surface-negative hover:bg-surface-negative text-content-negative border border-negative-400 px-4 py-2 rounded-lg text-sm font-medium"
                       >
                         ✗ Reject
                       </button>

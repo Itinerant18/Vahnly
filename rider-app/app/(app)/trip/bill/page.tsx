@@ -23,15 +23,15 @@ function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
       <div className="flex flex-col items-center gap-4">
         <svg width="80" height="80" viewBox="0 0 80 80">
-          <circle cx="40" cy="40" r="36" fill="#22C55E" opacity="0.2" />
-          <circle cx="40" cy="40" r="28" fill="#22C55E" />
+          <circle cx="40" cy="40" r="36" fill="var(--positive-400)" opacity="0.2" />
+          <circle cx="40" cy="40" r="28" fill="var(--positive-400)" />
           <polyline
             points="26,40 36,52 54,30"
             stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
             fill="none"
           />
         </svg>
-        <p className="text-lg font-bold text-white">Payment Successful</p>
+        <p className="text-lg font-bold text-content-primary">Payment Successful</p>
       </div>
     </div>
   );
@@ -40,8 +40,8 @@ function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
 function RowItem({ label, value, accent, bold }: { label: string; value: string; accent?: boolean; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2.5">
-      <span className={`text-sm ${bold ? "text-white font-semibold" : "text-[#9CA3AF]"}`}>{label}</span>
-      <span className={`text-sm font-semibold ${accent ? "text-[#EF4444]" : bold ? "text-[#FF6B35]" : "text-white"}`}>
+      <span className={`text-sm ${bold ? "text-content-primary font-semibold" : "text-content-secondary"}`}>{label}</span>
+      <span className={`text-sm font-semibold ${accent ? "text-content-negative" : bold ? "text-content-accent" : "text-content-primary"}`}>
         {value}
       </span>
     </div>
@@ -106,12 +106,12 @@ export default function BillPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0A0A]">
+    <div className="flex min-h-screen flex-col bg-background-primary">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pb-4 pt-12">
-        <h1 className="text-xl font-bold text-white">Trip Summary</h1>
+        <h1 className="text-xl font-bold text-content-primary">Trip Summary</h1>
         {fare && (
-          <span className="ml-auto rounded-lg bg-[#22C55E]/10 px-2.5 py-1 text-xs font-semibold text-[#22C55E]">
+          <span className="ml-auto rounded-lg bg-surface-positive px-2.5 py-1 text-xs font-semibold text-content-positive">
             Completed
           </span>
         )}
@@ -121,20 +121,20 @@ export default function BillPage() {
         {/* Trip stats */}
         {fare && (
           <div className="mb-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-[#141414] p-4">
-              <p className="text-xs text-[#9CA3AF]">Distance</p>
-              <p className="mt-1 text-lg font-bold text-white">{fare.distanceKm.toFixed(1)} km</p>
+            <div className="rounded-2xl bg-background-secondary p-4">
+              <p className="text-xs text-content-secondary">Distance</p>
+              <p className="mt-1 text-lg font-bold text-content-primary">{fare.distanceKm.toFixed(1)} km</p>
             </div>
-            <div className="rounded-2xl bg-[#141414] p-4">
-              <p className="text-xs text-[#9CA3AF]">Duration</p>
-              <p className="mt-1 text-lg font-bold text-white">{fare.durationMinutes} min</p>
+            <div className="rounded-2xl bg-background-secondary p-4">
+              <p className="text-xs text-content-secondary">Duration</p>
+              <p className="mt-1 text-lg font-bold text-content-primary">{fare.durationMinutes} min</p>
             </div>
           </div>
         )}
 
         {/* Fare breakdown */}
-        <div className="mb-4 rounded-2xl bg-[#141414] px-4">
-          <p className="border-b border-white/6 py-3 text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+        <div className="mb-4 rounded-2xl bg-background-secondary px-4">
+          <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
             Fare Breakdown
           </p>
           {breakdown ? (
@@ -157,7 +157,7 @@ export default function BillPage() {
                   accent
                 />
               )}
-              <div className="border-t border-white/6">
+              <div className="border-t border-border-opaque">
                 <RowItem label="Total" value={formatCurrency(displayTotal)} bold />
               </div>
             </>
@@ -167,8 +167,8 @@ export default function BillPage() {
         </div>
 
         {/* Payment method */}
-        <div className="mb-4 rounded-2xl bg-[#141414] p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">Payment Method</p>
+        <div className="mb-4 rounded-2xl bg-background-secondary p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Payment Method</p>
           <div className="flex flex-wrap gap-2">
             {(["CASH", "UPI", "WALLET", "CARD"] as PaymentMethod[]).map((m) => (
               <button
@@ -176,8 +176,8 @@ export default function BillPage() {
                 onClick={() => setMethod(m)}
                 className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
                   method === m
-                    ? "bg-[#FF6B35] text-white"
-                    : "bg-[#1E1E1E] text-[#9CA3AF] ring-1 ring-white/10"
+                    ? "bg-accent-400 text-white"
+                    : "bg-background-tertiary text-content-secondary ring-1 ring-border-opaque"
                 }`}
               >
                 {PAYMENT_LABELS[m]}
@@ -187,9 +187,9 @@ export default function BillPage() {
         </div>
 
         {walletAnim && (
-          <div className="mb-4 flex items-center justify-center gap-3 rounded-2xl bg-[#141414] p-6">
+          <div className="mb-4 flex items-center justify-center gap-3 rounded-2xl bg-background-secondary p-6">
             <span className="animate-bounce text-3xl">👛</span>
-            <span className="text-sm font-medium text-[#9CA3AF]">Processing wallet payment…</span>
+            <span className="text-sm font-medium text-content-secondary">Processing wallet payment…</span>
           </div>
         )}
       </div>
@@ -199,7 +199,7 @@ export default function BillPage() {
         <button
           onClick={handlePay}
           disabled={paying}
-          className="w-full rounded-2xl bg-[#FF6B35] py-4 text-base font-bold text-white shadow-lg shadow-[#FF6B35]/20 transition-transform active:scale-[0.98] disabled:opacity-60"
+          className="w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text shadow-elevation-2 transition-transform active:scale-[0.98] disabled:opacity-60"
         >
           {method === "CASH" ? "Mark as Paid" : `Pay ${formatCurrency(displayTotal)}`}
         </button>

@@ -15,26 +15,26 @@ interface TripMapProps {
 }
 
 function driverIconHtml(bearing: number): string {
-  return `<div style="transform:rotate(${bearing}deg);width:36px;height:36px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 6px #FF6B3540)">
+  return `<div style="transform:rotate(${bearing}deg);width:36px;height:36px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 6px var(--accent-400))">
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <circle cx="14" cy="14" r="13" fill="#FF6B35" fill-opacity="0.15" stroke="#FF6B35"/>
-      <path d="M14 6l3 4H11l3-4z" fill="#FF6B35"/>
-      <rect x="10" y="10" width="8" height="10" rx="1.5" fill="#FF6B35"/>
-      <rect x="10.5" y="10.5" width="7" height="4" rx="0.5" fill="white" fill-opacity="0.4"/>
-      <circle cx="11.5" cy="21" r="1.5" fill="#1E1E1E"/>
-      <circle cx="16.5" cy="21" r="1.5" fill="#1E1E1E"/>
+      <circle cx="14" cy="14" r="13" fill="var(--accent-400)" fill-opacity="0.15" stroke="var(--accent-400)"/>
+      <path d="M14 6l3 4H11l3-4z" fill="var(--accent-400)"/>
+      <rect x="10" y="10" width="8" height="10" rx="1.5" fill="var(--accent-400)"/>
+      <rect x="10.5" y="10.5" width="7" height="4" rx="0.5" fill="var(--content-primary)" fill-opacity="0.4"/>
+      <circle cx="11.5" cy="21" r="1.5" fill="var(--background-tertiary)"/>
+      <circle cx="16.5" cy="21" r="1.5" fill="var(--background-tertiary)"/>
     </svg>
   </div>`;
 }
 
 const USER_PIN_HTML = `
   <div style="position:relative;width:18px;height:18px">
-    <div style="position:absolute;inset:-4px;border-radius:50%;background:#22C55E;opacity:0.25;animation:ping 2s ease-out infinite"></div>
-    <div style="width:18px;height:18px;border-radius:50%;background:#22C55E;border:2px solid white;box-shadow:0 0 8px #22C55E60"></div>
+    <div style="position:absolute;inset:-4px;border-radius:50%;background:var(--positive-400);opacity:0.25;animation:ping 2s ease-out infinite"></div>
+    <div style="width:18px;height:18px;border-radius:50%;background:var(--positive-400);border:2px solid var(--content-primary);box-shadow:0 0 8px var(--positive-400)"></div>
   </div>`;
 
 const DROP_PIN_HTML = `
-  <div style="width:16px;height:16px;border-radius:50%;background:#EF4444;border:2px solid white;box-shadow:0 0 8px #EF444460"></div>`;
+  <div style="width:16px;height:16px;border-radius:50%;background:var(--negative-400);border:2px solid var(--content-primary);box-shadow:0 0 8px var(--negative-400)"></div>`;
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -117,10 +117,10 @@ export default function TripMap({
       interpRef.current = { fromLat: startLat, fromLng: startLng, toLat: startLat, toLng: startLng, startMs: Date.now(), durationMs: 5000, bearing: 0, initialized: false };
 
       // Polyline
-      polylineRef.current = L.polyline([], { color: "#FF6B35", weight: 3, dashArray: "6 4" }).addTo(map);
+      polylineRef.current = L.polyline([], { color: "var(--accent-400)", weight: 3, dashArray: "6 4" }).addTo(map);
 
       // ETA label marker
-      const etaIcon = L.divIcon({ html: `<div id="eta-label" style="background:#000000cc;color:#FF6B35;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:8px;white-space:nowrap"></div>`, className: "", iconSize: [70, 22], iconAnchor: [35, 11] });
+      const etaIcon = L.divIcon({ html: `<div id="eta-label" style="background:var(--background-primary);color:var(--accent-400);font-size:11px;font-weight:bold;padding:2px 6px;border-radius:8px;white-space:nowrap"></div>`, className: "", iconSize: [70, 22], iconAnchor: [35, 11] });
       etaLabelRef.current = L.marker([center.lat, center.lng], { icon: etaIcon, interactive: false }).addTo(map);
 
       leafletMapRef.current = map;

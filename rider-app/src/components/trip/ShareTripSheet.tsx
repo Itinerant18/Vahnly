@@ -38,35 +38,35 @@ export function ShareTripSheet({ onClose }: ShareTripSheetProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-[#141414] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl bg-background-secondary p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
-        <h3 className="mb-1 text-base font-semibold text-white">Share Trip</h3>
+        <h3 className="mb-1 text-base font-semibold text-content-primary">Share Trip</h3>
         {shareUrl && (
-          <p className="mb-4 truncate rounded-xl bg-[#1E1E1E] px-3 py-2 text-xs text-[#9CA3AF]">
+          <p className="mb-4 truncate rounded-xl bg-background-tertiary px-3 py-2 text-xs text-content-secondary">
             {shareUrl}
           </p>
         )}
         <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => shareNative("whatsapp")}
-            className="flex flex-col items-center gap-2 rounded-xl bg-[#1E1E1E] py-4"
+            className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
             <span className="text-2xl">💬</span>
-            <span className="text-[11px] text-[#9CA3AF]">WhatsApp</span>
+            <span className="text-[11px] text-content-secondary">WhatsApp</span>
           </button>
           <button
             onClick={() => shareNative("sms")}
-            className="flex flex-col items-center gap-2 rounded-xl bg-[#1E1E1E] py-4"
+            className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
             <span className="text-2xl">📱</span>
-            <span className="text-[11px] text-[#9CA3AF]">SMS</span>
+            <span className="text-[11px] text-content-secondary">SMS</span>
           </button>
           <button
             onClick={copyLink}
-            className="flex flex-col items-center gap-2 rounded-xl bg-[#1E1E1E] py-4"
+            className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
             <span className="text-2xl">🔗</span>
-            <span className="text-[11px] text-[#9CA3AF]">Copy Link</span>
+            <span className="text-[11px] text-content-secondary">Copy Link</span>
           </button>
         </div>
         <div className="h-6" />

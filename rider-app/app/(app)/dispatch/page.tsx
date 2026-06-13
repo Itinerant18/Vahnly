@@ -15,7 +15,7 @@ const POLL_INTERVAL_MS = 3_000;
 function RadarRing({ delay, size }: { delay: string; size: string }) {
   return (
     <div
-      className="absolute rounded-full border border-[#FF6B35]/30"
+      className="absolute rounded-full border border-border-accent"
       style={{
         width: size,
         height: size,
@@ -34,10 +34,10 @@ function RadarAnimation() {
       <RadarRing delay="0s" size="192px" />
       <RadarRing delay="0.5s" size="148px" />
       <RadarRing delay="1s" size="104px" />
-      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#FF6B35]/10 ring-2 ring-[#FF6B35]/40">
+      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-surface-accent ring-2 ring-border-accent">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="#FF6B35" strokeWidth="1.5" />
-          <path d="M12 7v5l3 3" stroke="#FF6B35" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="10" stroke="var(--accent-400)" strokeWidth="1.5" />
+          <path d="M12 7v5l3 3" stroke="var(--accent-400)" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </div>
     </div>
@@ -51,20 +51,20 @@ function CountdownRing({ seconds, total }: { seconds: number; total: number }) {
   const dash = circ * pct;
   return (
     <svg width="64" height="64" viewBox="0 0 64 64">
-      <circle cx="32" cy="32" r={r} fill="none" stroke="#1E1E1E" strokeWidth="4" />
+      <circle cx="32" cy="32" r={r} fill="none" stroke="var(--background-tertiary)" strokeWidth="4" />
       <circle
         cx="32"
         cy="32"
         r={r}
         fill="none"
-        stroke="#FF6B35"
+        stroke="var(--accent-400)"
         strokeWidth="4"
         strokeDasharray={`${dash} ${circ - dash}`}
         strokeLinecap="round"
         transform="rotate(-90 32 32)"
         style={{ transition: "stroke-dasharray 0.5s linear" }}
       />
-      <text x="32" y="37" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">
+      <text x="32" y="37" textAnchor="middle" fill="var(--content-primary)" fontSize="14" fontWeight="bold">
         {seconds}
       </text>
     </svg>
@@ -180,11 +180,11 @@ function DispatchContent() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background-primary px-6">
       {state === "BOOKING" && (
         <div className="flex flex-col items-center gap-6 text-center">
-          <div className="h-16 w-16 animate-pulse rounded-full bg-[#FF6B35]/20 ring-2 ring-[#FF6B35]/30" />
-          <p className="text-[#9CA3AF]">Preparing your booking…</p>
+          <div className="h-16 w-16 animate-pulse rounded-full bg-surface-accent ring-2 ring-border-accent" />
+          <p className="text-content-secondary">Preparing your booking…</p>
         </div>
       )}
 
@@ -193,16 +193,16 @@ function DispatchContent() {
           <RadarAnimation />
 
           <div>
-            <h1 className="text-xl font-bold text-white">Finding a driver near you…</h1>
-            <p className="mt-1 text-sm text-[#9CA3AF]">Usually takes 30–60 seconds</p>
+            <h1 className="text-xl font-bold text-content-primary">Finding a driver near you…</h1>
+            <p className="mt-1 text-sm text-content-secondary">Usually takes 30–60 seconds</p>
           </div>
 
           {/* Trip summary chip */}
           {fareEstimate && (
-            <div className="flex items-center gap-3 rounded-2xl bg-[#1E1E1E] px-4 py-2.5">
-              <span className="text-sm text-[#9CA3AF]">{tripLabel[tripType] ?? tripType}</span>
-              <span className="h-1 w-1 rounded-full bg-[#9CA3AF]" />
-              <span className="text-sm font-semibold text-white">
+            <div className="flex items-center gap-3 rounded-2xl bg-background-tertiary px-4 py-2.5">
+              <span className="text-sm text-content-secondary">{tripLabel[tripType] ?? tripType}</span>
+              <span className="h-1 w-1 rounded-full bg-content-secondary" />
+              <span className="text-sm font-semibold text-content-primary">
                 {formatCurrency(fareEstimate.fare_breakdown.estimated_total_paise)}
               </span>
             </div>
@@ -218,28 +218,28 @@ function DispatchContent() {
                 ordersApi.cancel(activeOrderId, "RIDER_CHANGED_MIND").catch(() => {});
                 handleGoBack();
               }}
-              className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-[#9CA3AF]"
+              className="rounded-full border border-border-opaque px-6 py-2.5 text-sm text-content-secondary"
             >
               Cancel (no fee)
             </button>
           )}
           {remainingSecs <= 30 && (
-            <p className="text-xs text-[#9CA3AF]">Cancellation fee may apply</p>
+            <p className="text-xs text-content-secondary">Cancellation fee may apply</p>
           )}
         </div>
       )}
 
       {state === "TIMEOUT" && (
         <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1E1E1E]">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-background-tertiary">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.5" />
-              <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="10" stroke="var(--negative-400)" strokeWidth="1.5" />
+              <path d="M12 8v4M12 16h.01" stroke="var(--negative-400)" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">No drivers available</h1>
-            <p className="mt-1 text-sm text-[#9CA3AF]">
+            <h1 className="text-xl font-bold text-content-primary">No drivers available</h1>
+            <p className="mt-1 text-sm text-content-secondary">
               All drivers in your area are busy right now. Try again in a few minutes.
             </p>
           </div>
@@ -247,19 +247,19 @@ function DispatchContent() {
           <div className="flex w-full flex-col gap-3">
             <button
               onClick={handleTryAgain}
-              className="h-14 w-full rounded-2xl bg-[#FF6B35] text-base font-bold text-white shadow-lg shadow-[#FF6B35]/20"
+              className="h-14 w-full rounded-2xl bg-interactive-primary text-base font-bold text-interactive-primary-text shadow-elevation-2"
             >
               Try Again
             </button>
             <button
               onClick={() => router.push("/home")}
-              className="h-12 w-full rounded-2xl bg-[#1E1E1E] text-sm font-medium text-[#9CA3AF]"
+              className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-secondary"
             >
               Schedule for Later
             </button>
             <button
               onClick={handleGoBack}
-              className="h-12 w-full text-sm text-[#9CA3AF]"
+              className="h-12 w-full text-sm text-content-secondary"
             >
               Go Back
             </button>
@@ -272,7 +272,7 @@ function DispatchContent() {
 
 export default function DispatchPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#0A0A0A]" />}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background-primary" />}>
       <DispatchContent />
     </Suspense>
   );

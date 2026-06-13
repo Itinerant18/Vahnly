@@ -17,9 +17,9 @@ export function TripTimeline({ status }: { status: TripStatus | null }) {
       {STEPS.map((step, i) => (
         <li key={step.status} className="flex flex-1 flex-col items-center">
           <span
-            className={`h-2 w-2 rounded-full ${i <= activeIndex ? "bg-[#0073E6]" : "bg-[#252D48]"}`}
+            className={`h-2 w-2 rounded-full ${i <= activeIndex ? "bg-accent-400" : "bg-background-tertiary"}`}
           />
-          <span className="mt-1 text-[10px] text-slate-400">{step.label}</span>
+          <span className="mt-1 text-[10px] text-content-secondary">{step.label}</span>
         </li>
       ))}
     </ol>

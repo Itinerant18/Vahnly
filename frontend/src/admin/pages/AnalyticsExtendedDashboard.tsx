@@ -130,7 +130,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                   {chartPoints.length >= 2 && (
                     <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
                       <div className="text-sm font-semibold text-ink mb-3">Trips Over Period</div>
-                      <SvgAreaChart data={chartPoints} height={140} strokeColor="#6366f1" fillColor="rgba(99,102,241,0.1)" />
+                      <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
                     </div>
                   )}
                 </div>
@@ -147,7 +147,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                   {chartPoints.length >= 2 && (
                     <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
                       <div className="text-sm font-semibold text-ink mb-3">Trip Volume Trend</div>
-                      <SvgAreaChart data={chartPoints} height={140} strokeColor="#10b981" fillColor="rgba(16,185,129,0.1)" />
+                      <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--positive-400)" fillColor="var(--positive-400)" />
                     </div>
                   )}
                   {dbData.daily_riders?.length > 0 && (
@@ -155,7 +155,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                       <div className="text-sm font-semibold text-ink mb-3">Daily Active Riders</div>
                       <SvgAreaChart
                         data={dbData.daily_riders.map((r: any) => ({ label: r.day?.slice(5) ?? '', value: r.riders ?? 0 }))}
-                        height={120} strokeColor="#f59e0b" fillColor="rgba(245,158,11,0.1)"
+                        height={120} strokeColor="var(--warning-400)" fillColor="var(--warning-400)"
                       />
                     </div>
                   )}
@@ -195,10 +195,10 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                     <div className="text-sm font-semibold text-ink mb-3">Driver State Distribution</div>
                     <div className="space-y-2">
                       {[
-                        { label: 'Available', value: dbData.state_counts.available ?? 0, color: 'bg-emerald-500' },
-                        { label: 'En Route', value: dbData.state_counts.en_route ?? 0, color: 'bg-blue-500' },
-                        { label: 'On Trip', value: dbData.state_counts.delivering ?? 0, color: 'bg-indigo-500' },
-                        { label: 'Offline', value: dbData.state_counts.offline ?? 0, color: 'bg-slate-400' },
+                        { label: 'Available', value: dbData.state_counts.available ?? 0, color: 'bg-surface-positive0' },
+                        { label: 'En Route', value: dbData.state_counts.en_route ?? 0, color: 'bg-surface-accent0' },
+                        { label: 'On Trip', value: dbData.state_counts.delivering ?? 0, color: 'bg-surface-accent0' },
+                        { label: 'Offline', value: dbData.state_counts.offline ?? 0, color: 'bg-background-tertiary' },
                       ].map(row => {
                         const total = (dbData.state_counts.available + dbData.state_counts.en_route + dbData.state_counts.delivering + dbData.state_counts.offline) || 1;
                         const pct = Math.round((row.value / total) * 100);
@@ -245,7 +245,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                             <div key={c.category} className="flex items-center gap-3">
                               <div className="w-32 text-xs text-body shrink-0 truncate">{c.category}</div>
                               <div className="flex-1 h-4 bg-canvas-soft rounded-sm overflow-hidden">
-                                <div className="h-full bg-red-400" style={{ width: `${(c.count / maxVal) * 100}%` }} />
+                                <div className="h-full bg-negative-400" style={{ width: `${(c.count / maxVal) * 100}%` }} />
                               </div>
                               <div className="w-8 text-right text-xs text-ink font-mono">{c.count}</div>
                             </div>
@@ -347,7 +347,7 @@ const CustomReportBuilder: React.FC<{
             {METRICS.map(m => (
               <button key={m} onClick={() => toggle(metrics, m, setMetrics)}
                 className={`px-3 py-1.5 rounded-lg text-xs border transition-colors font-mono ${
-                  metrics.includes(m) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                  metrics.includes(m) ? 'bg-surface-accent0 text-white border-border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
                 }`}>{m}</button>
             ))}
           </div>

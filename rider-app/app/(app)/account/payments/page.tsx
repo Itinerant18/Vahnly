@@ -7,7 +7,7 @@ import { paymentsApi, type AddPaymentMethodInput } from "@/lib/api/payments";
 import type { SavedCard, UpiMethod } from "@/lib/api/types";
 
 const INPUT =
-  "w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6B7280] focus:ring-1 focus:ring-[#FF6B35]";
+  "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
 
 interface Billing {
   name: string;
@@ -206,34 +206,34 @@ export default function PaymentsPage() {
         ) : (
           <div className="mb-3 space-y-2">
             {cards.map((c) => (
-              <div key={c.id} className="rounded-xl bg-[#141414] px-4 py-3">
+              <div key={c.id} className="rounded-xl bg-background-secondary px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">💳</span>
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-content-primary">
                       {c.brand} •••• {c.last4}
                     </span>
                     {c.is_default && (
-                      <span className="rounded-full bg-[#FF6B35]/15 px-2 py-0.5 text-[10px] font-semibold text-[#FF6B35]">
+                      <span className="rounded-full bg-surface-accent px-2 py-0.5 text-[10px] font-semibold text-content-accent">
                         Default
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => removeCard(c.id)}
-                    className="text-xs font-semibold text-[#EF4444]"
+                    className="text-xs font-semibold text-content-negative"
                   >
                     Remove
                   </button>
                 </div>
                 <div className="mt-1.5 flex items-center justify-between">
-                  <span className="text-xs text-[#9CA3AF]">
+                  <span className="text-xs text-content-secondary">
                     Exp {String(c.exp_month).padStart(2, "0")}/{c.exp_year}
                   </span>
                   {!c.is_default && (
                     <button
                       onClick={() => setDefaultCard(c.id)}
-                      className="text-xs font-semibold text-[#FF6B35]"
+                      className="text-xs font-semibold text-content-accent"
                     >
                       Set default
                     </button>
@@ -245,8 +245,8 @@ export default function PaymentsPage() {
         )}
 
         {showCardForm ? (
-          <div className="space-y-3 rounded-2xl bg-[#141414] p-4">
-            <div className="rounded-xl bg-[#1E1E1E] px-3 py-2 text-xs text-[#9CA3AF]">
+          <div className="space-y-3 rounded-2xl bg-background-secondary p-4">
+            <div className="rounded-xl bg-background-tertiary px-3 py-2 text-xs text-content-secondary">
               Payment gateway integration coming soon
             </div>
             <input
@@ -285,14 +285,14 @@ export default function PaymentsPage() {
             <div className="flex gap-2">
               <button
                 onClick={resetCardForm}
-                className="flex-1 rounded-2xl bg-[#1E1E1E] py-3 text-sm font-semibold text-[#9CA3AF] ring-1 ring-white/8"
+                className="flex-1 rounded-2xl bg-background-tertiary py-3 text-sm font-semibold text-content-secondary ring-1 ring-border-opaque"
               >
                 Cancel
               </button>
               <button
                 onClick={saveCard}
                 disabled={!cardMasked || !expMonth || !expYear}
-                className="flex-1 rounded-2xl bg-[#FF6B35] py-3 text-sm font-bold text-white disabled:opacity-40"
+                className="flex-1 rounded-2xl bg-interactive-primary py-3 text-sm font-bold text-interactive-primary-text disabled:opacity-40"
               >
                 Save Card
               </button>
@@ -301,7 +301,7 @@ export default function PaymentsPage() {
         ) : (
           <button
             onClick={() => setShowCardForm(true)}
-            className="w-full rounded-2xl bg-[#1E1E1E] py-3.5 text-sm font-semibold text-[#FF6B35] ring-1 ring-white/8"
+            className="w-full rounded-2xl bg-background-tertiary py-3.5 text-sm font-semibold text-content-accent ring-1 ring-border-opaque"
           >
             + Add Card
           </button>
@@ -315,20 +315,20 @@ export default function PaymentsPage() {
             {upis.map((u) => (
               <div
                 key={u.id}
-                className="flex items-center justify-between rounded-xl bg-[#141414] px-4 py-3"
+                className="flex items-center justify-between rounded-xl bg-background-secondary px-4 py-3"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🏦</span>
-                  <span className="text-sm text-white">{u.vpa}</span>
+                  <span className="text-sm text-content-primary">{u.vpa}</span>
                   {u.is_default && (
-                    <span className="rounded-full bg-[#FF6B35]/15 px-2 py-0.5 text-[10px] font-semibold text-[#FF6B35]">
+                    <span className="rounded-full bg-surface-accent px-2 py-0.5 text-[10px] font-semibold text-content-accent">
                       Default
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => removeUpi(u.id)}
-                  className="text-xs font-semibold text-[#EF4444]"
+                  className="text-xs font-semibold text-content-negative"
                 >
                   Remove
                 </button>
@@ -348,12 +348,12 @@ export default function PaymentsPage() {
           />
           <button
             onClick={addUpi}
-            className="rounded-xl bg-[#FF6B35] px-4 text-sm font-semibold text-white"
+            className="rounded-xl bg-interactive-primary px-4 text-sm font-semibold text-interactive-primary-text"
           >
             Add
           </button>
         </div>
-        {upiErr && <p className="mt-1 text-xs text-[#EF4444]">{upiErr}</p>}
+        {upiErr && <p className="mt-1 text-xs text-content-negative">{upiErr}</p>}
       </Section>
 
       {/* Auto-pay */}
@@ -413,7 +413,7 @@ export default function PaymentsPage() {
           />
           <button
             onClick={saveBilling}
-            className="w-full rounded-2xl bg-[#FF6B35] py-3.5 text-sm font-bold text-white"
+            className="w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
           >
             Save Billing Details
           </button>
@@ -421,7 +421,7 @@ export default function PaymentsPage() {
       </Section>
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-24 z-50 rounded-2xl bg-[#1E1E1E] px-4 py-3 text-center text-sm text-white ring-1 ring-white/10">
+        <div className="fixed inset-x-4 bottom-24 z-50 rounded-2xl bg-background-tertiary px-4 py-3 text-center text-sm text-content-primary ring-1 ring-border-opaque">
           {toast}
         </div>
       )}
@@ -432,7 +432,7 @@ export default function PaymentsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="mb-3 text-sm font-bold text-white">{title}</h2>
+      <h2 className="mb-3 text-sm font-bold text-content-primary">{title}</h2>
       {children}
     </div>
   );
@@ -450,14 +450,14 @@ function Toggle({
   onChange: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-[#141414] p-4">
+    <div className="flex items-center justify-between rounded-2xl bg-background-secondary p-4">
       <div className="mr-3">
-        <p className="text-sm text-white">{label}</p>
-        {desc && <p className="mt-0.5 text-xs text-[#9CA3AF]">{desc}</p>}
+        <p className="text-sm text-content-primary">{label}</p>
+        {desc && <p className="mt-0.5 text-xs text-content-secondary">{desc}</p>}
       </div>
       <button
         onClick={onChange}
-        className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${on ? "bg-[#FF6B35]" : "bg-[#3A3A3A]"}`}
+        className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${on ? "bg-accent-400" : "bg-background-tertiary"}`}
       >
         <span
           className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`}

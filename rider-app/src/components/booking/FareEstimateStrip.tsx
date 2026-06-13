@@ -8,22 +8,22 @@ export function FareEstimateStrip() {
   const isSearching = useBookingStore((s) => s.isSearching);
 
   if (isSearching && !fare) {
-    return <div className="rounded-lg bg-[#1A1F3A] px-4 py-3 text-sm text-slate-400">Estimating fare…</div>;
+    return <div className="rounded-lg bg-background-secondary px-4 py-3 text-sm text-content-secondary">Estimating fare…</div>;
   }
   if (!fare) return null;
 
   return (
-    <div className="flex items-center justify-between rounded-lg bg-[#1A1F3A] px-4 py-3">
+    <div className="flex items-center justify-between rounded-lg bg-background-secondary px-4 py-3">
       <div>
         <p className="text-lg font-bold">
           {formatCurrency(fare.fare_breakdown.estimated_total_paise)}
         </p>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-content-secondary">
           {fare.surge_active ? "Surge active · " : ""}
           {fare.driver_availability} availability
         </p>
       </div>
-      <p className="text-xs text-slate-400">~{fare.estimated_pickup_eta_minutes} min</p>
+      <p className="text-xs text-content-secondary">~{fare.estimated_pickup_eta_minutes} min</p>
     </div>
   );
 }

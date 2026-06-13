@@ -119,25 +119,25 @@ export default function LegalPoliciesPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fadeIn">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-zinc-900 pb-4">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-border-opaque pb-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move flex items-center gap-2">
             <span>⚖️</span> Legal & Policy Documents
           </h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">
             Review user terms, cancellations rules, privacy safeguards, and insurance coverage
           </p>
         </div>
         <button
           onClick={handleDownloadPdf}
-          className="bg-zinc-900 hover:bg-zinc-850 text-white font-mono font-bold text-[9px] uppercase tracking-wider py-2 px-3 border border-zinc-800 rounded-lg hover:border-zinc-700 transition self-start sm:self-center"
+          className="bg-background-secondary hover:bg-background-tertiary text-white font-mono font-bold text-[9px] uppercase tracking-wider py-2 px-3 border border-border-opaque rounded-lg hover:border-border-opaque transition self-start sm:self-center"
         >
           📥 Download PDF
         </button>
       </div>
 
       {/* Tabs Row */}
-      <div className="flex flex-wrap gap-2 border-b border-zinc-900 pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-border-opaque pb-3">
         {(Object.keys(policies) as LegalSection[]).map((sectionKey) => (
           <button
             key={sectionKey}
@@ -148,7 +148,7 @@ export default function LegalPoliciesPage() {
             className={`py-1.5 px-3 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider border transition cursor-pointer ${
               activeSection === sectionKey
                 ? 'bg-white text-black border-white'
-                : 'bg-zinc-950 text-zinc-400 border-zinc-900 hover:border-zinc-850 hover:text-white'
+                : 'bg-background-primary text-content-secondary border-border-opaque hover:border-border-opaque hover:text-white'
             }`}
           >
             {policies[sectionKey].title}
@@ -163,15 +163,15 @@ export default function LegalPoliciesPage() {
           placeholder="Filter legal terms or keywords (e.g. 'cancellation', 'liability', 'GPS')..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-zinc-950 border border-zinc-900 rounded-xl py-2.5 pl-9 pr-4 text-xs text-white placeholder-zinc-600 outline-none focus:border-zinc-700 transition font-mono"
+          className="w-full bg-background-primary border border-border-opaque rounded-xl py-2.5 pl-9 pr-4 text-xs text-white placeholder-zinc-600 outline-none focus:border-border-opaque transition font-mono"
         />
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-content-tertiary text-xs">
           🔍
         </div>
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs font-mono"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-content-tertiary hover:text-white text-xs font-mono"
           >
             CLEAR
           </button>
@@ -179,13 +179,13 @@ export default function LegalPoliciesPage() {
       </div>
 
       {/* Primary Policy Box */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 space-y-6">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-6 space-y-6">
         <div>
-          <span className="text-[9px] font-mono font-bold text-zinc-500 uppercase tracking-widest block mb-1">
+          <span className="text-[9px] font-mono font-bold text-content-tertiary uppercase tracking-widest block mb-1">
             {currentPolicy.lastUpdated}
           </span>
           <h3 className="text-base font-bold text-white font-mono">{currentPolicy.title}</h3>
-          <p className="text-zinc-400 text-xs mt-2 leading-relaxed font-sans italic border-l-2 border-zinc-800 pl-3">
+          <p className="text-content-secondary text-xs mt-2 leading-relaxed font-sans italic border-l-2 border-border-opaque pl-3">
             "{currentPolicy.intro}"
           </p>
         </div>
@@ -194,17 +194,17 @@ export default function LegalPoliciesPage() {
         <div className="space-y-6 pt-2">
           {filteredParagraphs.length > 0 ? (
             filteredParagraphs.map((para, i) => (
-              <div key={i} className="space-y-2 border-b border-zinc-900/50 pb-4 last:border-b-0 last:pb-0">
+              <div key={i} className="space-y-2 border-b border-border-opaque/50 pb-4 last:border-b-0 last:pb-0">
                 <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wide">
                   {para.heading}
                 </h4>
-                <p className="text-zinc-400 text-xs font-sans leading-relaxed">
+                <p className="text-content-secondary text-xs font-sans leading-relaxed">
                   {para.text}
                 </p>
               </div>
             ))
           ) : (
-            <div className="py-8 text-center text-zinc-600 font-mono text-xs">
+            <div className="py-8 text-center text-content-tertiary font-mono text-xs">
               No matching legal clauses found for query: "{searchQuery}"
             </div>
           )}
@@ -212,16 +212,16 @@ export default function LegalPoliciesPage() {
       </div>
 
       {/* Support Trigger Footer */}
-      <div className="bg-zinc-900/30 border border-zinc-900 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-background-secondary/30 border border-border-opaque rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-left">
           <h4 className="text-xs font-bold text-white font-mono uppercase">Have a Policy Dispute or Query?</h4>
-          <p className="text-zinc-500 text-[10px] mt-1 font-sans">
+          <p className="text-content-tertiary text-[10px] mt-1 font-sans">
             Our legal compliance team answers within 24 business hours to address billing discrepancies or terms.
           </p>
         </div>
         <a
           href="/account/support"
-          className="bg-white hover:bg-zinc-200 text-black font-mono font-bold text-[9px] uppercase tracking-wider py-2.5 px-4 rounded-xl transition shrink-0 inline-block text-center cursor-pointer"
+          className="bg-white hover:bg-background-tertiary text-black font-mono font-bold text-[9px] uppercase tracking-wider py-2.5 px-4 rounded-xl transition shrink-0 inline-block text-center cursor-pointer"
         >
           💬 Contact Legal Desk
         </a>

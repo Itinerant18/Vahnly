@@ -90,7 +90,7 @@ export default function FinalBillPage() {
       <div className="min-h-screen bg-black text-white p-6 font-mono flex items-center justify-center">
         <div className="text-center space-y-2">
           <span className="text-2xl animate-spin block">⏳</span>
-          <p className="text-xs text-zinc-500">HYDRATING TRANSIT RECEIPT...</p>
+          <p className="text-xs text-content-tertiary">HYDRATING TRANSIT RECEIPT...</p>
         </div>
       </div>
     );
@@ -123,23 +123,23 @@ export default function FinalBillPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-6 font-mono flex flex-col justify-between selection:bg-white selection:text-black">
-      <header className="border-b border-zinc-900 pb-4 mb-4">
-        <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Transit Settlement Panel</span>
+      <header className="border-b border-border-opaque pb-4 mb-4">
+        <span className="text-[8px] text-content-tertiary uppercase tracking-widest font-bold">Transit Settlement Panel</span>
         <h1 className="text-sm font-bold text-white mt-1 uppercase">Trip Finalization Receipt</h1>
-        <p className="text-[8px] text-zinc-650 mt-0.5">ORDER ID: {orderID.substring(0, 18)}...</p>
+        <p className="text-[8px] text-content-tertiary mt-0.5">ORDER ID: {orderID.substring(0, 18)}...</p>
       </header>
 
       <main className="flex-grow max-w-md mx-auto w-full space-y-6">
         {/* Receipt Table Component */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-2 bg-zinc-900 text-zinc-400 text-[7px] uppercase font-bold tracking-widest rounded-bl border-l border-b border-zinc-850">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-2 bg-background-secondary text-content-secondary text-[7px] uppercase font-bold tracking-widest rounded-bl border-l border-b border-border-opaque">
             Invoice
           </div>
-          <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block border-b border-zinc-900 pb-2">
+          <span className="text-[9px] font-bold text-content-secondary uppercase tracking-wider block border-b border-border-opaque pb-2">
             Itemized Breakdown (INR)
           </span>
 
-          <div className="space-y-2 text-[10px] text-zinc-400">
+          <div className="space-y-2 text-[10px] text-content-secondary">
             <div className="flex justify-between">
               <span>Base Package Quoted:</span>
               <span className="text-white">₹{baseFare.toFixed(2)}</span>
@@ -172,31 +172,31 @@ export default function FinalBillPage() {
               <span>D4M Care Trust Surcharge:</span>
               <span className="text-white">₹{d4mCareFee.toFixed(2)}</span>
             </div>
-            <div className="border-t border-zinc-900 pt-3 flex justify-between items-center text-xs font-bold mt-1">
+            <div className="border-t border-border-opaque pt-3 flex justify-between items-center text-xs font-bold mt-1">
               <span className="text-white">TOTAL AMOUNT DUE:</span>
-              <span className="text-emerald-400 text-sm font-extrabold">₹{totalAmount.toFixed(2)}</span>
+              <span className="text-content-positive text-sm font-extrabold">₹{totalAmount.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         {/* Report Car Issue (Phase 10) */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 shadow-xl text-left">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-4 shadow-xl text-left">
           {!showIssueForm && !issueDone && (
             <button
               onClick={() => setShowIssueForm(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-amber-900/40 bg-amber-950/20 text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:bg-amber-950/40 transition cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-warning-400/40 bg-surface-warning/20 text-[10px] font-bold uppercase tracking-wider text-content-warning hover:bg-surface-warning/40 transition cursor-pointer"
             >
               🔧 Report Car Issue
             </button>
           )}
           {issueDone && (
-            <p className="text-center text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+            <p className="text-center text-[10px] font-bold uppercase tracking-wider text-content-positive">
               ✓ Car issue reported — admin notified
             </p>
           )}
           {showIssueForm && (
             <div className="space-y-3">
-              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider block">
+              <span className="text-[9px] font-bold text-content-warning uppercase tracking-wider block">
                 Report Car Issue
               </span>
               <div className="grid grid-cols-3 gap-2">
@@ -206,8 +206,8 @@ export default function FinalBillPage() {
                     onClick={() => setIssueType(t.value)}
                     className={`py-2 rounded-lg text-[9px] font-bold uppercase tracking-wide border transition cursor-pointer ${
                       issueType === t.value
-                        ? 'bg-amber-950/40 border-amber-700 text-amber-300'
-                        : 'bg-black border-zinc-900 text-zinc-500 hover:text-zinc-300'
+                        ? 'bg-surface-warning/40 border-warning-400 text-content-warning'
+                        : 'bg-black border-border-opaque text-content-tertiary hover:text-content-secondary'
                     }`}
                   >
                     {t.label}
@@ -219,19 +219,19 @@ export default function FinalBillPage() {
                 onChange={(e) => setIssueDesc(e.target.value)}
                 placeholder="Describe the issue (optional)"
                 rows={2}
-                className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-amber-600 text-xs font-mono resize-none"
+                className="w-full bg-black border border-border-opaque rounded-lg p-2 text-white focus:outline-none focus:border-warning-400 text-xs font-mono resize-none"
               />
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setShowIssueForm(false)}
-                  className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider text-zinc-400 cursor-pointer"
+                  className="bg-background-secondary border border-border-opaque px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider text-content-secondary cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={submitCarIssue}
                   disabled={issueSubmitting}
-                  className="bg-amber-600 hover:bg-amber-700 text-black px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                  className="bg-warning-400 hover:bg-warning-400 text-black px-3 py-1.5 rounded text-[8px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50"
                 >
                   {issueSubmitting ? 'Filing...' : 'Submit Report'}
                 </button>
@@ -241,8 +241,8 @@ export default function FinalBillPage() {
         </div>
 
         {/* Payment Selector */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 shadow-xl text-left">
-          <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 shadow-xl text-left">
+          <span className="text-[9px] font-bold text-content-secondary uppercase tracking-wider block border-b border-border-opaque pb-2">
             Select Payment Method
           </span>
           <div className="grid grid-cols-2 gap-3">
@@ -250,8 +250,8 @@ export default function FinalBillPage() {
               onClick={() => setPaymentMethod('UPI')}
               className={`py-4 px-4 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
                 paymentMethod === 'UPI'
-                  ? 'bg-zinc-900 border-white text-white font-extrabold shadow-lg shadow-white/5'
-                  : 'bg-black border-zinc-900 text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-background-secondary border-white text-white font-extrabold shadow-lg shadow-white/5'
+                  : 'bg-black border-border-opaque text-content-tertiary hover:text-content-secondary'
               }`}
             >
               <span className="text-base">📱</span>
@@ -261,8 +261,8 @@ export default function FinalBillPage() {
               onClick={() => setPaymentMethod('CASH')}
               className={`py-4 px-4 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
                 paymentMethod === 'CASH'
-                  ? 'bg-zinc-900 border-white text-white font-extrabold shadow-lg shadow-white/5'
-                  : 'bg-black border-zinc-900 text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-background-secondary border-white text-white font-extrabold shadow-lg shadow-white/5'
+                  : 'bg-black border-border-opaque text-content-tertiary hover:text-content-secondary'
               }`}
             >
               <span className="text-base">💵</span>
@@ -278,8 +278,8 @@ export default function FinalBillPage() {
           disabled={!paymentMethod || isSubmitting}
           className={`w-full font-bold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition cursor-pointer font-mono border ${
             paymentMethod
-              ? 'bg-white text-black hover:bg-zinc-200 border-white font-extrabold active:scale-[0.98]'
-              : 'bg-zinc-950 border-zinc-900 text-zinc-550 cursor-not-allowed'
+              ? 'bg-white text-black hover:bg-background-tertiary border-white font-extrabold active:scale-[0.98]'
+              : 'bg-background-primary border-border-opaque text-content-tertiary cursor-not-allowed'
           }`}
         >
           {isSubmitting ? 'Finalizing Invoice...' : 'Confirm payment & next'}

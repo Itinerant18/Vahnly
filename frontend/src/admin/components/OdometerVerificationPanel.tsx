@@ -54,7 +54,7 @@ function CheckpointCard({
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wider font-bold text-mute">{label}</span>
         {cp && (
-          <button type="button" onClick={onAdjust} className="text-[9px] text-blue-600 hover:underline font-bold uppercase tracking-wider">
+          <button type="button" onClick={onAdjust} className="text-[9px] text-content-accent hover:underline font-bold uppercase tracking-wider">
             Adjust
           </button>
         )}
@@ -160,10 +160,10 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
 
   const variance = audit.variance_pct;
   const badge = !audit.has_both
-    ? { cls: 'bg-gray-100 text-gray-600 border-gray-300', text: 'Incomplete checkpoints' }
+    ? { cls: 'bg-background-secondary text-content-secondary border-border-opaque', text: 'Incomplete checkpoints' }
     : audit.is_flagged
-      ? { cls: 'bg-red-100 text-red-700 border-red-300', text: `Variance ${variance?.toFixed(1)}% — action required` }
-      : { cls: 'bg-green-100 text-green-700 border-green-300', text: `Variance ${variance?.toFixed(1)}% — balanced` };
+      ? { cls: 'bg-surface-negative text-content-negative border-negative-400', text: `Variance ${variance?.toFixed(1)}% — action required` }
+      : { cls: 'bg-surface-positive text-content-positive border-positive-400', text: `Variance ${variance?.toFixed(1)}% — balanced` };
 
   return (
     <div className="border-t border-canvas-soft pt-4 mt-2 space-y-3">
@@ -173,8 +173,8 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
       </div>
 
       {audit.financial_status === 'REVIEW_REQUIRED' && (
-        <div className="flex items-center gap-2 p-2 rounded-md bg-red-50 border border-red-200 text-[10px] font-bold text-red-700 uppercase tracking-wider">
-          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+        <div className="flex items-center gap-2 p-2 rounded-md bg-surface-negative border border-negative-400 text-[10px] font-bold text-content-negative uppercase tracking-wider">
+          <span className="h-1.5 w-1.5 rounded-full bg-surface-negative0 animate-pulse" />
           Financial review required — corrective ledger entry posted, driver payout held
         </div>
       )}
@@ -200,8 +200,8 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
       </div>
 
       {editing && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
-          <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Override {editing} odometer</p>
+        <div className="bg-surface-accent border border-border-accent rounded-xl p-3 space-y-2">
+          <p className="text-[10px] font-bold text-content-accent uppercase tracking-wider">Override {editing} odometer</p>
           <div className="flex gap-2">
             <input
               type="number"
@@ -223,11 +223,11 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
               type="button"
               disabled={saving || editValue <= 0 || !editReason.trim()}
               onClick={() => saveOverride(editing)}
-              className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded disabled:opacity-40 uppercase tracking-wider"
+              className="px-3 py-1 bg-accent-400 text-white text-[10px] font-bold rounded disabled:opacity-40 uppercase tracking-wider"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button type="button" onClick={() => setEditing(null)} className="px-3 py-1 bg-white border text-[10px] text-gray-600 rounded uppercase tracking-wider">
+            <button type="button" onClick={() => setEditing(null)} className="px-3 py-1 bg-white border text-[10px] text-content-secondary rounded uppercase tracking-wider">
               Cancel
             </button>
           </div>
@@ -235,7 +235,7 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
       )}
 
       {audit.is_flagged && (
-        <label className="flex items-center gap-2 text-[11px] text-red-700 font-medium bg-red-50 border border-red-200 rounded-md p-2 cursor-pointer">
+        <label className="flex items-center gap-2 text-[11px] text-content-negative font-medium bg-surface-negative border border-negative-400 rounded-md p-2 cursor-pointer">
           <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
           I have inspected the dashboard photos and sign off on this mileage variance.
         </label>

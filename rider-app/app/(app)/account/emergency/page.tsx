@@ -7,7 +7,7 @@ import { accountApi, type EmergencyContactInput } from "@/lib/api/account";
 import type { EmergencyContact } from "@/lib/api/types";
 
 const INPUT =
-  "w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6B7280] focus:ring-1 focus:ring-[#FF6B35]";
+  "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
 
 export default function EmergencyPage() {
   const [contacts, setContacts] = useState<EmergencyContact[] | null>(null);
@@ -39,17 +39,17 @@ export default function EmergencyPage() {
   return (
     <AccountScaffold title="Emergency Contacts">
       {/* Auto-share toggle */}
-      <div className="mb-4 rounded-2xl bg-[#141414] p-4">
+      <div className="mb-4 rounded-2xl bg-background-secondary p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm text-white">Auto-share trip</span>
-            <button onClick={() => setShowTip((v) => !v)} className="text-xs text-[#9CA3AF]">
+            <span className="text-sm text-content-primary">Auto-share trip</span>
+            <button onClick={() => setShowTip((v) => !v)} className="text-xs text-content-secondary">
               ⓘ
             </button>
           </div>
           <button
             onClick={() => setAutoShare((v) => !v)}
-            className={`relative h-6 w-11 rounded-full transition-colors ${autoShare ? "bg-[#FF6B35]" : "bg-[#3A3A3A]"}`}
+            className={`relative h-6 w-11 rounded-full transition-colors ${autoShare ? "bg-accent-400" : "bg-background-tertiary"}`}
           >
             <span
               className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${autoShare ? "translate-x-5" : "translate-x-0.5"}`}
@@ -57,7 +57,7 @@ export default function EmergencyPage() {
           </button>
         </div>
         {showTip && (
-          <p className="mt-2 rounded-lg bg-[#1E1E1E] p-2.5 text-xs text-[#9CA3AF]">
+          <p className="mt-2 rounded-lg bg-background-tertiary p-2.5 text-xs text-content-secondary">
             When on, your live trip link is automatically shared with these contacts whenever a trip starts.
           </p>
         )}
@@ -73,18 +73,18 @@ export default function EmergencyPage() {
             <EmptyState icon="🆘" title="No contacts yet" message="Add up to 3 people to alert on SOS." />
           )}
           {contacts.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-[#141414] p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EF4444]/15 text-sm font-bold text-[#EF4444]">
+            <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-negative text-sm font-bold text-content-negative">
                 {c.name.slice(0, 1).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">{c.name}</p>
-                <p className="text-xs text-[#9CA3AF]">
+                <p className="text-sm font-semibold text-content-primary">{c.name}</p>
+                <p className="text-xs text-content-secondary">
                   {c.phone}
                   {c.relationship ? ` · ${c.relationship}` : ""}
                 </p>
               </div>
-              <button onClick={() => remove(c.id)} className="text-xs font-semibold text-[#EF4444]">
+              <button onClick={() => remove(c.id)} className="text-xs font-semibold text-content-negative">
                 Delete
               </button>
             </div>
@@ -106,12 +106,12 @@ export default function EmergencyPage() {
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="mt-4 w-full rounded-2xl bg-[#FF6B35] py-3.5 text-sm font-bold text-white"
+            className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
           >
             + Add Contact
           </button>
         ))}
-      {atMax && <p className="mt-4 text-center text-xs text-[#6B7280]">Maximum of 3 contacts reached</p>}
+      {atMax && <p className="mt-4 text-center text-xs text-content-tertiary">Maximum of 3 contacts reached</p>}
     </AccountScaffold>
   );
 }
@@ -162,7 +162,7 @@ function AddContactForm({
   };
 
   return (
-    <div className="mt-4 space-y-3 rounded-2xl bg-[#141414] p-4">
+    <div className="mt-4 space-y-3 rounded-2xl bg-background-secondary p-4">
       <div>
         <input
           value={name}
@@ -171,7 +171,7 @@ function AddContactForm({
           placeholder="Name"
           className={INPUT}
         />
-        {errors.name && <p className="mt-1 text-xs text-[#EF4444]">{errors.name}</p>}
+        {errors.name && <p className="mt-1 text-xs text-content-negative">{errors.name}</p>}
       </div>
       <div>
         <input
@@ -182,7 +182,7 @@ function AddContactForm({
           inputMode="numeric"
           className={INPUT}
         />
-        {errors.phone && <p className="mt-1 text-xs text-[#EF4444]">{errors.phone}</p>}
+        {errors.phone && <p className="mt-1 text-xs text-content-negative">{errors.phone}</p>}
       </div>
       <input
         value={relationship}
@@ -191,13 +191,13 @@ function AddContactForm({
         className={INPUT}
       />
       <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 rounded-xl bg-[#1E1E1E] py-3 text-sm text-[#9CA3AF]">
+        <button onClick={onCancel} className="flex-1 rounded-xl bg-background-tertiary py-3 text-sm text-content-secondary">
           Cancel
         </button>
         <button
           onClick={save}
           disabled={saving}
-          className="flex-1 rounded-xl bg-[#FF6B35] py-3 text-sm font-bold text-white disabled:opacity-50"
+          className="flex-1 rounded-xl bg-interactive-primary py-3 text-sm font-bold text-interactive-primary-text disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>

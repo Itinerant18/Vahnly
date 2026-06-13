@@ -86,22 +86,22 @@ function TripRateContent() {
     <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
       
       {/* Header */}
-      <header className="border-b border-zinc-900 pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left shrink-0">
+      <header className="border-b border-border-opaque pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left shrink-0">
         <div>
-          <span className="bg-zinc-900 text-zinc-500 border border-zinc-850 px-2.5 py-1 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
+          <span className="bg-background-secondary text-content-tertiary border border-border-opaque px-2.5 py-1 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
             {t('badge')}
           </span>
           <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">{t('title')}</h1>
         </div>
-        <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">ID: {tripId.slice(0, 10)}</span>
+        <span className="text-[9px] font-mono text-content-tertiary uppercase font-bold">ID: {tripId.slice(0, 10)}</span>
       </header>
 
       {/* Main feedback forms layout */}
       <main className="w-full max-w-md mx-auto flex-grow my-4 flex flex-col gap-4 text-left">
         
         {/* Interactive 5-Star block with hover effects */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 text-center space-y-3">
-          <span className="text-zinc-500 text-[8px] font-mono font-bold uppercase tracking-widest block">{t('howWasService')}</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 text-center space-y-3">
+          <span className="text-content-tertiary text-[8px] font-mono font-bold uppercase tracking-widest block">{t('howWasService')}</span>
           <div className="flex justify-center gap-3">
             {[1, 2, 3, 4, 5].map((star) => {
               const isActive = hoverRating !== null ? star <= hoverRating : star <= rating;
@@ -113,7 +113,7 @@ function TripRateContent() {
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(null)}
                   className={`text-3xl transition-transform active:scale-95 duration-100 cursor-pointer ${
-                    isActive ? 'text-amber-500 scale-110' : 'text-zinc-800'
+                    isActive ? 'text-content-warning scale-110' : 'text-content-tertiary'
                   }`}
                 >
                   ★
@@ -130,8 +130,8 @@ function TripRateContent() {
         </div>
 
         {/* Dynamic Behavioral Tag Chips (Bi-Axial: positive vs negative conditional display) */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+          <span className="block text-[8px] font-bold text-content-tertiary uppercase tracking-widest font-mono">
             {rating <= 3 ? t('areasForImprovement') : t('whatWentWell')}
           </span>
 
@@ -145,8 +145,8 @@ function TripRateContent() {
                   onClick={() => handleToggleTag(tag)}
                   className={`text-[9px] font-bold uppercase tracking-wider py-1.5 px-3 rounded-full border transition cursor-pointer ${
                     selectedTags.includes(tag)
-                      ? 'bg-emerald-950 border-emerald-500 text-emerald-200 shadow-md shadow-emerald-950/25'
-                      : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
+                      ? 'bg-surface-positive border-positive-400 text-content-positive shadow-md shadow-emerald-950/25'
+                      : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                   }`}
                 >
                   👍 {tagLabels[tag]}
@@ -166,15 +166,15 @@ function TripRateContent() {
                     onClick={() => handleToggleTag(tag)}
                     className={`text-[9px] font-bold uppercase tracking-wider py-1.5 px-3 rounded-full border transition cursor-pointer ${
                       selectedTags.includes(tag)
-                        ? 'bg-red-950 border-red-500 text-red-200 shadow-md shadow-red-950/25'
-                        : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
+                        ? 'bg-surface-negative border-negative-400 text-content-negative shadow-md shadow-red-950/25'
+                        : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                     }`}
                   >
                     ⚠️ {tagLabels[tag]}
                   </button>
                 ))}
               </div>
-              <p className="text-[8px] text-zinc-500 font-mono uppercase mt-1 leading-normal">
+              <p className="text-[8px] text-content-tertiary font-mono uppercase mt-1 leading-normal">
                 {t('poorRatingNote')}
               </p>
             </div>
@@ -182,8 +182,8 @@ function TripRateContent() {
         </div>
 
         {/* Deduplicated Tip Allocation Row */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 font-mono">
-          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">{t('addTip')}</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 font-mono">
+          <span className="block text-[8px] font-bold text-content-tertiary uppercase tracking-widest block">{t('addTip')}</span>
           
           <div className="grid grid-cols-5 gap-2 text-xs">
             {[0, 20, 50, 100].map((amt) => (
@@ -194,7 +194,7 @@ function TripRateContent() {
                 className={`py-2 rounded-xl border transition cursor-pointer font-bold ${
                   tipAmount === amt && tipAmount !== -1 
                     ? 'bg-white border-white text-black' 
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                    : 'bg-background-secondary border-border-opaque text-content-secondary'
                 }`}
               >
                 {amt === 0 ? t('noTip') : `₹${amt}`}
@@ -204,7 +204,7 @@ function TripRateContent() {
             <button
               onClick={() => handleSelectTipOption(-1)}
               className={`py-2 rounded-xl border transition cursor-pointer font-bold ${
-                tipAmount === -1 ? 'bg-white border-white text-black' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                tipAmount === -1 ? 'bg-white border-white text-black' : 'bg-background-secondary border-border-opaque text-content-secondary'
               }`}
             >
               {t('customTip')}
@@ -214,27 +214,27 @@ function TripRateContent() {
           {/* Custom Tip Input Display */}
           {tipAmount === -1 && (
             <div className="flex gap-2 items-center animate-fadeIn pt-1">
-              <span className="text-zinc-500 text-xs">₹</span>
+              <span className="text-content-tertiary text-xs">₹</span>
               <input
                 type="number"
                 value={customTip}
                 onChange={(e) => setCustomTip(e.target.value)}
                 placeholder={t('customAmountPlaceholder')}
-                className="bg-zinc-900 border border-zinc-850 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-zinc-700 w-full"
+                className="bg-background-secondary border border-border-opaque rounded-xl p-2 text-xs text-white focus:outline-none focus:border-border-opaque w-full"
               />
             </div>
           )}
         </div>
 
         {/* Text Comments */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 text-xs">
-          <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">{t('commentsLabel')}</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3 text-xs">
+          <span className="block text-[8px] font-bold text-content-tertiary uppercase tracking-widest font-mono">{t('commentsLabel')}</span>
           <textarea
             value={comments}
             onChange={(e) => setComments(e.target.value)}
             rows={2}
             placeholder={t('commentsPlaceholder')}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-zinc-500 font-sans"
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-white focus:outline-none focus:border-border-opaque font-sans"
             maxLength={500}
           />
         </div>
@@ -249,14 +249,14 @@ function TripRateContent() {
               router.push('/rider');
             }}
             disabled={isSubmitting}
-            className="bg-zinc-950 hover:bg-zinc-900 text-zinc-500 font-mono font-bold uppercase py-3.5 border border-zinc-900 rounded-xl transition cursor-pointer text-center disabled:opacity-50"
+            className="bg-background-primary hover:bg-background-secondary text-content-tertiary font-mono font-bold uppercase py-3.5 border border-border-opaque rounded-xl transition cursor-pointer text-center disabled:opacity-50"
           >
             {t('skipFeedback')}
           </button>
           <button
             onClick={handleSubmitFeedback}
             disabled={isSubmitting}
-            className="bg-white hover:bg-zinc-200 text-black font-sans font-bold uppercase py-3.5 rounded-xl transition cursor-pointer text-center disabled:opacity-50"
+            className="bg-white hover:bg-background-tertiary text-black font-sans font-bold uppercase py-3.5 rounded-xl transition cursor-pointer text-center disabled:opacity-50"
           >
             {isSubmitting ? t('submitting') : t('submitReview')}
           </button>
@@ -264,7 +264,7 @@ function TripRateContent() {
 
       </main>
 
-      <footer className="w-full max-w-md mx-auto text-center text-[7px] font-mono text-zinc-700 select-none pt-4 border-t border-zinc-900 shrink-0">
+      <footer className="w-full max-w-md mx-auto text-center text-[7px] font-mono text-content-tertiary select-none pt-4 border-t border-border-opaque shrink-0">
         RATED ON-DUTY OPERATOR: ANIKET KARMAKAR • SHARD: KOL
       </footer>
     </div>
@@ -275,7 +275,7 @@ export default function TripRatePage() {
   const t = useTranslations('riderTripRate');
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-zinc-500 font-mono text-xs uppercase animate-pulse">
+      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-content-tertiary font-mono text-xs uppercase animate-pulse">
         {t('loadingPortal')}
       </div>
     }>

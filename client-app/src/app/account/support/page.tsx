@@ -93,21 +93,21 @@ export default function RiderSupportPage() {
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">Rider Support Center</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Read FAQs, speak with dispatcher representatives, or raise formal trip disputes</p>
+        <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">Read FAQs, speak with dispatcher representatives, or raise formal trip disputes</p>
       </div>
 
       {/* Safety dial */}
-      <div className="bg-red-950/20 border border-red-900 rounded-2xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+      <div className="bg-surface-negative/20 border border-negative-400 rounded-2xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h4 className="text-xs font-bold text-red-400 font-mono uppercase tracking-wider">🚨 Rider Safety Hotline</h4>
-          <p className="text-[11px] text-red-200/70 mt-1 font-sans leading-normal">
+          <h4 className="text-xs font-bold text-content-negative font-mono uppercase tracking-wider">🚨 Rider Safety Hotline</h4>
+          <p className="text-[11px] text-content-negative/70 mt-1 font-sans leading-normal">
             For critical on-road accidents, immediate security concerns, or lost items contact, call emergency support.
           </p>
         </div>
         
         <button
           onClick={() => alert('Dialing rider support hotline proxy: +91 1800 220 1122...')}
-          className="bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded-xl shrink-0 cursor-pointer active:scale-95"
+          className="bg-negative-400 hover:bg-negative-400 text-white font-mono font-bold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded-xl shrink-0 cursor-pointer active:scale-95"
         >
           Call Helpline
         </button>
@@ -117,22 +117,22 @@ export default function RiderSupportPage() {
         
         {/* FAQs */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
             Frequently Asked Questions
           </h3>
 
           <div className="space-y-2">
             {faqs.map((faq, idx) => (
-              <div key={idx} className="bg-zinc-950 border border-zinc-900 rounded-xl overflow-hidden">
+              <div key={idx} className="bg-background-primary border border-border-opaque rounded-xl overflow-hidden">
                 <button
                   onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
-                  className="w-full text-left p-4 text-xs font-bold text-zinc-300 hover:text-white transition flex justify-between items-center cursor-pointer"
+                  className="w-full text-left p-4 text-xs font-bold text-content-secondary hover:text-white transition flex justify-between items-center cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   <span>{faqOpen === idx ? '▲' : '▼'}</span>
                 </button>
                 {faqOpen === idx && (
-                  <div className="px-4 pb-4 text-[11px] text-zinc-400 leading-relaxed font-sans border-t border-zinc-900/40 pt-2 bg-zinc-900/10">
+                  <div className="px-4 pb-4 text-[11px] text-content-secondary leading-relaxed font-sans border-t border-border-opaque/40 pt-2 bg-background-secondary/10">
                     {faq.a}
                   </div>
                 )}
@@ -143,35 +143,35 @@ export default function RiderSupportPage() {
 
         {/* Live Chat */}
         <div className="space-y-4 flex flex-col h-[400px]">
-          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+          <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
             Speak with Support agent
           </h3>
 
-          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl flex-1 flex flex-col justify-between overflow-hidden">
+          <div className="bg-background-primary border border-border-opaque rounded-2xl flex-1 flex flex-col justify-between overflow-hidden">
             <div className="p-4 overflow-y-auto space-y-3 flex-grow max-h-[280px] scrollbar-thin">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex flex-col max-w-[85%] ${msg.sender === 'rider' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
                   <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${
-                    msg.sender === 'rider' ? 'bg-white text-black font-medium' : 'bg-zinc-900 text-zinc-300'
+                    msg.sender === 'rider' ? 'bg-white text-black font-medium' : 'bg-background-secondary text-content-secondary'
                   }`}>
                     {msg.text}
                   </div>
-                  <span className="text-[7px] font-mono text-zinc-650 mt-1">{msg.time}</span>
+                  <span className="text-[7px] font-mono text-content-tertiary mt-1">{msg.time}</span>
                 </div>
               ))}
             </div>
 
-            <form onSubmit={handleSendChat} className="p-3 border-t border-zinc-900 flex gap-2">
+            <form onSubmit={handleSendChat} className="p-3 border-t border-border-opaque flex gap-2">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Message support dispatcher..."
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-500 font-sans"
+                className="flex-1 bg-background-secondary border border-border-opaque rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-border-opaque font-sans"
               />
               <button
                 type="submit"
-                className="bg-white hover:bg-zinc-200 text-black px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+                className="bg-white hover:bg-background-tertiary text-black px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
               >
                 Send
               </button>
@@ -185,19 +185,19 @@ export default function RiderSupportPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
         
         {/* Ticket Form */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
             File Support Ticket
           </h4>
 
           <form onSubmit={handleCreateTicket} className="space-y-4 font-sans text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Issue Category</label>
+                <label className="block text-[8px] font-bold text-content-tertiary uppercase font-mono mb-1.5">Issue Category</label>
                 <select
                   value={ticketCategory}
                   onChange={(e) => setTicketCategory(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-350 focus:outline-none"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-content-secondary focus:outline-none"
                 >
                   <option>Trip dispute issue</option>
                   <option>Payment / Billing mismatch</option>
@@ -208,37 +208,37 @@ export default function RiderSupportPage() {
               </div>
 
               <div>
-                <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Associated Trip ID</label>
+                <label className="block text-[8px] font-bold text-content-tertiary uppercase font-mono mb-1.5">Associated Trip ID</label>
                 <input
                   type="text"
                   placeholder="e.g. trp-2209 (Optional)"
                   value={selectedTripId}
                   onChange={(e) => setSelectedTripId(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white focus:outline-none font-mono"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white focus:outline-none font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono mb-1.5">Description</label>
+              <label className="block text-[8px] font-bold text-content-tertiary uppercase font-mono mb-1.5">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="Enter description of incident..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white focus:outline-none"
                 required
               />
             </div>
 
             {/* Mock Incident Image Upload */}
             <div className="space-y-2">
-              <label className="block text-[8px] font-bold text-zinc-500 uppercase font-mono">Incident Screenshot / Proof</label>
+              <label className="block text-[8px] font-bold text-content-tertiary uppercase font-mono">Incident Screenshot / Proof</label>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
-                  className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 text-white font-mono text-[9px] uppercase px-4 py-2.5 rounded-xl cursor-pointer"
+                  className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque hover:border-border-opaque text-white font-mono text-[9px] uppercase px-4 py-2.5 rounded-xl cursor-pointer"
                 >
                   📸 Attach Photo
                 </button>
@@ -254,12 +254,12 @@ export default function RiderSupportPage() {
                     <img 
                       src={uploadedImage} 
                       alt="Proof Thumbnail" 
-                      className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                      className="h-10 w-10 rounded-lg object-cover border border-border-opaque"
                     />
                     <button
                       type="button"
                       onClick={() => setUploadedImage(null)}
-                      className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full h-4 w-4 text-[8px] font-bold flex items-center justify-center text-white"
+                      className="absolute -top-1.5 -right-1.5 bg-negative-400 rounded-full h-4 w-4 text-[8px] font-bold flex items-center justify-center text-white"
                     >
                       ×
                     </button>
@@ -270,32 +270,32 @@ export default function RiderSupportPage() {
 
             <button
               type="submit"
-              className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+              className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
             >
               Submit Ticket
             </button>
           </form>
         </div>
 
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
             Ticket Resolutions History
           </h4>
 
-          <div className="divide-y divide-zinc-900">
+          <div className="divide-y divide-border-opaque">
             {tickets.map((t) => (
               <div key={t.id} className="py-3.5 space-y-2 text-xs font-mono">
                 <div className="flex justify-between items-center">
                   <div>
                     <span className="text-white font-sans font-medium block">{t.category}</span>
-                    <span className="text-zinc-500 text-[8px] block mt-0.5">{t.date} • ID: {t.id}</span>
+                    <span className="text-content-tertiary text-[8px] block mt-0.5">{t.date} • ID: {t.id}</span>
                   </div>
-                  <span className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded text-[8px] font-bold uppercase">
+                  <span className="bg-background-secondary border border-border-opaque text-content-secondary px-2 py-0.5 rounded text-[8px] font-bold uppercase">
                     {t.status}
                   </span>
                 </div>
-                <div className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-900 text-[10px] text-zinc-400 leading-normal font-sans">
-                  <span className="font-bold font-mono text-[8px] text-zinc-500 block uppercase mb-1">Resolution:</span>
+                <div className="bg-background-secondary/40 p-2.5 rounded-lg border border-border-opaque text-[10px] text-content-secondary leading-normal font-sans">
+                  <span className="font-bold font-mono text-[8px] text-content-tertiary block uppercase mb-1">Resolution:</span>
                   {t.response}
                 </div>
               </div>

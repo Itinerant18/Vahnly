@@ -14,13 +14,13 @@ export function CarSelector({ cars }: { cars: GarageCar[] }) {
           key={car.id}
           onClick={() => setSelectedCar(car.id)}
           className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm ${
-            selectedCarId === car.id ? "bg-[#0073E6]/20 ring-1 ring-[#0073E6]" : "bg-[#252D48]"
+            selectedCarId === car.id ? "bg-surface-accent ring-1 ring-border-accent" : "bg-background-tertiary"
           }`}
         >
           <span>
             {car.make} {car.model}
           </span>
-          <span className="text-xs text-slate-400">{car.transmission}</span>
+          <span className="text-xs text-content-secondary">{car.transmission}</span>
         </button>
       ))}
     </div>

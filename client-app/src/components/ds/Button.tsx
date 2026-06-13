@@ -22,9 +22,9 @@ export interface ButtonProps {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-interactive-primary text-interactive-primary-text hover:opacity-90 active:opacity-75 disabled:bg-gray-100 disabled:text-gray-400',
+    'bg-interactive-primary text-interactive-primary-text hover:opacity-90 active:opacity-75 disabled:bg-background-tertiary disabled:text-content-secondary',
   secondary:
-    'bg-background-tertiary text-content-primary border border-border-opaque hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40',
+    'bg-background-tertiary text-content-primary border border-border-opaque hover:bg-background-tertiary active:bg-background-tertiary disabled:opacity-40',
   tertiary:
     'bg-transparent text-content-primary hover:bg-background-secondary active:bg-background-tertiary disabled:opacity-40',
   destructive:

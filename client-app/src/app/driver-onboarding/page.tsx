@@ -344,16 +344,16 @@ export default function DriverOnboardingWizard() {
       />
       
       {/* Onboarding Header */}
-      <header className="border-b border-zinc-800 pb-4 flex justify-between items-center w-full max-w-4xl mx-auto text-left">
+      <header className="border-b border-border-opaque pb-4 flex justify-between items-center w-full max-w-4xl mx-auto text-left">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-white font-move">Driver Partner Registration</h1>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">8-Step Safety & KYC Compliance Wizard</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">8-Step Safety & KYC Compliance Wizard</p>
         </div>
         
         <div className="flex gap-2">
           <button 
             onClick={saveAndExit} 
-            className="text-[10px] font-mono font-bold uppercase tracking-wider border border-zinc-800 px-3 py-1.5 rounded-full hover:bg-zinc-900 transition"
+            className="text-[10px] font-mono font-bold uppercase tracking-wider border border-border-opaque px-3 py-1.5 rounded-full hover:bg-background-secondary transition"
           >
             Save & Exit
           </button>
@@ -362,16 +362,16 @@ export default function DriverOnboardingWizard() {
 
       {/* Progress Stepper Bar */}
       <div className="w-full max-w-4xl mx-auto my-6">
-        <div className="flex justify-between items-center text-xs font-mono mb-2 text-zinc-500">
+        <div className="flex justify-between items-center text-xs font-mono mb-2 text-content-tertiary">
           <span>Progress: Step {currentStep} of 8</span>
           <span>{Math.round((currentStep / 8) * 100)}% Complete</span>
         </div>
-        <div className="h-1.5 bg-zinc-900 rounded-full w-full overflow-hidden flex">
+        <div className="h-1.5 bg-background-secondary rounded-full w-full overflow-hidden flex">
           {Array.from({ length: 8 }).map((_, i) => (
             <div 
               key={i} 
               className={`flex-1 border-r border-black h-full transition-all duration-300 ${
-                i + 1 <= currentStep ? 'bg-white' : 'bg-zinc-850'
+                i + 1 <= currentStep ? 'bg-white' : 'bg-background-tertiary'
               }`}
             />
           ))}
@@ -380,38 +380,38 @@ export default function DriverOnboardingWizard() {
 
       {/* Active Form Step Cards rendering */}
       <main className="w-full max-w-4xl mx-auto flex-grow flex items-center justify-center my-6">
-        <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-6 sm:p-8 space-y-6 text-left relative overflow-hidden">
+        <div className="w-full bg-background-primary border border-border-opaque rounded-2xl p-6 sm:p-8 space-y-6 text-left relative overflow-hidden">
           
           {/* STEP 1: PERSONAL DETAILS */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 1 — Personal Identification</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 1 — Personal Identification</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Full Legal Name (matching PAN/Aadhaar)</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Full Legal Name (matching PAN/Aadhaar)</label>
                   <input
                     type="text"
                     value={onboardingData.fullName}
                     onChange={(e) => setOnboardingData({ ...onboardingData, fullName: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                     placeholder="Enter name"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Date of Birth</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Date of Birth</label>
                   <input
                     type="date"
                     value={onboardingData.dob}
                     onChange={(e) => setOnboardingData({ ...onboardingData, dob: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 text-zinc-400"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque text-content-secondary"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Gender Identification</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Gender Identification</label>
                   <select
                     value={onboardingData.gender}
                     onChange={(e) => setOnboardingData({ ...onboardingData, gender: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                   >
                     <option>Male</option>
                     <option>Female</option>
@@ -419,7 +419,7 @@ export default function DriverOnboardingWizard() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Languages Spoken</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Languages Spoken</label>
                   <div className="flex flex-wrap gap-2 pt-1">
                     {['English', 'Hindi', 'Bengali', 'Kannada', 'Tamil'].map((lang) => (
                       <button
@@ -429,7 +429,7 @@ export default function DriverOnboardingWizard() {
                         className={`text-[9px] uppercase tracking-wider font-bold py-1.5 px-3 rounded-full border transition cursor-pointer ${
                           onboardingData.languages.includes(lang)
                             ? 'bg-white border-white text-black'
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+                            : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                         }`}
                       >
                         {lang}
@@ -439,15 +439,15 @@ export default function DriverOnboardingWizard() {
                 </div>
               </div>
               <div className="pt-2">
-                <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-2 font-mono">Profile Photo Scan</label>
-                <div className="flex items-center gap-4 bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl">
-                  <div className="h-16 w-16 bg-zinc-850 rounded-xl flex items-center justify-center text-xs font-mono text-zinc-600 border border-zinc-800">
+                <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-2 font-mono">Profile Photo Scan</label>
+                <div className="flex items-center gap-4 bg-background-secondary/50 p-4 border border-border-opaque rounded-xl">
+                  <div className="h-16 w-16 bg-background-tertiary rounded-xl flex items-center justify-center text-xs font-mono text-content-tertiary border border-border-opaque">
                     {onboardingData.profilePhoto ? '✔️ Ready' : 'NO SCAN'}
                   </div>
                   <button
                     type="button"
                     onClick={() => triggerUploadClick('profilePhoto', 'PROFILE_PHOTO')}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                    className="bg-background-tertiary hover:bg-background-tertiary border border-border-opaque text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
                   >
                     {uploadProgress.profilePhoto ? `Uploading ${uploadProgress.profilePhoto}%` : 'Upload Live Scan'}
                   </button>
@@ -459,34 +459,34 @@ export default function DriverOnboardingWizard() {
           {/* STEP 2: ADDRESS */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 2 — Operating Location</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 2 — Operating Location</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Permanent Residential Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Permanent Residential Address</label>
                   <textarea
                     rows={2}
                     value={onboardingData.permAddress}
                     onChange={(e) => setOnboardingData({ ...onboardingData, permAddress: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-sans"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-sans"
                     placeholder="Enter permanent address details..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Current Residential Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Current Residential Address</label>
                   <textarea
                     rows={2}
                     value={onboardingData.currAddress}
                     onChange={(e) => setOnboardingData({ ...onboardingData, currAddress: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-sans"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-sans"
                     placeholder="Enter current address details..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Primary City of Operation</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Primary City of Operation</label>
                   <select
                     value={onboardingData.city}
                     onChange={(e) => setOnboardingData({ ...onboardingData, city: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                   >
                     <option>Kolkata</option>
                     <option>Bangalore</option>
@@ -501,7 +501,7 @@ export default function DriverOnboardingWizard() {
           {/* STEP 3: KYC DOCUMENTS */}
           {currentStep === 3 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 3 — KYC Verification Credentials</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 3 — KYC Verification Credentials</h2>
               <div className="space-y-4">
                 {[
                   { field: 'drivingLicense', label: 'Driving License (Front & Back OCR Scan)', type: 'DL_FRONT' },
@@ -510,10 +510,10 @@ export default function DriverOnboardingWizard() {
                   { field: 'policeVerification', label: 'Police Clearance Certificate (Last 6 Months)', type: 'POLICE_VERIFY' },
                   { field: 'addressProof', label: 'Address Proof Document (Utility Bill / Rent Agreement)', type: 'ADDRESS_PROOF' }
                 ].map((doc) => (
-                  <div key={doc.field} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl">
+                  <div key={doc.field} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary/50 p-4 border border-border-opaque rounded-xl">
                     <div>
                       <span className="block text-xs font-bold text-white">{doc.label}</span>
-                      <span className="block text-[8px] font-mono text-zinc-500 mt-1 uppercase">
+                      <span className="block text-[8px] font-mono text-content-tertiary mt-1 uppercase">
                         {onboardingData[doc.field as keyof typeof onboardingData] 
                           ? `SYNCED: ${onboardingData[doc.field as keyof typeof onboardingData]?.toString().slice(0, 30)}...` 
                           : 'Awaiting Secure Document Submission'
@@ -523,7 +523,7 @@ export default function DriverOnboardingWizard() {
                     <button
                       type="button"
                       onClick={() => triggerUploadClick(doc.field, doc.type)}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer font-mono shrink-0"
+                      className="bg-background-tertiary hover:bg-background-tertiary text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer font-mono shrink-0"
                     >
                       {uploadProgress[doc.field] ? `Uploading ${uploadProgress[doc.field]}%` : 'Upload Doc'}
                     </button>
@@ -536,16 +536,16 @@ export default function DriverOnboardingWizard() {
           {/* STEP 4: VEHICLE EXPERTISE */}
           {currentStep === 4 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 4 — Transmission & Expertise Filters</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 4 — Transmission & Expertise Filters</h2>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-2 font-mono">Transmission Systems Qualified to Drive</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-2 font-mono">Transmission Systems Qualified to Drive</label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
                       onClick={() => setOnboardingData({ ...onboardingData, manualExpertise: !onboardingData.manualExpertise })}
                       className={`py-4 rounded-xl border text-xs font-bold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-2 ${
-                        onboardingData.manualExpertise ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                        onboardingData.manualExpertise ? 'bg-white text-black border-white' : 'bg-background-secondary border-border-opaque text-content-secondary'
                       }`}
                     >
                       <span className="text-xl">⚙️</span>
@@ -556,7 +556,7 @@ export default function DriverOnboardingWizard() {
                       type="button"
                       onClick={() => setOnboardingData({ ...onboardingData, automaticExpertise: !onboardingData.automaticExpertise })}
                       className={`py-4 rounded-xl border text-xs font-bold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-2 ${
-                        onboardingData.automaticExpertise ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                        onboardingData.automaticExpertise ? 'bg-white text-black border-white' : 'bg-background-secondary border-border-opaque text-content-secondary'
                       }`}
                     >
                       <span className="text-xl">🕹️</span>
@@ -567,12 +567,12 @@ export default function DriverOnboardingWizard() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Professional Driving Experience (Years)</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Professional Driving Experience (Years)</label>
                   <input
                     type="number"
                     value={onboardingData.yearsOfExperience}
                     onChange={(e) => setOnboardingData({ ...onboardingData, yearsOfExperience: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="e.g. 5"
                     min="1"
                   />
@@ -584,59 +584,59 @@ export default function DriverOnboardingWizard() {
           {/* STEP 5: BANK DETAILS */}
           {currentStep === 5 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 5 — Payout Bank Details</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 5 — Payout Bank Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Account Number</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Account Number</label>
                   <input
                     type="text"
                     value={onboardingData.accountNo}
                     onChange={(e) => setOnboardingData({ ...onboardingData, accountNo: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="Enter Bank Account No"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">IFSC Code</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">IFSC Code</label>
                   <input
                     type="text"
                     value={onboardingData.ifscCode}
                     onChange={(e) => setOnboardingData({ ...onboardingData, ifscCode: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="IFSC0001234"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Account Holder Name</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Account Holder Name</label>
                   <input
                     type="text"
                     value={onboardingData.holderName}
                     onChange={(e) => setOnboardingData({ ...onboardingData, holderName: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                     placeholder="Enter Bank Holder Name"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">UPI ID (for instant payouts)</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">UPI ID (for instant payouts)</label>
                   <input
                     type="text"
                     value={onboardingData.upiId}
                     onChange={(e) => setOnboardingData({ ...onboardingData, upiId: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="name@okbank"
                   />
                 </div>
               </div>
               <div className="pt-2">
-                <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-2 font-mono">Upload Cancelled Cheque / Statement Proof</label>
-                <div className="flex items-center gap-4 bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl">
-                  <div className="h-12 w-12 bg-zinc-850 rounded-xl flex items-center justify-center text-xs font-mono text-zinc-600 border border-zinc-800">
+                <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-2 font-mono">Upload Cancelled Cheque / Statement Proof</label>
+                <div className="flex items-center gap-4 bg-background-secondary/50 p-4 border border-border-opaque rounded-xl">
+                  <div className="h-12 w-12 bg-background-tertiary rounded-xl flex items-center justify-center text-xs font-mono text-content-tertiary border border-border-opaque">
                     {onboardingData.cancelledCheque ? '✔️ Validated' : 'NO FILE'}
                   </div>
                   <button
                     type="button"
                     onClick={() => triggerUploadClick('cancelledCheque', 'CANCELLED_CHEQUE')}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                    className="bg-background-tertiary hover:bg-background-tertiary border border-border-opaque text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
                   >
                     {uploadProgress.cancelledCheque ? `Uploading ${uploadProgress.cancelledCheque}%` : 'Upload Cancelled Cheque'}
                   </button>
@@ -648,35 +648,35 @@ export default function DriverOnboardingWizard() {
           {/* STEP 6: EMERGENCY CONTACT */}
           {currentStep === 6 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 6 — Emergency Contacts</h2>
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 6 — Emergency Contacts</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Contact Name</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Contact Name</label>
                   <input
                     type="text"
                     value={onboardingData.emergencyName}
                     onChange={(e) => setOnboardingData({ ...onboardingData, emergencyName: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                     placeholder="Emergency Contact Name"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Relationship</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Relationship</label>
                   <input
                     type="text"
                     value={onboardingData.emergencyRelation}
                     onChange={(e) => setOnboardingData({ ...onboardingData, emergencyRelation: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque"
                     placeholder="e.g. Spouse / Sibling / Parent"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Phone Number</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Phone Number</label>
                   <input
                     type="tel"
                     value={onboardingData.emergencyPhone}
                     onChange={(e) => setOnboardingData({ ...onboardingData, emergencyPhone: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="+91 99999 00000"
                   />
                 </div>
@@ -687,11 +687,11 @@ export default function DriverOnboardingWizard() {
           {/* STEP 7: AGREEMENT */}
           {currentStep === 7 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 7 — Digitally Sign Agreements</h2>
-              <div className="space-y-4 text-zinc-400 text-xs leading-relaxed">
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 7 — Digitally Sign Agreements</h2>
+              <div className="space-y-4 text-content-secondary text-xs leading-relaxed">
                 <div 
                   onScroll={handleTermsScroll}
-                  className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 max-h-48 overflow-y-auto space-y-3 font-sans"
+                  className="bg-background-secondary p-4 rounded-xl border border-border-opaque max-h-48 overflow-y-auto space-y-3 font-sans"
                 >
                   <h4 className="font-bold text-white text-xs">Terms & Conditions of Partner Dispatch Node</h4>
                   <p>1. The Driver Partner acts as an independent service provider executing matching allocations on behalf of registered vehicle owners.</p>
@@ -702,9 +702,9 @@ export default function DriverOnboardingWizard() {
 
                 <div className="flex justify-between items-center text-[9px] font-mono font-bold uppercase tracking-wider">
                   {termsScrolledToBottom ? (
-                    <span className="text-emerald-500">✓ Terms Read & Completed</span>
+                    <span className="text-content-positive">✓ Terms Read & Completed</span>
                   ) : (
-                    <span className="text-zinc-500">↓ Please scroll to the bottom of terms to read</span>
+                    <span className="text-content-tertiary">↓ Please scroll to the bottom of terms to read</span>
                   )}
                 </div>
                 
@@ -720,12 +720,12 @@ export default function DriverOnboardingWizard() {
                   </label>
 
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Digital Signature (Type your Full Legal Name)</label>
+                    <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Digital Signature (Type your Full Legal Name)</label>
                     <input
                       type="text"
                       value={onboardingData.signatureName}
                       onChange={(e) => setOnboardingData({ ...onboardingData, signatureName: e.target.value })}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 font-mono italic"
+                      className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono italic"
                       placeholder="Type name to sign digitally"
                     />
                   </div>
@@ -737,14 +737,14 @@ export default function DriverOnboardingWizard() {
           {/* STEP 8: TRAINING QUIZ */}
           {currentStep === 8 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-zinc-900 pb-2">Step 8 — Safety & Etiquette Certification Quiz</h2>
-              <p className="text-[10px] text-zinc-500 font-mono leading-relaxed">
+              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 8 — Safety & Etiquette Certification Quiz</h2>
+              <p className="text-[10px] text-content-tertiary font-mono leading-relaxed">
                 Passing Score requirement: 80% (at least 4/5 answers correct). Review the safety and etiquette questions below.
               </p>
               
               <div className="space-y-6 pt-2">
                 {quizQuestions.map((q, idx) => (
-                  <div key={q.id} className="space-y-2 border-b border-zinc-900 pb-4">
+                  <div key={q.id} className="space-y-2 border-b border-border-opaque pb-4">
                     <span className="block text-xs font-bold text-white">{idx + 1}. {q.text}</span>
                     <div className="flex flex-col gap-2 pt-1">
                       {q.options.map((opt, optIdx) => (
@@ -755,7 +755,7 @@ export default function DriverOnboardingWizard() {
                           className={`w-full text-left p-3 text-xs rounded-xl border transition cursor-pointer flex items-center justify-between ${
                             onboardingData.quizAnswers[q.id] === optIdx
                               ? 'bg-white border-white text-black font-semibold'
-                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+                              : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                           }`}
                         >
                           <span>{opt}</span>
@@ -770,12 +770,12 @@ export default function DriverOnboardingWizard() {
           )}
 
           {/* Stepper Navigation Buttons */}
-          <div className="flex justify-between items-center border-t border-zinc-900 pt-6">
+          <div className="flex justify-between items-center border-t border-border-opaque pt-6">
             <button
               onClick={prevStep}
               disabled={currentStep === 1}
               type="button"
-              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+              className="bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
             >
               Back
             </button>
@@ -785,7 +785,7 @@ export default function DriverOnboardingWizard() {
                 onClick={nextStep}
                 disabled={currentStep === 7 && (!termsScrolledToBottom || !onboardingData.agreedToTerms || !onboardingData.signatureName.trim())}
                 type="button"
-                className="bg-white hover:bg-zinc-200 text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                className="bg-white hover:bg-background-tertiary text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
                 {currentStep === 7 ? 'I Agree and Digitally Sign' : 'Next'}
               </button>
@@ -793,7 +793,7 @@ export default function DriverOnboardingWizard() {
               <button
                 onClick={evaluateQuizAndSubmit}
                 type="button"
-                className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono"
+                className="bg-positive-400 hover:bg-positive-400 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono"
               >
                 Submit for Verification
               </button>
@@ -805,9 +805,9 @@ export default function DriverOnboardingWizard() {
 
       {/* Onboarding Logs Terminal panel */}
       {logs.length > 0 && (
-        <div className="w-full max-w-4xl mx-auto border-t border-zinc-900 pt-4 text-left">
-          <span className="text-[9px] font-mono font-bold text-zinc-600 uppercase tracking-widest block mb-2">Live Verification Stream Audit logs:</span>
-          <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 max-h-32 overflow-y-auto font-mono text-[8px] text-zinc-500 space-y-1 scrollbar-thin">
+        <div className="w-full max-w-4xl mx-auto border-t border-border-opaque pt-4 text-left">
+          <span className="text-[9px] font-mono font-bold text-content-tertiary uppercase tracking-widest block mb-2">Live Verification Stream Audit logs:</span>
+          <div className="bg-background-primary border border-border-opaque rounded-xl p-3 max-h-32 overflow-y-auto font-mono text-[8px] text-content-tertiary space-y-1 scrollbar-thin">
             {logs.map((lg, i) => (
               <div key={i} className="truncate select-all">{lg}</div>
             ))}
@@ -815,7 +815,7 @@ export default function DriverOnboardingWizard() {
         </div>
       )}
 
-      <footer className="w-full max-w-4xl mx-auto text-left flex justify-between items-center text-[9px] text-zinc-600 font-mono pt-4 mt-6 border-t border-zinc-900">
+      <footer className="w-full max-w-4xl mx-auto text-left flex justify-between items-center text-[9px] text-content-tertiary font-mono pt-4 mt-6 border-t border-border-opaque">
         <span>SECURITY NODE: ID_VERIFY_ACTIVE</span>
         <span>HUB: KOLKATA / BANGALORE CORPS</span>
       </footer>

@@ -27,7 +27,7 @@ export function TripActions({ tripId }: { tripId?: string }) {
     <div className="flex gap-2" data-trip-id={id}>
       {cancellable && (
         <button
-          className="flex-1 rounded-lg bg-[#EF4444]/20 py-3 text-sm font-semibold text-[#EF4444] disabled:opacity-50"
+          className="flex-1 rounded-lg bg-surface-negative py-3 text-sm font-semibold text-content-negative disabled:opacity-50"
           disabled={busy}
           onClick={onCancel}
         >
@@ -36,7 +36,7 @@ export function TripActions({ tripId }: { tripId?: string }) {
       )}
       {inTrip && (
         <button
-          className="flex-1 rounded-lg bg-[#EF4444] py-3 text-sm font-semibold text-white"
+          className="flex-1 rounded-lg bg-negative-400 py-3 text-sm font-semibold text-content-primary"
           onClick={() => triggerSOS()}
         >
           SOS

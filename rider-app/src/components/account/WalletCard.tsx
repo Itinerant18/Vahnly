@@ -5,9 +5,9 @@ import { formatCurrency } from "@/lib/utils/formatCurrency";
 
 export function WalletCard({ wallet }: { wallet: Wallet | null }) {
   return (
-    <div className="rounded-xl bg-gradient-to-br from-[#0073E6] to-[#0056B3] p-5">
-      <p className="text-xs text-white/70">Wallet balance</p>
-      <p className="mt-1 text-2xl font-bold text-white">
+    <div className="rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 p-5">
+      <p className="text-xs text-content-secondary">Wallet balance</p>
+      <p className="mt-1 text-2xl font-bold text-content-primary">
         {wallet ? formatCurrency(wallet.balance_paise) : "₹0.00"}
       </p>
     </div>

@@ -36,9 +36,9 @@ interface Analytics {
 
 type Tab = 'accounts' | 'employees' | 'policies' | 'invoices' | 'analytics';
 
-const PLAN_COLORS: Record<string, string> = { STANDARD: 'bg-slate-100 text-slate-600', PREMIUM: 'bg-blue-100 text-blue-700', ENTERPRISE: 'bg-violet-100 text-violet-700' };
-const INV_STATUS: Record<string, string> = { DRAFT: 'bg-slate-100 text-slate-500', SENT: 'bg-blue-100 text-blue-700', PAID: 'bg-emerald-100 text-emerald-700', OVERDUE: 'bg-red-100 text-red-700', CANCELLED: 'bg-slate-100 text-slate-400' };
-const ROLE_COLORS: Record<string, string> = { ADMIN: 'bg-violet-100 text-violet-700', MANAGER: 'bg-blue-100 text-blue-700', EMPLOYEE: 'bg-canvas-soft text-body' };
+const PLAN_COLORS: Record<string, string> = { STANDARD: 'bg-background-secondary text-content-secondary', PREMIUM: 'bg-surface-accent text-content-accent', ENTERPRISE: 'bg-surface-accent text-content-accent' };
+const INV_STATUS: Record<string, string> = { DRAFT: 'bg-background-secondary text-content-secondary', SENT: 'bg-surface-accent text-content-accent', PAID: 'bg-surface-positive text-content-positive', OVERDUE: 'bg-surface-negative text-content-negative', CANCELLED: 'bg-background-secondary text-content-tertiary' };
+const ROLE_COLORS: Record<string, string> = { ADMIN: 'bg-surface-accent text-content-accent', MANAGER: 'bg-surface-accent text-content-accent', EMPLOYEE: 'bg-canvas-soft text-body' };
 function rupees(p: number) { return `₹${(p / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ const AccountsTab: React.FC<{
                 </div>
               ))}
             </div>
-            <div className={`px-3 py-2 rounded-lg text-xs font-medium ${selectedAccount.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+            <div className={`px-3 py-2 rounded-lg text-xs font-medium ${selectedAccount.is_active ? 'bg-surface-positive text-content-positive' : 'bg-surface-negative text-content-negative'}`}>
               Account is {selectedAccount.is_active ? 'Active' : 'Inactive'}
             </div>
           </div>
@@ -264,15 +264,15 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
               ↑ CSV Bulk
               <input type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files?.[0] ?? null)} />
             </label>
-            {csvFile && <button onClick={bulkUpload} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium">Upload: {csvFile.name}</button>}
+            {csvFile && <button onClick={bulkUpload} className="px-3 py-1.5 bg-positive-400 text-white rounded-lg text-sm font-medium">Upload: {csvFile.name}</button>}
           </>}
         </div>
       </div>
 
       {bulkResult && (
         <div className="bg-canvas rounded-xl border border-canvas-soft p-3 text-sm">
-          Bulk upload: <span className="text-emerald-600">{bulkResult.inserted} inserted</span> · <span className="text-mute">{bulkResult.skipped} skipped</span>
-          {bulkResult.errors?.length > 0 && <div className="text-xs text-red-600 mt-1">{bulkResult.errors.join(', ')}</div>}
+          Bulk upload: <span className="text-content-positive">{bulkResult.inserted} inserted</span> · <span className="text-mute">{bulkResult.skipped} skipped</span>
+          {bulkResult.errors?.length > 0 && <div className="text-xs text-content-negative mt-1">{bulkResult.errors.join(', ')}</div>}
         </div>
       )}
 
@@ -334,7 +334,7 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
                 <td className="px-4 py-2.5 text-xs font-mono text-mute">{emp.cost_center || '—'}</td>
                 <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_COLORS[emp.role] ?? 'bg-canvas-soft text-body'}`}>{emp.role}</span></td>
                 <td className="px-4 py-2.5 text-xs text-right text-mute">{emp.monthly_limit_paise > 0 ? rupees(emp.monthly_limit_paise) : '—'}</td>
-                <td className="px-4 py-2.5"><span className={`text-[10px] ${emp.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>{emp.is_active ? '● Active' : '● Inactive'}</span></td>
+                <td className="px-4 py-2.5"><span className={`text-[10px] ${emp.is_active ? 'text-content-positive' : 'text-content-tertiary'}`}>{emp.is_active ? '● Active' : '● Inactive'}</span></td>
               </tr>
             ))}
           </tbody>
@@ -418,7 +418,7 @@ const PoliciesTab: React.FC<{ base: string; headers: Record<string, string>; isS
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm text-ink">{p.policy_name}</span>
                   {p.is_default && <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded font-medium">DEFAULT</span>}
-                  {p.requires_approval && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">APPROVAL REQ.</span>}
+                  {p.requires_approval && <span className="text-[10px] bg-surface-warning text-content-warning px-1.5 py-0.5 rounded">APPROVAL REQ.</span>}
                 </div>
                 <div className="text-xs text-mute mt-1">Max fare: {p.max_fare_paise > 0 ? rupees(p.max_fare_paise) : 'No limit'} · Hours: {p.allowed_hours_start}:00–{p.allowed_hours_end}:00</div>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
@@ -473,7 +473,7 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
       </div>
 
       {genResult && (
-        <div className={`rounded-xl border p-4 text-sm ${genResult.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+        <div className={`rounded-xl border p-4 text-sm ${genResult.error ? 'bg-surface-negative border-negative-400 text-content-negative' : 'bg-surface-positive border-positive-400 text-content-positive'}`}>
           {genResult.error ? genResult.error : `✓ Invoice ${genResult.invoice_number} created — ${genResult.total_trips} trips · ${rupees(genResult.total_paise ?? 0)}`}
         </div>
       )}
@@ -521,7 +521,7 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
                   {isSuperAdmin && inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
                     <div className="flex gap-1">
                       {inv.status === 'DRAFT' && <button onClick={() => updateStatus(inv.id, 'SENT')} className="text-[10px] text-accent hover:underline">Send</button>}
-                      {inv.status === 'SENT' && <button onClick={() => updateStatus(inv.id, 'PAID')} className="text-[10px] text-emerald-600 hover:underline">Mark Paid</button>}
+                      {inv.status === 'SENT' && <button onClick={() => updateStatus(inv.id, 'PAID')} className="text-[10px] text-content-positive hover:underline">Mark Paid</button>}
                     </div>
                   )}
                 </td>
@@ -578,7 +578,7 @@ const AnalyticsTab: React.FC<{ base: string; headers: Record<string, string>; se
           {data.daily_trips.length >= 2 && (
             <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
               <div className="text-sm font-semibold text-ink mb-3">Daily Trip Volume</div>
-              <SvgAreaChart data={data.daily_trips.map(d => ({ label: d.day.slice(5), value: d.trips }))} height={120} strokeColor="#6366f1" fillColor="rgba(99,102,241,0.1)" />
+              <SvgAreaChart data={data.daily_trips.map(d => ({ label: d.day.slice(5), value: d.trips }))} height={120} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
             </div>
           )}
 

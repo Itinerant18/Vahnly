@@ -53,7 +53,7 @@ export default function NotificationsPage() {
       title="Notifications"
       action={
         unreadCount > 0 ? (
-          <button onClick={markAll} className="text-xs font-semibold text-[#FF6B35]">
+          <button onClick={markAll} className="text-xs font-semibold text-content-accent">
             Mark all read
           </button>
         ) : undefined
@@ -69,22 +69,22 @@ export default function NotificationsPage() {
         <div className="space-y-5">
           {ORDER.filter((b) => groups[b]?.length).map((b) => (
             <div key={b}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B7280]">{b}</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-content-tertiary">{b}</p>
               <div className="space-y-2">
                 {groups[b].map((n) => (
                   <button
                     key={n.id}
                     onClick={() => !n.is_read && markRead(n.id)}
                     className={`block w-full rounded-2xl p-4 text-left ${
-                      n.is_read ? "bg-[#141414]" : "bg-[#1E1E1E] ring-1 ring-[#FF6B35]/20"
+                      n.is_read ? "bg-background-secondary" : "bg-background-tertiary ring-1 ring-border-accent"
                     }`}
                   >
                     <div className="flex items-start gap-2">
-                      {!n.is_read && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-[#FF6B35]" />}
+                      {!n.is_read && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent-400" />}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white">{n.title}</p>
-                        <p className="mt-0.5 text-xs text-[#9CA3AF]">{n.body}</p>
-                        <p className="mt-1 text-[10px] text-[#6B7280]">
+                        <p className="text-sm font-semibold text-content-primary">{n.title}</p>
+                        <p className="mt-0.5 text-xs text-content-secondary">{n.body}</p>
+                        <p className="mt-1 text-[10px] text-content-tertiary">
                           {new Date(n.created_at).toLocaleTimeString("en-IN", {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
 
       <Link
         href="/account/settings"
-        className="mt-6 block rounded-2xl bg-[#141414] py-3.5 text-center text-sm font-semibold text-[#FF6B35]"
+        className="mt-6 block rounded-2xl bg-background-secondary py-3.5 text-center text-sm font-semibold text-content-accent"
       >
         Notification Preferences →
       </Link>

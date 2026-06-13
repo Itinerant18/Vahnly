@@ -36,15 +36,15 @@ export default function RiderPlacesPage() {
   return (
     <div className="space-y-6 text-left">
       {/* Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+      <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
+          className="bg-white hover:bg-background-tertiary text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
         >
           {showAddForm ? t('closeForm') : t('addPlace')}
         </button>
@@ -52,16 +52,16 @@ export default function RiderPlacesPage() {
 
       {/* Add form */}
       {showAddForm && (
-        <form onSubmit={handleAddPlace} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 animate-fadeIn font-mono text-xs">
-          <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2">{t('addFavoriteLocation')}</h4>
+        <form onSubmit={handleAddPlace} className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 animate-fadeIn font-mono text-xs">
+          <h4 className="text-xs font-bold text-white uppercase border-b border-border-opaque pb-2">{t('addFavoriteLocation')}</h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('labelTag')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('labelTag')}</label>
               <select
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-zinc-350"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2.5 text-content-secondary"
               >
                 <option>{t('optionHome')}</option>
                 <option>{t('optionWork')}</option>
@@ -71,13 +71,13 @@ export default function RiderPlacesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('addressDetails')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('addressDetails')}</label>
               <input
                 type="text"
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
                 placeholder={t('addressPlaceholder')}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-white"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2.5 text-white"
                 required
               />
             </div>
@@ -85,7 +85,7 @@ export default function RiderPlacesPage() {
 
           <button
             type="submit"
-            className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl font-sans font-bold uppercase transition"
+            className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl font-sans font-bold uppercase transition"
           >
             {t('saveFavoriteAddress')}
           </button>
@@ -95,14 +95,14 @@ export default function RiderPlacesPage() {
       {/* List */}
       <div className="space-y-3">
         {places.map((p) => (
-          <div key={p.id} className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl flex justify-between items-center text-xs font-mono">
+          <div key={p.id} className="bg-background-primary border border-border-opaque p-5 rounded-2xl flex justify-between items-center text-xs font-mono">
             <div>
               <span className="text-white block font-sans font-bold">{p.label}</span>
-              <span className="text-zinc-550 text-[10px] block mt-1">{p.address}</span>
+              <span className="text-content-tertiary text-[10px] block mt-1">{p.address}</span>
             </div>
             <button
               onClick={() => handleRemovePlace(p.id)}
-              className="text-red-500 hover:text-red-400 font-mono text-[8px] uppercase tracking-wider cursor-pointer shrink-0"
+              className="text-content-negative hover:text-content-negative font-mono text-[8px] uppercase tracking-wider cursor-pointer shrink-0"
             >
               {t('delete')}
             </button>

@@ -29,28 +29,28 @@ export default function RiderInsurancePage() {
   return (
     <div className="space-y-6 text-left">
       {/* Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+      <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={handleFileClaim}
-          className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
+          className="bg-white hover:bg-background-tertiary text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
         >
           {t('fileClaim')}
         </button>
       </div>
 
       {/* Subscription Type */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
           {t('subscriptionPlan')}
         </h4>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-          <label className="flex items-center justify-between p-3.5 bg-zinc-900/40 border border-zinc-800 rounded-xl cursor-pointer">
+          <label className="flex items-center justify-between p-3.5 bg-background-secondary/40 border border-border-opaque rounded-xl cursor-pointer">
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -60,12 +60,12 @@ export default function RiderInsurancePage() {
               />
               <div>
                 <span className="text-white font-sans font-medium block">{t('tripByTripCoverage')}</span>
-                <span className="text-[9px] text-zinc-500 block mt-0.5">{t('tripByTripPrice')}</span>
+                <span className="text-[9px] text-content-tertiary block mt-0.5">{t('tripByTripPrice')}</span>
               </div>
             </div>
           </label>
 
-          <label className="flex items-center justify-between p-3.5 bg-zinc-900/40 border border-zinc-800 rounded-xl cursor-pointer">
+          <label className="flex items-center justify-between p-3.5 bg-background-secondary/40 border border-border-opaque rounded-xl cursor-pointer">
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -75,7 +75,7 @@ export default function RiderInsurancePage() {
               />
               <div>
                 <span className="text-white font-sans font-medium block">{t('monthlyUnlimitedPack')}</span>
-                <span className="text-[9px] text-zinc-500 block mt-0.5">{t('monthlyUnlimitedPrice')}</span>
+                <span className="text-[9px] text-content-tertiary block mt-0.5">{t('monthlyUnlimitedPrice')}</span>
               </div>
             </div>
           </label>
@@ -83,8 +83,8 @@ export default function RiderInsurancePage() {
       </div>
 
       {/* Coverage details */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 font-mono text-xs text-zinc-400">
-        <span className="text-zinc-600 block text-[8px] uppercase font-bold border-b border-zinc-900 pb-1.5">{t('policyDetails')}</span>
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3 font-mono text-xs text-content-secondary">
+        <span className="text-content-tertiary block text-[8px] uppercase font-bold border-b border-border-opaque pb-1.5">{t('policyDetails')}</span>
         <div className="flex justify-between">
           <span>{t('accidentalDamageShield')}</span>
           <span className="text-white">{t('accidentalDamageValue')}</span>
@@ -100,21 +100,21 @@ export default function RiderInsurancePage() {
       </div>
 
       {/* Past Claims */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
           {t('claimsHistory')}
         </h4>
 
-        <div className="divide-y divide-zinc-900">
+        <div className="divide-y divide-border-opaque">
           {claims.map((c) => (
             <div key={c.id} className="py-3 flex justify-between items-center text-xs font-mono">
               <div>
                 <span className="text-white block font-sans font-medium">{c.type}</span>
-                <span className="text-zinc-500 text-[8px] block mt-0.5">{c.date} • ID: {c.id}</span>
+                <span className="text-content-tertiary text-[8px] block mt-0.5">{c.date} • ID: {c.id}</span>
               </div>
               <div className="text-right">
                 {c.amount > 0 && <span className="text-white block font-bold">₹{c.amount.toFixed(2)}</span>}
-                <span className={`text-[8px] block mt-0.5 font-bold uppercase ${c.status === 'Settled' ? 'text-emerald-500' : 'text-amber-500 animate-pulse'}`}>
+                <span className={`text-[8px] block mt-0.5 font-bold uppercase ${c.status === 'Settled' ? 'text-content-positive' : 'text-content-warning animate-pulse'}`}>
                   ● {c.status}
                 </span>
               </div>

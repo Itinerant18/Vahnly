@@ -147,44 +147,44 @@ export default function RiderPaymentsPage() {
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">Payment Methods</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage credit/debit cards, UPI accounts, and invoice addresses</p>
+        <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage credit/debit cards, UPI accounts, and invoice addresses</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Saved Cards */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+          <div className="flex justify-between items-center border-b border-border-opaque pb-2">
             <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Credit & Debit Cards</h4>
             <button
               onClick={() => setShowAddCard(true)}
-              className="bg-white hover:bg-zinc-200 text-black text-[8px] font-mono font-bold uppercase px-3 py-1.5 rounded-full cursor-pointer transition active:scale-95"
+              className="bg-white hover:bg-background-tertiary text-black text-[8px] font-mono font-bold uppercase px-3 py-1.5 rounded-full cursor-pointer transition active:scale-95"
             >
               Add Card
             </button>
           </div>
 
-          <div className="divide-y divide-zinc-900">
+          <div className="divide-y divide-border-opaque">
             {cards.map((c) => (
               <div key={c.id} className="py-3 flex justify-between items-center text-xs font-mono">
                 <div>
                   <span className="text-white block font-sans font-medium">{c.brand} •••• {c.last4}</span>
-                  <span className="text-zinc-650 text-[8px] block mt-0.5">Expires {c.expiry}</span>
+                  <span className="text-content-tertiary text-[8px] block mt-0.5">Expires {c.expiry}</span>
                 </div>
                 <div className="flex items-center gap-3 font-mono text-[8px] uppercase tracking-wider font-bold">
                   {c.isDefault ? (
-                    <span className="text-emerald-400">DEFAULT</span>
+                    <span className="text-content-positive">DEFAULT</span>
                   ) : (
                     <button
                       onClick={() => handleSetDefaultCard(c.id)}
-                      className="text-zinc-400 hover:text-white cursor-pointer transition"
+                      className="text-content-secondary hover:text-white cursor-pointer transition"
                     >
                       Set Default
                     </button>
                   )}
                   <button
                     onClick={() => handleRemoveCard(c.id, c.brand, c.last4)}
-                    className="text-red-500 hover:text-red-400 cursor-pointer transition"
+                    className="text-content-negative hover:text-content-negative cursor-pointer transition"
                   >
                     Delete
                   </button>
@@ -195,24 +195,24 @@ export default function RiderPaymentsPage() {
         </div>
 
         {/* UPI IDs */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-          <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+          <div className="flex justify-between items-center border-b border-border-opaque pb-2">
             <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Linked UPI Handles</h4>
             <button
               onClick={() => setShowAddUpi(true)}
-              className="bg-white hover:bg-zinc-200 text-black text-[8px] font-mono font-bold uppercase px-3 py-1.5 rounded-full cursor-pointer transition active:scale-95"
+              className="bg-white hover:bg-background-tertiary text-black text-[8px] font-mono font-bold uppercase px-3 py-1.5 rounded-full cursor-pointer transition active:scale-95"
             >
               Link UPI
             </button>
           </div>
 
-          <div className="divide-y divide-zinc-900">
+          <div className="divide-y divide-border-opaque">
             {upis.map((upi) => (
               <div key={upi} className="py-3 flex justify-between items-center text-xs font-mono">
                 <span className="text-white font-sans font-medium" title={upi}>{maskUPI(upi)}</span>
                 <button
                   onClick={() => handleRemoveUPI(upi)}
-                  className="text-red-500 hover:text-red-400 font-mono text-[8px] uppercase tracking-wider cursor-pointer transition"
+                  className="text-content-negative hover:text-content-negative font-mono text-[8px] uppercase tracking-wider cursor-pointer transition"
                 >
                   Remove
                 </button>
@@ -224,12 +224,12 @@ export default function RiderPaymentsPage() {
       </div>
 
       {/* Corporate Invoices Address */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
-        <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
+        <div className="flex justify-between items-center border-b border-border-opaque pb-2">
           <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Corporate Billing Address (GST Invoices)</h4>
           <button
             onClick={() => setIsEditingAddress(!isEditingAddress)}
-            className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer"
+            className="text-[9px] font-mono font-bold text-content-secondary hover:text-white uppercase tracking-wider cursor-pointer"
           >
             {isEditingAddress ? 'Save Address' : 'Edit'}
           </button>
@@ -239,30 +239,30 @@ export default function RiderPaymentsPage() {
           <textarea
             value={billingAddress}
             onChange={(e) => setBillingAddress(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-white focus:outline-none font-mono"
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white focus:outline-none font-mono"
             rows={2}
           />
         ) : (
-          <p className="text-xs text-zinc-400 font-mono">{billingAddress}</p>
+          <p className="text-xs text-content-secondary font-mono">{billingAddress}</p>
         )}
       </div>
 
       {/* ADD CARD MODAL FORM */}
       {showAddCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-900 w-full max-w-md rounded-2xl p-6 relative font-mono text-xs text-left space-y-4">
-            <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2 flex justify-between">
+          <div className="bg-background-primary border border-border-opaque w-full max-w-md rounded-2xl p-6 relative font-mono text-xs text-left space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase border-b border-border-opaque pb-2 flex justify-between">
               <span>Secure Card Ingestion Vault</span>
               <button 
                 onClick={() => setShowAddCard(false)}
-                className="text-[9px] text-zinc-500 hover:text-white uppercase cursor-pointer"
+                className="text-[9px] text-content-tertiary hover:text-white uppercase cursor-pointer"
               >
                 Close
               </button>
             </h4>
 
             {/* Virtual card UI representing scrambled value */}
-            <div className="bg-gradient-to-tr from-zinc-900 to-zinc-800 rounded-2xl p-5 border border-zinc-700/40 relative overflow-hidden flex flex-col justify-between min-h-[140px] text-white">
+            <div className="bg-gradient-to-tr from-background-secondary to-background-tertiary rounded-2xl p-5 border border-border-opaque/40 relative overflow-hidden flex flex-col justify-between min-h-[140px] text-white">
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold tracking-widest">{cardBrand.toUpperCase()} PLATINUM</span>
                 <span className="text-[14px]">💳</span>
@@ -273,17 +273,17 @@ export default function RiderPaymentsPage() {
                 <div className="text-base font-bold tracking-widest py-1">
                   {cardNumber || '•••• •••• •••• ••••'}
                 </div>
-                <div className="flex justify-between items-center text-[8px] text-zinc-400">
+                <div className="flex justify-between items-center text-[8px] text-content-secondary">
                   <div>
-                    <span className="block text-[6px] text-zinc-500 uppercase">Cardholder</span>
+                    <span className="block text-[6px] text-content-tertiary uppercase">Cardholder</span>
                     {riderName.toUpperCase()}
                   </div>
                   <div>
-                    <span className="block text-[6px] text-zinc-500 uppercase">Expires</span>
+                    <span className="block text-[6px] text-content-tertiary uppercase">Expires</span>
                     {cardExpiry || 'MM/YY'}
                   </div>
                   <div>
-                    <span className="block text-[6px] text-zinc-500 uppercase">CVV</span>
+                    <span className="block text-[6px] text-content-tertiary uppercase">CVV</span>
                     {cardCvv || '•••'}
                   </div>
                 </div>
@@ -293,11 +293,11 @@ export default function RiderPaymentsPage() {
             <form onSubmit={handleAddCardSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Network Brand</label>
+                  <label className="block text-[8px] text-content-tertiary uppercase mb-1">Network Brand</label>
                   <select
                     value={cardBrand}
                     onChange={(e) => setCardBrand(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
                   >
                     <option>Visa</option>
                     <option>Mastercard</option>
@@ -306,13 +306,13 @@ export default function RiderPaymentsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Card Number (16 Digits)</label>
+                  <label className="block text-[8px] text-content-tertiary uppercase mb-1">Card Number (16 Digits)</label>
                   <input
                     type="text"
                     value={cardNumber}
                     onChange={handleCardNumberChange}
                     placeholder="•••• •••• •••• ••••"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
                     required
                   />
                 </div>
@@ -320,25 +320,25 @@ export default function RiderPaymentsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Expiry Date</label>
+                  <label className="block text-[8px] text-content-tertiary uppercase mb-1">Expiry Date</label>
                   <input
                     type="text"
                     value={cardExpiry}
                     onChange={(e) => setCardExpiry(e.target.value)}
                     placeholder="MM/YY"
                     maxLength={5}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-[8px] text-zinc-500 uppercase mb-1">Security Code (CVV)</label>
+                  <label className="block text-[8px] text-content-tertiary uppercase mb-1">Security Code (CVV)</label>
                   <input
                     type="text"
                     value={cardCvv}
                     onChange={handleCvvChange}
                     placeholder="•••"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none animate-pulse"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none animate-pulse"
                     required
                   />
                 </div>
@@ -346,7 +346,7 @@ export default function RiderPaymentsPage() {
 
               <button
                 type="submit"
-                className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
                 Ingest & Authorize card
               </button>
@@ -358,12 +358,12 @@ export default function RiderPaymentsPage() {
       {/* LINK UPI MODAL FORM */}
       {showAddUpi && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-900 w-full max-w-md rounded-2xl p-6 relative font-mono text-xs text-left space-y-4">
-            <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2 flex justify-between">
+          <div className="bg-background-primary border border-border-opaque w-full max-w-md rounded-2xl p-6 relative font-mono text-xs text-left space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase border-b border-border-opaque pb-2 flex justify-between">
               <span>Link UPI Virtual Payment Address</span>
               <button 
                 onClick={() => setShowAddUpi(false)}
-                className="text-[9px] text-zinc-500 hover:text-white uppercase cursor-pointer"
+                className="text-[9px] text-content-tertiary hover:text-white uppercase cursor-pointer"
               >
                 Close
               </button>
@@ -371,20 +371,20 @@ export default function RiderPaymentsPage() {
 
             <form onSubmit={handleAddUpiSubmit} className="space-y-4">
               <div>
-                <label className="block text-[8px] text-zinc-500 uppercase mb-1">UPI Address / VPA</label>
+                <label className="block text-[8px] text-content-tertiary uppercase mb-1">UPI Address / VPA</label>
                 <input
                   type="text"
                   value={newUpi}
                   onChange={(e) => setNewUpi(e.target.value)}
                   placeholder="e.g. mobile@paytm or name@okaxis"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
                 Verify & Link UPI
               </button>

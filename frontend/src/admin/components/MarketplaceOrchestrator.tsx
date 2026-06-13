@@ -550,13 +550,13 @@ export const MarketplaceOrchestrator: React.FC = () => {
   const getPolicyBadge = (policy: GeofenceZoneRecord['policy_type']) => {
     switch (policy) {
       case 'ACTIVE_DISPATCH': 
-        return <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold">ACTIVE_DISPATCH</span>;
+        return <span className="bg-positive-400/10 text-positive-400 border border-positive-400/20 px-2 py-0.5 rounded text-[8px] font-bold">ACTIVE_DISPATCH</span>;
       case 'BLACKLIST_BLOCK': 
-        return <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[8px] font-bold">BLACKLIST_BLOCK</span>;
+        return <span className="bg-negative-400/10 text-negative-400 border border-negative-400/20 px-2 py-0.5 rounded text-[8px] font-bold">BLACKLIST_BLOCK</span>;
       case 'SURGE_FLOOR_FORCE': 
-        return <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[8px] font-bold">SURGE_FLOOR</span>;
+        return <span className="bg-accent-400/10 text-accent-400 border border-border-accent/20 px-2 py-0.5 rounded text-[8px] font-bold">SURGE_FLOOR</span>;
       case 'TRANSMISSION_RESTRICT': 
-        return <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold">RESTRICTED</span>;
+        return <span className="bg-accent-400/10 text-accent-400 border border-border-accent/20 px-2 py-0.5 rounded text-[8px] font-bold">RESTRICTED</span>;
     }
   };
 
@@ -593,7 +593,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
         {activeControlTab === 'GEOFENCE' && (
           <button
             onClick={() => setIsStudioExpanded(true)}
-            className="pb-3 text-xs text-indigo-500 hover:text-indigo-600 font-bold bg-transparent border-none focus:outline-none flex items-center gap-1.5 cursor-pointer"
+            className="pb-3 text-xs text-accent-400 hover:text-accent-400 font-bold bg-transparent border-none focus:outline-none flex items-center gap-1.5 cursor-pointer"
           >
             🖥️ ENTER GEOFENCE VECTOR STUDIO
           </button>
@@ -604,13 +604,13 @@ export const MarketplaceOrchestrator: React.FC = () => {
       <div className="bg-white border border-canvas-soft rounded-xl p-6 min-h-[300px]">
         {activeControlTab === 'GEOFENCE' && (
           <div className="text-left space-y-4">
-            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-800 leading-relaxed flex justify-between items-center">
+            <div className="p-4 bg-accent-400 border border-border-accent rounded-xl text-xs text-accent-400 leading-relaxed flex justify-between items-center">
               <div>
                 <strong>GEOSPATIAL VECTOR WORKSPACE DETECTED:</strong> Use the immersive visual vector editor to map coordinates, configure surge multipliers, and enforce dispatch blacklists directly over Postgres PostGIS tables.
               </div>
               <button 
                 onClick={() => setIsStudioExpanded(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded-lg text-[10px] transition cursor-pointer select-none"
+                className="bg-accent-400 hover:bg-accent-400 text-white font-bold py-1.5 px-4 rounded-lg text-[10px] transition cursor-pointer select-none"
               >
                 Open Vector Studio
               </button>
@@ -622,7 +622,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
                 <div 
                   key={zone.id}
                   onClick={() => { selectGeofenceZone(zone); setIsStudioExpanded(true); }}
-                  className="p-4 rounded-xl border border-canvas-soft hover:bg-slate-50 transition cursor-pointer space-y-3"
+                  className="p-4 rounded-xl border border-canvas-soft hover:bg-gray-800 transition cursor-pointer space-y-3"
                 >
                   <div className="flex justify-between items-center">
                     <strong className="text-xs font-mono">{zone.zone_name}</strong>
@@ -632,12 +632,12 @@ export const MarketplaceOrchestrator: React.FC = () => {
                     Coords: <strong className="text-ink">{zone.polygon_coordinates.length} Nodes</strong>
                   </div>
                   {zone.policy_type === 'SURGE_FLOOR_FORCE' && (
-                    <div className="text-[10px] font-mono text-blue-500 font-bold">
+                    <div className="text-[10px] font-mono text-accent-400 font-bold">
                       Surge: {zone.surge_multiplier.toFixed(2)}x
                     </div>
                   )}
                   {zone.notes && (
-                    <p className="text-[10px] text-mute italic border-t border-slate-100 pt-2">{zone.notes}</p>
+                    <p className="text-[10px] text-mute italic border-t border-gray-800 pt-2">{zone.notes}</p>
                   )}
                 </div>
               ))}
@@ -739,32 +739,32 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
       {/* FULLSCREEN TAKEOVER: IMMERSIVE GEOFENCE VECTOR STUDIO */}
       {isStudioExpanded && (
-        <div className="fixed top-[72px] left-0 right-0 bottom-0 bg-slate-950 flex flex-col z-50 text-slate-100 font-sans select-none animate-fade-in">
+        <div className="fixed top-[72px] left-0 right-0 bottom-0 bg-gray-800 flex flex-col z-50 text-gray-300 font-sans select-none animate-fade-in">
           
           {/* Header Ribbon */}
-          <div className="flex justify-between items-center px-6 py-3 border-b border-slate-900 bg-slate-950 font-mono text-xs">
+          <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800 bg-gray-800 font-mono text-xs">
             <div className="flex items-center gap-6">
-              <span className="text-indigo-400 font-bold tracking-widest uppercase">
+              <span className="text-accent-400 font-bold tracking-widest uppercase">
                 GEOFENCE VECTOR STUDIO
               </span>
-              <span className="text-slate-700">|</span>
-              <span className="text-slate-400">
-                Mode: <strong className="text-indigo-400">POLYGON_EDIT</strong>
+              <span className="text-gray-300">|</span>
+              <span className="text-gray-300">
+                Mode: <strong className="text-accent-400">POLYGON_EDIT</strong>
               </span>
-              <span className="text-slate-400">
-                Active Zones: <strong className="text-emerald-500">{geofences.length}</strong>
+              <span className="text-gray-300">
+                Active Zones: <strong className="text-positive-400">{geofences.length}</strong>
               </span>
             </div>
             
             <div className="flex items-center gap-4">
-              <span className="text-emerald-500 font-bold tracking-wider flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-positive-400 font-bold tracking-wider flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-positive-400 animate-pulse"></span>
                 POSTGIS SYNCED
               </span>
-              <span className="text-slate-800">•</span>
+              <span className="text-gray-300">•</span>
               <button
                 onClick={() => setIsStudioExpanded(false)}
-                className="px-4 py-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded transition active:scale-95"
+                className="px-4 py-1 text-[10px] bg-gray-800 border border-gray-800 text-gray-300 hover:text-white rounded transition active:scale-95"
               >
                 Close Studio
               </button>
@@ -775,13 +775,13 @@ export const MarketplaceOrchestrator: React.FC = () => {
           <div className="flex-1 flex overflow-hidden min-h-0">
             
             {/* PANEL A: Territory Matrix Browser */}
-            <div className="w-[300px] border-r border-slate-900 flex flex-col bg-slate-950">
-              <div className="p-4 border-b border-slate-900 space-y-3">
+            <div className="w-[300px] border-r border-gray-800 flex flex-col bg-gray-800">
+              <div className="p-4 border-b border-gray-800 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-bold font-mono tracking-wider text-slate-500 uppercase">Territory Matrix</span>
+                  <span className="text-[9px] font-bold font-mono tracking-wider text-gray-300 uppercase">Territory Matrix</span>
                   <button
                     onClick={initNewGeofenceZone}
-                    className="text-[9px] font-mono bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2.5 rounded transition"
+                    className="text-[9px] font-mono bg-accent-400 hover:bg-accent-400 text-white font-bold py-1 px-2.5 rounded transition"
                   >
                     + Add Zone
                   </button>
@@ -792,13 +792,13 @@ export const MarketplaceOrchestrator: React.FC = () => {
                   placeholder="Search market zones..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 focus:border-slate-700 rounded-lg py-2 px-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none transition font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 focus:border-gray-800 rounded-lg py-2 px-3 text-xs text-gray-300 placeholder-slate-600 focus:outline-none transition font-mono"
                 />
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
                 {filteredGeofences.length === 0 ? (
-                  <div className="text-center text-slate-500 text-xs italic py-12">No matching geofences.</div>
+                  <div className="text-center text-gray-300 text-xs italic py-12">No matching geofences.</div>
                 ) : (
                   filteredGeofences.map(zone => {
                     const isSelected = selectedGeofence?.id === zone.id;
@@ -808,33 +808,33 @@ export const MarketplaceOrchestrator: React.FC = () => {
                         onClick={() => selectGeofenceZone(zone)}
                         className={`p-3 rounded-lg border text-left cursor-pointer transition relative overflow-hidden ${
                           isSelected
-                            ? 'bg-slate-900 border-slate-700'
-                            : 'bg-slate-950 border-slate-900 hover:bg-slate-900/30'
+                            ? 'bg-gray-800 border-gray-800'
+                            : 'bg-gray-800 border-gray-800 hover:bg-gray-800/30'
                         }`}
                       >
                         {/* Visual policy left marker */}
                         <div className={`absolute top-0 left-0 bottom-0 w-1 ${
                           zone.policy_type === 'BLACKLIST_BLOCK' 
-                            ? 'bg-rose-500' 
+                            ? 'bg-negative-400' 
                             : zone.policy_type === 'SURGE_FLOOR_FORCE' 
-                            ? 'bg-blue-500' 
+                            ? 'bg-accent-400' 
                             : zone.policy_type === 'TRANSMISSION_RESTRICT' 
-                            ? 'bg-indigo-500' 
-                            : 'bg-emerald-500'
+                            ? 'bg-accent-400' 
+                            : 'bg-positive-400'
                         }`} />
 
                         <div className="pl-1.5 space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-bold text-slate-200 truncate pr-2 max-w-[130px]">
+                            <span className="text-[11px] font-bold text-gray-300 truncate pr-2 max-w-[130px]">
                               {zone.zone_name}
                             </span>
-                            <span className="text-[8px] font-mono bg-slate-950 text-slate-500 px-1 py-0.2 rounded border border-slate-900">
+                            <span className="text-[8px] font-mono bg-gray-800 text-gray-300 px-1 py-0.2 rounded border border-gray-800">
                               {zone.city_prefix}
                             </span>
                           </div>
 
-                          <div className="flex justify-between items-center text-[9px] font-mono text-slate-500">
-                            <span>Nodes: <strong className="text-slate-300">{zone.polygon_coordinates.length}</strong></span>
+                          <div className="flex justify-between items-center text-[9px] font-mono text-gray-300">
+                            <span>Nodes: <strong className="text-gray-300">{zone.polygon_coordinates.length}</strong></span>
                             <span>{zone.is_active ? '🟢 ACTIVE' : '🔴 DISABLED'}</span>
                           </div>
 
@@ -850,20 +850,20 @@ export const MarketplaceOrchestrator: React.FC = () => {
             </div>
 
             {/* PANEL B: Interactive Vector Canvas */}
-            <div className="flex-1 flex flex-col bg-slate-950 border-r border-slate-900 overflow-hidden relative">
-              <div className="flex justify-between items-center p-3.5 border-b border-slate-900 bg-slate-950/70 z-10">
+            <div className="flex-1 flex flex-col bg-gray-800 border-r border-gray-800 overflow-hidden relative">
+              <div className="flex justify-between items-center p-3.5 border-b border-gray-800 bg-gray-800/70 z-10">
                 
                 {/* Floating Vector drawing controls */}
                 <div className="flex items-center gap-2 text-[10px] font-mono">
-                  <span className="text-slate-500 font-bold mr-1">DRAWING TOOLS:</span>
+                  <span className="text-gray-300 font-bold mr-1">DRAWING TOOLS:</span>
                   {(['PAN', 'DRAW'] as const).map((mode) => (
                     <button
                       key={mode}
                       onClick={() => setDrawingMode(mode)}
                       className={`px-3 py-1 rounded border text-[9px] font-bold uppercase transition ${
                         drawingMode === mode
-                          ? 'bg-slate-100 text-slate-950 border-slate-100'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-900'
+                          ? 'bg-gray-800 text-gray-300 border-gray-800'
+                          : 'bg-gray-800 border-gray-800 text-gray-300 hover:bg-gray-800'
                       }`}
                     >
                       {mode} Mode
@@ -871,19 +871,19 @@ export const MarketplaceOrchestrator: React.FC = () => {
                   ))}
                   <button
                     onClick={() => setPolygonPoints([])}
-                    className="px-3 py-1 bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-950/30 rounded transition text-[9px] font-bold"
+                    className="px-3 py-1 bg-gray-800 border border-gray-800 text-negative-400 hover:bg-negative-400/30 rounded transition text-[9px] font-bold"
                   >
                     Clear Path
                   </button>
                 </div>
 
-                <div className="text-[10px] font-mono text-slate-400">
+                <div className="text-[10px] font-mono text-gray-300">
                   {drawingMode === 'DRAW' ? '🖱️ Left-Click Canvas to plot Polygon boundary nodes' : '✋ Pan/inspect geofences'}
                 </div>
               </div>
 
               {/* Central Map Canvas Frame */}
-              <div className="flex-1 relative min-h-0 bg-slate-950">
+              <div className="flex-1 relative min-h-0 bg-gray-800">
                 <canvas
                   ref={canvasRef}
                   width={680}
@@ -894,7 +894,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
                 {/* Self Intersection Warning Overlay */}
                 {intersectionError && (
-                  <div className="absolute top-4 left-4 right-4 bg-rose-950/95 border border-rose-800/80 p-3 rounded-lg flex items-center gap-2.5 z-20 text-xs font-mono text-rose-300 shadow-xl">
+                  <div className="absolute top-4 left-4 right-4 bg-negative-400/95 border border-negative-400/80 p-3 rounded-lg flex items-center gap-2.5 z-20 text-xs font-mono text-negative-400 shadow-xl">
                     <span className="text-base animate-pulse">⚠️</span>
                     <div>
                       <strong>GEOMETRIC OVERLAP DETECTED:</strong> Polygon segments cross. PostGIS boundaries must be closed non-overlapping paths.
@@ -904,44 +904,44 @@ export const MarketplaceOrchestrator: React.FC = () => {
               </div>
 
               {/* WKT Serialized String readout */}
-              <div className="border-t border-slate-900 p-4 bg-slate-950/80 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <div className="border-t border-gray-800 p-4 bg-gray-800/80 text-[10px] font-mono text-gray-300 flex items-center justify-between">
                 <div className="flex items-center gap-2 max-w-[80%] truncate">
-                  <span className="text-slate-500 font-bold select-none">WKT OUTPUT:</span>
-                  <span className="text-slate-300 font-bold select-all bg-slate-900 border border-slate-800/60 px-2 py-0.5 rounded truncate select-all">{getSerializedWktString()}</span>
+                  <span className="text-gray-300 font-bold select-none">WKT OUTPUT:</span>
+                  <span className="text-gray-300 font-bold select-all bg-gray-800 border border-gray-800/60 px-2 py-0.5 rounded truncate select-all">{getSerializedWktString()}</span>
                 </div>
-                <div className="text-slate-500">
-                  Nodes plotted: <strong className="text-slate-300 font-bold">{polygonPoints.length}</strong>
+                <div className="text-gray-300">
+                  Nodes plotted: <strong className="text-gray-300 font-bold">{polygonPoints.length}</strong>
                 </div>
               </div>
             </div>
 
             {/* PANEL C: Operational Restriction Sheet */}
-            <div className="w-[340px] flex flex-col bg-slate-950 overflow-y-auto">
+            <div className="w-[340px] flex flex-col bg-gray-800 overflow-y-auto">
               <div className="p-5 space-y-5 text-left text-xs font-mono">
-                <div className="text-[10px] font-bold text-slate-500 tracking-wider uppercase border-b border-slate-900 pb-2">
+                <div className="text-[10px] font-bold text-gray-300 tracking-wider uppercase border-b border-gray-800 pb-2">
                   Restriction Configuration Sheet
                 </div>
 
                 <div className="space-y-4">
                   {/* Name field */}
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Zone Key Name</label>
+                    <label className="block text-[9px] font-bold text-gray-300 uppercase mb-1.5">Zone Key Name</label>
                     <input
                       type="text"
                       value={zoneName}
                       onChange={(e) => setZoneName(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-gray-800 border border-gray-800 rounded-lg p-2.5 text-xs text-gray-300 focus:outline-none focus:border-gray-800"
                       placeholder="e.g. HOWRAH_STATION_CORE"
                     />
                   </div>
 
                   {/* Active Toggle */}
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Execution Status</label>
+                    <label className="block text-[9px] font-bold text-gray-300 uppercase mb-1.5">Execution Status</label>
                     <select
                       value={isZoneActive ? 'ACTIVE' : 'DISABLED'}
                       onChange={(e) => setIsZoneActive(e.target.value === 'ACTIVE')}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-bold text-slate-200 focus:outline-none"
+                      className="w-full bg-gray-800 border border-gray-800 rounded-lg p-2.5 text-xs font-bold text-gray-300 focus:outline-none"
                     >
                       <option value="ACTIVE">🟢 ENABLED & SYNCED</option>
                       <option value="DISABLED">🔴 DISABLED (INACTIVE)</option>
@@ -950,11 +950,11 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
                   {/* Policy rules selection */}
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Marketplace policy Token</label>
+                    <label className="block text-[9px] font-bold text-gray-300 uppercase mb-1.5">Marketplace policy Token</label>
                     <select
                       value={policyType}
                       onChange={(e) => setPolicyType(e.target.value as any)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none font-bold"
+                      className="w-full bg-gray-800 border border-gray-800 rounded-lg p-2.5 text-xs text-gray-300 focus:outline-none font-bold"
                     >
                       <option value="ACTIVE_DISPATCH">ACTIVE_DISPATCH (Normal Dispatching)</option>
                       <option value="BLACKLIST_BLOCK">BLACKLIST_BLOCK (Halt Inbound/Outbound Booking)</option>
@@ -965,10 +965,10 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
                   {/* Dynamic policy parameters */}
                   {policyType === 'SURGE_FLOOR_FORCE' && (
-                    <div className="bg-slate-900/50 border border-slate-900 p-3.5 rounded-lg space-y-2">
-                      <div className="flex justify-between items-center text-[10px] text-slate-400">
+                    <div className="bg-gray-800/50 border border-gray-800 p-3.5 rounded-lg space-y-2">
+                      <div className="flex justify-between items-center text-[10px] text-gray-300">
                         <span>SURGE FLOOR OVERRIDE:</span>
-                        <strong className="text-blue-400 text-xs font-bold">{surgeMultiplier.toFixed(1)}x</strong>
+                        <strong className="text-accent-400 text-xs font-bold">{surgeMultiplier.toFixed(1)}x</strong>
                       </div>
                       <input
                         type="range"
@@ -983,8 +983,8 @@ export const MarketplaceOrchestrator: React.FC = () => {
                   )}
 
                   {policyType === 'TRANSMISSION_RESTRICT' && (
-                    <div className="bg-slate-900/50 border border-slate-900 p-3.5 rounded-lg space-y-2">
-                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Allowed Pilot Profile</label>
+                    <div className="bg-gray-800/50 border border-gray-800 p-3.5 rounded-lg space-y-2">
+                      <label className="block text-[9px] font-bold text-gray-300 uppercase mb-1">Allowed Pilot Profile</label>
                       <div className="grid grid-cols-3 gap-1.5">
                         {(['ALL', 'AUTOMATIC_ONLY', 'MANUAL_ONLY'] as const).map(trans => (
                           <button
@@ -993,8 +993,8 @@ export const MarketplaceOrchestrator: React.FC = () => {
                             onClick={() => setAllowedTransmissions(trans)}
                             className={`py-1 rounded text-[8px] font-bold uppercase text-center border transition ${
                               allowedTransmissions === trans
-                                ? 'bg-indigo-600 text-white border-indigo-500'
-                                : 'bg-slate-950 border-slate-900 text-slate-400'
+                                ? 'bg-accent-400 text-white border-border-accent'
+                                : 'bg-gray-800 border-gray-800 text-gray-300'
                             }`}
                           >
                             {trans.replace('_ONLY', '')}
@@ -1007,28 +1007,28 @@ export const MarketplaceOrchestrator: React.FC = () => {
                   {/* Active Scheduled dates pickers */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Activation Start</label>
+                      <label className="block text-[8px] font-bold text-gray-300 uppercase mb-1">Activation Start</label>
                       <input
                         type="datetime-local"
                         value={activationStart}
                         onChange={(e) => setActivationStart(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[10px] text-slate-300 focus:outline-none"
+                        className="w-full bg-gray-800 border border-gray-800 rounded-lg p-2 text-[10px] text-gray-300 focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Activation End</label>
+                      <label className="block text-[8px] font-bold text-gray-300 uppercase mb-1">Activation End</label>
                       <input
                         type="datetime-local"
                         value={activationEnd}
                         onChange={(e) => setActivationEnd(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[10px] text-slate-300 focus:outline-none"
+                        className="w-full bg-gray-800 border border-gray-800 rounded-lg p-2 text-[10px] text-gray-300 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Cache eviction warning banner */}
-                  <div className="bg-slate-900 border border-slate-850 p-3.5 rounded-lg text-[9px] text-slate-400 space-y-1">
-                    <div className="text-amber-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <div className="bg-gray-800 border border-gray-800 p-3.5 rounded-lg text-[9px] text-gray-300 space-y-1">
+                    <div className="text-warning-400 font-bold uppercase tracking-wider flex items-center gap-1">
                       <span>⚠️</span> IMMEDIATE CACHE EVICTION ACTIONS
                     </div>
                     <p className="leading-normal">
@@ -1038,7 +1038,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
                   {/* Displacement Warnings indicator check */}
                   {policyType === 'BLACKLIST_BLOCK' && (
-                    <div className="bg-rose-950/20 border border-rose-900/35 p-3 rounded-lg text-[9px] text-rose-300 flex items-start gap-1.5">
+                    <div className="bg-negative-400/20 border border-negative-400/35 p-3 rounded-lg text-[9px] text-negative-400 flex items-start gap-1.5">
                       <span className="text-xs animate-pulse">⚠️</span>
                       <div>
                         <strong>ACTIVE VEHICLE DISPLACEMENT WARNING:</strong> 3 active trip journeys are currently traversing this geofence boundaries. Blacklist deployment will evict matches.
@@ -1048,14 +1048,14 @@ export const MarketplaceOrchestrator: React.FC = () => {
                 </div>
 
                 {/* Justification note & Slide confirmation gate */}
-                <div className="border-t border-slate-900 pt-4 mt-4 space-y-4">
+                <div className="border-t border-gray-800 pt-4 mt-4 space-y-4">
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Intervention Justification Notes</label>
+                    <label className="block text-[9px] font-bold text-gray-300 uppercase mb-1.5">Intervention Justification Notes</label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Input justification note details (mandatory to unlock execution slide gate)..."
-                      className="w-full h-16 bg-slate-900 border border-slate-800 focus:border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none transition resize-none leading-relaxed"
+                      className="w-full h-16 bg-gray-800 border border-gray-800 focus:border-gray-800 rounded-lg p-2.5 text-xs text-gray-300 placeholder-slate-600 focus:outline-none transition resize-none leading-relaxed"
                     />
                   </div>
 

@@ -836,7 +836,7 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ══════════════════════════════════════════════════════════ */}
 			{selectedTx && (
 				<div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-					<div className="absolute inset-0 bg-gray-1000/30 backdrop-blur-sm" onClick={() => setSelectedTx(null)} />
+					<div className="absolute inset-0 bg-background-secondary0/30 backdrop-blur-sm" onClick={() => setSelectedTx(null)} />
 					<div className="relative w-full max-w-lg bg-background-primary border-l border-border-opaque h-full shadow-2xl flex flex-col">
 						<div className="p-6 overflow-y-auto space-y-6 flex-1">
 							<div className="flex justify-between items-start border-b border-border-opaque pb-4">
@@ -910,7 +910,7 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ── REFUND MODAL ── */}
 			{showRefundModal && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-					<div className="absolute inset-0 bg-gray-1000/40 backdrop-blur-sm" onClick={() => setShowRefundModal(false)} />
+					<div className="absolute inset-0 bg-background-secondary0/40 backdrop-blur-sm" onClick={() => setShowRefundModal(false)} />
 					<form onSubmit={handleRequestRefund} className="relative w-full max-w-md card space-y-4">
 						<div>
 							<h3 className="text-label-large text-content-primary font-semibold">Request Transaction Refund</h3>
@@ -941,7 +941,7 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ── WALLET ADJUSTMENT MODAL ── */}
 			{showAdjustModal && selectedWallet && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-					<div className="absolute inset-0 bg-gray-1000/40 backdrop-blur-sm" onClick={() => setShowAdjustModal(false)} />
+					<div className="absolute inset-0 bg-background-secondary0/40 backdrop-blur-sm" onClick={() => setShowAdjustModal(false)} />
 					<form onSubmit={handleAdjustWallet} className="relative w-full max-w-md card space-y-4">
 						<div>
 							<h3 className="text-label-large text-content-primary font-semibold">Manual Wallet Balance Adjustment</h3>
@@ -993,7 +993,7 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ── DISPUTE EVIDENCE MODAL ── */}
 			{showEvidenceModal && selectedDispute && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-					<div className="absolute inset-0 bg-gray-1000/40 backdrop-blur-sm" onClick={() => setShowEvidenceModal(false)} />
+					<div className="absolute inset-0 bg-background-secondary0/40 backdrop-blur-sm" onClick={() => setShowEvidenceModal(false)} />
 					<form onSubmit={handleSubmitEvidence} className="relative w-full max-w-md card space-y-4">
 						<div>
 							<h3 className="text-label-large text-content-primary font-semibold">Submit Dispute Evidence</h3>

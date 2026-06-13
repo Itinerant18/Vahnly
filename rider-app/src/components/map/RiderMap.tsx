@@ -22,15 +22,15 @@ interface RiderMapProps {
 
 const USER_ICON_HTML = `
   <div style="position:relative;width:20px;height:20px">
-    <div style="position:absolute;inset:0;border-radius:50%;background:#3B82F6;opacity:0.3;animation:pulse 2s infinite"></div>
-    <div style="position:absolute;inset:4px;border-radius:50%;background:#3B82F6;border:2px solid white;box-shadow:0 0 8px #3B82F640"></div>
+    <div style="position:absolute;inset:0;border-radius:50%;background:var(--accent-400);opacity:0.3;animation:pulse 2s infinite"></div>
+    <div style="position:absolute;inset:4px;border-radius:50%;background:var(--accent-400);border:2px solid var(--content-primary);box-shadow:0 0 8px var(--accent-400)"></div>
   </div>
 `;
 
 const DRIVER_ICON_HTML = `
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-    <circle cx="14" cy="14" r="13" fill="#FF6B35" fill-opacity="0.15" stroke="#FF6B35" stroke-width="1"/>
-    <circle cx="14" cy="14" r="5" fill="#FF6B35"/>
+    <circle cx="14" cy="14" r="13" fill="var(--accent-400)" fill-opacity="0.15" stroke="var(--accent-400)" stroke-width="1"/>
+    <circle cx="14" cy="14" r="5" fill="var(--accent-400)"/>
   </svg>
 `;
 
@@ -153,11 +153,11 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
       {/* Recenter FAB */}
       <button
         onClick={onRecenter}
-        className="absolute bottom-[136px] right-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#1E1E1E] shadow-lg ring-1 ring-white/10"
+        className="absolute bottom-[136px] right-4 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary shadow-lg ring-1 ring-border-opaque"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="4" stroke="white" strokeWidth="1.5" />
-          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </button>
     </div>

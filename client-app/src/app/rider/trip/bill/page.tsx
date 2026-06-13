@@ -82,14 +82,14 @@ function TripBillContent() {
     <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
       
       {/* Header */}
-      <header className="border-b border-zinc-900 pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left shrink-0">
+      <header className="border-b border-border-opaque pb-4 flex justify-between items-center w-full max-w-md mx-auto text-left shrink-0">
         <div>
-          <span className="bg-zinc-900 text-zinc-500 border border-zinc-850 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
+          <span className="bg-background-secondary text-content-tertiary border border-border-opaque px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider block w-max mb-1">
             {t('badge')}
           </span>
           <h1 className="text-sm font-bold tracking-tight text-white font-mono uppercase">{t('title')}</h1>
         </div>
-        <span className="text-[9px] font-mono text-zinc-500 uppercase font-bold">ID: {tripId.slice(0, 10)}</span>
+        <span className="text-[9px] font-mono text-content-tertiary uppercase font-bold">ID: {tripId.slice(0, 10)}</span>
       </header>
 
       {/* Main Billing and post billing layout */}
@@ -97,22 +97,22 @@ function TripBillContent() {
         
         {/* State Banner / Spinner indicators */}
         {paymentState === 'AWAITING_INTENT' && (
-          <div className="bg-blue-950/60 border border-blue-900 text-blue-200 text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider animate-pulse">
+          <div className="bg-surface-accent/60 border border-border-accent text-content-accent text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider animate-pulse">
             {t('stateAwaitingIntent')}
           </div>
         )}
 
         {paymentState === 'PROCESSING_DEBIT' && (
-          <div className="bg-amber-950/60 border border-amber-900 text-amber-200 text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2">
-            <span className="h-2 w-2 bg-amber-400 rounded-full animate-ping" />
+          <div className="bg-surface-warning/60 border border-warning-400 text-content-warning text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+            <span className="h-2 w-2 bg-warning-400 rounded-full animate-ping" />
             <span>{t('stateProcessingDebit')}</span>
           </div>
         )}
 
         {paymentState === 'RETRY_FALLBACK' && (
-          <div className="bg-red-950 border border-red-900 text-red-200 text-xs p-4 rounded-xl space-y-3 font-mono text-center">
+          <div className="bg-surface-negative border border-negative-400 text-content-negative text-xs p-4 rounded-xl space-y-3 font-mono text-center">
             <h4 className="font-bold uppercase tracking-wider">{t('retryFailedTitle')}</h4>
-            <p className="text-[10px] leading-normal text-red-300 font-sans normal-case">
+            <p className="text-[10px] leading-normal text-content-negative font-sans normal-case">
               {t('retryFailedBody')}
             </p>
             <button
@@ -125,36 +125,36 @@ function TripBillContent() {
         )}
 
         {paymentState === 'SETTLED' && (
-          <div className="bg-emerald-950 border border-emerald-900 text-emerald-300 text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider animate-pulse">
+          <div className="bg-surface-positive border border-positive-400 text-content-positive text-xs p-4 rounded-xl text-center font-mono font-bold uppercase tracking-wider animate-pulse">
             {t('stateSettled')}
           </div>
         )}
 
         {/* Section A: Journey Metrics Block */}
-        <div className="grid grid-cols-2 gap-2 bg-zinc-950 border border-zinc-900 p-4 rounded-2xl text-[10px] font-mono text-zinc-400">
-          <div className="border-r border-zinc-900 pr-2">
-            <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-1">{t('distanceCount')}</span>
+        <div className="grid grid-cols-2 gap-2 bg-background-primary border border-border-opaque p-4 rounded-2xl text-[10px] font-mono text-content-secondary">
+          <div className="border-r border-border-opaque pr-2">
+            <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-1">{t('distanceCount')}</span>
             <span className="text-white text-xs font-semibold">{billBreakdown.distance}</span>
           </div>
           <div className="pl-2">
-            <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-1">{t('totalDuration')}</span>
+            <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-1">{t('totalDuration')}</span>
             <span className="text-white text-xs font-semibold">{billBreakdown.duration}</span>
           </div>
-          <div className="border-t border-zinc-900 border-r pr-2 pt-2 mt-2">
-            <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-1">{t('stopsNode')}</span>
+          <div className="border-t border-border-opaque border-r pr-2 pt-2 mt-2">
+            <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-1">{t('stopsNode')}</span>
             <span className="text-white text-xs font-semibold">{billBreakdown.stops}</span>
           </div>
-          <div className="border-t border-zinc-900 pl-2 pt-2 mt-2">
-            <span className="text-zinc-600 font-bold uppercase text-[8px] block mb-1">{t('waitingTime')}</span>
+          <div className="border-t border-border-opaque pl-2 pt-2 mt-2">
+            <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-1">{t('waitingTime')}</span>
             <span className="text-white text-xs font-semibold">{billBreakdown.waitingTime}</span>
           </div>
         </div>
 
         {/* Section B: Itemized Fare Ledger Matrix */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3 font-mono text-xs text-zinc-400">
-          <div className="flex justify-between items-center text-[8px] font-bold text-zinc-500 uppercase tracking-wider border-b border-zinc-900 pb-2">
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3 font-mono text-xs text-content-secondary">
+          <div className="flex justify-between items-center text-[8px] font-bold text-content-tertiary uppercase tracking-wider border-b border-border-opaque pb-2">
             <span>{t('itemizedComponents')}</span>
-            <span className="text-zinc-400">{t('paiseMappings')}</span>
+            <span className="text-content-secondary">{t('paiseMappings')}</span>
           </div>
 
           <div className="flex justify-between">
@@ -186,23 +186,23 @@ function TripBillContent() {
             <span className="text-white">₹{billBreakdown.gstTax.toFixed(2)}</span>
           </div>
 
-          <div className="flex justify-between text-zinc-500 border-t border-zinc-900 pt-2.5">
+          <div className="flex justify-between text-content-tertiary border-t border-border-opaque pt-2.5">
             <span>{t('linePromoDiscount')}</span>
-            <span className="text-emerald-400">-₹{billBreakdown.promoDiscount.toFixed(2)}</span>
+            <span className="text-content-positive">-₹{billBreakdown.promoDiscount.toFixed(2)}</span>
           </div>
 
-          <div className="flex justify-between font-bold text-sm text-white border-t border-zinc-800 pt-2.5">
+          <div className="flex justify-between font-bold text-sm text-white border-t border-border-opaque pt-2.5">
             <span>{t('lineTotalPayable')}</span>
-            <span className="text-emerald-400">₹{billBreakdown.total.toFixed(2)}</span>
+            <span className="text-content-positive">₹{billBreakdown.total.toFixed(2)}</span>
           </div>
         </div>
 
         {/* Section C: Checkout Access Interface (Only before settlement) */}
         {paymentState !== 'SETTLED' ? (
           <div className="space-y-3">
-            <div className="flex justify-between items-center bg-zinc-950 border border-zinc-900 p-4 rounded-xl text-xs font-mono">
+            <div className="flex justify-between items-center bg-background-primary border border-border-opaque p-4 rounded-xl text-xs font-mono">
               <div className="space-y-0.5">
-                <span className="text-zinc-500 text-[8px] uppercase block">{t('settlementInstrument')}</span>
+                <span className="text-content-tertiary text-[8px] uppercase block">{t('settlementInstrument')}</span>
                 <span className="font-bold text-white text-xs">{t('instrumentLink', { method: paymentMethod })}</span>
               </div>
 
@@ -210,7 +210,7 @@ function TripBillContent() {
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 disabled={paymentState !== 'IDLE' && paymentState !== 'RETRY_FALLBACK'}
-                className="bg-zinc-900 border border-zinc-850 rounded-xl p-2.5 text-zinc-300 outline-none cursor-pointer"
+                className="bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-content-secondary outline-none cursor-pointer"
               >
                 <option value="UPI">{t('optionUpi')}</option>
                 <option value="CREDIT CARD">{t('optionCreditCard')}</option>
@@ -222,17 +222,17 @@ function TripBillContent() {
             <button
               onClick={handlePayNow}
               disabled={paymentState !== 'IDLE' && paymentState !== 'RETRY_FALLBACK'}
-              className="w-full bg-white hover:bg-zinc-200 text-black py-4.5 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center font-sans shadow-lg disabled:opacity-50"
+              className="w-full bg-white hover:bg-background-tertiary text-black py-4.5 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center font-sans shadow-lg disabled:opacity-50"
             >
               {t('confirmAndPay', { amount: billBreakdown.total.toFixed(2) })}
             </button>
           </div>
         ) : (
           /* Post-Trip Accounting & Post-Billing Invoice Integrity */
-          <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
-              <span className="font-mono text-[9px] text-zinc-500 font-bold uppercase">{t('invoiceActions')}</span>
-              <span className="bg-emerald-950 text-emerald-400 border border-emerald-900 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
+          <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-border-opaque pb-3">
+              <span className="font-mono text-[9px] text-content-tertiary font-bold uppercase">{t('invoiceActions')}</span>
+              <span className="bg-surface-positive text-content-positive border border-positive-400 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">
                 {t('paid')}
               </span>
             </div>
@@ -241,7 +241,7 @@ function TripBillContent() {
               {/* PDF Invoicing Infrastructure */}
               <button
                 onClick={handlePrintPDFInvoice}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-300 text-center cursor-pointer"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary text-center cursor-pointer"
               >
                 {t('printSavePdf')}
               </button>
@@ -251,8 +251,8 @@ function TripBillContent() {
                 onClick={handleTriggerEmailDispatch}
                 className={`py-3 rounded-xl text-center border cursor-pointer ${
                   emailSent 
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-500' 
-                    : 'bg-zinc-900 hover:bg-zinc-850 border-zinc-850 text-zinc-300'
+                    ? 'bg-background-secondary border-border-opaque text-content-tertiary' 
+                    : 'bg-background-secondary hover:bg-background-tertiary border-border-opaque text-content-secondary'
                 }`}
               >
                 {emailSent ? t('emailSent') : t('emailReceipt')}
@@ -263,7 +263,7 @@ function TripBillContent() {
                 onClick={() => {
                   router.push(`/account/support?tripId=${tripId}&dispute=billing`);
                 }}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl text-zinc-400 hover:text-white text-center col-span-2 cursor-pointer"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary hover:text-white text-center col-span-2 cursor-pointer"
               >
                 {t('reportDispute')}
               </button>
@@ -281,7 +281,7 @@ function TripBillContent() {
       </main>
 
       {/* Invoice Legal parameters */}
-      <footer className="w-full max-w-md mx-auto text-center text-[7px] font-mono text-zinc-700 select-none pt-4 border-t border-zinc-900 shrink-0">
+      <footer className="w-full max-w-md mx-auto text-center text-[7px] font-mono text-content-tertiary select-none pt-4 border-t border-border-opaque shrink-0">
         REGISTRY GSTIN: 19AAACD4561M1Z5 • INVOICE NO: inv-2026-0604 • FAST-TAG ACTIVE
       </footer>
     </div>
@@ -292,7 +292,7 @@ export default function TripBillPage() {
   const t = useTranslations('riderTripBill');
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-zinc-500 font-mono text-xs uppercase animate-pulse">
+      <div className="min-h-screen bg-black flex items-center justify-center font-sans text-content-tertiary font-mono text-xs uppercase animate-pulse">
         {t('loadingInvoice')}
       </div>
     }>

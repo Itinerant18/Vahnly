@@ -583,9 +583,9 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
   const getIncidentBadgeColor = (type: 'SOS' | 'FRAUD' | 'SILENCE') => {
     switch (type) {
-      case 'SOS': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      case 'FRAUD': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'SILENCE': return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
+      case 'SOS': return 'bg-negative-400/10 text-negative-400 border-negative-400/20';
+      case 'FRAUD': return 'bg-warning-400/10 text-warning-400 border-warning-400/20';
+      case 'SILENCE': return 'bg-accent-400/10 text-accent-400 border-border-accent/20';
     }
   };
 
@@ -594,24 +594,24 @@ export const IncidentRecoveryTerminal: React.FC = () => {
   const activeSilenceCount = incidents.filter(i => i.incident_type === 'SILENCE' && i.incident_status === 'UNASSIGNED').length;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] w-full text-slate-100 bg-slate-950 font-sans relative overflow-hidden select-none">
+    <div className="flex flex-col h-[calc(100vh-80px)] w-full text-gray-300 bg-gray-800 font-sans relative overflow-hidden select-none">
       
       {/* Dynamic Ribbon Control Header */}
-      <div className="flex justify-between items-center px-6 py-3 border-b border-slate-900 bg-slate-950 text-xs font-mono">
+      <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800 bg-gray-800 text-xs font-mono">
         <div className="flex items-center gap-6">
-          <span className="flex items-center gap-2 text-rose-500 font-bold tracking-wider animate-pulse">
+          <span className="flex items-center gap-2 text-negative-400 font-bold tracking-wider animate-pulse">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-negative-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-negative-400"></span>
             </span>
             CRITICAL INTERVENTION COMMAND CENTER
           </span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400">
-            Active SOS: <strong className="text-rose-500">{activeSOSCount}</strong>
+          <span className="text-gray-300">|</span>
+          <span className="text-gray-300">
+            Active SOS: <strong className="text-negative-400">{activeSOSCount}</strong>
           </span>
-          <span className="text-slate-400">
-            Telemetry Alerts: <strong className="text-amber-500">{activeFraudCount + activeSilenceCount}</strong>
+          <span className="text-gray-300">
+            Telemetry Alerts: <strong className="text-warning-400">{activeFraudCount + activeSilenceCount}</strong>
           </span>
         </div>
         
@@ -619,20 +619,20 @@ export const IncidentRecoveryTerminal: React.FC = () => {
           {import.meta.env.DEV && (
             <button
               onClick={triggerSandboxSOSAlert}
-              className="px-3 py-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded hover:bg-slate-800 transition active:scale-95"
+              className="px-3 py-1 text-[10px] bg-gray-800 border border-gray-800 text-gray-300 hover:text-white rounded hover:bg-gray-800 transition active:scale-95"
             >
               Trigger Sandbox SOS
             </button>
           )}
-          <span className="text-slate-700 font-bold select-none">•</span>
+          <span className="text-gray-300 font-bold select-none">•</span>
           {wsLive ? (
-            <span className="text-emerald-500 font-bold tracking-wider flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-positive-400 font-bold tracking-wider flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-positive-400 animate-pulse"></span>
               GATEWAY LINK ACTIVE
             </span>
           ) : (
-            <span className="text-amber-500 font-bold tracking-wider flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span className="text-warning-400 font-bold tracking-wider flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-warning-400 animate-pulse"></span>
               GATEWAY LINK DOWN — RECONNECTING
             </span>
           )}
@@ -643,9 +643,9 @@ export const IncidentRecoveryTerminal: React.FC = () => {
       <div className="flex flex-1 overflow-hidden min-h-0">
         
         {/* ZONE A: Sidebar Feed (1/3 viewport width) */}
-        <div className="w-[340px] border-r border-slate-900 flex flex-col bg-slate-950 select-none">
-          <div className="p-4 border-b border-slate-900">
-            <span className="text-[10px] font-bold tracking-wider font-mono text-slate-500 uppercase">Exceptions Ingestion Feed</span>
+        <div className="w-[340px] border-r border-gray-800 flex flex-col bg-gray-800 select-none">
+          <div className="p-4 border-b border-gray-800">
+            <span className="text-[10px] font-bold tracking-wider font-mono text-gray-300 uppercase">Exceptions Ingestion Feed</span>
             
             {/* Filter buttons matrix */}
             <div className="grid grid-cols-4 gap-1.5 mt-3 text-[10px] font-mono font-bold">
@@ -655,8 +655,8 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                   onClick={() => setActiveFilter(filter)}
                   className={`py-1 rounded border text-center transition ${
                     activeFilter === filter
-                      ? 'bg-slate-100 text-slate-950 border-slate-100'
-                      : 'bg-slate-900/50 text-slate-400 border-slate-800 hover:bg-slate-900'
+                      ? 'bg-gray-800 text-gray-300 border-gray-800'
+                      : 'bg-gray-800/50 text-gray-300 border-gray-800 hover:bg-gray-800'
                   }`}
                 >
                   {filter}
@@ -667,7 +667,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {filteredIncidents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-900 rounded-lg text-slate-500 text-xs italic p-4 text-center">
+              <div className="flex flex-col items-center justify-center h-48 border border-dashed border-gray-800 rounded-lg text-gray-300 text-xs italic p-4 text-center">
                 All telemetry feeds stable. No unresolved exceptions matching active filters.
               </div>
             ) : (
@@ -679,25 +679,25 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                     onClick={() => { setSelectedIncident(incident); setTerminalLog(null); }}
                     className={`relative p-4 rounded-lg border cursor-pointer transition text-left overflow-hidden ${
                       incident.incident_type === 'SOS'
-                        ? 'border-rose-600 bg-rose-950/20 animate-pulse shadow-lg'
+                        ? 'border-negative-400 bg-negative-400/20 animate-pulse shadow-lg'
                         : isSelected
-                        ? 'bg-slate-900 border-slate-700 shadow-lg'
-                        : 'bg-slate-950 border-slate-900 hover:bg-slate-900/30'
+                        ? 'bg-gray-800 border-gray-800 shadow-lg'
+                        : 'bg-gray-800 border-gray-800 hover:bg-gray-800/30'
                     }`}
                   >
                     {/* Visual left edge warning strip */}
                     <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${
                       incident.incident_type === 'SOS' 
-                        ? 'bg-rose-500 animate-pulse' 
+                        ? 'bg-negative-400 animate-pulse' 
                         : incident.incident_type === 'FRAUD' 
-                        ? 'bg-amber-500' 
-                        : 'bg-sky-500'
+                        ? 'bg-warning-400' 
+                        : 'bg-accent-400'
                     }`} />
 
                     <div className="pl-2.5">
                       <div className="flex justify-between items-start">
-                        <span className={`text-xs font-bold ${incident.incident_type === 'SOS' ? 'text-rose-500 animate-pulse' : 'text-slate-200'}`}>{incident.driver_name}</span>
-                        <span className="text-[9px] font-mono bg-slate-900 text-slate-400 border border-slate-800 px-1.5 py-0.5 rounded">
+                        <span className={`text-xs font-bold ${incident.incident_type === 'SOS' ? 'text-negative-400 animate-pulse' : 'text-gray-300'}`}>{incident.driver_name}</span>
+                        <span className="text-[9px] font-mono bg-gray-800 text-gray-300 border border-gray-800 px-1.5 py-0.5 rounded">
                           {incident.city_prefix}
                         </span>
                       </div>
@@ -708,22 +708,22 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                         </span>
                         
                         {incident.incident_status === 'INVESTIGATING' ? (
-                          <span className="text-[8px] font-bold font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded animate-pulse">
+                          <span className="text-[8px] font-bold font-mono bg-accent-400/10 text-accent-400 border border-border-accent/20 px-1.5 py-0.5 rounded animate-pulse">
                             INVESTIGATING
                           </span>
                         ) : (
-                          <span className="text-[8px] font-bold font-mono bg-slate-900 text-rose-500 border border-slate-800 px-1.5 py-0.5 rounded animate-pulse">
+                          <span className="text-[8px] font-bold font-mono bg-gray-800 text-negative-400 border border-gray-800 px-1.5 py-0.5 rounded animate-pulse">
                             UNASSIGNED
                           </span>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 mt-3 text-[10px] font-mono text-slate-500 border-t border-slate-900/60 pt-2">
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-[10px] font-mono text-gray-300 border-t border-gray-800/60 pt-2">
                         <div>
-                          Ping: <strong className="text-slate-400">{incident.seconds_since_last_ping}s ago</strong>
+                          Ping: <strong className="text-gray-300">{incident.seconds_since_last_ping}s ago</strong>
                         </div>
                         <div>
-                          Plate: <strong className="text-slate-400">{incident.license_plate}</strong>
+                          Plate: <strong className="text-gray-300">{incident.license_plate}</strong>
                         </div>
                       </div>
                     </div>
@@ -735,10 +735,10 @@ export const IncidentRecoveryTerminal: React.FC = () => {
         </div>
 
         {/* Dynamic Right Split Pane (Zone B & C Combined) */}
-        <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden">
+        <div className="flex-1 flex flex-col bg-gray-800 overflow-hidden">
           
           {/* ZONE B: Stark Minimalist Map Viewport (Canvas mapping) */}
-          <div className="flex-1 min-h-[300px] border-b border-slate-900 relative">
+          <div className="flex-1 min-h-[300px] border-b border-gray-800 relative">
             <canvas 
               ref={canvasRef} 
               width={700}
@@ -746,62 +746,62 @@ export const IncidentRecoveryTerminal: React.FC = () => {
               className="w-full h-full block"
             />
             {selectedIncident && (
-              <div className="absolute top-4 left-4 bg-slate-950/90 border border-slate-800 px-3.5 py-2.5 rounded-lg text-xs font-mono space-y-1 z-10 text-left shadow-lg">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Telemetry Vectors</div>
-                <div>Status: <span className="text-slate-200">{selectedIncident.last_known_status}</span></div>
-                <div>Lat: <span className="text-slate-200">{selectedIncident.latitude.toFixed(6)}</span></div>
-                <div>Lng: <span className="text-slate-200">{selectedIncident.longitude.toFixed(6)}</span></div>
+              <div className="absolute top-4 left-4 bg-gray-800/90 border border-gray-800 px-3.5 py-2.5 rounded-lg text-xs font-mono space-y-1 z-10 text-left shadow-lg">
+                <div className="text-[10px] text-gray-300 font-bold uppercase tracking-wider">Telemetry Vectors</div>
+                <div>Status: <span className="text-gray-300">{selectedIncident.last_known_status}</span></div>
+                <div>Lat: <span className="text-gray-300">{selectedIncident.latitude.toFixed(6)}</span></div>
+                <div>Lng: <span className="text-gray-300">{selectedIncident.longitude.toFixed(6)}</span></div>
               </div>
             )}
           </div>
 
           {/* ZONE C: Telemetry Health Grid & Intervention Auditing Panel */}
-          <div className="h-[280px] bg-slate-950 p-6 flex flex-col justify-between overflow-y-auto">
+          <div className="h-[280px] bg-gray-800 p-6 flex flex-col justify-between overflow-y-auto">
             {selectedIncident ? (
               <div className="flex-1 flex flex-col justify-between text-left space-y-4">
                 <div className="grid grid-cols-3 gap-6">
                   
                   {/* Telemetry Health Grid Readout */}
-                  <div className="col-span-1 space-y-3.5 border-r border-slate-900 pr-4">
-                    <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider font-mono">Telemetry Health Metrics</div>
+                  <div className="col-span-1 space-y-3.5 border-r border-gray-800 pr-4">
+                    <div className="text-[10px] uppercase font-bold text-gray-300 tracking-wider font-mono">Telemetry Health Metrics</div>
                     
                     <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                      <div className="bg-slate-900/40 border border-slate-900 p-2.5 rounded-md">
-                        <div className="text-[9px] text-slate-500 font-bold">CALCULATED SPEED</div>
-                        <div className={`text-sm font-bold mt-1 ${selectedIncident.calculated_speed > 100 ? 'text-amber-500 animate-pulse' : 'text-slate-200'}`}>
+                      <div className="bg-gray-800/40 border border-gray-800 p-2.5 rounded-md">
+                        <div className="text-[9px] text-gray-300 font-bold">CALCULATED SPEED</div>
+                        <div className={`text-sm font-bold mt-1 ${selectedIncident.calculated_speed > 100 ? 'text-warning-400 animate-pulse' : 'text-gray-300'}`}>
                           {selectedIncident.calculated_speed.toFixed(1)} km/h
                         </div>
                       </div>
                       
-                      <div className="bg-slate-900/40 border border-slate-900 p-2.5 rounded-md">
-                        <div className="text-[9px] text-slate-500 font-bold">BEARING DELTA</div>
-                        <div className="text-sm font-bold text-slate-200 mt-1">
+                      <div className="bg-gray-800/40 border border-gray-800 p-2.5 rounded-md">
+                        <div className="text-[9px] text-gray-300 font-bold">BEARING DELTA</div>
+                        <div className="text-sm font-bold text-gray-300 mt-1">
                           {selectedIncident.bearing_delta.toFixed(1)}°
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/40 border border-slate-900 p-2.5 rounded-md">
-                        <div className="text-[9px] text-slate-500 font-bold">DEVICE BATTERY</div>
+                      <div className="bg-gray-800/40 border border-gray-800 p-2.5 rounded-md">
+                        <div className="text-[9px] text-gray-300 font-bold">DEVICE BATTERY</div>
                         <div className="flex items-center gap-1.5 mt-1.5">
-                          <div className="w-full bg-slate-800 rounded-full h-1.5">
+                          <div className="w-full bg-gray-800 rounded-full h-1.5">
                             <div 
-                              className={`h-1.5 rounded-full ${selectedIncident.battery_level < 30 ? 'bg-rose-500' : 'bg-emerald-500'}`} 
+                              className={`h-1.5 rounded-full ${selectedIncident.battery_level < 30 ? 'bg-negative-400' : 'bg-positive-400'}`} 
                               style={{ width: `${selectedIncident.battery_level}%` }}
                             />
                           </div>
-                          <span className="text-[9px] text-slate-300 font-bold">{selectedIncident.battery_level}%</span>
+                          <span className="text-[9px] text-gray-300 font-bold">{selectedIncident.battery_level}%</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/40 border border-slate-900 p-2.5 rounded-md">
-                        <div className="text-[9px] text-slate-500 font-bold">MOCK PROVIDER</div>
+                      <div className="bg-gray-800/40 border border-gray-800 p-2.5 rounded-md">
+                        <div className="text-[9px] text-gray-300 font-bold">MOCK PROVIDER</div>
                         <div className="mt-1">
                           {selectedIncident.is_mock_provider ? (
-                            <span className="text-[9px] font-bold text-rose-400 bg-rose-950/40 border border-rose-900 px-1.5 py-0.5 rounded animate-pulse">
+                            <span className="text-[9px] font-bold text-negative-400 bg-negative-400/40 border border-negative-400 px-1.5 py-0.5 rounded animate-pulse">
                               MOCKING DETECTED
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-900 px-1.5 py-0.5 rounded">
+                            <span className="text-[9px] font-bold text-positive-400 bg-positive-400/40 border border-positive-400 px-1.5 py-0.5 rounded">
                               GENUINE GPS
                             </span>
                           )}
@@ -811,30 +811,30 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                   </div>
 
                   {/* Operational Claim controls */}
-                  <div className="col-span-1 border-r border-slate-900 pr-4 flex flex-col justify-between">
+                  <div className="col-span-1 border-r border-gray-800 pr-4 flex flex-col justify-between">
                     <div>
-                      <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider font-mono">Claim Ownership Status</div>
+                      <div className="text-[10px] uppercase font-bold text-gray-300 tracking-wider font-mono">Claim Ownership Status</div>
                       <div className="mt-4 text-xs font-mono">
                         {selectedIncident.incident_status === 'UNASSIGNED' ? (
                           <div className="space-y-3">
-                            <div className="text-rose-400 font-bold flex items-center gap-1.5 animate-pulse">
+                            <div className="text-negative-400 font-bold flex items-center gap-1.5 animate-pulse">
                               <span>⚠️</span> ALERT REQUIRES COMMAND TAKEOVER
                             </div>
                             <button
                               onClick={() => executeClaimIncident(selectedIncident.order_id)}
                               disabled={isMutating}
-                              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-lg transition active:scale-95 text-xs font-mono uppercase tracking-wider"
+                              className="w-full bg-negative-400 hover:bg-negative-400 text-white font-bold py-2 rounded-lg transition active:scale-95 text-xs font-mono uppercase tracking-wider"
                             >
                               CLAIM INCIDENT MUTEX
                             </button>
                           </div>
                         ) : (
                           <div className="space-y-2.5">
-                            <div className="text-indigo-400 font-bold flex items-center gap-1.5">
-                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                            <div className="text-accent-400 font-bold flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent-400 animate-pulse"></span>
                               INVESTIGATION IN PROGRESS
                             </div>
-                            <div className="bg-slate-900 border border-slate-900 p-3 rounded-lg text-slate-300">
+                            <div className="bg-gray-800 border border-gray-800 p-3 rounded-lg text-gray-300">
                               Agent: <strong className="text-white font-mono">{selectedIncident.assigned_agent_id}</strong>
                             </div>
                           </div>
@@ -844,7 +844,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                     
                     {terminalLog && (
                       <div className={`p-2 rounded text-[9px] font-mono font-bold uppercase tracking-wider text-center ${
-                        terminalLog.startsWith('SUCCESS') ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-900/30' : 'bg-rose-950/20 text-rose-400 border border-rose-900/30'
+                        terminalLog.startsWith('SUCCESS') ? 'bg-positive-400/20 text-positive-400 border border-positive-400/30' : 'bg-negative-400/20 text-negative-400 border border-negative-400/30'
                       }`}>
                         {terminalLog}
                       </div>
@@ -854,13 +854,13 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                   {/* Actions & Justification note inputs */}
                   <div className="col-span-1 flex flex-col justify-between h-full">
                     <div className="space-y-2">
-                      <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider font-mono">Intervention Logs Justification</div>
+                      <div className="text-[10px] uppercase font-bold text-gray-300 tracking-wider font-mono">Intervention Logs Justification</div>
                       <textarea
                         disabled={isMutating}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="State audit reasons before dispatching destructive database resets..."
-                        className="w-full h-20 bg-slate-950 border border-slate-800 focus:border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none transition resize-none font-mono"
+                        className="w-full h-20 bg-gray-800 border border-gray-800 focus:border-gray-800 rounded-lg p-2.5 text-xs text-gray-300 placeholder-slate-600 focus:outline-none transition resize-none font-mono"
                       />
                     </div>
 
@@ -887,7 +887,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-grow flex flex-col items-center justify-center text-slate-500 italic text-xs font-mono">
+              <div className="flex-grow flex flex-col items-center justify-center text-gray-300 italic text-xs font-mono">
                 SELECT A STRANDED TELEMETRY STREAM FROM THE INGESTION FEED QUEUE TO EVALUATE RECOVERY ACTIONS.
               </div>
             )}
@@ -899,55 +899,55 @@ export const IncidentRecoveryTerminal: React.FC = () => {
 
       {/* Global SOS Takeover Modal Layer */}
       {takeoverIncident && (
-        <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-6 animate-fade-in select-none">
-          <div className="w-[500px] bg-slate-900 border-2 border-rose-600 rounded-xl overflow-hidden shadow-2xl animate-scale-up text-left">
+        <div className="absolute inset-0 bg-gray-800/90 backdrop-blur-md flex items-center justify-center z-50 p-6 animate-fade-in select-none">
+          <div className="w-[500px] bg-gray-800 border-2 border-negative-400 rounded-xl overflow-hidden shadow-2xl animate-scale-up text-left">
             
-            <div className="bg-rose-950/60 border-b border-rose-900/50 p-4 flex items-center gap-3">
+            <div className="bg-negative-400/60 border-b border-negative-400/50 p-4 flex items-center gap-3">
               <span className="relative flex h-3.5 w-3.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-negative-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-negative-400"></span>
               </span>
-              <span className="text-sm font-bold tracking-widest font-mono text-rose-500">
+              <span className="text-sm font-bold tracking-widest font-mono text-negative-400">
                 CRITICAL SOS PANIC ALARM DETECTED
               </span>
             </div>
 
-            <div className="p-6 space-y-4 font-mono text-xs text-slate-300">
-              <p className="text-slate-400">
+            <div className="p-6 space-y-4 font-mono text-xs text-gray-300">
+              <p className="text-gray-300">
                 An unassigned passenger/driver panic event trigger is currently routing. Automatic matches are suspended for this order id. Immediate manual intervention is required.
               </p>
 
-              <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-2">
+              <div className="bg-gray-800 border border-gray-800 rounded-lg p-4 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <span className="text-slate-500">ORDER ID:</span>
+                  <span className="text-gray-300">ORDER ID:</span>
                   <span className="text-white font-bold select-all">{takeoverIncident.order_id}</span>
                   
-                  <span className="text-slate-500">DRIVER NAME:</span>
+                  <span className="text-gray-300">DRIVER NAME:</span>
                   <span className="text-white font-bold">{takeoverIncident.driver_name}</span>
 
-                  <span className="text-slate-500">CUSTOMER:</span>
+                  <span className="text-gray-300">CUSTOMER:</span>
                   <span className="text-white font-bold">{takeoverIncident.customer_name}</span>
 
-                  <span className="text-slate-500">VEHICLE PLATE:</span>
+                  <span className="text-gray-300">VEHICLE PLATE:</span>
                   <span className="text-white font-bold">{takeoverIncident.license_plate}</span>
 
-                  <span className="text-slate-500">CITY SHARD:</span>
+                  <span className="text-gray-300">CITY SHARD:</span>
                   <span className="text-white font-bold">{takeoverIncident.city_prefix}</span>
                 </div>
               </div>
 
-              <div className="border-t border-slate-800 pt-4 space-y-3">
+              <div className="border-t border-gray-800 pt-4 space-y-3">
                 <button
                   onClick={() => executeClaimIncident(takeoverIncident.order_id)}
                   disabled={isMutating}
-                  className="w-full bg-rose-600 hover:bg-rose-700 border border-rose-500/20 text-white font-bold py-3 rounded-lg text-xs uppercase tracking-widest transition duration-150 cursor-pointer active:scale-98 select-none"
+                  className="w-full bg-negative-400 hover:bg-negative-400 border border-negative-400/20 text-white font-bold py-3 rounded-lg text-xs uppercase tracking-widest transition duration-150 cursor-pointer active:scale-98 select-none"
                 >
                   {isMutating ? 'ACQUIRING COMMAND LOCK...' : 'ACKNOWLEDGE & CLAIM INCIDENT'}
                 </button>
                 
                 <button
                   onClick={handleBypassTakeover}
-                  className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-white py-2 rounded-lg text-[10px] uppercase tracking-wider transition duration-150 cursor-pointer select-none"
+                  className="w-full bg-gray-800 hover:bg-gray-800 border border-gray-800 text-gray-300 hover:text-white py-2 rounded-lg text-[10px] uppercase tracking-wider transition duration-150 cursor-pointer select-none"
                 >
                   Bypass Notification (Acknowledge Manually)
                 </button>

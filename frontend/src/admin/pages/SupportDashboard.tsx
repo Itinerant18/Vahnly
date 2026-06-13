@@ -784,7 +784,7 @@ export const SupportDashboard: React.FC = () => {
 																<span className="w-1.5 h-1.5 rounded-full bg-status-alert animate-ping" title="SLA Breached" />
 															)}
 															<span className={`text-[9px] font-extrabold uppercase border px-1.5 py-0.5 rounded-pill ${
-																tkt.priority === 'URGENT' ? 'border-status-alert text-status-alert bg-red-50' : 'border-canvas-soft text-body bg-canvas-soft'
+																tkt.priority === 'URGENT' ? 'border-status-alert text-status-alert bg-surface-negative' : 'border-canvas-soft text-body bg-canvas-soft'
 															}`}>
 																{tkt.priority}
 															</span>
@@ -862,7 +862,7 @@ export const SupportDashboard: React.FC = () => {
 											</div>
 											<div className="flex items-center gap-2">
 												<span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-pill border tracking-wide uppercase ${
-													selectedTicketDetail.ticket.status === 'OPEN' ? 'border-status-alert text-status-alert bg-red-50' : 'border-canvas-soft text-body bg-canvas-soft'
+													selectedTicketDetail.ticket.status === 'OPEN' ? 'border-status-alert text-status-alert bg-surface-negative' : 'border-canvas-soft text-body bg-canvas-soft'
 												}`}>
 													{selectedTicketDetail.ticket.status}
 												</span>
@@ -980,13 +980,13 @@ export const SupportDashboard: React.FC = () => {
 																</div>
 																<div className={`p-3 rounded-xl text-xs leading-relaxed ${
 																	isInternal
-																		? 'bg-amber-50 text-amber-950 border border-amber-200'
+																		? 'bg-surface-warning text-content-warning border border-warning-400'
 																		: isAgent
 																			? 'bg-ink text-on-dark'
 																			: 'bg-canvas-soft text-ink'
 																}`}>
 																	{isInternal && (
-																		<span className="block text-[8px] font-extrabold uppercase tracking-wide text-amber-700 mb-1">
+																		<span className="block text-[8px] font-extrabold uppercase tracking-wide text-content-warning mb-1">
 																			🔒 Internal note (team only)
 																		</span>
 																	)}
@@ -1163,7 +1163,7 @@ export const SupportDashboard: React.FC = () => {
 												</td>
 												<td className="p-3 text-center">
 													<span className={`inline-flex items-center text-[9px] font-bold border rounded-pill h-5 px-2 tracking-wider ${
-														item.status === 'RETURNED' ? 'border-status-online text-status-online bg-green-50' : 'border-canvas-soft text-body bg-canvas-soft'
+														item.status === 'RETURNED' ? 'border-status-online text-status-online bg-surface-positive' : 'border-canvas-soft text-body bg-canvas-soft'
 													}`}>
 														{item.status}
 													</span>
@@ -1288,7 +1288,7 @@ export const SupportDashboard: React.FC = () => {
 						<span className="text-xs font-bold">{formatSeconds(dialSeconds)}</span>
 						<button
 							onClick={handleHangUpCall}
-							className="bg-red-600 hover:bg-red-700 text-on-dark text-[10px] font-bold px-4 py-1.5 rounded-pill font-sans transition"
+							className="bg-negative-400 hover:bg-negative-400 text-on-dark text-[10px] font-bold px-4 py-1.5 rounded-pill font-sans transition"
 						>
 							Hang Up
 						</button>

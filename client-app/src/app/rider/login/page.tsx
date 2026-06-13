@@ -12,7 +12,7 @@ export default function RiderLoginRedirect() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center font-sans text-zinc-400">
+    <div className="min-h-screen bg-white flex items-center justify-center font-sans text-content-secondary">
       <div className="font-mono text-xs uppercase animate-pulse">
         {t('redirecting')}
       </div>

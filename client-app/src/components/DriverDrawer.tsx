@@ -40,20 +40,20 @@ export const DriverDrawer: React.FC<DriverDrawerProps> = ({ isOpen, onClose, dri
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
       
       {/* Sliding Content Container */}
-      <div className="relative w-80 max-w-sm bg-zinc-950 border-r border-zinc-800 p-6 shadow-2xl flex flex-col justify-between h-full overflow-y-auto text-left font-mono animate-slideInLeft">
+      <div className="relative w-80 max-w-sm bg-background-primary border-r border-border-opaque p-6 shadow-2xl flex flex-col justify-between h-full overflow-y-auto text-left font-mono animate-slideInLeft">
         <div>
           {/* Profile Card Summary Section */}
-          <div className="flex items-center gap-3 border-b border-zinc-900 pb-5 mb-5">
+          <div className="flex items-center gap-3 border-b border-border-opaque pb-5 mb-5">
             {driverProfile.photo ? (
-              <img src={driverProfile.photo} alt="Driver" className="h-12 w-12 rounded-xl object-cover border border-zinc-800" />
+              <img src={driverProfile.photo} alt="Driver" className="h-12 w-12 rounded-xl object-cover border border-border-opaque" />
             ) : (
-              <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-sm font-bold text-white uppercase overflow-hidden">
+              <div className="h-12 w-12 rounded-xl bg-background-secondary border border-border-opaque flex items-center justify-center text-sm font-bold text-white uppercase overflow-hidden">
                 👤
               </div>
             )}
             <div>
               <h3 className="text-xs font-bold text-white uppercase tracking-tight">{driverProfile.name}</h3>
-              <p className="text-[10px] text-amber-500 font-bold mt-0.5">★ {driverProfile.rating.toFixed(2)}</p>
+              <p className="text-[10px] text-content-warning font-bold mt-0.5">★ {driverProfile.rating.toFixed(2)}</p>
             </div>
           </div>
 
@@ -63,8 +63,8 @@ export const DriverDrawer: React.FC<DriverDrawerProps> = ({ isOpen, onClose, dri
               onClick={() => setDutyState(dutyState === "OFFLINE" ? "ONLINE" : "OFFLINE")}
               className={`w-full py-3 rounded-xl text-center font-bold text-[9px] uppercase tracking-wider transition-all cursor-pointer border ${
                 dutyState !== "OFFLINE"
-                  ? "bg-zinc-900 text-emerald-400 border-emerald-900 hover:bg-emerald-950/20"
-                  : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white"
+                  ? "bg-background-secondary text-content-positive border-positive-400 hover:bg-surface-positive/20"
+                  : "bg-background-secondary text-content-secondary border-border-opaque hover:text-white"
               }`}
             >
               {dutyState !== "OFFLINE" ? "● Go Offline" : "○ Go Online"}
@@ -78,7 +78,7 @@ export const DriverDrawer: React.FC<DriverDrawerProps> = ({ isOpen, onClose, dri
                 key={index}
                 href={item.path}
                 onClick={onClose}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 text-[9px] font-bold uppercase tracking-wider transition-colors"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-content-secondary hover:text-white hover:bg-background-secondary text-[9px] font-bold uppercase tracking-wider transition-colors"
               >
                 <span className="text-xs">{item.icon}</span>
                 <span>{item.label}</span>
@@ -88,11 +88,11 @@ export const DriverDrawer: React.FC<DriverDrawerProps> = ({ isOpen, onClose, dri
         </div>
 
         {/* Exit Application Action */}
-        <div className="border-t border-zinc-900 pt-5 mt-6">
+        <div className="border-t border-border-opaque pt-5 mt-6">
           <Link
             href="/login"
             onClick={onClose}
-            className="flex items-center justify-center gap-2.5 w-full bg-zinc-900 hover:bg-zinc-850 text-red-500 hover:text-red-400 rounded-xl py-3 text-[9px] font-bold uppercase tracking-wider transition-colors border border-zinc-800"
+            className="flex items-center justify-center gap-2.5 w-full bg-background-secondary hover:bg-background-tertiary text-content-negative hover:text-content-negative rounded-xl py-3 text-[9px] font-bold uppercase tracking-wider transition-colors border border-border-opaque"
           >
             <span>🚪</span>
             <span>Logout & Exit</span>

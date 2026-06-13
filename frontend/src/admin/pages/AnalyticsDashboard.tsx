@@ -160,13 +160,13 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
           <div className="text-sm font-semibold text-ink mb-3">Trips Over Time</div>
           {tripsChartData.length >= 2
-            ? <SvgAreaChart data={tripsChartData} height={120} strokeColor="#6366f1" fillColor="rgba(99,102,241,0.12)" />
+            ? <SvgAreaChart data={tripsChartData} height={120} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
             : <div className="text-xs text-mute">No data for period</div>}
         </div>
         <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
           <div className="text-sm font-semibold text-ink mb-3">Revenue (₹) Over Time</div>
           {revenueChartData.length >= 2
-            ? <SvgAreaChart data={revenueChartData} height={120} strokeColor="#10b981" fillColor="rgba(16,185,129,0.12)" />
+            ? <SvgAreaChart data={revenueChartData} height={120} strokeColor="var(--positive-400)" fillColor="var(--positive-400)" />
             : <div className="text-xs text-mute">No data for period</div>}
         </div>
       </div>
@@ -206,11 +206,11 @@ export const AnalyticsDashboard: React.FC = () => {
           {funnel ? (
             <div className="space-y-2">
               {[
-                { label: 'Booked', value: funnel.created, color: 'bg-indigo-500' },
-                { label: 'Assigned', value: funnel.assigned, color: 'bg-blue-500' },
-                { label: 'Trip Started', value: funnel.started, color: 'bg-teal-500' },
-                { label: 'Completed', value: funnel.completed, color: 'bg-emerald-500' },
-                { label: 'Cancelled', value: funnel.cancelled, color: 'bg-red-400' },
+                { label: 'Booked', value: funnel.created, color: 'bg-surface-accent0' },
+                { label: 'Assigned', value: funnel.assigned, color: 'bg-surface-accent0' },
+                { label: 'Trip Started', value: funnel.started, color: 'bg-surface-positive0' },
+                { label: 'Completed', value: funnel.completed, color: 'bg-surface-positive0' },
+                { label: 'Cancelled', value: funnel.cancelled, color: 'bg-negative-400' },
               ].map(step => {
                 const pctVal = funnel.created > 0 ? Math.round((step.value / funnel.created) * 100) : 0;
                 return (

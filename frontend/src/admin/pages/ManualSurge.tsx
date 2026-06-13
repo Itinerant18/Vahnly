@@ -123,13 +123,13 @@ export const ManualSurge: React.FC = () => {
             <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <PolygonDrawer onAddVertex={(p) => setDraftPolygon((prev) => [...prev, p])} />
             {draftPolygon.length >= 2 && (
-              <Polygon positions={draftPolygon} pathOptions={{ color: '#0073E6', fillColor: '#0073E6', fillOpacity: 0.25 }} />
+              <Polygon positions={draftPolygon} pathOptions={{ color: 'var(--accent-400)', fillColor: 'var(--accent-400)', fillOpacity: 0.25 }} />
             )}
             {zones.map((z) =>
               z.polygon && z.polygon.length >= 3 ? (
-                <Polygon key={z.id} positions={z.polygon} pathOptions={{ color: '#b00020', fillColor: '#b00020', fillOpacity: 0.2 }} />
+                <Polygon key={z.id} positions={z.polygon} pathOptions={{ color: 'var(--negative-400)', fillColor: 'var(--negative-400)', fillOpacity: 0.2 }} />
               ) : (
-                <Circle key={z.id} center={[z.center_lat, z.center_lng]} radius={z.radius_m || 1000} pathOptions={{ color: '#b00020', fillColor: '#b00020', fillOpacity: 0.2 }} />
+                <Circle key={z.id} center={[z.center_lat, z.center_lng]} radius={z.radius_m || 1000} pathOptions={{ color: 'var(--negative-400)', fillColor: 'var(--negative-400)', fillOpacity: 0.2 }} />
               )
             )}
           </MapContainer>

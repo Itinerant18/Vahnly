@@ -146,8 +146,8 @@ export default function LegalPage() {
                 className={
                   "rounded-xl px-3 py-2 text-sm font-medium transition-colors " +
                   (isActive
-                    ? "bg-[#FF6B35] text-white"
-                    : "bg-[#1E1E1E] text-[#9CA3AF] hover:text-white")
+                    ? "bg-accent-400 text-content-primary"
+                    : "bg-background-tertiary text-content-secondary hover:text-content-primary")
                 }
               >
                 {tab.label}
@@ -156,19 +156,19 @@ export default function LegalPage() {
           })}
         </div>
 
-        <div className="rounded-2xl bg-[#141414] p-4">
+        <div className="rounded-2xl bg-background-secondary p-4">
           {doc && (
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-white">{doc.title}</h2>
+                <h2 className="text-base font-bold text-content-primary">{doc.title}</h2>
                 {updated && (
-                  <p className="mt-1 text-xs text-[#6B7280]">Last updated {updated}</p>
+                  <p className="mt-1 text-xs text-content-tertiary">Last updated {updated}</p>
                 )}
               </div>
               <button
                 onClick={onDownload}
                 disabled={!doc}
-                className="shrink-0 rounded-xl bg-[#1E1E1E] px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
+                className="shrink-0 rounded-xl bg-background-tertiary px-3 py-2 text-xs font-medium text-content-primary disabled:opacity-40"
               >
                 Download as PDF
               </button>
@@ -176,15 +176,15 @@ export default function LegalPage() {
           )}
 
           {showShimmer && (
-            <div className="h-40 animate-pulse rounded-2xl bg-[#1E1E1E]" />
+            <div className="h-40 animate-pulse rounded-2xl bg-background-tertiary" />
           )}
 
           {showPlaceholder && (
-            <div className="rounded-2xl bg-[#1E1E1E] p-6 text-center">
-              <p className="text-sm text-[#9CA3AF]">Document loading…</p>
+            <div className="rounded-2xl bg-background-tertiary p-6 text-center">
+              <p className="text-sm text-content-secondary">Document loading…</p>
               <button
                 onClick={() => void loadDoc(active, { force: true })}
-                className="mt-4 rounded-xl bg-[#FF6B35] px-4 py-2 text-sm font-medium text-white"
+                className="mt-4 rounded-xl bg-interactive-primary px-4 py-2 text-sm font-medium text-interactive-primary-text"
               >
                 Retry
               </button>
@@ -194,7 +194,7 @@ export default function LegalPage() {
           {doc && doc.html && (
             <div className="max-h-[60vh] overflow-y-auto pr-1">
               <div
-                className="text-sm leading-relaxed text-[#D1D5DB] space-y-3 [&_h2]:text-white [&_h2]:font-bold [&_h3]:text-white [&_h3]:font-semibold [&_a]:text-[#FF6B35] [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                className="text-sm leading-relaxed text-content-secondary space-y-3 [&_h2]:text-content-primary [&_h2]:font-bold [&_h3]:text-content-primary [&_h3]:font-semibold [&_a]:text-content-accent [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
                 dangerouslySetInnerHTML={{ __html: doc.html }}
               />
             </div>

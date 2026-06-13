@@ -71,12 +71,12 @@ export default function ReferPage() {
   return (
     <AccountScaffold title="Refer & Earn">
       {/* Code chip */}
-      <div className="rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#E04A1F] p-5 text-center">
+      <div className="rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 p-5 text-center">
         <p className="text-xs text-white/80">Your referral code</p>
-        <p className="my-2 text-3xl font-bold tracking-[0.3em] text-white">{code}</p>
+        <p className="my-2 text-3xl font-bold tracking-[0.3em] text-content-primary">{code}</p>
         <button
           onClick={copy}
-          className="rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold text-white"
+          className="rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold text-content-primary"
         >
           {copied ? "Copied!" : "Copy Code"}
         </button>
@@ -98,32 +98,32 @@ export default function ReferPage() {
       </div>
 
       {/* Earnings */}
-      <div className="mt-3 rounded-2xl bg-[#141414] p-4 text-center">
-        <p className="text-xs text-[#9CA3AF]">Total earned</p>
-        <p className="mt-1 text-2xl font-bold text-[#22C55E]">{formatCurrency(earned)}</p>
+      <div className="mt-3 rounded-2xl bg-background-secondary p-4 text-center">
+        <p className="text-xs text-content-secondary">Total earned</p>
+        <p className="mt-1 text-2xl font-bold text-content-positive">{formatCurrency(earned)}</p>
       </div>
 
       {/* Referral list */}
-      <h2 className="mb-3 mt-6 text-sm font-bold text-white">Your Referrals</h2>
+      <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Your Referrals</h2>
       {error ? (
         <ErrorState onRetry={load} />
       ) : refs === null ? (
         <SkeletonList rows={3} height="h-14" />
       ) : refs.length === 0 ? (
-        <p className="py-8 text-center text-sm text-[#9CA3AF]">No referrals yet. Share your code!</p>
+        <p className="py-8 text-center text-sm text-content-secondary">No referrals yet. Share your code!</p>
       ) : (
         <div className="space-y-2">
           {refs.map((r) => (
-            <div key={r.id} className="flex items-center gap-3 rounded-xl bg-[#141414] p-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FF6B35]/20 text-sm font-bold text-[#FF6B35]">
+            <div key={r.id} className="flex items-center gap-3 rounded-xl bg-background-secondary p-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-accent text-sm font-bold text-content-accent">
                 {r.referral_code.slice(0, 2)}
               </div>
               <div className="flex-1">
-                <p className="text-sm text-white">Referral {r.referral_code}</p>
-                <p className="text-xs text-[#9CA3AF]">{r.status}</p>
+                <p className="text-sm text-content-primary">Referral {r.referral_code}</p>
+                <p className="text-xs text-content-secondary">{r.status}</p>
               </div>
               {r.reward_amount_paise > 0 && (
-                <span className="text-sm font-semibold text-[#22C55E]">
+                <span className="text-sm font-semibold text-content-positive">
                   +{formatCurrency(r.reward_amount_paise)}
                 </span>
               )}
@@ -137,18 +137,18 @@ export default function ReferPage() {
 
 function ShareBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-1.5 rounded-2xl bg-[#141414] py-3">
+    <button onClick={onClick} className="flex flex-col items-center gap-1.5 rounded-2xl bg-background-secondary py-3">
       <span className="text-xl">{icon}</span>
-      <span className="text-[10px] text-[#9CA3AF]">{label}</span>
+      <span className="text-[10px] text-content-secondary">{label}</span>
     </button>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-[#141414] p-3 text-center">
-      <p className="text-lg font-bold text-white">{value}</p>
-      <p className="text-xs text-[#9CA3AF]">{label}</p>
+    <div className="rounded-2xl bg-background-secondary p-3 text-center">
+      <p className="text-lg font-bold text-content-primary">{value}</p>
+      <p className="text-xs text-content-secondary">{label}</p>
     </div>
   );
 }

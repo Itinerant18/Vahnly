@@ -89,11 +89,11 @@ export default function RiderGaragePage() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays <= 0) {
-      return { label: t('docExpired'), color: 'text-red-500', isCritical: true };
+      return { label: t('docExpired'), color: 'text-content-negative', isCritical: true };
     } else if (diffDays <= 30) {
-      return { label: t('docExpiresIn', { days: diffDays }), color: 'text-amber-500 animate-pulse', isWarning: true };
+      return { label: t('docExpiresIn', { days: diffDays }), color: 'text-content-warning animate-pulse', isWarning: true };
     } else {
-      return { label: t('docVerified', { expiry: expiryDateStr }), color: 'text-emerald-400', isValid: true };
+      return { label: t('docVerified', { expiry: expiryDateStr }), color: 'text-content-positive', isValid: true };
     }
   };
 
@@ -199,15 +199,15 @@ export default function RiderGaragePage() {
   return (
     <div className="space-y-6 text-left">
       {/* Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+      <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
         </div>
 
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
+          className="bg-white hover:bg-background-tertiary text-black text-[10px] font-mono font-bold uppercase px-4 py-2 rounded-full cursor-pointer"
         >
           {showAddForm ? t('closeForm') : t('addVehicle')}
         </button>
@@ -221,9 +221,9 @@ export default function RiderGaragePage() {
           const puc = getDocStatus(v.pucExpiry);
           return rc.isCritical || rc.isWarning || ins.isCritical || ins.isWarning || puc.isCritical || puc.isWarning;
         }) && (
-          <div className="bg-amber-950/20 border border-amber-900 rounded-2xl p-4 text-xs text-amber-400 space-y-1">
+          <div className="bg-surface-warning/20 border border-warning-400 rounded-2xl p-4 text-xs text-content-warning space-y-1">
             <span className="block font-bold">{t('alertBannerTitle')}</span>
-            <p className="text-[10px] text-amber-200/70 leading-relaxed font-sans">
+            <p className="text-[10px] text-content-warning/70 leading-relaxed font-sans">
               {t('alertBannerBody')}
             </p>
           </div>
@@ -232,40 +232,40 @@ export default function RiderGaragePage() {
 
       {/* Add vehicle form */}
       {showAddForm && (
-        <form onSubmit={handleAddCar} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4 animate-fadeIn font-mono text-xs">
-          <h4 className="text-xs font-bold text-white uppercase border-b border-zinc-900 pb-2">{t('registerNewVehicle')}</h4>
+        <form onSubmit={handleAddCar} className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4 animate-fadeIn font-mono text-xs">
+          <h4 className="text-xs font-bold text-white uppercase border-b border-border-opaque pb-2">{t('registerNewVehicle')}</h4>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('make')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('make')}</label>
               <input
                 type="text"
                 value={newCar.make}
                 onChange={(e) => setNewCar({ ...newCar, make: e.target.value })}
                 placeholder={t('makePlaceholder')}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2.5 text-white focus:outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('model')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('model')}</label>
               <input
                 type="text"
                 value={newCar.model}
                 onChange={(e) => setNewCar({ ...newCar, model: e.target.value })}
                 placeholder={t('modelPlaceholder')}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2.5 text-white focus:outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('licensePlate')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('licensePlate')}</label>
               <input
                 type="text"
                 value={newCar.plate}
                 onChange={(e) => setNewCar({ ...newCar, plate: e.target.value })}
                 placeholder={t('licensePlatePlaceholder')}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-white uppercase focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2.5 text-white uppercase focus:outline-none"
                 required
               />
             </div>
@@ -273,11 +273,11 @@ export default function RiderGaragePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('type')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('type')}</label>
               <select
                 value={newCar.type}
                 onChange={(e) => setNewCar({ ...newCar, type: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-zinc-350 focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-content-secondary focus:outline-none"
               >
                 <option>Hatchback</option>
                 <option>Sedan</option>
@@ -286,22 +286,22 @@ export default function RiderGaragePage() {
               </select>
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('transmission')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('transmission')}</label>
               <select
                 value={newCar.transmission}
                 onChange={(e) => setNewCar({ ...newCar, transmission: e.target.value as any })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-zinc-350 focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-content-secondary focus:outline-none"
               >
                 <option>AUTOMATIC</option>
                 <option>MANUAL</option>
               </select>
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('fuelType')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('fuelType')}</label>
               <select
                 value={newCar.fuel}
                 onChange={(e) => setNewCar({ ...newCar, fuel: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-zinc-350 focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-content-secondary focus:outline-none"
               >
                 <option>Petrol</option>
                 <option>Diesel</option>
@@ -310,43 +310,43 @@ export default function RiderGaragePage() {
               </select>
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('color')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('color')}</label>
               <input
                 type="text"
                 value={newCar.color}
                 onChange={(e) => setNewCar({ ...newCar, color: e.target.value })}
                 placeholder={t('colorPlaceholder')}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-zinc-900 pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border-opaque pt-3">
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('rcExpiryDate')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('rcExpiryDate')}</label>
               <input
                 type="date"
                 value={newCar.rcExpiry}
                 onChange={(e) => setNewCar({ ...newCar, rcExpiry: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('insuranceExpiry')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('insuranceExpiry')}</label>
               <input
                 type="date"
                 value={newCar.insuranceExpiry}
                 onChange={(e) => setNewCar({ ...newCar, insuranceExpiry: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-[8px] text-zinc-500 uppercase mb-1">{t('pucExpiry')}</label>
+              <label className="block text-[8px] text-content-tertiary uppercase mb-1">{t('pucExpiry')}</label>
               <input
                 type="date"
                 value={newCar.pucExpiry}
                 onChange={(e) => setNewCar({ ...newCar, pucExpiry: e.target.value })}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none"
+                className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white focus:outline-none"
               />
             </div>
           </div>
@@ -364,7 +364,7 @@ export default function RiderGaragePage() {
 
           <button
             type="submit"
-            className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl font-sans font-bold uppercase transition"
+            className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl font-sans font-bold uppercase transition"
           >
             {t('submitRegistration')}
           </button>
@@ -379,23 +379,23 @@ export default function RiderGaragePage() {
           const pucStatus = getDocStatus(v.pucExpiry);
 
           return (
-            <div key={v.id} className="bg-zinc-950 border border-zinc-900 p-5 rounded-2xl space-y-4">
+            <div key={v.id} className="bg-background-primary border border-border-opaque p-5 rounded-2xl space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-white font-sans">{v.make} {v.model}</h4>
                     {v.isDefault && (
-                      <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider animate-pulse">
+                      <span className="bg-surface-positive/20 text-content-positive border border-positive-400 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider animate-pulse">
                         {t('defaultVehicleBadge')}
                       </span>
                     )}
                   </div>
                   
                   <div className="flex gap-2 mt-1.5 font-mono text-[9px]">
-                    <span className="bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded border border-zinc-850 font-bold uppercase">{v.plate}</span>
-                    <span className="bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded border border-zinc-850 font-bold uppercase">{v.transmission}</span>
-                    <span className="bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded border border-zinc-850 font-bold uppercase">{v.type}</span>
-                    <span className="bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded border border-zinc-850 font-bold uppercase">{v.fuel}</span>
+                    <span className="bg-background-secondary text-content-secondary px-2 py-0.5 rounded border border-border-opaque font-bold uppercase">{v.plate}</span>
+                    <span className="bg-background-secondary text-content-secondary px-2 py-0.5 rounded border border-border-opaque font-bold uppercase">{v.transmission}</span>
+                    <span className="bg-background-secondary text-content-secondary px-2 py-0.5 rounded border border-border-opaque font-bold uppercase">{v.type}</span>
+                    <span className="bg-background-secondary text-content-secondary px-2 py-0.5 rounded border border-border-opaque font-bold uppercase">{v.fuel}</span>
                   </div>
                 </div>
 
@@ -403,14 +403,14 @@ export default function RiderGaragePage() {
                   {!v.isDefault && (
                     <button
                       onClick={() => handleSetDefault(v.id)}
-                      className="text-zinc-400 hover:text-white cursor-pointer transition"
+                      className="text-content-secondary hover:text-white cursor-pointer transition"
                     >
                       {t('setDefault')}
                     </button>
                   )}
                   <button
                     onClick={() => handleRemoveCar(v.id, v.plate)}
-                    className="text-red-500 hover:text-red-400 cursor-pointer transition"
+                    className="text-content-negative hover:text-content-negative cursor-pointer transition"
                   >
                     {t('delete')}
                   </button>
@@ -418,38 +418,38 @@ export default function RiderGaragePage() {
               </div>
 
               {/* Document stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-zinc-900 pt-3 text-[10px] font-mono text-zinc-400">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border-opaque pt-3 text-[10px] font-mono text-content-secondary">
                 <div className="space-y-1">
-                  <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('docRcLabel')}</span>
+                  <span className="text-content-tertiary block text-[8px] uppercase font-bold">{t('docRcLabel')}</span>
                   <span className={`block font-bold ${rcStatus.color}`}>{rcStatus.label}</span>
                   {(rcStatus.isCritical || rcStatus.isWarning) && (
                     <button 
                       onClick={() => handleTriggerReupload(v.id, 'rc')}
-                      className="text-[8px] text-zinc-500 hover:text-white underline uppercase block"
+                      className="text-[8px] text-content-tertiary hover:text-white underline uppercase block"
                     >
                       Re-upload
                     </button>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('docInsuranceLabel')}</span>
+                  <span className="text-content-tertiary block text-[8px] uppercase font-bold">{t('docInsuranceLabel')}</span>
                   <span className={`block font-bold ${insStatus.color}`}>{insStatus.label}</span>
                   {(insStatus.isCritical || insStatus.isWarning) && (
                     <button 
                       onClick={() => handleTriggerReupload(v.id, 'insurance')}
-                      className="text-[8px] text-zinc-500 hover:text-white underline uppercase block"
+                      className="text-[8px] text-content-tertiary hover:text-white underline uppercase block"
                     >
                       Re-upload
                     </button>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <span className="text-zinc-600 block text-[8px] uppercase font-bold">{t('docPucLabel')}</span>
+                  <span className="text-content-tertiary block text-[8px] uppercase font-bold">{t('docPucLabel')}</span>
                   <span className={`block font-bold ${pucStatus.color}`}>{pucStatus.label}</span>
                   {(pucStatus.isCritical || pucStatus.isWarning) && (
                     <button 
                       onClick={() => handleTriggerReupload(v.id, 'puc')}
-                      className="text-[8px] text-zinc-500 hover:text-white underline uppercase block"
+                      className="text-[8px] text-content-tertiary hover:text-white underline uppercase block"
                     >
                       Re-upload
                     </button>

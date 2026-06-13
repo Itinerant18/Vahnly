@@ -210,11 +210,15 @@ export default function RiderDispatchPage() {
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
+      // Resolve design-system tokens once (canvas can't take var())
+      const css = getComputedStyle(document.documentElement);
+      const v = (name: string) => css.getPropertyValue(name).trim();
+
       // 1. Draw Grid lines
-      ctx.fillStyle = '#09090b';
+      ctx.fillStyle = v('--background-primary');
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.strokeStyle = '#18181b';
+      ctx.strokeStyle = v('--background-secondary');
       ctx.lineWidth = 1;
       const size = 45;
       for (let x = 0; x < canvas.width; x += size) {
@@ -260,7 +264,7 @@ export default function RiderDispatchPage() {
       ctx.stroke();
 
       // Draw central streets
-      ctx.strokeStyle = '#27272a';
+      ctx.strokeStyle = v('--background-tertiary');
       ctx.lineWidth = 4;
       ctx.beginPath();
       const st1 = toScreen(22.6100, 88.3620);
@@ -278,11 +282,11 @@ export default function RiderDispatchPage() {
 
       // Draw origin coordinates anchor pin
       const origin = toScreen(center.lat, center.lng);
-      ctx.fillStyle = '#3b82f6';
+      ctx.fillStyle = v('--accent-400');
       ctx.beginPath();
       ctx.arc(origin.x, origin.y, 8, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = v('--content-primary');
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
@@ -314,13 +318,17 @@ export default function RiderDispatchPage() {
 
     const drawRadar = () => {
       if (ctx) {
+        // Resolve design-system tokens once per frame (canvas can't take var())
+        const css = getComputedStyle(document.documentElement);
+        const v = (name: string) => css.getPropertyValue(name).trim();
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
 
         // Circular background grid frames
-        ctx.strokeStyle = '#18181b';
+        ctx.strokeStyle = v('--background-secondary');
         ctx.lineWidth = 1;
         [40, 90, 140, 190].forEach((r) => {
           ctx.beginPath();
@@ -354,8 +362,8 @@ export default function RiderDispatchPage() {
         // Glowing center core node
         const rad = 25 + Math.sin(Date.now() / 200) * 4;
         const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, rad);
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.3, '#60a5fa');
+        grad.addColorStop(0, v('--content-primary'));
+        grad.addColorStop(0.3, v('--accent-400'));
         grad.addColorStop(1, 'rgba(59,130,246,0)');
 
         ctx.fillStyle = grad;
@@ -430,12 +438,12 @@ export default function RiderDispatchPage() {
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-hidden relative">
       
       {/* Header overlay */}
-      <header className="bg-zinc-950/80 border-b border-zinc-900/60 p-4 fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full backdrop-blur-md font-mono text-[10px]">
+      <header className="bg-background-primary/80 border-b border-border-opaque/60 p-4 fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full backdrop-blur-md font-mono text-[10px]">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="font-bold uppercase tracking-widest text-zinc-300">{t('headerTitle')}</span>
+          <span className="h-2.5 w-2.5 bg-positive-400 rounded-full animate-pulse" />
+          <span className="font-bold uppercase tracking-widest text-content-secondary">{t('headerTitle')}</span>
         </div>
-        <span className="text-zinc-500 font-semibold uppercase">{t('headerShard')}</span>
+        <span className="text-content-tertiary font-semibold uppercase">{t('headerShard')}</span>
       </header>
 
       {/* ==================== LAYER 1 (Z-INDEX: 10): DIMMED MAP BACKGROUND ==================== */}
@@ -449,7 +457,7 @@ export default function RiderDispatchPage() {
           <canvas ref={radarCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
           
           {/* Circular Countdown Tracker Badge */}
-          <div className="bg-black/90 border border-zinc-800 h-16 w-16 rounded-full flex items-center justify-center shadow-2xl z-40 select-none">
+          <div className="bg-black/90 border border-border-opaque h-16 w-16 rounded-full flex items-center justify-center shadow-2xl z-40 select-none">
             <span className="font-mono text-sm font-bold text-white animate-pulse">
               {t('countdownSeconds', { seconds: countdown })}
             </span>
@@ -462,17 +470,17 @@ export default function RiderDispatchPage() {
         
         {/* State A: SEARCHING - Float Component summary block */}
         {matchState === 'SEARCHING' && (
-          <div className="w-full max-w-md mx-auto bg-zinc-950/95 border border-zinc-900 rounded-2xl p-5 space-y-4 shadow-2xl backdrop-blur-md text-left animate-slideUp">
+          <div className="w-full max-w-md mx-auto bg-background-primary/95 border border-border-opaque rounded-2xl p-5 space-y-4 shadow-2xl backdrop-blur-md text-left animate-slideUp">
             
             <div className="space-y-1">
-              <div className="flex justify-between items-center text-[8px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+              <div className="flex justify-between items-center text-[8px] font-mono font-bold text-content-tertiary uppercase tracking-widest">
                 <span>{t('seekingMatch')}</span>
-                <span className="text-blue-400">{t('activeScan')}</span>
+                <span className="text-content-accent">{t('activeScan')}</span>
               </div>
               <h3 className="text-xs font-bold text-white font-mono mt-1 uppercase">
                 {scanRadiusExpanded ? t('searchExpanded') : t('searchFiltering')}
               </h3>
-              <p className="text-[9px] text-zinc-400 font-sans leading-relaxed">
+              <p className="text-[9px] text-content-secondary font-sans leading-relaxed">
                 {t('matchingAttributes', {
                   transmission: bookingSpecs?.car?.transmission || 'AUTOMATIC',
                   make: bookingSpecs?.car?.make || 'default',
@@ -483,10 +491,10 @@ export default function RiderDispatchPage() {
 
             {/* Route summary info strip */}
             {bookingSpecs && (
-              <div className="bg-zinc-900/50 p-3.5 border border-zinc-900 rounded-xl text-[10px] font-mono text-zinc-400 space-y-1.5 leading-normal">
-                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">{t('pickupLabel')}</span> {bookingSpecs.pickup}</div>
-                <div className="truncate"><span className="text-zinc-600 font-bold uppercase">{t('dropLabel')}</span> {bookingSpecs.dropoff || t('hourlyPack')}</div>
-                <div className="flex justify-between items-center text-emerald-400 font-bold border-t border-zinc-900 pt-1.5 mt-1.5 text-xs">
+              <div className="bg-background-secondary/50 p-3.5 border border-border-opaque rounded-xl text-[10px] font-mono text-content-secondary space-y-1.5 leading-normal">
+                <div className="truncate"><span className="text-content-tertiary font-bold uppercase">{t('pickupLabel')}</span> {bookingSpecs.pickup}</div>
+                <div className="truncate"><span className="text-content-tertiary font-bold uppercase">{t('dropLabel')}</span> {bookingSpecs.dropoff || t('hourlyPack')}</div>
+                <div className="flex justify-between items-center text-content-positive font-bold border-t border-border-opaque pt-1.5 mt-1.5 text-xs">
                   <span>{t('upfrontPricing')}</span>
                   <span>₹{bookingSpecs.fare.toFixed(2)}</span>
                 </div>
@@ -496,7 +504,7 @@ export default function RiderDispatchPage() {
             {/* Cancellation abort trigger */}
             <button
               onClick={handleAbortTrigger}
-              className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 text-red-500 py-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center"
+              className="w-full bg-background-secondary hover:bg-background-tertiary border border-border-opaque text-content-negative py-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition active:scale-98 cursor-pointer text-center"
             >
               {t('cancelDispatch')}
             </button>
@@ -505,52 +513,52 @@ export default function RiderDispatchPage() {
 
         {/* State B: ASSIGNED_MODAL - Full drawer view */}
         {matchState === 'ASSIGNED' && assignedDriver && (
-          <div className="w-full max-w-md mx-auto bg-zinc-950/95 border border-zinc-900 rounded-2xl p-5 space-y-4 shadow-2xl backdrop-blur-md text-left animate-slideUp">
+          <div className="w-full max-w-md mx-auto bg-background-primary/95 border border-border-opaque rounded-2xl p-5 space-y-4 shadow-2xl backdrop-blur-md text-left animate-slideUp">
             
-            <div className="text-center border-b border-zinc-900 pb-3.5 space-y-1">
-              <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
+            <div className="text-center border-b border-border-opaque pb-3.5 space-y-1">
+              <span className="bg-surface-positive/20 text-content-positive border border-positive-400 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                 {t('matchDetected')}
               </span>
               <h3 className="text-sm font-bold text-white font-sans mt-2">{t('driverEnRoute')}</h3>
-              <p className="text-[9px] text-zinc-500 font-mono">{t('arrivingIn', { eta: assignedDriver.eta })}</p>
+              <p className="text-[9px] text-content-tertiary font-mono">{t('arrivingIn', { eta: assignedDriver.eta })}</p>
             </div>
 
             {/* Pilot Profile Identity Card */}
-            <div className="flex items-center gap-4 bg-zinc-900/40 p-4 border border-zinc-900 rounded-xl">
-              <div className="h-16 w-16 bg-zinc-900 rounded-xl flex items-center justify-center text-3xl border border-zinc-800 shrink-0">
+            <div className="flex items-center gap-4 bg-background-secondary/40 p-4 border border-border-opaque rounded-xl">
+              <div className="h-16 w-16 bg-background-secondary rounded-xl flex items-center justify-center text-3xl border border-border-opaque shrink-0">
                 {assignedDriver.photo}
               </div>
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-white text-sm">{assignedDriver.name}</h4>
                 <div className="flex items-center gap-1.5 font-mono text-[9px]">
-                  <span className="text-amber-400 font-bold">{t('ratingLabel', { rating: assignedDriver.rating })}</span>
-                  <span className="text-zinc-700">•</span>
-                  <span className="text-zinc-500">{t('verifiedProfessional')}</span>
+                  <span className="text-content-warning font-bold">{t('ratingLabel', { rating: assignedDriver.rating })}</span>
+                  <span className="text-content-tertiary">•</span>
+                  <span className="text-content-tertiary">{t('verifiedProfessional')}</span>
                 </div>
                 
                 {/* Transmission Competency Verification Badge */}
-                <span className="bg-emerald-950/30 text-emerald-400 border border-emerald-900/50 px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase inline-block">
+                <span className="bg-surface-positive/30 text-content-positive border border-positive-400/50 px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase inline-block">
                   {assignedDriver.transmission === 'MANUAL' ? t('manualCertified') : t('automaticCertified')}
                 </span>
               </div>
             </div>
 
             {/* Matched Vehicle Context Label */}
-            <div className="bg-zinc-900/40 p-3.5 border border-zinc-900 rounded-xl text-xs font-mono text-zinc-400 leading-normal">
-              🚗 <span className="text-zinc-500 font-bold uppercase text-[9px]">{t('vehicleTarget')}</span> {t('guidingYourVehicle', { car: assignedDriver.car, plate: assignedDriver.plate })}
+            <div className="bg-background-secondary/40 p-3.5 border border-border-opaque rounded-xl text-xs font-mono text-content-secondary leading-normal">
+              🚗 <span className="text-content-tertiary font-bold uppercase text-[9px]">{t('vehicleTarget')}</span> {t('guidingYourVehicle', { car: assignedDriver.car, plate: assignedDriver.plate })}
             </div>
 
             {/* Secure Communication Channels */}
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <button
                 onClick={() => alert('📞 Connection routed: Dialing proxy number +91 99999 88888. Real identity secure.')}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl font-bold uppercase text-zinc-300 cursor-pointer text-center"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
                 📞 Secure Call
               </button>
               <button
                 onClick={() => setShowChatModal(true)}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl font-bold uppercase text-zinc-300 cursor-pointer text-center"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
                 💬 In-App Chat
               </button>
@@ -561,7 +569,7 @@ export default function RiderDispatchPage() {
                 const orderId = bookingSpecs?.orderId || 'trp-sandbox-99';
                 router.push(`/rider/trip/live?tripId=${orderId}`);
               }}
-              className="w-full bg-white hover:bg-zinc-200 text-black py-4 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer text-center font-sans mt-2"
+              className="w-full bg-white hover:bg-background-tertiary text-black py-4 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer text-center font-sans mt-2"
             >
               ➔ Open Active Journey Timelines
             </button>
@@ -570,12 +578,12 @@ export default function RiderDispatchPage() {
 
         {/* State C: TIMEOUT_FALLBACK - Out-of-service matrix overlay */}
         {matchState === 'TIMEOUT' && (
-          <div className="w-full max-w-md mx-auto bg-zinc-950/95 border border-zinc-900 rounded-2xl p-6 space-y-5 shadow-2xl backdrop-blur-md text-left animate-slideUp">
+          <div className="w-full max-w-md mx-auto bg-background-primary/95 border border-border-opaque rounded-2xl p-6 space-y-5 shadow-2xl backdrop-blur-md text-left animate-slideUp">
             
-            <div className="text-center border-b border-zinc-900 pb-3.5">
+            <div className="text-center border-b border-border-opaque pb-3.5">
               <span className="text-4xl block animate-bounce">🔍</span>
               <h3 className="text-base font-bold text-white font-mono uppercase tracking-widest mt-3">No Driver Available Nearby</h3>
-              <p className="text-[10px] text-zinc-400 font-sans leading-normal mt-1">
+              <p className="text-[10px] text-content-secondary font-sans leading-normal mt-1">
                 Regional demand spike in Kolkata Sector V area. Scanning bounds limits reached without pilot allocation handshake.
               </p>
             </div>
@@ -585,7 +593,7 @@ export default function RiderDispatchPage() {
               {/* Immediate Re-Queue Selector */}
               <button
                 onClick={handleRequeueSearch}
-                className="w-full bg-white hover:bg-zinc-200 text-black py-4 rounded-xl transition cursor-pointer active:scale-95 text-center font-sans"
+                className="w-full bg-white hover:bg-background-tertiary text-black py-4 rounded-xl transition cursor-pointer active:scale-95 text-center font-sans"
               >
                 🔄 Re-verify & Re-queue Match
               </button>
@@ -597,7 +605,7 @@ export default function RiderDispatchPage() {
                   handleRequeueSearch();
                   alert('🔍 Spatial parameters expanded: Grid scope widened to adjacent H3 cells.');
                 }}
-                className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 py-3.5 rounded-xl transition cursor-pointer text-center"
+                className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque py-3.5 rounded-xl transition cursor-pointer text-center"
               >
                 📡 Expand Scan search Radius
               </button>
@@ -605,7 +613,7 @@ export default function RiderDispatchPage() {
               {/* Future Scheduler Integration Drawer */}
               <button
                 onClick={() => setShowSchedulerModal(true)}
-                className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 py-3.5 rounded-xl transition cursor-pointer text-center"
+                className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque py-3.5 rounded-xl transition cursor-pointer text-center"
               >
                 📅 Convert to scheduled trip
               </button>
@@ -613,7 +621,7 @@ export default function RiderDispatchPage() {
 
             <button
               onClick={() => router.push('/rider')}
-              className="w-full text-center text-zinc-500 hover:text-white font-mono text-[9px] uppercase tracking-widest font-bold block pt-2"
+              className="w-full text-center text-content-tertiary hover:text-white font-mono text-[9px] uppercase tracking-widest font-bold block pt-2"
             >
               ← Back to booking console
             </button>
@@ -625,20 +633,20 @@ export default function RiderDispatchPage() {
       {/* ==================== ABORT JUSTIFICATION CANCELLATION OVERLAY SHEET ==================== */}
       {showCancelConfirmation && (
         <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-6 animate-fadeIn">
-          <div className="w-full sm:max-w-md bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-3xl sm:rounded-2xl p-6 space-y-5 text-left">
+          <div className="w-full sm:max-w-md bg-background-primary border-t sm:border border-border-opaque rounded-t-3xl sm:rounded-2xl p-6 space-y-5 text-left">
             <div className="space-y-1">
-              <span className="bg-red-950/20 text-red-500 border border-red-900/60 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
+              <span className="bg-surface-negative/20 text-content-negative border border-negative-400/60 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                 CANCEL DISPATCH WARNING
               </span>
               <h3 className="text-sm font-bold text-white font-mono mt-2 uppercase">Post-Match Penalty Indicator</h3>
-              <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+              <p className="text-[10px] text-content-secondary font-sans leading-normal">
                 Cancellation grace period of 30 seconds has expired. Proceeding will apply an immediate cancellation penalty of ₹50 directly onto your ledger account.
               </p>
             </div>
 
             {/* Abort Reason Justification Selectors */}
             <div className="space-y-2 text-xs font-mono font-bold">
-              <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1">Select cancellation reason</label>
+              <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1">Select cancellation reason</label>
               {[
                 'Driver too far away / ETA mismatch',
                 'Plans changed / No longer require pilot',
@@ -650,8 +658,8 @@ export default function RiderDispatchPage() {
                   onClick={() => setCancelReason(reason)}
                   className={`w-full py-3 px-4 border rounded-xl text-left text-[10px] transition ${
                     cancelReason === reason
-                      ? 'bg-red-950/30 border-red-500 text-red-200'
-                      : 'bg-zinc-900/50 border-zinc-850 text-zinc-400 hover:text-white'
+                      ? 'bg-surface-negative/30 border-negative-400 text-content-negative'
+                      : 'bg-background-secondary/50 border-border-opaque text-content-secondary hover:text-white'
                   }`}
                 >
                   {cancelReason === reason ? '✔️ ' : ''}{reason}
@@ -662,7 +670,7 @@ export default function RiderDispatchPage() {
             <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2">
               <button
                 onClick={() => setShowCancelConfirmation(false)}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl font-bold uppercase text-zinc-400 cursor-pointer text-center"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
                 Keep Searching
               </button>
@@ -671,8 +679,8 @@ export default function RiderDispatchPage() {
                 disabled={!cancelReason}
                 className={`py-3 rounded-xl font-bold uppercase text-center cursor-pointer ${
                   cancelReason 
-                    ? 'bg-red-600 hover:bg-red-700 text-white border border-red-500' 
-                    : 'bg-zinc-900 text-zinc-600 border border-transparent cursor-not-allowed'
+                    ? 'bg-negative-400 hover:bg-negative-400 text-white border border-negative-400' 
+                    : 'bg-background-secondary text-content-tertiary border border-transparent cursor-not-allowed'
                 }`}
               >
                 Confirm Cancel (Charge ₹50)
@@ -685,27 +693,27 @@ export default function RiderDispatchPage() {
       {/* ==================== IN-APP CHAT MESSAGE GATEWAY OVERLAY ==================== */}
       {showChatModal && assignedDriver && (
         <div className="fixed inset-0 z-[999999] bg-black/90 backdrop-blur-md flex flex-col justify-end items-center p-0 sm:p-6 animate-fadeIn">
-          <div className="w-full sm:max-w-md h-[80vh] sm:h-[650px] bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-3xl sm:rounded-2xl flex flex-col justify-between overflow-hidden shadow-2xl text-left">
+          <div className="w-full sm:max-w-md h-[80vh] sm:h-[650px] bg-background-primary border-t sm:border border-border-opaque rounded-t-3xl sm:rounded-2xl flex flex-col justify-between overflow-hidden shadow-2xl text-left">
             
             {/* Header info */}
-            <div className="bg-zinc-900/50 p-4 border-b border-zinc-900 flex justify-between items-center shrink-0">
+            <div className="bg-background-secondary/50 p-4 border-b border-border-opaque flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">👨🏽‍✈️</span>
                 <div>
                   <h4 className="font-bold text-xs text-white leading-none">{assignedDriver.name}</h4>
-                  <span className="text-[8px] text-zinc-500 font-mono block mt-1 uppercase">PILOT MASKED CONNECTION PORT</span>
+                  <span className="text-[8px] text-content-tertiary font-mono block mt-1 uppercase">PILOT MASKED CONNECTION PORT</span>
                 </div>
               </div>
               <button
                 onClick={() => setShowChatModal(false)}
-                className="text-xs font-mono text-zinc-500 hover:text-white uppercase font-bold"
+                className="text-xs font-mono text-content-tertiary hover:text-white uppercase font-bold"
               >
                 Close
               </button>
             </div>
 
             {/* Messages body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-zinc-950/20">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-background-primary/20">
               {chatMessages.map((msg, i) => (
                 <div 
                   key={i} 
@@ -714,29 +722,29 @@ export default function RiderDispatchPage() {
                   <div 
                     className={`p-3 rounded-2xl text-xs leading-relaxed ${
                       msg.sender === 'RIDER' 
-                        ? 'bg-blue-600 text-white rounded-tr-none' 
-                        : 'bg-zinc-900 text-zinc-300 rounded-tl-none border border-zinc-850'
+                        ? 'bg-accent-400 text-white rounded-tr-none' 
+                        : 'bg-background-secondary text-content-secondary rounded-tl-none border border-border-opaque'
                     }`}
                   >
                     {msg.text}
                   </div>
-                  <span className="text-[7px] font-mono text-zinc-600 mt-1">{msg.time}</span>
+                  <span className="text-[7px] font-mono text-content-tertiary mt-1">{msg.time}</span>
                 </div>
               ))}
             </div>
 
             {/* Input bar */}
-            <form onSubmit={handleSendChatMessage} className="bg-zinc-950 border-t border-zinc-900 p-3 flex gap-2 shrink-0">
+            <form onSubmit={handleSendChatMessage} className="bg-background-primary border-t border-border-opaque p-3 flex gap-2 shrink-0">
               <input
                 type="text"
                 value={newChatMessage}
                 onChange={(e) => setNewChatMessage(e.target.value)}
                 placeholder="Type messaging to operator..."
-                className="flex-1 bg-zinc-900 border border-zinc-850 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-700 font-sans"
+                className="flex-1 bg-background-secondary border border-border-opaque rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-border-opaque font-sans"
               />
               <button
                 type="submit"
-                className="bg-white text-black font-mono font-bold text-[9px] px-4.5 rounded-xl uppercase hover:bg-zinc-200 transition"
+                className="bg-white text-black font-mono font-bold text-[9px] px-4.5 rounded-xl uppercase hover:bg-background-tertiary transition"
               >
                 Send
               </button>
@@ -748,32 +756,32 @@ export default function RiderDispatchPage() {
       {/* ==================== FUTURE SCHEDULER DRAWER OVERLAY ==================== */}
       {showSchedulerModal && (
         <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-6 animate-fadeIn">
-          <div className="w-full sm:max-w-md bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-3xl sm:rounded-2xl p-6 space-y-4 text-left">
+          <div className="w-full sm:max-w-md bg-background-primary border-t sm:border border-border-opaque rounded-t-3xl sm:rounded-2xl p-6 space-y-4 text-left">
             <div className="space-y-1">
-              <span className="bg-blue-950/20 text-blue-400 border border-blue-900/60 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
+              <span className="bg-surface-accent/20 text-content-accent border border-border-accent/60 px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                 Future Scheduling drawer
               </span>
               <h3 className="text-sm font-bold text-white font-mono mt-2 uppercase">Plan booking for later</h3>
-              <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+              <p className="text-[10px] text-content-secondary font-sans leading-normal">
                 Convert failed real-time scan matching sequence into a pre-reserved scheduled appointment. A driver will be dispatched 30 mins before target time.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="space-y-1">
-                <label className="block text-[8px] uppercase text-zinc-500 font-bold">Select Date</label>
+                <label className="block text-[8px] uppercase text-content-tertiary font-bold">Select Date</label>
                 <input
                   type="date"
                   defaultValue="2026-06-04"
-                  className="w-full bg-zinc-900 border border-zinc-850 rounded-lg p-2 text-white outline-none"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white outline-none"
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-[8px] uppercase text-zinc-500 font-bold">Select Time</label>
+                <label className="block text-[8px] uppercase text-content-tertiary font-bold">Select Time</label>
                 <input
                   type="time"
                   defaultValue="16:00"
-                  className="w-full bg-zinc-900 border border-zinc-850 rounded-lg p-2 text-white outline-none"
+                  className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-white outline-none"
                 />
               </div>
             </div>
@@ -781,7 +789,7 @@ export default function RiderDispatchPage() {
             <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-3">
               <button
                 onClick={() => setShowSchedulerModal(false)}
-                className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 py-3 rounded-xl font-bold uppercase text-zinc-400 cursor-pointer text-center"
+                className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
                 Close
               </button>
@@ -791,7 +799,7 @@ export default function RiderDispatchPage() {
                   alert('📅 Booking converted successfully to scheduled appointment queue.');
                   router.push('/rider');
                 }}
-                className="bg-white hover:bg-zinc-200 text-black py-3 rounded-xl font-bold uppercase text-center cursor-pointer"
+                className="bg-white hover:bg-background-tertiary text-black py-3 rounded-xl font-bold uppercase text-center cursor-pointer"
               >
                 Confirm Schedule
               </button>
@@ -801,7 +809,7 @@ export default function RiderDispatchPage() {
       )}
 
       {/* Footer Details */}
-      <footer className="bg-zinc-950 py-3.5 text-center text-[7px] font-mono text-zinc-700 border-t border-zinc-900 z-50 select-none">
+      <footer className="bg-background-primary py-3.5 text-center text-[7px] font-mono text-content-tertiary border-t border-border-opaque z-50 select-none">
         ENCRYPTED SHA-256 MATCHER RADAR • SHARD REPLICA ACTIVE
       </footer>
     </div>

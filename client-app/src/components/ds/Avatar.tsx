@@ -37,7 +37,7 @@ export function Avatar({ src, name, size = 40, className = '' }: AvatarProps) {
     <div
       className={[
         base,
-        'bg-gray-200 text-content-secondary font-medium',
+        'bg-background-tertiary text-content-secondary font-medium',
         'flex items-center justify-center select-none',
       ].join(' ')}
       aria-label={name}

@@ -9,7 +9,7 @@ import type { SavedPlace } from "@/lib/api/types";
 
 const PlacePickerMap = dynamic(() => import("@/components/account/PlacePickerMap"), {
   ssr: false,
-  loading: () => <div className="h-56 w-full animate-pulse rounded-2xl bg-[#1E1E1E]" />,
+  loading: () => <div className="h-56 w-full animate-pulse rounded-2xl bg-background-tertiary" />,
 });
 
 const LABELS: { value: SavePlaceInput["label"]; icon: string; name: string }[] = [
@@ -51,13 +51,13 @@ export default function PlacesPage() {
             <EmptyState icon="📍" title="No saved places" message="Save Home & Work for one-tap booking." />
           )}
           {places.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-[#141414] p-4">
+            <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4">
               <span className="text-2xl">{iconFor(p.label)}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">{p.display_name}</p>
-                <p className="truncate text-xs text-[#9CA3AF]">{p.address_text}</p>
+                <p className="text-sm font-semibold text-content-primary">{p.display_name}</p>
+                <p className="truncate text-xs text-content-secondary">{p.address_text}</p>
               </div>
-              <button onClick={() => remove(p.id)} className="text-xs font-semibold text-[#EF4444]">
+              <button onClick={() => remove(p.id)} className="text-xs font-semibold text-content-negative">
                 Delete
               </button>
             </div>
@@ -67,7 +67,7 @@ export default function PlacesPage() {
 
       <button
         onClick={() => setEditing(true)}
-        className="mt-4 w-full rounded-2xl bg-[#FF6B35] py-3.5 text-sm font-bold text-white"
+        className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
       >
         + Add Place
       </button>
@@ -124,19 +124,19 @@ function AddPlaceSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   };
 
   const input =
-    "w-full rounded-xl bg-[#1E1E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6B7280] focus:ring-1 focus:ring-[#FF6B35]";
+    "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-[#141414] p-5"
+        className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-background-secondary p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
-        <h3 className="mb-4 text-lg font-bold text-white">Add Place</h3>
+        <h3 className="mb-4 text-lg font-bold text-content-primary">Add Place</h3>
 
         <PlacePickerMap lat={coords.lat} lng={coords.lng} onPick={(lat, lng) => setCoords({ lat, lng })} />
-        <p className="mb-3 mt-2 text-center text-xs text-[#6B7280]">
+        <p className="mb-3 mt-2 text-center text-xs text-content-tertiary">
           Tap or drag the pin · {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
         </p>
 
@@ -147,7 +147,7 @@ function AddPlaceSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                 key={l.value}
                 onClick={() => setLabel(l.value)}
                 className={`flex-1 rounded-xl py-2.5 text-sm ${
-                  label === l.value ? "bg-[#FF6B35] text-white" : "bg-[#1E1E1E] text-[#9CA3AF]"
+                  label === l.value ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
                 }`}
               >
                 {l.icon} {l.name}
@@ -166,13 +166,13 @@ function AddPlaceSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () 
             placeholder="Search or enter address"
             className={input}
           />
-          {err && <p className="text-xs text-[#EF4444]">{err}</p>}
+          {err && <p className="text-xs text-content-negative">{err}</p>}
         </div>
 
         <button
           onClick={save}
           disabled={!valid || saving}
-          className="mt-5 w-full rounded-2xl bg-[#FF6B35] py-4 text-base font-bold text-white disabled:opacity-40"
+          className="mt-5 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save Place"}
         </button>

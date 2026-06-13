@@ -13,7 +13,7 @@ export default function DriverLoginRedirect() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center font-sans">
-      <div className="text-zinc-500 font-mono text-xs uppercase animate-pulse">
+      <div className="text-content-tertiary font-mono text-xs uppercase animate-pulse">
         {t('redirecting')}
       </div>
     </div>

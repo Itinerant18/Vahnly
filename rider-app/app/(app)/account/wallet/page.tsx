@@ -66,14 +66,14 @@ export default function WalletPage() {
       ) : wallet === "error" ? (
         <ErrorState message="Could not load wallet." onRetry={loadWallet} />
       ) : (
-        <div className="rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#E04A1F] p-5">
+        <div className="rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 p-5">
           <div className="flex items-center justify-between">
             <p className="text-xs text-white/80">Wallet Balance</p>
             <span className="text-xl">👛</span>
           </div>
-          <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(wallet.balance_paise)}</p>
+          <p className="mt-2 text-3xl font-bold text-content-primary">{formatCurrency(wallet.balance_paise)}</p>
           {wallet.locked_paise > 0 && (
-            <span className="mt-3 inline-block rounded-lg bg-black/20 px-2.5 py-1 text-xs text-white">
+            <span className="mt-3 inline-block rounded-lg bg-black/20 px-2.5 py-1 text-xs text-content-primary">
               🔒 {formatCurrency(wallet.locked_paise)} locked
             </span>
           )}
@@ -82,13 +82,13 @@ export default function WalletPage() {
 
       <button
         onClick={() => setShowAdd(true)}
-        className="mt-3 w-full rounded-2xl bg-[#FF6B35] py-3.5 text-sm font-bold text-white"
+        className="mt-3 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
       >
         + Add Money
       </button>
 
       {/* Transactions */}
-      <h2 className="mb-3 mt-6 text-sm font-bold text-white">Transactions</h2>
+      <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Transactions</h2>
       {txns.length === 0 && loadingMore ? (
         <SkeletonList rows={5} height="h-16" />
       ) : txns.length === 0 && txError ? (
@@ -100,21 +100,21 @@ export default function WalletPage() {
           {txns.map((t) => {
             const credit = t.amount_paise >= 0;
             return (
-              <div key={t.id} className="flex items-center gap-3 rounded-xl bg-[#141414] p-3">
+              <div key={t.id} className="flex items-center gap-3 rounded-xl bg-background-secondary p-3">
                 <div
                   className={`flex h-9 w-9 items-center justify-center rounded-full text-sm ${
-                    credit ? "bg-[#22C55E]/15 text-[#22C55E]" : "bg-[#EF4444]/15 text-[#EF4444]"
+                    credit ? "bg-surface-positive text-content-positive" : "bg-surface-negative text-content-negative"
                   }`}
                 >
                   {credit ? "+" : "−"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-white">{t.description ?? t.type}</p>
-                  <p className="text-xs text-[#9CA3AF]">
+                  <p className="truncate text-sm text-content-primary">{t.description ?? t.type}</p>
+                  <p className="text-xs text-content-secondary">
                     {new Date(t.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                   </p>
                 </div>
-                <p className={`text-sm font-semibold ${credit ? "text-[#22C55E]" : "text-[#EF4444]"}`}>
+                <p className={`text-sm font-semibold ${credit ? "text-content-positive" : "text-content-negative"}`}>
                   {credit ? "+" : "−"}
                   {formatCurrency(Math.abs(t.amount_paise))}
                 </p>
@@ -123,7 +123,7 @@ export default function WalletPage() {
           })}
           <div ref={sentinelRef} className="h-8" />
           {loadingMore && <Shimmer className="h-16 w-full" />}
-          {done && <p className="py-3 text-center text-xs text-[#6B7280]">No more transactions</p>}
+          {done && <p className="py-3 text-center text-xs text-content-tertiary">No more transactions</p>}
         </div>
       )}
 
@@ -161,12 +161,12 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-[#141414] p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl bg-background-secondary p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
 
         {phase === "amount" && (
           <>
-            <h3 className="mb-4 text-lg font-bold text-white">Add Money</h3>
+            <h3 className="mb-4 text-lg font-bold text-content-primary">Add Money</h3>
             <div className="mb-3 flex gap-2">
               {PRESETS.map((p) => (
                 <button
@@ -176,27 +176,27 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
                     setCustom("");
                   }}
                   className={`flex-1 rounded-xl py-3 text-sm font-semibold ${
-                    amount === p && !custom ? "bg-[#FF6B35] text-white" : "bg-[#1E1E1E] text-[#9CA3AF]"
+                    amount === p && !custom ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
                   }`}
                 >
                   {formatCurrency(p)}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-[#1E1E1E] px-4">
-              <span className="text-sm text-[#9CA3AF]">₹</span>
+            <div className="flex items-center gap-2 rounded-xl bg-background-tertiary px-4">
+              <span className="text-sm text-content-secondary">₹</span>
               <input
                 type="number"
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
                 placeholder="Custom amount"
-                className="flex-1 bg-transparent py-3 text-sm text-white outline-none placeholder:text-[#6B7280]"
+                className="flex-1 bg-transparent py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary"
               />
             </div>
             <button
               onClick={pay}
               disabled={paise <= 0}
-              className="mt-5 w-full rounded-2xl bg-[#FF6B35] py-4 text-base font-bold text-white disabled:opacity-40"
+              className="mt-5 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40"
             >
               Add {formatCurrency(paise > 0 ? paise : 0)}
             </button>
@@ -205,17 +205,17 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
 
         {phase === "processing" && (
           <div className="flex flex-col items-center gap-3 py-8">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1E1E1E] border-t-[#FF6B35]" />
-            <p className="text-sm text-[#9CA3AF]">Processing payment…</p>
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-border-opaque border-t-border-accent" />
+            <p className="text-sm text-content-secondary">Processing payment…</p>
           </div>
         )}
 
         {phase === "success" && (
           <div className="flex flex-col items-center gap-3 py-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#22C55E]">
-              <span className="text-3xl text-white">✓</span>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-positive-400">
+              <span className="text-3xl text-content-primary">✓</span>
             </div>
-            <p className="text-base font-bold text-white">{formatCurrency(paise)} added!</p>
+            <p className="text-base font-bold text-content-primary">{formatCurrency(paise)} added!</p>
           </div>
         )}
         <div className="h-4" />

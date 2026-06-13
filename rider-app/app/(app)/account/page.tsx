@@ -25,9 +25,9 @@ const LINKS: { href: string; label: string; icon: string }[] = [
 ];
 
 function loyaltyTier(trips: number): { name: string; color: string } {
-  if (trips >= 15) return { name: "Platinum", color: "text-[#E5E4E2]" };
-  if (trips >= 5) return { name: "Gold", color: "text-[#FFD700]" };
-  return { name: "Silver", color: "text-[#C0C0C0]" };
+  if (trips >= 15) return { name: "Platinum", color: "text-content-secondary" };
+  if (trips >= 5) return { name: "Gold", color: "text-content-warning" };
+  return { name: "Silver", color: "text-content-secondary" };
 }
 
 export default function AccountPage() {
@@ -55,13 +55,13 @@ export default function AccountPage() {
   const initials = (rider?.name ?? "?").trim().slice(0, 1).toUpperCase();
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] pb-24">
+    <main className="min-h-screen bg-background-primary pb-24">
       <div className="px-4 pt-12">
-        <h1 className="mb-4 text-2xl font-bold text-white">Account</h1>
+        <h1 className="mb-4 text-2xl font-bold text-content-primary">Account</h1>
 
         {/* Profile card */}
-        <div className="flex items-center gap-4 rounded-2xl bg-[#141414] p-4">
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FF6B35]/20 text-2xl font-bold text-[#FF6B35]">
+        <div className="flex items-center gap-4 rounded-2xl bg-background-secondary p-4">
+          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-accent text-2xl font-bold text-content-accent">
             {rider?.profile_photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={rider.profile_photo_url} alt="" className="h-full w-full object-cover" />
@@ -70,14 +70,14 @@ export default function AccountPage() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold text-white">{rider?.name ?? "Add your name"}</p>
-            <p className="text-sm text-[#9CA3AF]">{rider?.phone ?? ""}</p>
+            <p className="truncate text-base font-bold text-content-primary">{rider?.name ?? "Add your name"}</p>
+            <p className="text-sm text-content-secondary">{rider?.phone ?? ""}</p>
           </div>
           <span
             className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
               rider?.kyc_level && rider.kyc_level !== "NONE"
-                ? "bg-[#22C55E]/10 text-[#22C55E]"
-                : "bg-[#9CA3AF]/10 text-[#9CA3AF]"
+                ? "bg-surface-positive text-content-positive"
+                : "bg-surface-neutral text-content-secondary"
             }`}
           >
             {rider?.kyc_level && rider.kyc_level !== "NONE" ? "✓ KYC" : "Unverified"}
@@ -86,24 +86,24 @@ export default function AccountPage() {
 
         {/* Stats row */}
         <div className="mt-3 grid grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-[#141414] p-3 text-center">
-            <p className="text-xs text-[#9CA3AF]">Trips</p>
+          <div className="rounded-2xl bg-background-secondary p-3 text-center">
+            <p className="text-xs text-content-secondary">Trips</p>
             {stats ? (
-              <p className="mt-1 text-lg font-bold text-white">{stats.trips}</p>
+              <p className="mt-1 text-lg font-bold text-content-primary">{stats.trips}</p>
             ) : (
               <Shimmer className="mx-auto mt-1 h-6 w-10" />
             )}
           </div>
-          <div className="rounded-2xl bg-[#141414] p-3 text-center">
-            <p className="text-xs text-[#9CA3AF]">Spent</p>
+          <div className="rounded-2xl bg-background-secondary p-3 text-center">
+            <p className="text-xs text-content-secondary">Spent</p>
             {stats ? (
-              <p className="mt-1 text-sm font-bold text-white">{formatCurrency(stats.spent)}</p>
+              <p className="mt-1 text-sm font-bold text-content-primary">{formatCurrency(stats.spent)}</p>
             ) : (
               <Shimmer className="mx-auto mt-1 h-6 w-14" />
             )}
           </div>
-          <div className="rounded-2xl bg-[#141414] p-3 text-center">
-            <p className="text-xs text-[#9CA3AF]">Tier</p>
+          <div className="rounded-2xl bg-background-secondary p-3 text-center">
+            <p className="text-xs text-content-secondary">Tier</p>
             <p className={`mt-1 text-lg font-bold ${tier.color}`}>{tier.name}</p>
           </div>
         </div>
@@ -114,10 +114,10 @@ export default function AccountPage() {
             <Link
               key={l.href}
               href={l.href}
-              className="flex flex-col items-center gap-2 rounded-2xl bg-[#141414] py-4 active:bg-[#1E1E1E]"
+              className="flex flex-col items-center gap-2 rounded-2xl bg-background-secondary py-4 active:bg-background-tertiary"
             >
               <span className="text-2xl">{l.icon}</span>
-              <span className="text-center text-xs text-[#D1D5DB]">{l.label}</span>
+              <span className="text-center text-xs text-content-secondary">{l.label}</span>
             </Link>
           ))}
         </div>
@@ -125,7 +125,7 @@ export default function AccountPage() {
         {/* Logout */}
         <button
           onClick={logout}
-          className="mt-6 w-full rounded-2xl border border-[#EF4444]/40 py-3.5 text-sm font-semibold text-[#EF4444] active:bg-[#EF4444]/10"
+          className="mt-6 w-full rounded-2xl border border-border-opaque py-3.5 text-sm font-semibold text-content-negative active:bg-surface-negative"
         >
           Log Out
         </button>

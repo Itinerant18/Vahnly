@@ -52,33 +52,33 @@ export default function RiderAccountLayout({ children }: { children: React.React
       <div className="min-h-screen bg-black text-white font-sans flex flex-col md:flex-row relative">
         
         {/* 1. LEFT SIDEBAR FOR DESKTOP SCREEN RESOLUTIONS */}
-        <aside className="hidden md:flex md:w-72 bg-zinc-950 border-r border-zinc-900 flex-col justify-between p-6 shrink-0 text-left h-screen sticky top-0">
+        <aside className="hidden md:flex md:w-72 bg-background-primary border-r border-border-opaque flex-col justify-between p-6 shrink-0 text-left h-screen sticky top-0">
           <div className="overflow-y-auto space-y-6 scrollbar-thin pr-1">
             {/* Logo */}
-            <div className="pb-4 border-b border-zinc-900">
+            <div className="pb-4 border-b border-border-opaque">
               <h2 className="text-sm font-extrabold tracking-widest font-mono text-white">DRIVERS-FOR-U</h2>
-              <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-widest">Rider Portal Console</span>
+              <span className="text-[8px] font-mono text-content-tertiary uppercase tracking-widest">Rider Portal Console</span>
             </div>
 
             {/* Profile info */}
-            <div className="flex items-center gap-3 bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
+            <div className="flex items-center gap-3 bg-background-secondary/40 p-3 border border-border-opaque rounded-xl">
               {avatar ? (
                 <img 
                   src={avatar} 
                   alt="Profile" 
-                  className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                  className="h-10 w-10 rounded-lg object-cover border border-border-opaque"
                 />
               ) : (
-                <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs text-zinc-500 border border-zinc-800">
+                <div className="h-10 w-10 bg-background-tertiary rounded-lg flex items-center justify-center text-xs text-content-tertiary border border-border-opaque">
                   👤
                 </div>
               )}
               <div className="truncate">
                 <div className="flex items-center gap-1.5">
                   <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
-                  <span className="text-[10px] text-emerald-400" title="Verified Driver Partner / Asset Owner">✓</span>
+                  <span className="text-[10px] text-content-positive" title="Verified Driver Partner / Asset Owner">✓</span>
                 </div>
-                <span className="text-[9px] font-mono text-zinc-500 block truncate">{riderID.toUpperCase()}</span>
+                <span className="text-[9px] font-mono text-content-tertiary block truncate">{riderID.toUpperCase()}</span>
               </div>
             </div>
 
@@ -88,7 +88,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent hover:border-zinc-850 transition-all font-mono uppercase tracking-wider"
+                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-white hover:bg-background-secondary border border-transparent hover:border-border-opaque transition-all font-mono uppercase tracking-wider"
                 >
                   <span>{item.icon}</span>
                   <span>{item.label}</span>
@@ -97,13 +97,13 @@ export default function RiderAccountLayout({ children }: { children: React.React
             </nav>
           </div>
 
-          <div className="border-t border-zinc-900 pt-4 mt-4">
+          <div className="border-t border-border-opaque pt-4 mt-4">
             <button
               onClick={() => {
                 useAuthStore.getState().logout();
                 window.location.href = '/login';
               }}
-              className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-zinc-800 cursor-pointer"
+              className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-border-opaque cursor-pointer"
             >
               🚪 Terminate Session
             </button>
@@ -111,18 +111,18 @@ export default function RiderAccountLayout({ children }: { children: React.React
         </aside>
 
         {/* 2. RESPONSIVE MOBILE TOP NAVIGATION HEADER BAR */}
-        <div className="md:hidden bg-zinc-950 border-b border-zinc-900 p-4 flex justify-between items-center w-full sticky top-0 z-50">
+        <div className="md:hidden bg-background-primary border-b border-border-opaque p-4 flex justify-between items-center w-full sticky top-0 z-50">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="h-8 w-8 bg-zinc-900 rounded-lg border border-zinc-850 flex items-center justify-center text-sm cursor-pointer"
+              className="h-8 w-8 bg-background-secondary rounded-lg border border-border-opaque flex items-center justify-center text-sm cursor-pointer"
             >
               ☰
             </button>
             <h2 className="text-xs font-bold font-mono tracking-widest text-white">RIDER PORTAL</h2>
           </div>
 
-          <Link href="/rider" className="text-[9px] font-mono font-bold uppercase tracking-wider border border-zinc-800 px-3 py-1.5 rounded-full hover:bg-zinc-900 transition">
+          <Link href="/rider" className="text-[9px] font-mono font-bold uppercase tracking-wider border border-border-opaque px-3 py-1.5 rounded-full hover:bg-background-secondary transition">
             ← Map Home
           </Link>
         </div>
@@ -130,37 +130,37 @@ export default function RiderAccountLayout({ children }: { children: React.React
         {/* 3. MOBILE MENU SIDE DRAWER POPUP */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="w-72 bg-zinc-950 border-r border-zinc-900 h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
+            <div className="w-72 bg-background-primary border-r border-border-opaque h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
               <div className="overflow-y-auto space-y-6">
-                <div className="flex justify-between items-center pb-4 border-b border-zinc-900">
+                <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
                   <h2 className="text-xs font-bold font-mono text-white">DRAWER MENU</h2>
                   <button 
                     onClick={() => setMobileMenuOpen(false)}
-                    className="text-xs text-zinc-500 font-bold font-mono"
+                    className="text-xs text-content-tertiary font-bold font-mono"
                   >
                     CLOSE
                   </button>
                 </div>
 
                 {/* Mobile Identity Apex Card */}
-                <div className="flex items-center gap-3 bg-zinc-900/40 p-3 border border-zinc-900 rounded-xl">
+                <div className="flex items-center gap-3 bg-background-secondary/40 p-3 border border-border-opaque rounded-xl">
                   {avatar ? (
                     <img 
                       src={avatar} 
                       alt="Profile" 
-                      className="h-10 w-10 rounded-lg object-cover border border-zinc-800"
+                      className="h-10 w-10 rounded-lg object-cover border border-border-opaque"
                     />
                   ) : (
-                    <div className="h-10 w-10 bg-zinc-850 rounded-lg flex items-center justify-center text-xs text-zinc-500 border border-zinc-800">
+                    <div className="h-10 w-10 bg-background-tertiary rounded-lg flex items-center justify-center text-xs text-content-tertiary border border-border-opaque">
                       👤
                     </div>
                   )}
                   <div className="truncate">
                     <div className="flex items-center gap-1.5">
                       <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
-                      <span className="text-[10px] text-emerald-400">✓</span>
+                      <span className="text-[10px] text-content-positive">✓</span>
                     </div>
-                    <span className="text-[9px] font-mono text-zinc-500 block truncate">{riderID.toUpperCase()}</span>
+                    <span className="text-[9px] font-mono text-content-tertiary block truncate">{riderID.toUpperCase()}</span>
                   </div>
                 </div>
 
@@ -170,7 +170,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
                       key={item.label}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all font-mono uppercase tracking-wider"
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-white hover:bg-background-secondary transition-all font-mono uppercase tracking-wider"
                     >
                       <span>{item.icon}</span>
                       <span>{item.label}</span>
@@ -179,13 +179,13 @@ export default function RiderAccountLayout({ children }: { children: React.React
                 </nav>
               </div>
 
-              <div className="border-t border-zinc-900 pt-4">
+              <div className="border-t border-border-opaque pt-4">
                 <button
                   onClick={() => {
                     useAuthStore.getState().logout();
                     window.location.href = '/login';
                   }}
-                  className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-500 hover:text-white border border-zinc-800 rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
+                  className="w-full bg-background-secondary hover:bg-background-tertiary text-content-tertiary hover:text-white border border-border-opaque rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
                 >
                   🚪 Logout
                 </button>

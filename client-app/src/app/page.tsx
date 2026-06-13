@@ -96,28 +96,28 @@ export default function Home() {
     <div className="min-h-screen relative flex flex-col justify-center items-center p-6 bg-black text-white font-sans overflow-hidden selection:bg-white selection:text-black">
       {/* Grid line matrix background */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-black to-zinc-900 z-0 animate-pulse" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-background-primary via-black to-background-secondary z-0 animate-pulse" />
 
       {/* Main Core Loader */}
       <div className="relative z-10 text-center space-y-6">
-        <h1 className="text-4xl font-extrabold tracking-tight font-move bg-gradient-to-r from-white via-zinc-400 to-zinc-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-extrabold tracking-tight font-move bg-gradient-to-r from-white via-background-tertiary to-background-tertiary bg-clip-text text-transparent">
           DRIVERS-FOR-U
         </h1>
         
         <div className="flex flex-col items-center gap-3">
           <div className="relative flex h-8 w-8">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-20"></span>
-            <span className="relative inline-flex rounded-full h-8 w-8 bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+            <span className="relative inline-flex rounded-full h-8 w-8 bg-background-secondary border border-border-opaque flex items-center justify-center">
               <span className="h-2 w-2 rounded-full bg-white animate-pulse"></span>
             </span>
           </div>
-          <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 font-bold select-none">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-content-tertiary font-bold select-none">
             {statusMessage}
           </span>
         </div>
       </div>
 
-      <footer className="absolute bottom-8 left-6 right-6 flex justify-between items-center text-[9px] text-zinc-600 font-mono select-none">
+      <footer className="absolute bottom-8 left-6 right-6 flex justify-between items-center text-[9px] text-content-tertiary font-mono select-none">
         <span>{t('securityLabel')}</span>
         <span>BUILD: v2.4.1-prod</span>
       </footer>

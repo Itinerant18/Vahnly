@@ -177,7 +177,7 @@ export const SettingsDashboard: React.FC = () => {
           >
             Save Changes
           </button>
-          {saved && <span className="text-sm text-emerald-600">✓ Settings saved</span>}
+          {saved && <span className="text-sm text-content-positive">✓ Settings saved</span>}
           <span className="text-xs text-mute ml-auto">Some settings require a gateway restart to take effect.</span>
         </div>
       </div>

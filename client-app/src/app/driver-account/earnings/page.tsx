@@ -16,7 +16,7 @@ import { saveAndShareCsv } from '@/lib/saveStatement';
 const EarningsChart = dynamic(() => import('./EarningsChart'), {
   ssr: false,
   loading: () => (
-    <div className="h-full flex items-center justify-center text-[10px] font-mono text-zinc-600">Loading…</div>
+    <div className="h-full flex items-center justify-center text-[10px] font-mono text-content-tertiary">Loading…</div>
   ),
 });
 
@@ -95,27 +95,27 @@ export default function DriverEarningsPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move">Earnings</h2>
-          <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Ledger-backed payout summary</p>
-          {error && <p className="text-red-400 text-[10px] font-mono mt-2">{error}</p>}
+          <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">Ledger-backed payout summary</p>
+          {error && <p className="text-content-negative text-[10px] font-mono mt-2">{error}</p>}
         </div>
         <button
           onClick={handleDownloadStatement}
           disabled={downloading}
-          className="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono disabled:opacity-50"
+          className="bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer font-mono disabled:opacity-50"
         >
           {downloading ? 'Preparing…' : 'Download Statement'}
         </button>
       </div>
 
       {/* Period selector */}
-      <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 max-w-sm font-mono text-[10px]">
+      <div className="flex bg-background-primary p-1 rounded-xl border border-border-opaque max-w-sm font-mono text-[10px]">
         {(['TODAY', 'WEEK', 'MONTH', 'CUSTOM'] as const).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriod(p)}
             className={`flex-1 py-2 font-bold uppercase rounded-lg transition-all ${
-              period === p ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'
+              period === p ? 'bg-white text-black' : 'text-content-secondary hover:text-white'
             }`}
           >
             {p}
@@ -126,40 +126,40 @@ export default function DriverEarningsPage() {
       {period === 'CUSTOM' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-sm">
           <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-            className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono" />
+            className="bg-background-primary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
           <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-            className="bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-xs text-white font-mono" />
+            className="bg-background-primary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
         </div>
       )}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-1 col-span-2 lg:col-span-1">
-          <span className="text-zinc-500 block text-[9px] uppercase font-mono tracking-wider font-bold">Net Earnings</span>
-          <KpiValue paise={s?.net_earnings_paise ?? 0} className="text-2xl font-mono font-bold text-emerald-400 block" />
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-1 col-span-2 lg:col-span-1">
+          <span className="text-content-tertiary block text-[9px] uppercase font-mono tracking-wider font-bold">Net Earnings</span>
+          <KpiValue paise={s?.net_earnings_paise ?? 0} className="text-2xl font-mono font-bold text-content-positive block" />
         </div>
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-1">
-          <span className="text-zinc-500 block text-[9px] uppercase font-mono tracking-wider font-bold">Trips</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-1">
+          <span className="text-content-tertiary block text-[9px] uppercase font-mono tracking-wider font-bold">Trips</span>
           <CountInt value={s?.trip_count ?? 0} className="text-2xl font-mono font-bold text-white block" />
         </div>
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-1">
-          <span className="text-zinc-500 block text-[9px] uppercase font-mono tracking-wider font-bold">Tips</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-1">
+          <span className="text-content-tertiary block text-[9px] uppercase font-mono tracking-wider font-bold">Tips</span>
           <KpiValue paise={s?.tips_paise ?? 0} className="text-2xl font-mono font-bold text-white block" />
         </div>
-        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-1">
-          <span className="text-zinc-500 block text-[9px] uppercase font-mono tracking-wider font-bold">Online</span>
+        <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-1">
+          <span className="text-content-tertiary block text-[9px] uppercase font-mono tracking-wider font-bold">Online</span>
           <span className="text-2xl font-mono font-bold text-white block">{onlineHours.toFixed(1)} hrs</span>
         </div>
       </div>
 
       {/* Daily earnings bar chart */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">Daily Earnings (last 7 days)</h4>
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">Daily Earnings (last 7 days)</h4>
         <div className="h-48">
           {mounted && chartData.length > 0 ? (
             <EarningsChart data={chartData} />
           ) : (
-            <div className="h-full flex items-center justify-center text-[10px] font-mono text-zinc-600">
+            <div className="h-full flex items-center justify-center text-[10px] font-mono text-content-tertiary">
               {loading ? 'Loading…' : 'No earnings in this period.'}
             </div>
           )}
@@ -167,27 +167,27 @@ export default function DriverEarningsPage() {
       </div>
 
       {/* Recent trips */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">Recent Trips</h4>
-        <div className="divide-y divide-zinc-900">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">Recent Trips</h4>
+        <div className="divide-y divide-border-opaque">
           {(data?.recent_trips ?? []).length === 0 && (
-            <p className="py-3 text-[10px] font-mono text-zinc-600 text-center">No trips in this period.</p>
+            <p className="py-3 text-[10px] font-mono text-content-tertiary text-center">No trips in this period.</p>
           )}
           {(data?.recent_trips ?? []).map((t) => (
             <button
               key={t.order_id}
               onClick={() => router.push(`/driver-account/trip-history/${t.order_id}`)}
-              className="w-full py-3 flex justify-between items-center text-xs font-mono text-left hover:bg-zinc-900/30 transition rounded-lg px-1"
+              className="w-full py-3 flex justify-between items-center text-xs font-mono text-left hover:bg-background-secondary/30 transition rounded-lg px-1"
             >
               <div>
                 <span className="text-white block font-sans font-medium">
                   {t.pickup_short || 'Ride'} {t.drop_short ? `➔ ${t.drop_short}` : ''}
                 </span>
-                <span className="text-zinc-500 text-[8px] block mt-0.5">{formatCompactDate(t.completed_at)} • fare {formatCurrency(t.fare_paise)}</span>
+                <span className="text-content-tertiary text-[8px] block mt-0.5">{formatCompactDate(t.completed_at)} • fare {formatCurrency(t.fare_paise)}</span>
               </div>
               <div className="text-right">
-                <span className="text-emerald-400 block font-bold">{formatCurrency(t.driver_earnings_paise)}</span>
-                {t.tip_paise > 0 && <span className="text-zinc-500 text-[8px] block">tip {formatCurrency(t.tip_paise)}</span>}
+                <span className="text-content-positive block font-bold">{formatCurrency(t.driver_earnings_paise)}</span>
+                {t.tip_paise > 0 && <span className="text-content-tertiary text-[8px] block">tip {formatCurrency(t.tip_paise)}</span>}
               </div>
             </button>
           ))}

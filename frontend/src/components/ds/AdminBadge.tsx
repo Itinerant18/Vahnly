@@ -50,7 +50,7 @@ export function AdminBadge({ label, variant, dot = false, pulse = false }: Admin
             resolved === 'negative' ? 'bg-negative-400' :
             resolved === 'warning'  ? 'bg-warning-400'  :
             resolved === 'accent'   ? 'bg-accent-400'   :
-            'bg-gray-400'
+            'bg-background-tertiary'
           } ${pulse ? 'animate-pulse' : ''}`}
         />
       )}

@@ -867,7 +867,7 @@ export const SafetyDashboard: React.FC = () => {
 
 			{/* ─── Create Block Modal ───────────────────────────────────── */}
 			{showAddBlockModal && (
-				<div className="fixed inset-0 bg-gray-1000/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+				<div className="fixed inset-0 bg-background-secondary0/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
 					<div className="bg-background-primary border border-border-opaque rounded-md shadow-xl w-full max-w-md overflow-hidden">
 						<div className="px-6 py-4 border-b border-border-opaque flex justify-between items-center bg-background-secondary">
 							<h3 className="font-bold text-label-large text-content-primary uppercase tracking-wider">Deploy Blacklist Block</h3>
@@ -936,7 +936,7 @@ export const SafetyDashboard: React.FC = () => {
 						</div>
 						<span className="w-2.5 h-2.5 rounded-full bg-negative-400 animate-pulse mt-1 inline-block" />
 					</div>
-					<div className="h-10 flex items-center justify-center gap-1 bg-gray-900 rounded-sm px-4 border border-gray-700">
+					<div className="h-10 flex items-center justify-center gap-1 bg-gray-900 rounded-sm px-4 border border-gray-800">
 						{waveHeights.map((h, i) => (
 							<div key={i} className="w-0.5 rounded-full bg-negative-400" style={{ height: `${h}px` }} />
 						))}

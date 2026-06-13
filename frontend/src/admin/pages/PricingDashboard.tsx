@@ -601,7 +601,7 @@ export const PricingDashboard: React.FC = () => {
 
 			{/* ── HISTORY DRAWER ── */}
 			{showHistoryDrawer && (
-				<div className="fixed inset-0 bg-gray-1000/40 flex justify-end z-50">
+				<div className="fixed inset-0 bg-background-secondary0/40 flex justify-end z-50">
 					<div className="bg-background-primary border-l border-border-opaque w-96 h-full p-5 space-y-4 shadow-xl flex flex-col overflow-y-auto">
 						<div className="flex justify-between items-center">
 							<h3 className="text-label-large uppercase tracking-wider text-content-primary">Fare Revisions History</h3>

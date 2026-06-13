@@ -209,7 +209,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
             {/* Rider card */}
             <div className="card flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-pill bg-gray-200 flex items-center justify-center text-heading-small text-content-secondary flex-shrink-0 select-none">
+                <div className="w-12 h-12 rounded-pill bg-background-tertiary flex items-center justify-center text-heading-small text-content-secondary flex-shrink-0 select-none">
                   {riderFirstName[0]?.toUpperCase()}
                 </div>
                 <div>

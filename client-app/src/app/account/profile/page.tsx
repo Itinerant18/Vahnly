@@ -79,21 +79,21 @@ export default function RiderProfilePage() {
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">My Profile Details</h2>
-        <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage personal settings and check KYC authorization status</p>
+        <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">Manage personal settings and check KYC authorization status</p>
       </div>
 
       {/* Account Overview Card */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-center">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-center">
         {/* Avatar Picker & Compression Trigger */}
         <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
           {avatar ? (
             <img 
               src={avatar} 
               alt="Avatar" 
-              className="h-20 w-20 rounded-2xl object-cover border border-zinc-800 group-hover:opacity-75 transition"
+              className="h-20 w-20 rounded-2xl object-cover border border-border-opaque group-hover:opacity-75 transition"
             />
           ) : (
-            <div className="h-20 w-20 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center text-3xl text-zinc-600 group-hover:opacity-75 transition">
+            <div className="h-20 w-20 bg-background-secondary border border-border-opaque rounded-2xl flex items-center justify-center text-3xl text-content-tertiary group-hover:opacity-75 transition">
               👤
             </div>
           )}
@@ -113,23 +113,23 @@ export default function RiderProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <h3 className="text-base font-bold text-white flex items-center gap-1.5 justify-center sm:justify-start">
               <span>{riderName}</span>
-              <span className="text-emerald-400 text-xs" title="Verified Account">✓</span>
+              <span className="text-content-positive text-xs" title="Verified Account">✓</span>
             </h3>
             <span className={`px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider w-max mx-auto sm:mx-0 border ${
               kycLevel === 'Fully Authenticated'
-                ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900'
-                : 'bg-amber-950/20 text-amber-500 border-amber-900'
+                ? 'bg-surface-positive/20 text-content-positive border-positive-400'
+                : 'bg-surface-warning/20 text-content-warning border-warning-400'
             }`}>
               KYC: {kycLevel}
             </span>
           </div>
-          <p className="text-xs text-zinc-500 font-mono">{riderPhone} • City: Kolkata</p>
+          <p className="text-xs text-content-tertiary font-mono">{riderPhone} • City: Kolkata</p>
         </div>
 
         {kycLevel !== 'Fully Authenticated' && (
           <button
             onClick={handleUpgradeKyc}
-            className="bg-white hover:bg-zinc-200 text-black text-[10px] font-mono font-bold uppercase py-2 px-4 rounded-xl cursor-pointer transition active:scale-95 shrink-0 self-center"
+            className="bg-white hover:bg-background-tertiary text-black text-[10px] font-mono font-bold uppercase py-2 px-4 rounded-xl cursor-pointer transition active:scale-95 shrink-0 self-center"
           >
             Upgrade to Fully Authenticated
           </button>
@@ -137,20 +137,20 @@ export default function RiderProfilePage() {
       </div>
 
       {/* KYC Limitations Alert */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-zinc-900 pb-2">
+      <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
+        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2">
           KYC Tier Capability Mapping
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-          <div className={`p-3 rounded-xl border ${kycLevel === 'Basic' ? 'border-amber-900/50 bg-amber-950/5' : 'border-zinc-900 bg-zinc-950/40 opacity-55'}`}>
-            <span className="text-[10px] font-bold text-amber-400 block mb-1">Tier 1: Basic Identity</span>
-            <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+          <div className={`p-3 rounded-xl border ${kycLevel === 'Basic' ? 'border-warning-400/50 bg-surface-warning/5' : 'border-border-opaque bg-background-primary/40 opacity-55'}`}>
+            <span className="text-[10px] font-bold text-content-warning block mb-1">Tier 1: Basic Identity</span>
+            <p className="text-[10px] text-content-secondary font-sans leading-normal">
               For initial registrations. Limits bookings to City Hourly matches, budget/hatchback classes, and distances under 50km.
             </p>
           </div>
-          <div className={`p-3 rounded-xl border ${kycLevel === 'Fully Authenticated' ? 'border-emerald-900 bg-emerald-950/5' : 'border-zinc-900 bg-zinc-950/40 opacity-55'}`}>
-            <span className="text-[10px] font-bold text-emerald-400 block mb-1">Tier 2: Fully Authenticated</span>
-            <p className="text-[10px] text-zinc-400 font-sans leading-normal">
+          <div className={`p-3 rounded-xl border ${kycLevel === 'Fully Authenticated' ? 'border-positive-400 bg-surface-positive/5' : 'border-border-opaque bg-background-primary/40 opacity-55'}`}>
+            <span className="text-[10px] font-bold text-content-positive block mb-1">Tier 2: Fully Authenticated</span>
+            <p className="text-[10px] text-content-secondary font-sans leading-normal">
               Unlocks premium/luxury fleets (Sedans, SUVs), outstation long-distance round trips, and priority pilot matching pools.
             </p>
           </div>
@@ -158,13 +158,13 @@ export default function RiderProfilePage() {
       </div>
 
       {/* Profile Form */}
-      <form onSubmit={handleSave} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
-        <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+      <form onSubmit={handleSave} className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
+        <div className="flex justify-between items-center border-b border-border-opaque pb-2">
           <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">Personal Settings</h4>
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
-            className="text-[9px] font-mono font-bold text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer"
+            className="text-[9px] font-mono font-bold text-content-secondary hover:text-white uppercase tracking-wider cursor-pointer"
           >
             {isEditing ? 'Cancel' : 'Edit Info'}
           </button>
@@ -172,26 +172,26 @@ export default function RiderProfilePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
           <div>
-            <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Email Address</label>
+            <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Email Address</label>
             <div className="flex gap-2">
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={!isEditing || emailVerified}
-                className={`flex-grow bg-zinc-900 border rounded-xl p-2.5 focus:outline-none ${
-                  emailVerified ? 'border-emerald-900 text-zinc-400' : 'border-zinc-800 text-white'
+                className={`flex-grow bg-background-secondary border rounded-xl p-2.5 focus:outline-none ${
+                  emailVerified ? 'border-positive-400 text-content-secondary' : 'border-border-opaque text-white'
                 }`}
               />
               {emailVerified ? (
-                <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
+                <span className="bg-surface-positive/20 text-content-positive border border-positive-400 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
                   Verified ✓
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={handleVerifyEmail}
-                  className="bg-white text-black hover:bg-zinc-200 text-[8px] font-bold px-3 py-2.5 rounded-xl cursor-pointer shrink-0 uppercase transition active:scale-95"
+                  className="bg-white text-black hover:bg-background-tertiary text-[8px] font-bold px-3 py-2.5 rounded-xl cursor-pointer shrink-0 uppercase transition active:scale-95"
                 >
                   Verify
                 </button>
@@ -200,38 +200,38 @@ export default function RiderProfilePage() {
           </div>
 
           <div>
-            <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Phone Number</label>
+            <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Phone Number</label>
             <div className="flex gap-2">
               <input
                 type="tel"
                 value={riderPhone}
                 disabled
-                className="flex-grow bg-zinc-900 border border-emerald-900 text-zinc-400 rounded-xl p-2.5 focus:outline-none"
+                className="flex-grow bg-background-secondary border border-positive-400 text-content-secondary rounded-xl p-2.5 focus:outline-none"
               />
-              <span className="bg-emerald-950/20 text-emerald-400 border border-emerald-900 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
+              <span className="bg-surface-positive/20 text-content-positive border border-positive-400 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
                 Verified ✓
               </span>
             </div>
           </div>
 
           <div>
-            <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Date of Birth</label>
+            <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Date of Birth</label>
             <input
               type="date"
               value={dob}
               onChange={(e) => setDob(e.target.value)}
               disabled={!isEditing}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+              className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Gender</label>
+            <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Gender</label>
             <select
               value={gender}
               onChange={(e) => setGender(e.target.value)}
               disabled={!isEditing}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+              className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
             >
               <option>Male</option>
               <option>Female</option>
@@ -240,12 +240,12 @@ export default function RiderProfilePage() {
           </div>
 
           <div>
-            <label className="block text-[8px] uppercase font-bold text-zinc-500 mb-1.5 font-mono">Language preference</label>
+            <label className="block text-[8px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Language preference</label>
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value)}
               disabled={!isEditing}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white focus:outline-none"
+              className="w-full bg-background-secondary border border-border-opaque rounded-xl p-2.5 text-white focus:outline-none"
             >
               <option>English</option>
               <option>Bengali</option>
@@ -257,7 +257,7 @@ export default function RiderProfilePage() {
         {isEditing && (
           <button
             type="submit"
-            className="w-full bg-white hover:bg-zinc-200 text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95"
+            className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer active:scale-95"
           >
             Save Profile Preferences
           </button>

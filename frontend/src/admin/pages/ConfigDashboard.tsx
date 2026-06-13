@@ -50,17 +50,17 @@ const NAV: { key: Section; label: string; icon: string }[] = [
 ];
 
 const HEALTH_COLORS: Record<string, string> = {
-  HEALTHY: 'bg-emerald-100 text-emerald-700',
-  DEGRADED: 'bg-yellow-100 text-yellow-700',
-  DOWN: 'bg-red-100 text-red-700',
-  UNKNOWN: 'bg-slate-100 text-slate-500',
+  HEALTHY: 'bg-surface-positive text-content-positive',
+  DEGRADED: 'bg-surface-warning text-content-warning',
+  DOWN: 'bg-surface-negative text-content-negative',
+  UNKNOWN: 'bg-background-secondary text-content-secondary',
 };
 const RELEASE_COLORS: Record<string, string> = {
-  FORCE: 'bg-red-100 text-red-700', OPTIONAL: 'bg-blue-100 text-blue-700', SILENT: 'bg-slate-100 text-slate-500',
+  FORCE: 'bg-surface-negative text-content-negative', OPTIONAL: 'bg-surface-accent text-content-accent', SILENT: 'bg-background-secondary text-content-secondary',
 };
 const CHANNEL_COLORS: Record<string, string> = {
-  PUSH: 'bg-violet-100 text-violet-700', SMS: 'bg-blue-100 text-blue-700',
-  EMAIL: 'bg-sky-100 text-sky-700', WHATSAPP: 'bg-emerald-100 text-emerald-700',
+  PUSH: 'bg-surface-accent text-content-accent', SMS: 'bg-surface-accent text-content-accent',
+  EMAIL: 'bg-surface-accent text-content-accent', WHATSAPP: 'bg-surface-positive text-content-positive',
 };
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-ink">Global Settings</h2><p className="text-sm text-mute">Brand, locale, support, and legal configuration</p></div>
-        {saved && <span className="text-sm text-emerald-600">✓ Saved</span>}
+        {saved && <span className="text-sm text-content-positive">✓ Saved</span>}
       </div>
       {categories.map(cat => (
         <div key={cat} className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
@@ -214,7 +214,7 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
           </div>
           <div className="flex items-center gap-4 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={editing.is_enabled} onChange={e => setEditing({ ...editing, is_enabled: e.target.checked })} /> Enabled</label>
-            <label className="flex items-center gap-2 text-red-600"><input type="checkbox" checked={editing.is_kill_switch} onChange={e => setEditing({ ...editing, is_kill_switch: e.target.checked })} /> Kill Switch</label>
+            <label className="flex items-center gap-2 text-content-negative"><input type="checkbox" checked={editing.is_kill_switch} onChange={e => setEditing({ ...editing, is_kill_switch: e.target.checked })} /> Kill Switch</label>
           </div>
           <div className="flex gap-2">
             <button onClick={saveEditing} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
@@ -225,15 +225,15 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
 
       <div className="space-y-2">
         {flags.map(flag => (
-          <div key={flag.flag_key} className={`bg-canvas rounded-xl border p-4 flex items-center gap-4 ${flag.is_kill_switch ? 'border-red-200' : 'border-canvas-soft'}`}>
+          <div key={flag.flag_key} className={`bg-canvas rounded-xl border p-4 flex items-center gap-4 ${flag.is_kill_switch ? 'border-negative-400' : 'border-canvas-soft'}`}>
             <button onClick={() => isSuperAdmin && toggle(flag)}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${flag.is_enabled ? (flag.is_kill_switch ? 'bg-red-500' : 'bg-accent') : 'bg-canvas-soft'} ${!isSuperAdmin ? 'cursor-default' : 'cursor-pointer'}`}>
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${flag.is_enabled ? (flag.is_kill_switch ? 'bg-surface-negative0' : 'bg-accent') : 'bg-canvas-soft'} ${!isSuperAdmin ? 'cursor-default' : 'cursor-pointer'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${flag.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-ink">{flag.name}</span>
-                {flag.is_kill_switch && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">KILL SWITCH</span>}
+                {flag.is_kill_switch && <span className="text-[10px] bg-surface-negative text-content-negative px-1.5 py-0.5 rounded font-medium">KILL SWITCH</span>}
                 <span className="text-xs text-mute font-mono">{flag.flag_key}</span>
               </div>
               <div className="text-xs text-mute mt-0.5">{flag.description}</div>
@@ -429,7 +429,7 @@ const IntegrationsSection: React.FC<{ base: string; headers: Record<string, stri
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ig.is_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ig.is_enabled ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                   {ig.is_enabled ? 'ENABLED' : 'DISABLED'}
                 </span>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${HEALTH_COLORS[ig.health_status] ?? 'bg-canvas-soft text-body'}`}>
@@ -528,7 +528,7 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-ink">{t.name}</span>
                 <span className="text-xs text-mute font-mono">{t.template_key}</span>
-                {!t.is_active && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">inactive</span>}
+                {!t.is_active && <span className="text-[10px] bg-background-secondary text-content-secondary px-1.5 py-0.5 rounded">inactive</span>}
               </div>
               {t.title_template && <div className="text-xs text-body mt-0.5">Title: <span className="font-medium">{t.title_template}</span></div>}
               <div className="text-xs text-mute mt-0.5 truncate">{t.body_template}</div>
@@ -628,7 +628,7 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
               <tr key={rule.id} className={`border-t border-canvas-soft/50 hover:bg-canvas-soft/20 ${!rule.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-2.5 text-xs font-medium text-ink">{rule.rule_name}</td>
                 <td className="px-4 py-2.5 text-xs text-body">{rule.applies_to}</td>
-                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${rule.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{rule.is_active ? 'ON' : 'OFF'}</span></td>
+                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${rule.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{rule.is_active ? 'ON' : 'OFF'}</span></td>
                 <td className="px-4 py-2.5 text-xs text-right text-mute font-mono">{rule.minutes_elapsed_min}–{rule.minutes_elapsed_max === 999999 ? '∞' : rule.minutes_elapsed_max}m</td>
                 <td className="px-4 py-2.5 text-xs text-right font-mono">{rule.cancellation_fee_pct > 0 ? `${rule.cancellation_fee_pct}%` : rule.cancellation_fee_fixed_paise > 0 ? `₹${rule.cancellation_fee_fixed_paise / 100}` : '—'}</td>
                 <td className="px-4 py-2.5 text-xs text-right font-mono">{rule.refund_pct}%</td>
@@ -668,7 +668,7 @@ const RatingRulesSection: React.FC<{ base: string; headers: Record<string, strin
 
   useEffect(() => { fetchRules(); }, [fetchRules]);
 
-  const THRESHOLD_COLORS: Record<string, string> = { WARNING: 'bg-yellow-100 text-yellow-700', SUSPEND: 'bg-orange-100 text-orange-700', BAN: 'bg-red-100 text-red-700' };
+  const THRESHOLD_COLORS: Record<string, string> = { WARNING: 'bg-surface-warning text-content-warning', SUSPEND: 'bg-surface-warning text-content-warning', BAN: 'bg-surface-negative text-content-negative' };
 
   return (
     <div className="space-y-5">

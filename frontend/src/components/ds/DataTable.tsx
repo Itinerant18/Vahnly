@@ -72,10 +72,10 @@ function SortIcon({ dir }: { dir: SortDir }) {
   return (
     <span className="inline-flex flex-col ml-1 opacity-60">
       <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-        <path d="M4 0L8 5H0L4 0Z" fill={dir === 'asc' ? 'currentColor' : '#CBCBCB'} />
+        <path d="M4 0L8 5H0L4 0Z" fill={dir === 'asc' ? 'currentColor' : 'var(--content-tertiary)'} />
       </svg>
       <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className="-mt-0.5">
-        <path d="M4 5L0 0H8L4 5Z" fill={dir === 'desc' ? 'currentColor' : '#CBCBCB'} />
+        <path d="M4 5L0 0H8L4 5Z" fill={dir === 'desc' ? 'currentColor' : 'var(--content-tertiary)'} />
       </svg>
     </span>
   );
@@ -308,7 +308,7 @@ export function DataTable<T extends { id?: string; [key: string]: unknown }>({
                 <td colSpan={totalCols} className="py-16">
                   {emptyState ?? (
                     <div className="flex flex-col items-center gap-3 text-center">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-gray-300">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-content-tertiary">
                         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                       <span className="text-heading-medium text-content-secondary">No results</span>
