@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface AuditEntry {
@@ -7,6 +8,7 @@ interface AuditEntry {
   action: string; module: string; entity_type: string; entity_id: string;
   details: string | null; before_value: unknown; after_value: unknown;
   ip_address: string; user_agent: string; created_at: string;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
 interface ActionMeta { action: string; module: string; count: number; }
 
@@ -49,6 +51,49 @@ function fmtJSON(val: unknown): string {
   if (val === null || val === undefined || val === 'null') return '—';
   try { return JSON.stringify(JSON.parse(String(val)), null, 2); } catch { return String(val); }
 }
+
+// ── Column definitions (DataTable hero component) ───────────────────────────────
+const AUDIT_COLUMNS: ColumnDef<AuditEntry>[] = [
+  {
+    key: 'created_at', header: 'When',
+    render: (v) => (
+      <span className="text-xs text-mute whitespace-nowrap" title={new Date(String(v)).toLocaleString()}>{relTime(String(v))}</span>
+    ),
+  },
+  {
+    key: 'admin_email', header: 'Admin',
+    render: (v) => <span className="font-mono text-mono-small text-body">{String(v)}</span>,
+  },
+  {
+    key: 'admin_role', header: 'Role',
+    render: (v) => <span className="text-xs text-mute">{String(v)}</span>,
+  },
+  {
+    key: 'module', header: 'Module',
+    render: (v) => moduleBadge(String(v)),
+  },
+  {
+    key: 'action', header: 'Action',
+    render: (v) => actionBadge(String(v)),
+  },
+  {
+    key: 'entity_type', header: 'Entity',
+    render: (_v, r) => (
+      <span className="text-xs text-mute">
+        {r.entity_type && <span>{r.entity_type}</span>}
+        {r.entity_id && <span className="ml-1 font-mono text-[10px]">{r.entity_id.slice(0, 12)}{r.entity_id.length > 12 ? '…' : ''}</span>}
+      </span>
+    ),
+  },
+  {
+    key: 'ip_address', header: 'IP',
+    render: (v) => <span className="font-mono text-mono-small text-mute">{String(v)}</span>,
+  },
+  {
+    key: '_expand', header: '', width: 20,
+    render: () => <span className="text-xs text-mute">▼</span>,
+  },
+];
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export const AuditLogsDashboard: React.FC = () => {
@@ -181,76 +226,50 @@ export const AuditLogsDashboard: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <table className="w-full text-sm min-w-[800px]">
-          <thead className="bg-canvas-soft/50">
-            <tr className="text-xs text-mute">
-              <th className="text-left px-4 py-2.5">When</th>
-              <th className="text-left px-4 py-2.5">Admin</th>
-              <th className="text-left px-4 py-2.5">Role</th>
-              <th className="text-left px-4 py-2.5">Module</th>
-              <th className="text-left px-4 py-2.5">Action</th>
-              <th className="text-left px-4 py-2.5">Entity</th>
-              <th className="text-left px-4 py-2.5">IP</th>
-              <th className="text-left px-4 py-2.5 w-5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={8} className="text-center py-10 text-mute text-sm animate-pulse">Loading…</td></tr>}
-            {!loading && logs.length === 0 && <tr><td colSpan={8} className="text-center py-10 text-mute text-sm">No audit logs found.</td></tr>}
-            {logs.map(entry => (
-              <React.Fragment key={entry.id}>
-                <tr className={`border-t border-canvas-soft/50 hover:bg-canvas-soft/20 cursor-pointer ${expanded === entry.id ? 'bg-canvas-soft/30' : ''}`}
-                  onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
-                  <td className="px-4 py-2.5 text-xs text-mute whitespace-nowrap" title={new Date(entry.created_at).toLocaleString()}>{relTime(entry.created_at)}</td>
-                  <td className="px-4 py-2.5 text-xs font-mono text-body">{entry.admin_email}</td>
-                  <td className="px-4 py-2.5 text-xs text-mute">{entry.admin_role}</td>
-                  <td className="px-4 py-2.5">{moduleBadge(entry.module)}</td>
-                  <td className="px-4 py-2.5">{actionBadge(entry.action)}</td>
-                  <td className="px-4 py-2.5 text-xs text-mute">
-                    {entry.entity_type && <span>{entry.entity_type}</span>}
-                    {entry.entity_id && <span className="ml-1 font-mono text-[10px]">{entry.entity_id.slice(0, 12)}{entry.entity_id.length > 12 ? '…' : ''}</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs font-mono text-mute">{entry.ip_address}</td>
-                  <td className="px-4 py-2.5 text-xs text-mute">{expanded === entry.id ? '▲' : '▼'}</td>
-                </tr>
-                {expanded === entry.id && (
-                  <tr className="bg-canvas-soft/20">
-                    <td colSpan={8} className="px-6 pb-4 pt-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Details */}
-                        <div>
-                          <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Details</div>
-                          <div className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs text-body font-mono whitespace-pre-wrap break-all">
-                            {entry.details || '—'}
-                          </div>
-                        </div>
-                        {/* Before */}
-                        <div>
-                          <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Before</div>
-                          <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                            {fmtJSON(entry.before_value)}
-                          </pre>
-                        </div>
-                        {/* After */}
-                        <div>
-                          <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">After</div>
-                          <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                            {fmtJSON(entry.after_value)}
-                          </pre>
-                        </div>
-                      </div>
-                      {entry.user_agent && (
-                        <div className="mt-2 text-[10px] text-mute font-mono truncate">UA: {entry.user_agent}</div>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<AuditEntry>
+        columns={AUDIT_COLUMNS}
+        data={logs}
+        loading={loading}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setExpanded(expanded === r.id ? null : r.id)}
+        emptyState={<span className="text-mute text-sm">No audit logs found.</span>}
+      />
+
+      {/* Expanded row detail (Details / Before / After) */}
+      {expanded && (() => {
+        const entry = logs.find(e => e.id === expanded);
+        if (!entry) return null;
+        return (
+          <div className="bg-canvas-soft/20 border border-canvas-soft rounded-xl px-6 pb-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Details */}
+              <div>
+                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Details</div>
+                <div className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs text-body font-mono whitespace-pre-wrap break-all">
+                  {entry.details || '—'}
+                </div>
+              </div>
+              {/* Before */}
+              <div>
+                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Before</div>
+                <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                  {fmtJSON(entry.before_value)}
+                </pre>
+              </div>
+              {/* After */}
+              <div>
+                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">After</div>
+                <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                  {fmtJSON(entry.after_value)}
+                </pre>
+              </div>
+            </div>
+            {entry.user_agent && (
+              <div className="mt-2 text-[10px] text-mute font-mono truncate">UA: {entry.user_agent}</div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Pagination */}
       {totalPages > 1 && (

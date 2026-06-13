@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { getAdminRole } from '../auth';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+import { AdminBadge } from '../../components/ds/AdminBadge';
 
 interface CarIssueReport {
   id: string;
@@ -16,6 +18,7 @@ interface CarIssueReport {
   admin_notes: string;
   admin_notified: boolean;
   created_at: string;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
 
 const ISSUE_LABEL: Record<string, string> = {
@@ -25,6 +28,35 @@ const ISSUE_LABEL: Record<string, string> = {
   AC: 'AC',
   OTHER: 'Other',
 };
+
+// Column definitions for the DataTable hero component (built-in sort / loading / empty).
+const ISSUE_COLUMNS: ColumnDef<CarIssueReport>[] = [
+  {
+    key: 'order_id', header: 'Trip',
+    render: (v) => <span className="font-mono text-mono-small">{String(v).slice(0, 8)}</span>,
+  },
+  {
+    key: 'driver_name', header: 'Driver',
+    render: (v) => <>{(v as string) || '—'}</>,
+  },
+  {
+    key: 'rider_id', header: 'Rider',
+    render: (v) => <span className="font-mono text-mono-small">{v ? String(v).slice(0, 8) : '—'}</span>,
+  },
+  { key: 'car', header: 'Car' },
+  {
+    key: 'issue_type', header: 'Issue',
+    render: (v) => <>{ISSUE_LABEL[String(v)] || String(v)}</>,
+  },
+  { key: 'created_at', header: 'Reported At', type: 'date' },
+  {
+    key: 'reviewed', header: 'Status', type: 'status',
+    render: (v) =>
+      v
+        ? <AdminBadge label="Reviewed" variant="positive" />
+        : <AdminBadge label="Pending" variant="warning" />,
+  },
+];
 
 export const CarIssuesDashboard: React.FC = () => {
   const [reports, setReports] = useState<CarIssueReport[]>([]);
@@ -94,44 +126,20 @@ export const CarIssuesDashboard: React.FC = () => {
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink" />
       </div>
 
-      {/* Table */}
-      <div className="border border-canvas-soft rounded-xl overflow-hidden bg-canvas">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-mute animate-pulse">Loading car issue reports…</div>
-        ) : visible.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="text-sm font-semibold text-ink">No car issues reported</div>
-            <p className="text-xs text-mute mt-1">Reports filed by drivers will appear here.</p>
+      {/* Table (DataTable hero component) */}
+      <DataTable<CarIssueReport>
+        columns={ISSUE_COLUMNS}
+        data={visible}
+        loading={loading}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setSelected(r)}
+        emptyState={
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="text-heading-medium text-content-secondary">No car issues reported</span>
+            <span className="text-paragraph-small text-content-tertiary">Reports filed by drivers will appear here.</span>
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-canvas-soft bg-canvas-soft">
-                {['Trip', 'Driver', 'Rider', 'Car', 'Issue', 'Reported At', 'Status'].map((c) => (
-                  <th key={c} className="p-3 text-[10px] font-semibold uppercase tracking-wider text-mute">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-canvas-soft">
-              {visible.map((r) => (
-                <tr key={r.id} onClick={() => setSelected(r)} className="hover:bg-canvas-softer cursor-pointer transition-colors">
-                  <td className="p-3 font-mono text-[11px] text-ink">{r.order_id.slice(0, 8)}</td>
-                  <td className="p-3 text-xs text-ink">{r.driver_name || '—'}</td>
-                  <td className="p-3 font-mono text-[11px] text-mute">{r.rider_id ? r.rider_id.slice(0, 8) : '—'}</td>
-                  <td className="p-3 text-xs text-ink">{r.car}</td>
-                  <td className="p-3 text-xs text-ink">{ISSUE_LABEL[r.issue_type] || r.issue_type}</td>
-                  <td className="p-3 text-[11px] text-mute">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="p-3">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-pill ${r.reviewed ? 'text-status-online bg-status-online/10' : 'text-status-warn bg-status-warn/10'}`}>
-                      {r.reviewed ? 'Reviewed' : 'Pending'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        }
+      />
 
       {selected && (
         <CarIssueDetailPanel

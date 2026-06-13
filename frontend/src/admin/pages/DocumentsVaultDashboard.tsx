@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface VaultDoc {
@@ -9,6 +10,7 @@ interface VaultDoc {
   tags: string[]; expiry_date: string | null;
   uploaded_by_email: string; status: string;
   created_at: string; updated_at: string;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
 interface AccessEntry {
   id: number; document_id: string; accessed_by_email: string;
@@ -39,6 +41,79 @@ function daysUntil(d: string | null) {
   if (!d) return null;
   return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 }
+
+// ── Column definitions for the DataTable hero component ───────────────────────
+// Factory: the leading checkbox column needs the page's bulk-select state, so
+// columns are built with the current selection set + toggle handler.
+const buildDocColumns = (
+  selectedIds: Set<string>,
+  toggleSelect: (id: string) => void,
+): ColumnDef<VaultDoc>[] => [
+  {
+    key: '_select', header: '', width: 32,
+    render: (_v, doc) => (
+      <span onClick={e => { e.stopPropagation(); toggleSelect(doc.id); }}>
+        <input type="checkbox" checked={selectedIds.has(doc.id)} readOnly className="rounded" />
+      </span>
+    ),
+  },
+  {
+    key: 'display_name', header: 'Document',
+    render: (_v, doc) => (
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{MIME_ICONS[doc.mime_type] ?? '📁'}</span>
+        <div>
+          <div className="text-xs font-medium text-ink truncate max-w-[180px]">{doc.display_name}</div>
+          <div className="text-[10px] text-mute font-mono text-mono-small">v{doc.version}</div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: 'entity_type', header: 'Entity',
+    render: (_v, doc) => (
+      <div>
+        <div className="text-xs text-body">{doc.entity_type}</div>
+        <div className="text-[10px] text-mute font-mono text-mono-small">{doc.entity_id.slice(0, 8)}…</div>
+      </div>
+    ),
+  },
+  {
+    key: 'doc_type', header: 'Type',
+    render: (_v, doc) => <span className="text-xs text-body">{doc.doc_type}</span>,
+  },
+  {
+    key: 'tags', header: 'Tags',
+    render: (_v, doc) => (
+      <div className="flex gap-1 flex-wrap">
+        {doc.tags.slice(0, 3).map(t => (
+          <span key={t} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{t}</span>
+        ))}
+      </div>
+    ),
+  },
+  {
+    key: 'expiry_date', header: 'Expiry',
+    render: (_v, doc) => {
+      const expDays = daysUntil(doc.expiry_date);
+      return doc.expiry_date ? (
+        <div>
+          <div className="text-xs text-body">{doc.expiry_date}</div>
+          {expDays !== null && (
+            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-content-negative' : expDays <= 30 ? 'text-content-warning' : 'text-mute'}`}>
+              {expDays <= 0 ? 'EXPIRED' : `${expDays}d`}
+            </div>
+          )}
+        </div>
+      ) : <span className="text-[10px] text-mute">—</span>;
+    },
+  },
+  { key: 'status', header: 'Status', type: 'status' },
+  {
+    key: 'file_size_bytes', header: 'Size',
+    render: (_v, doc) => <span className="text-xs text-mute">{fileSize(doc.file_size_bytes)}</span>,
+  },
+];
 
 // ── Main Component ───────────────────────────────────────────────────────────
 export const DocumentsVaultDashboard: React.FC = () => {
@@ -170,85 +245,20 @@ export const DocumentsVaultDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Doc table */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft overflow-auto flex-1">
-          <table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-canvas-soft/50 sticky top-0 z-10">
-              <tr className="text-xs text-mute">
-                <th className="px-3 py-2.5 w-8">
-                  <input type="checkbox" onChange={e => setSelectedIds(e.target.checked ? new Set(docs.map(d => d.id)) : new Set())}
-                    checked={selectedIds.size === docs.length && docs.length > 0} className="rounded" />
-                </th>
-                <th className="text-left px-3 py-2.5">Document</th>
-                <th className="text-left px-3 py-2.5">Entity</th>
-                <th className="text-left px-3 py-2.5">Type</th>
-                <th className="text-left px-3 py-2.5">Tags</th>
-                <th className="text-left px-3 py-2.5">Expiry</th>
-                <th className="text-left px-3 py-2.5">Status</th>
-                <th className="text-left px-3 py-2.5">Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr><td colSpan={8} className="text-center py-10 text-mute text-sm animate-pulse">Loading…</td></tr>
-              )}
-              {!loading && docs.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-10 text-mute text-sm">No documents match this filter.</td></tr>
-              )}
-              {docs.map(doc => {
-                const expDays = daysUntil(doc.expiry_date);
-                return (
-                  <tr key={doc.id}
-                    className={`border-t border-canvas-soft/50 hover:bg-canvas-soft/20 cursor-pointer ${selected?.id === doc.id ? 'bg-accent/5' : ''}`}
-                    onClick={() => openDetail(doc)}>
-                    <td className="px-3 py-2.5" onClick={e => { e.stopPropagation(); toggleSelect(doc.id); }}>
-                      <input type="checkbox" checked={selectedIds.has(doc.id)} readOnly className="rounded" />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{MIME_ICONS[doc.mime_type] ?? '📁'}</span>
-                        <div>
-                          <div className="text-xs font-medium text-ink truncate max-w-[180px]">{doc.display_name}</div>
-                          <div className="text-[10px] text-mute font-mono">v{doc.version}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="text-xs text-body">{doc.entity_type}</div>
-                      <div className="text-[10px] text-mute font-mono">{doc.entity_id.slice(0, 8)}…</div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-body">{doc.doc_type}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex gap-1 flex-wrap">
-                        {doc.tags.slice(0, 3).map(t => (
-                          <span key={t} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{t}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {doc.expiry_date ? (
-                        <div>
-                          <div className="text-xs text-body">{doc.expiry_date}</div>
-                          {expDays !== null && (
-                            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-content-negative' : expDays <= 30 ? 'text-content-warning' : 'text-mute'}`}>
-                              {expDays <= 0 ? 'EXPIRED' : `${expDays}d`}
-                            </div>
-                          )}
-                        </div>
-                      ) : <span className="text-[10px] text-mute">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[doc.status] ?? 'bg-canvas-soft text-body'}`}>
-                        {doc.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-mute">{fileSize(doc.file_size_bytes)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {/* Doc table (DataTable hero component) */}
+        <DataTable<VaultDoc>
+          columns={buildDocColumns(selectedIds, toggleSelect)}
+          data={docs}
+          loading={loading}
+          rowKey={(d) => d.id}
+          onRowClick={openDetail}
+          className="flex-1"
+          emptyState={
+            <div className="flex flex-col items-center gap-1 text-center">
+              <span className="text-heading-medium text-content-secondary">No documents match this filter.</span>
+            </div>
+          }
+        />
 
         {/* Pagination */}
         {totalPages > 1 && (
