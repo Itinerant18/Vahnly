@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { SvgAreaChart } from '../components/SvgAreaChart';
-import { useDashboardData, TimeRange } from '../hooks/useDashboardData';
+import { useDashboardData, TimeRange, RecentTrip } from '../hooks/useDashboardData';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { getAdminRole } from '../auth';
 import { StatCard } from '../../components/ds/StatCard';
 import { AdminBadge } from '../../components/ds/AdminBadge';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 /* ------------------------------------------------------------------ */
 /*  Rider Metrics                                                       */
@@ -153,48 +154,49 @@ function AlertsPanel({ alerts }: { alerts: Array<{ id: string; timestamp: string
 /*  Recent Trips Table                                                  */
 /* ------------------------------------------------------------------ */
 
-function RecentTripsTable({
-  trips,
-}: {
-  trips: Array<{ tripId: string; rider: string; driver: string; status: 'completed' | 'active' | 'cancelled'; amount: number; durationMin: number }>;
-}) {
-  const statusVariant = (s: string) =>
-    s === 'completed' ? 'positive' : s === 'active' ? 'accent' : 'neutral';
+// Column definitions for the recent-trips DataTable.
+// Fare is stored in whole RUPEES (not paise), so it uses a custom font-mono render
+// preserving the existing `₹{amount}` format instead of the 'currency' type.
+const TRIP_COLUMNS: ColumnDef<RecentTrip>[] = [
+  {
+    key: 'tripId', header: 'Trip ID', width: 140,
+    render: (v) => (
+      <span className="font-mono text-mono-small text-content-primary truncate">{String(v)}</span>
+    ),
+  },
+  { key: 'rider', header: 'Rider', type: 'text' },
+  { key: 'driver', header: 'Driver', type: 'text' },
+  { key: 'status', header: 'Status', type: 'status' },
+  {
+    key: 'amount', header: 'Fare', type: 'numeric',
+    render: (v) => (
+      <span className="font-mono text-mono-small text-content-primary tabular-nums">
+        {Number(v) > 0 ? `₹${Number(v)}` : '—'}
+      </span>
+    ),
+  },
+  {
+    key: 'durationMin', header: 'Duration', type: 'numeric',
+    render: (v) => (
+      <span className="font-mono text-mono-small text-content-primary tabular-nums">
+        {Number(v) > 0 ? `${Number(v)} min` : '—'}
+      </span>
+    ),
+  },
+];
 
+function RecentTripsTable({ trips }: { trips: RecentTrip[] }) {
   return (
     <div className="card overflow-hidden p-0">
       <div className="px-500 py-400 border-b border-border-opaque">
         <h2 className="text-heading-small text-content-primary">Recent trips</h2>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-background-secondary border-b border-border-opaque">
-              {['Trip ID', 'Rider', 'Driver', 'Status', 'Fare', 'Duration'].map((h, i) => (
-                <th key={h} className={`px-4 py-2.5 text-label-small text-content-secondary uppercase tracking-wide whitespace-nowrap ${i >= 4 ? 'text-right' : ''}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {trips.map((trip) => (
-              <tr key={trip.tripId} className="border-b border-border-opaque last:border-none hover:bg-background-secondary transition-base">
-                <td className="px-4 py-3 font-mono text-mono-small text-content-primary">{trip.tripId}</td>
-                <td className="px-4 py-3 text-paragraph-medium text-content-primary">{trip.rider}</td>
-                <td className="px-4 py-3 text-paragraph-medium text-content-primary">{trip.driver}</td>
-                <td className="px-4 py-3">
-                  <AdminBadge label={trip.status} variant={statusVariant(trip.status) as 'positive' | 'accent' | 'neutral'} />
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-mono-small text-content-primary">
-                  {trip.amount > 0 ? `₹${trip.amount}` : '—'}
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-mono-small text-content-primary">
-                  {trip.durationMin > 0 ? `${trip.durationMin} min` : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<RecentTrip>
+        columns={TRIP_COLUMNS}
+        data={trips}
+        rowKey={(t) => t.tripId}
+        className="border-none rounded-none"
+      />
     </div>
   );
 }

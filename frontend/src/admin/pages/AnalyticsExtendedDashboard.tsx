@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { SvgAreaChart } from '../components/SvgAreaChart';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 type PrebuiltTab = 'operations' | 'growth' | 'finance' | 'driver-supply' | 'marketing' | 'safety';
 type ReportTab = 'prebuilt' | 'custom' | 'exports';
@@ -296,12 +297,29 @@ const METRICS = ['trips', 'completed_trips', 'cancelled_trips', 'revenue_paise',
 type Dimension = typeof DIMENSIONS[number];
 type Metric = typeof METRICS[number];
 
+// Custom report rows are dynamic (top-cities vs trips-over-time), so columns are
+// derived from the result keys. `revenue_paise` is in paise → currency column.
+interface ReportRow {
+  [key: string]: unknown;
+}
+
+const mono = (v: unknown) => (
+  <span className="text-xs text-body font-mono">{String(v)}</span>
+);
+
+const buildColumns = (keys: string[]): ColumnDef<ReportRow>[] =>
+  keys.map((c) => (
+    c === 'revenue_paise'
+      ? { key: c, header: c, type: 'currency' as const }
+      : { key: c, header: c, render: mono }
+  ));
+
 const CustomReportBuilder: React.FC<{
   period: Period; headers: Record<string, string>; periodRange: () => string;
 }> = ({ headers, periodRange }) => {
   const [dims, setDims] = useState<Dimension[]>(['day']);
   const [metrics, setMetrics] = useState<Metric[]>(['trips', 'revenue_paise']);
-  const [result, setResult] = useState<any[] | null>(null);
+  const [result, setResult] = useState<ReportRow[] | null>(null);
   const [running, setRunning] = useState(false);
 
   const toggle = <T extends string>(arr: T[], val: T, set: (a: T[]) => void) =>
@@ -325,7 +343,7 @@ const CustomReportBuilder: React.FC<{
     } finally { setRunning(false); }
   };
 
-  const colsForResult = result && result.length > 0 ? Object.keys(result[0]) : [];
+  const reportColumns = result && result.length > 0 ? buildColumns(Object.keys(result[0])) : [];
 
   return (
     <div className="space-y-5">
@@ -359,20 +377,10 @@ const CustomReportBuilder: React.FC<{
       </button>
 
       {result && result.length > 0 && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas-soft/50">
-              <tr>{colsForResult.map(c => <th key={c} className="text-left px-4 py-2.5 text-xs text-mute font-mono">{c}</th>)}</tr>
-            </thead>
-            <tbody>
-              {result.map((row, i) => (
-                <tr key={i} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
-                  {colsForResult.map(c => <td key={c} className="px-4 py-2.5 text-xs text-body font-mono">{String(row[c])}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<ReportRow>
+          columns={reportColumns}
+          data={result}
+        />
       )}
       {result && result.length === 0 && (
         <div className="text-sm text-mute text-center py-8">No data for the selected configuration.</div>
