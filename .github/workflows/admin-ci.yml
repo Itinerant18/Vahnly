@@ -77,7 +77,7 @@ jobs:
         working-directory: frontend
 
       - name: Wait for server
-        run: npx --yes wait-on http://localhost:5173 -t 120000
+        run: npx --yes wait-on http://localhost:5000 -t 120000
         working-directory: e2e
 
       - name: Run Playwright (admin)

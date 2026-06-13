@@ -45,52 +45,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: driver-app-build-${{ github.sha }}
-          path: client-app/.next/
+          path: client-app/out/
           retention-days: 7
 
-  e2e:
-    needs: [test]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            client-app/package-lock.json
-            e2e/package-lock.json
-
-      - name: Install client-app deps
-        run: npm ci
-        working-directory: client-app
-
-      - name: Install e2e deps
-        run: npm ci
-        working-directory: e2e
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-        working-directory: e2e
-
-      - name: Start driver-app dev server
-        run: npm run dev &
-        working-directory: client-app
-
-      - name: Wait for server
-        run: npx --yes wait-on http://localhost:3000 -t 120000
-        working-directory: e2e
-
-      - name: Run Playwright (driver project)
-        run: npm test -- --project=driver
-        working-directory: e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-driver-${{ github.sha }}
-          path: e2e/playwright-report/
-          retention-days: 14
+  # NOTE: no Playwright e2e job here — e2e/playwright.config.ts defines projects
+  # rider / admin / design / visual, but no "driver" project. The driver app's
+  # interactive flows are covered by its Vitest suite (npm test) above. Add a "driver"
+  # project to e2e/playwright.config.ts to reinstate a browser e2e job.

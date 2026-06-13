@@ -7,9 +7,12 @@ values in workflow YAML. Set them in **Settings → Secrets and variables → Ac
 
 ### Container registry
 
+CI pushes images to GHCR using the **built-in `GITHUB_TOKEN`** (with `packages: write`
+permission), so **no secret is required** for same-repo image pushes.
+
 | Secret | Description | How to create |
 |---|---|---|
-| `GHCR_TOKEN` | GitHub PAT with `write:packages` scope | Settings → Developer settings → Personal access tokens |
+| `GHCR_TOKEN` | _Optional._ Only needed to push to a *different* org/registry than the repo. PAT with `write:packages`. | Settings → Developer settings → Personal access tokens |
 
 ### Kubernetes
 
@@ -17,6 +20,12 @@ values in workflow YAML. Set them in **Settings → Secrets and variables → Ac
 |---|---|---|
 | `KUBECONFIG_STAGING` | base64-encoded kubeconfig for the staging cluster | `base64 -w0 ~/.kube/staging.yaml` |
 | `KUBECONFIG_PRODUCTION` | base64-encoded kubeconfig for the production cluster | `base64 -w0 ~/.kube/prod.yaml` |
+
+> `deploy.yml` runs only after **Backend CI** succeeds on `main` (or via manual dispatch),
+> and **skips cleanly** (does not fail) when these kubeconfig secrets are absent — so an
+> unconfigured repo won't show a red deploy on every push. `production-deploy` additionally
+> waits on the GitHub `production` environment; add required reviewers there for manual
+> approval.
 
 ### Backend runtime secrets (Kubernetes — NOT GitHub Actions)
 
