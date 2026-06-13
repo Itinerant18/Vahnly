@@ -24,10 +24,17 @@ func NewRegionRouterMiddleware(supportedRegions []string) *RegionRouterMiddlewar
 // RouteRegionalTraffic filters requests based on the spatial region prefix
 func (m *RegionRouterMiddleware) RouteRegionalTraffic(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Inspect headers first, fall back to URL query parameters
-		region := r.Header.Get("X-Region-Prefix")
+		// Region comes from the X-Region-Prefix header, cross-checked against the
+		// token's city_scope below. There is NO query-param fallback — a ?city_prefix=
+		// could let a caller route to a region outside their token scope. When the
+		// header is absent, derive the region from a single-region token scope.
+		region := strings.ToUpper(strings.TrimSpace(r.Header.Get("X-Region-Prefix")))
 		if region == "" {
-			region = r.URL.Query().Get("city_prefix")
+			if scope, ok := GetCityScopeFromContext(r.Context()); ok {
+				if parts := strings.Split(scope, ","); len(parts) == 1 {
+					region = strings.ToUpper(strings.TrimSpace(parts[0]))
+				}
+			}
 		}
 
 		region = strings.ToUpper(strings.TrimSpace(region))

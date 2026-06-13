@@ -385,6 +385,7 @@ func main() {
 
 	configLogger := log.New(os.Stdout, "[CONFIG_ADMIN] ", log.LstdFlags)
 	configHandler := adminHttp.NewConfigHandler(dbPool, configLogger)
+	citiesHandler := adminHttp.NewCitiesHandler(dbPool, redisClusterClient, log.New(os.Stdout, "[CITIES_ADMIN] ", log.LstdFlags))
 
 	developerLogger := log.New(os.Stdout, "[DEV_ADMIN] ", log.LstdFlags)
 	developerHandler := adminHttp.NewDeveloperHandler(dbPool, developerLogger)
@@ -474,6 +475,9 @@ func main() {
 	// real OTP flow (/api/v1/rider/auth/send-otp + verify-otp); the old mock
 	// /api/v1/auth/rider/login endpoint was removed (it accepted any OTP).
 	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
+	// Public, unauthenticated, Redis-cached config the apps read on startup.
+	mux.HandleFunc("GET /api/v1/config/flags", handler.HandlePublicFlags)
+	mux.HandleFunc("GET /api/v1/config/app-version", handler.HandlePublicAppVersion)
 	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
 	// Admin creation must be an authenticated SUPER_ADMIN action. Leaving this public
 	// let anyone self-register an account with an arbitrary role (incl. SUPER_ADMIN),
@@ -998,6 +1002,9 @@ func main() {
 
 	// Config / Settings endpoints
 	configRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}
+	// DB-driven city/region registry (regional_cities) with admin CRUD + Redis cache.
+	mux.HandleFunc("GET /api/v1/admin/cities", authGuard.RequireAnyRole(configRoles, citiesHandler.HandleListCities))
+	mux.HandleFunc("POST /api/v1/admin/cities", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER"}, citiesHandler.HandleCreateCity))
 	mux.HandleFunc("GET /api/v1/admin/config/settings", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetSettings))
 	mux.HandleFunc("POST /api/v1/admin/config/settings", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, configHandler.HandleUpsertSettings))
 	mux.HandleFunc("GET /api/v1/admin/config/flags", authGuard.RequireAnyRole(configRoles, configHandler.HandleGetFlags))

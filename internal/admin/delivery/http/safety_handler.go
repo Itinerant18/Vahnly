@@ -241,6 +241,24 @@ func (h *SafetyHandler) HandleAcknowledgeSOSAlert(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Notify the assigned driver that safety has the SOS in hand (FLOW 5 step 5).
+	// Resolve the driver from the alert's trip and enqueue an outbox push. Best-effort.
+	var driverID *string
+	_ = h.dbPool.QueryRow(ctx, `
+		SELECT o.assigned_driver_id::text FROM safety_sos_alerts s
+		JOIN orders o ON o.id = s.trip_id WHERE s.id = $1`, id).Scan(&driverID)
+	if driverID != nil && *driverID != "" {
+		_, _ = h.dbPool.Exec(ctx, `
+			INSERT INTO driver_notifications (driver_id, category, title, body)
+			VALUES ($1::uuid, 'SAFETY', $2, $3)`,
+			*driverID, "Safety team notified", "An SOS on your trip is being handled by our safety team. Stay calm and follow their guidance.")
+		_, _ = h.dbPool.Exec(ctx, `
+			INSERT INTO notification_outbox (user_id, title, body, payload, status)
+			VALUES ($1::uuid, $2, $3, $4::jsonb, 'PENDING')`,
+			*driverID, "Safety team notified", "An SOS on your trip is being handled by our safety team.",
+			`{"type":"SOS_ACKNOWLEDGED"}`)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))

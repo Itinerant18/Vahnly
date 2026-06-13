@@ -205,17 +205,20 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 	// explicitly. Gather rider + car context for a human-readable push, deliver a typed
 	// `driver.force.assigned` WS message, and queue an FCM backup so an offline driver
 	// still learns of the assignment.
-	var riderName, carMake, carModel, pickupAddr string
+	var riderName, carMake, carModel, pickupAddr, riderID, driverName string
 	_ = h.dbPool.QueryRow(ctx, `
 		SELECT COALESCE(r.name, ''),
 		       COALESCE(g.make, o.one_time_car_make, ''),
 		       COALESCE(g.model, o.one_time_car_model, ''),
 		       'Pickup (' || ROUND(ST_Y(o.pickup_location::geometry)::numeric, 4) || ', ' ||
-		                     ROUND(ST_X(o.pickup_location::geometry)::numeric, 4) || ')'
+		                     ROUND(ST_X(o.pickup_location::geometry)::numeric, 4) || ')',
+		       COALESCE(o.rider_id::text, ''),
+		       COALESCE(d.name, '')
 		FROM orders o
 		LEFT JOIN riders r       ON r.id = o.rider_id
 		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
-		WHERE o.id = $1::uuid`, req.OrderID).Scan(&riderName, &carMake, &carModel, &pickupAddr)
+		LEFT JOIN drivers d      ON d.id = o.assigned_driver_id
+		WHERE o.id = $1::uuid`, req.OrderID).Scan(&riderName, &carMake, &carModel, &pickupAddr, &riderID, &driverName)
 
 	firstName := riderName
 	if firstName == "" {
@@ -252,6 +255,27 @@ func (h *MarketplaceOrchestratorHandler) HandleManualForceMatch(w http.ResponseW
 		INSERT INTO notification_outbox (user_id, title, body, payload)
 		VALUES ($1::uuid, $2, $3, $4::jsonb)`,
 		req.DriverID, "New trip assigned", forceMsg, fcmPayload)
+
+	// Notify the RIDER over their live-trip WS (FLOW 6 rider side). Mirrors the normal
+	// dispatch path's rider.order.assigned; published as an Envelope on the rider backplane.
+	if riderID != "" {
+		vehicleContext := strings.TrimSpace("Driving your " + carContext)
+		data, _ := json.Marshal(map[string]interface{}{
+			"order_id":        req.OrderID,
+			"driver_id":       req.DriverID,
+			"driver_name":     driverName,
+			"driver_photo":    "",
+			"eta_minutes":     0,
+			"vehicle_context": vehicleContext,
+			"message":         "Driver assigned by operations",
+		})
+		envelope, _ := json.Marshal(map[string]interface{}{
+			"rider_id": riderID,
+			"type":     "rider.order.assigned",
+			"data":     json.RawMessage(data),
+		})
+		_ = h.clusterClient.Publish(ctx, "gateway:rider:broadcast", string(envelope)).Err()
+	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"FORCE_ALLOCATION_COMMITTED_SUCCESSFULLY"}`))

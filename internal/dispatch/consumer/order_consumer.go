@@ -778,6 +778,10 @@ func (c *OrderCreatedConsumer) pushRiderAssigned(orderID, driverID string, etaSe
 	}
 	_ = realtime.Publish(ctx, c.redisClusterClient, *riderID, realtime.MsgOrderAssigned, data)
 
+	// Cache order->rider so the telemetry ingestion fork can fan GPS out to the rider's
+	// live-trip WS without a DB lookup per ping (FLOW 2). Expires with the trip.
+	_ = c.redisClusterClient.Set(ctx, "order:rider:"+orderID, *riderID, 6*time.Hour).Err()
+
 	// FCM backup via the transactional outbox.
 	if payload, mErr := json.Marshal(data); mErr == nil {
 		_, _ = c.dbPool.Exec(ctx, `

@@ -117,7 +117,7 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 	// MILESTONE 20 LIVE STREAM FORK: Check if the driver is active on an in-progress trip
 	if u.clusterClient != nil {
 		go func(dID string, lat, lng float64) {
-			forkCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+			forkCtx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
 			defer cancel()
 
 			activeTripKey := fmt.Sprintf("driver:active:trip:%s", dID)
@@ -135,6 +135,25 @@ func (u *telemetryUseCase) ProcessLocationUpdate(ctx context.Context, loc *domai
 				bytes, mErr := json.Marshal(telemetryPayload)
 				if mErr == nil {
 					_ = u.clusterClient.Publish(forkCtx, RedisTelemetryChannel, string(bytes)).Err()
+				}
+
+				// FLOW 2: fan the live location out to the rider's WS too. The rider id is
+				// cached as order:rider:<orderID> at assignment, so no DB hit per ping. We
+				// publish an Envelope on the rider backplane (gateway:rider:broadcast).
+				if riderID, rErr := u.clusterClient.Get(forkCtx, "order:rider:"+orderID).Result(); rErr == nil && riderID != "" {
+					data, _ := json.Marshal(map[string]interface{}{
+						"order_id":  orderID,
+						"latitude":  lat,
+						"longitude": lng,
+					})
+					envelope, mErr2 := json.Marshal(map[string]interface{}{
+						"rider_id": riderID,
+						"type":     "rider.driver.location",
+						"data":     json.RawMessage(data),
+					})
+					if mErr2 == nil {
+						_ = u.clusterClient.Publish(forkCtx, "gateway:rider:broadcast", string(envelope)).Err()
+					}
 				}
 			}
 		}(loc.DriverID, loc.Latitude, loc.Longitude)

@@ -34,28 +34,23 @@ func TestRegionRouterMiddleware_SuccessHeader(t *testing.T) {
 	}
 }
 
-func TestRegionRouterMiddleware_SuccessQueryParam(t *testing.T) {
+// Security: a ?city_prefix= query param must NOT set the routing region (it could
+// route a caller outside their token scope). Region comes from the header / JWT only.
+func TestRegionRouterMiddleware_QueryParamRejected(t *testing.T) {
 	router := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
 
-	var capturedRegion string
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reg, ok := middleware.GetRegionFromContext(r.Context())
-		if ok {
-			capturedRegion = reg
-		}
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// No header, only a query param — must be treated as missing region (400).
 	req := httptest.NewRequest("GET", "/api/v1/pricing/quote?city_prefix=BLR", nil)
 
 	rr := httptest.NewRecorder()
 	router.RouteRegionalTraffic(testHandler).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status 200 OK, got: %d", rr.Code)
-	}
-	if capturedRegion != "BLR" {
-		t.Errorf("Expected context region to be 'BLR', got: %q", capturedRegion)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 (query param must not set region), got: %d", rr.Code)
 	}
 }
 
@@ -83,7 +78,8 @@ func TestRegionRouterMiddleware_UnsupportedRegion(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/api/v1/pricing/quote?city_prefix=BOM", nil)
+	req := httptest.NewRequest("GET", "/api/v1/pricing/quote", nil)
+	req.Header.Set("X-Region-Prefix", "BOM") // unsupported region via the header
 
 	rr := httptest.NewRecorder()
 	router.RouteRegionalTraffic(testHandler).ServeHTTP(rr, req)

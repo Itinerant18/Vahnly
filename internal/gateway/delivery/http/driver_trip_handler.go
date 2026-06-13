@@ -899,6 +899,27 @@ func (h *GatewayHandler) HandleDriverConfirmPayment(w http.ResponseWriter, r *ht
 	processStatus = "SUCCESS"
 	_ = h.clusterClient.Set(ctx, idempotencyKey, "SUCCESS", 24*time.Hour)
 
+	// Notify the rider over their live-trip WS that the trip completed, with the final
+	// fare breakdown (FLOW 7a — this is the real driver-app completion lifecycle; the
+	// /trip/complete endpoint already pushes, but odometer-END→confirm-payment did not).
+	var completedRiderID *string
+	_ = h.dbPool.QueryRow(ctx, `SELECT rider_id::text FROM orders WHERE id = $1::uuid`, orderID).Scan(&completedRiderID)
+	if completedRiderID != nil && *completedRiderID != "" {
+		data, _ := json.Marshal(map[string]interface{}{
+			"order_id":         orderID,
+			"total_fare_paise": totalFarePaise,
+			"fare_breakdown": map[string]interface{}{
+				"total_fare_paise":          totalFarePaise,
+				"driver_payout_paise":       driverEarningsPaise,
+				"platform_commission_paise": platformCommissionPaise,
+			},
+		})
+		envelope, _ := json.Marshal(map[string]interface{}{
+			"rider_id": *completedRiderID, "type": "rider.trip.completed", "data": json.RawMessage(data),
+		})
+		_ = h.clusterClient.Publish(ctx, "gateway:rider:broadcast", string(envelope)).Err()
+	}
+
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
 		"success":                   true,
 		"message":                   "Payment confirmed and financial ledger splits posted",

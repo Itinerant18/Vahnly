@@ -447,6 +447,11 @@ func (r *postgresOrderRepo) MarkSOSTriggered(ctx context.Context, orderID, rider
 	if err != nil {
 		return "", err
 	}
+	// Surface the rider SOS to the admin safety feed (safety_sos_alerts is what
+	// GET /api/v1/admin/safety/sos reads). Best-effort — never fail the SOS on this.
+	_, _ = r.dbPool.Exec(ctx, `
+		INSERT INTO safety_sos_alerts (id, trip_id, reporter_type, status)
+		VALUES ('sos-' || gen_random_uuid()::text, $1::uuid, 'RIDER', 'ACTIVE')`, orderID)
 	if driverID != nil {
 		return *driverID, nil
 	}

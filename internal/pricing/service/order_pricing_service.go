@@ -105,58 +105,6 @@ func (s *OrderPricingService) StartSurgeMatrixSync(ctx context.Context) {
 	}
 }
 
-// StartSurgeMatrixSyncLoop boots the background stream consumer that hydrates the shared Redis cache (FetchMessage/Commit pattern)
-func (s *OrderPricingService) StartSurgeMatrixSyncLoop(ctx context.Context) {
-	s.logger.Println("Successfully initialized shared Redis pricing cache sync consumer loop...")
-
-	for {
-		select {
-		case <-ctx.Done():
-			s.logger.Println("Draining in-flight pricing cache sync tasks and shutting down...")
-			_ = s.dlq.Close()
-			if err := s.kafkaReader.Close(); err != nil {
-				s.logger.Printf("Failed to close Kafka surge update reader channel cleanly: %v", err)
-			}
-			return
-		default:
-			msg, err := s.kafkaReader.FetchMessage(ctx)
-			if err != nil {
-				if errors.Is(ctx.Err(), context.Canceled) {
-					return
-				}
-				s.logger.Printf("Error pulling surge zone update message event frame: %v", err)
-				continue
-			}
-
-			var event SurgeZoneUpdateEvent
-			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				s.logger.Printf("Poison pill: routing unparseable surge matrix payload to DLQ: %v", err)
-				_ = s.dlq.Publish(ctx, msg, "json_unmarshal_failed: "+err.Error())
-				_ = s.kafkaReader.CommitMessages(ctx, msg)
-				continue
-			}
-
-			// Core Architecture Rule: Avoid city-bracket hashtagging to ensure keys are scattered
-			// uniformly across all cluster shards based on H3 spatial cell tokens.
-			matrixKey := fmt.Sprintf("surge:matrix:%s:%s", event.CityPrefix, event.H3Cell)
-
-			// Enforce a strict 60-second expiration TTL. If a neighborhood's compute pipeline fails,
-			// pricing automatically degrades back to baseline multipliers to protect consumers.
-			err = s.clusterClient.Set(ctx, matrixKey, fmt.Sprintf("%.4f", event.SurgeMultiplier), 60*time.Second).Err()
-			if err != nil {
-				s.logger.Printf("Cluster Slot Exception: failed to sync surge zone metric to Redis shard: %v", err)
-				// Do not commit offset to force a retry on adjacent scaled pods if infrastructure is down
-				continue
-			}
-
-			// Synchronously commit message offsets to ensure zero data-loss during scaling loops
-			if err := s.kafkaReader.CommitMessages(ctx, msg); err != nil {
-				s.logger.Printf("Failed to commit offset back to Kafka coordinator group: %v", err)
-			}
-		}
-	}
-}
-
 // applyFreezeCap clamps a live surge multiplier to an admin-set freeze cap when one is
 // active for the cell. The freeze lives at its own key (surge:freeze:<city>:<cell>),
 // separate from the live surge:matrix key the Kafka sync writes, so the cap is never
