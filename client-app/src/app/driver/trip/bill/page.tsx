@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { FinalBill, reportCarIssue, CarIssueType } from '@/api/client';
+import { FareDisplay } from '@/components/ds';
 
 const CAR_ISSUE_TYPES: { value: CarIssueType; label: string }[] = [
   { value: 'FUEL_LOW', label: 'Fuel Low' },
@@ -142,39 +143,39 @@ export default function FinalBillPage() {
           <div className="space-y-2 text-[10px] text-content-secondary">
             <div className="flex justify-between">
               <span>Base Package Quoted:</span>
-              <span className="text-white">₹{baseFare.toFixed(2)}</span>
+              <FareDisplay amount={baseFare * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Extra Distance ({bill.distance_km.toFixed(1)} KM):</span>
-              <span className="text-white">₹{extraKmCharge.toFixed(2)}</span>
+              <FareDisplay amount={extraKmCharge * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Waiting Time ({bill.wait_minutes} mins):</span>
-              <span className="text-white">₹{waitingCharge.toFixed(2)}</span>
+              <FareDisplay amount={waitingCharge * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Overtime Transit ({bill.overtime_minutes} mins):</span>
-              <span className="text-white">₹{overtimeCharge.toFixed(2)}</span>
+              <FareDisplay amount={overtimeCharge * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Night Surcharge:</span>
-              <span className="text-white">₹{nightCharge.toFixed(2)}</span>
+              <FareDisplay amount={nightCharge * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Highway Toll Charges:</span>
-              <span className="text-white">₹{tolls.toFixed(2)}</span>
+              <FareDisplay amount={tolls * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>Parking / Stops:</span>
-              <span className="text-white">₹{parking.toFixed(2)}</span>
+              <FareDisplay amount={parking * 100} size="md" className="text-white" />
             </div>
             <div className="flex justify-between">
               <span>D4M Care Trust Surcharge:</span>
-              <span className="text-white">₹{d4mCareFee.toFixed(2)}</span>
+              <FareDisplay amount={d4mCareFee * 100} size="md" className="text-white" />
             </div>
             <div className="border-t border-border-opaque pt-3 flex justify-between items-center text-xs font-bold mt-1">
               <span className="text-white">TOTAL AMOUNT DUE:</span>
-              <span className="text-content-positive text-sm font-extrabold">₹{totalAmount.toFixed(2)}</span>
+              <FareDisplay amount={totalAmount * 100} size="md" className="text-content-positive text-sm font-extrabold" />
             </div>
           </div>
         </div>

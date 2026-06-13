@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 import type { PaymentMethod } from "@/lib/api/types";
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -37,7 +38,7 @@ function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
   );
 }
 
-function RowItem({ label, value, accent, bold }: { label: string; value: string; accent?: boolean; bold?: boolean }) {
+function RowItem({ label, value, accent, bold }: { label: string; value: React.ReactNode; accent?: boolean; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2.5">
       <span className={`text-sm ${bold ? "text-content-primary font-semibold" : "text-content-secondary"}`}>{label}</span>
@@ -139,13 +140,13 @@ export default function BillPage() {
           </p>
           {breakdown ? (
             <>
-              <RowItem label="Base fare" value={formatCurrency(breakdown.base_fare_paise)} />
-              <RowItem label="Distance charge" value={formatCurrency(breakdown.distance_charge_paise)} />
+              <RowItem label="Base fare" value={<FareDisplay amount={breakdown.base_fare_paise} size="sm" />} />
+              <RowItem label="Distance charge" value={<FareDisplay amount={breakdown.distance_charge_paise} size="sm" />} />
               {breakdown.night_charge_paise > 0 && (
-                <RowItem label="Night charge" value={formatCurrency(breakdown.night_charge_paise)} />
+                <RowItem label="Night charge" value={<FareDisplay amount={breakdown.night_charge_paise} size="sm" />} />
               )}
               {breakdown.d4m_care_paise > 0 && (
-                <RowItem label="D4M Care" value={formatCurrency(breakdown.d4m_care_paise)} />
+                <RowItem label="D4M Care" value={<FareDisplay amount={breakdown.d4m_care_paise} size="sm" />} />
               )}
               {breakdown.surge_multiplier > 1 && (
                 <RowItem label={`Surge (${breakdown.surge_multiplier}×)`} value="included" />
@@ -153,16 +154,16 @@ export default function BillPage() {
               {breakdown.promo_discount_paise > 0 && (
                 <RowItem
                   label="Promo discount"
-                  value={`−${formatCurrency(breakdown.promo_discount_paise)}`}
+                  value={<>−<FareDisplay amount={breakdown.promo_discount_paise} size="sm" /></>}
                   accent
                 />
               )}
               <div className="border-t border-border-opaque">
-                <RowItem label="Total" value={formatCurrency(displayTotal)} bold />
+                <RowItem label="Total" value={<FareDisplay amount={displayTotal} size="sm" />} bold />
               </div>
             </>
           ) : (
-            <RowItem label="Estimated fare" value={formatCurrency(displayTotal)} bold />
+            <RowItem label="Estimated fare" value={<FareDisplay amount={displayTotal} size="sm" />} bold />
           )}
         </div>
 

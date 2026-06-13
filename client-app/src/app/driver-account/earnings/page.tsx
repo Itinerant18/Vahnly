@@ -8,9 +8,10 @@ import {
   type DriverEarningsResponse, type EarningsPeriod,
 } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
-import { formatCurrency, formatCompactDate } from '@/lib/format';
+import { formatCompactDate } from '@/lib/format';
 import { useCountUp } from '@/lib/useCountUp';
 import { saveAndShareCsv } from '@/lib/saveStatement';
+import { FareDisplay } from '@/components/ds';
 
 // Code-split recharts out of the initial earnings bundle; it only renders client-side.
 const EarningsChart = dynamic(() => import('./EarningsChart'), {
@@ -22,7 +23,7 @@ const EarningsChart = dynamic(() => import('./EarningsChart'), {
 
 function KpiValue({ paise, className }: { paise: number; className: string }) {
   const v = useCountUp(paise);
-  return <span className={className}>{formatCurrency(v)}</span>;
+  return <FareDisplay amount={v} size="md" className={className} />;
 }
 
 function CountInt({ value, className }: { value: number; className: string }) {
@@ -183,11 +184,11 @@ export default function DriverEarningsPage() {
                 <span className="text-white block font-sans font-medium">
                   {t.pickup_short || 'Ride'} {t.drop_short ? `➔ ${t.drop_short}` : ''}
                 </span>
-                <span className="text-content-tertiary text-[8px] block mt-0.5">{formatCompactDate(t.completed_at)} • fare {formatCurrency(t.fare_paise)}</span>
+                <span className="text-content-tertiary text-[8px] block mt-0.5">{formatCompactDate(t.completed_at)} • fare <FareDisplay amount={t.fare_paise} size="sm" /></span>
               </div>
               <div className="text-right">
-                <span className="text-content-positive block font-bold">{formatCurrency(t.driver_earnings_paise)}</span>
-                {t.tip_paise > 0 && <span className="text-content-tertiary text-[8px] block">tip {formatCurrency(t.tip_paise)}</span>}
+                <FareDisplay amount={t.driver_earnings_paise} size="md" className="text-content-positive block font-bold" />
+                {t.tip_paise > 0 && <span className="text-content-tertiary text-[8px] block">tip <FareDisplay amount={t.tip_paise} size="sm" /></span>}
               </div>
             </button>
           ))}

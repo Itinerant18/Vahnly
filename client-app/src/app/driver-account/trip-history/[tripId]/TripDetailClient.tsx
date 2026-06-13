@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getTripById } from '../tripData';
 import { useAuthStore } from '@/store/useAuthStore';
+import { FareDisplay } from '@/components/ds';
 
 interface AuditTrailProps {
   auditData: {
@@ -261,39 +262,39 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
           <div className="space-y-2 font-mono text-[10px] text-content-secondary">
             <div className="flex justify-between">
               <span>Base Package Quoted:</span>
-              <span className="text-white">₹{trip.bill.base.toFixed(2)}</span>
+              <FareDisplay amount={trip.bill.base * 100} size="md" className="text-white" />
             </div>
             {trip.bill.tolls > 0 && (
               <div className="flex justify-between">
                 <span>Toll Additions:</span>
-                <span className="text-white">₹{trip.bill.tolls.toFixed(2)}</span>
+                <FareDisplay amount={trip.bill.tolls * 100} size="md" className="text-white" />
               </div>
             )}
             {trip.bill.parking > 0 && (
               <div className="flex justify-between">
                 <span>Parking Additions:</span>
-                <span className="text-white">₹{trip.bill.parking.toFixed(2)}</span>
+                <FareDisplay amount={trip.bill.parking * 100} size="md" className="text-white" />
               </div>
             )}
             {trip.bill.waiting > 0 && (
               <div className="flex justify-between">
                 <span>Waiting Charges:</span>
-                <span className="text-white">₹{trip.bill.waiting.toFixed(2)}</span>
+                <FareDisplay amount={trip.bill.waiting * 100} size="md" className="text-white" />
               </div>
             )}
             {trip.bill.surge > 0 && (
               <div className="flex justify-between">
                 <span>Night Surge Surcharge:</span>
-                <span className="text-white">₹{trip.bill.surge.toFixed(2)}</span>
+                <FareDisplay amount={trip.bill.surge * 100} size="md" className="text-white" />
               </div>
             )}
             <div className="flex justify-between border-t border-border-opaque pt-2 text-content-tertiary">
               <span>Platform Commission (10%):</span>
-              <span className="text-content-negative">-₹{trip.bill.deductions.toFixed(2)}</span>
+              <span className="text-content-negative">-<FareDisplay amount={trip.bill.deductions * 100} size="md" /></span>
             </div>
             <div className="flex justify-between font-bold text-xs text-white border-t border-border-opaque pt-2">
               <span>Net Settled payout:</span>
-              <span className="text-content-positive">₹{trip.bill.net.toFixed(2)}</span>
+              <FareDisplay amount={trip.bill.net * 100} size="md" className="text-content-positive" />
             </div>
           </div>
         </div>

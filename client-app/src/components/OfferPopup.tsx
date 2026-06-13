@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useOfferStore } from '@/store/useOfferStore';
+import { FareDisplay } from '@/components/ds';
 
 // ── Slide-to-Accept ───────────────────────────────────────────────────────────
 // Uses DS tokens only — no hardcoded hex values.
@@ -286,9 +287,11 @@ export function OfferPopup() {
             <div className="flex items-center justify-between border-t border-border-opaque pt-400">
               <div>
                 <span className="text-label-small text-content-tertiary block">Est. Payout</span>
-                <span className="font-mono text-display-medium text-content-primary tabular-nums font-bold">
-                  ₹{(currentOffer.fareEstimate / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-                </span>
+                <FareDisplay
+                  amount={currentOffer.fareEstimate}
+                  size="display"
+                  className="text-content-primary font-bold"
+                />
               </div>
               <span className="badge badge-neutral">{currentOffer.tripType}</span>
             </div>

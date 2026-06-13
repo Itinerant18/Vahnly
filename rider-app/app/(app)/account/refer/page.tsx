@@ -6,7 +6,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, ErrorState } from "@/components/account/States";
 import { useAuthStore } from "@/lib/store/authStore";
 import { accountApi } from "@/lib/api/account";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 import type { RiderReferral } from "@/lib/api/types";
 
 export default function ReferPage() {
@@ -100,7 +100,7 @@ export default function ReferPage() {
       {/* Earnings */}
       <div className="mt-3 rounded-2xl bg-background-secondary p-4 text-center">
         <p className="text-xs text-content-secondary">Total earned</p>
-        <p className="mt-1 text-2xl font-bold text-content-positive">{formatCurrency(earned)}</p>
+        <FareDisplay amount={earned} size="lg" className="mt-1 block font-bold text-content-positive" />
       </div>
 
       {/* Referral list */}
@@ -124,7 +124,7 @@ export default function ReferPage() {
               </div>
               {r.reward_amount_paise > 0 && (
                 <span className="text-sm font-semibold text-content-positive">
-                  +{formatCurrency(r.reward_amount_paise)}
+                  +<FareDisplay amount={r.reward_amount_paise} size="sm" />
                 </span>
               )}
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Order } from "@/lib/api/types";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 
 export function TripHistoryCard({ order }: { order: Order }) {
   return (
@@ -12,7 +12,7 @@ export function TripHistoryCard({ order }: { order: Order }) {
           {new Date(order.created_at).toLocaleDateString("en-IN")}
         </p>
       </div>
-      <p className="text-sm font-semibold">{formatCurrency(order.base_fare_paise)}</p>
+      <FareDisplay amount={order.base_fare_paise} size="md" className="font-semibold" />
     </div>
   );
 }

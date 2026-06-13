@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { TripItem, TRIP_HISTORY } from './tripData';
 import { DriverTrip, getTripHistory } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
+import { FareDisplay } from '@/components/ds';
 
 function mapDriverTripToTripItem(trip: DriverTrip): TripItem {
   const baseFare = trip.base_fare_paise / 100;
@@ -166,7 +167,7 @@ export default function DriverTripHistoryPage() {
                   </div>
 
                   <div className="text-right shrink-0 flex flex-col justify-between space-y-4">
-                    <span className="text-sm font-bold text-content-positive">₹{item.fare.toFixed(2)}</span>
+                    <FareDisplay amount={item.fare * 100} size="md" className="font-bold text-content-positive" />
                     <span className="text-[8px] text-content-tertiary font-bold uppercase tracking-wider block">Details ➔</span>
                   </div>
                 </div>
@@ -299,39 +300,39 @@ export default function DriverTripHistoryPage() {
               <div className="space-y-2 font-mono text-[10px] text-content-secondary">
                 <div className="flex justify-between">
                   <span>Base Package Quoted:</span>
-                  <span className="text-white">₹{selectedTrip.bill.base.toFixed(2)}</span>
+                  <FareDisplay amount={selectedTrip.bill.base * 100} size="md" className="text-white" />
                 </div>
                 {selectedTrip.bill.tolls > 0 && (
                   <div className="flex justify-between">
                     <span>Toll Additions:</span>
-                    <span className="text-white">₹{selectedTrip.bill.tolls.toFixed(2)}</span>
+                    <FareDisplay amount={selectedTrip.bill.tolls * 100} size="md" className="text-white" />
                   </div>
                 )}
                 {selectedTrip.bill.parking > 0 && (
                   <div className="flex justify-between">
                     <span>Parking Additions:</span>
-                    <span className="text-white">₹{selectedTrip.bill.parking.toFixed(2)}</span>
+                    <FareDisplay amount={selectedTrip.bill.parking * 100} size="md" className="text-white" />
                   </div>
                 )}
                 {selectedTrip.bill.waiting > 0 && (
                   <div className="flex justify-between">
                     <span>Waiting Charges:</span>
-                    <span className="text-white">₹{selectedTrip.bill.waiting.toFixed(2)}</span>
+                    <FareDisplay amount={selectedTrip.bill.waiting * 100} size="md" className="text-white" />
                   </div>
                 )}
                 {selectedTrip.bill.surge > 0 && (
                   <div className="flex justify-between">
                     <span>Night Surge Surcharge:</span>
-                    <span className="text-white">₹{selectedTrip.bill.surge.toFixed(2)}</span>
+                    <FareDisplay amount={selectedTrip.bill.surge * 100} size="md" className="text-white" />
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border-opaque pt-2 text-content-tertiary">
                   <span>Platform Commission (10%):</span>
-                  <span className="text-content-negative">-₹{selectedTrip.bill.deductions.toFixed(2)}</span>
+                  <span className="text-content-negative">-<FareDisplay amount={selectedTrip.bill.deductions * 100} size="md" /></span>
                 </div>
                 <div className="flex justify-between font-bold text-xs text-white border-t border-border-opaque pt-2">
                   <span>Net Settled payout:</span>
-                  <span className="text-content-positive">₹{selectedTrip.bill.net.toFixed(2)}</span>
+                  <FareDisplay amount={selectedTrip.bill.net * 100} size="md" className="text-content-positive" />
                 </div>
               </div>
             </div>

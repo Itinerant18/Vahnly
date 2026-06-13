@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore, DutyState } from '@/store/useDriverDutyStore';
 import { verifyTripOTP, ApiClientError } from '@/api/client';
+import { FareDisplay } from '@/components/ds';
 
 interface ArrivedVerificationPaneProps {
   activeTrip: any;
@@ -273,7 +274,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
               <div>
                 <span className="text-label-small text-content-warning block">Waiting charge active</span>
                 <span className="font-mono text-mono-large text-content-warning tabular-nums">
-                  ₹{waitingCharges.toFixed(2)} at ₹2/min
+                  <FareDisplay amount={waitingCharges * 100} size="md" className="text-content-warning" /> at ₹2/min
                 </span>
               </div>
             </>

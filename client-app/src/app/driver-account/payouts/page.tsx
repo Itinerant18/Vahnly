@@ -6,7 +6,8 @@ import {
   getDriverPayouts, requestDriverPayout, ApiClientError,
   type DriverPayoutsResponse, type PayoutStatus,
 } from '@/api/client';
-import { formatCurrency, formatCompactDate } from '@/lib/format';
+import { formatCompactDate } from '@/lib/format';
+import { FareDisplay } from '@/components/ds';
 
 const MIN_PAYOUT_PAISE = 10000; // ₹100
 
@@ -94,7 +95,7 @@ export default function DriverPayoutsPage() {
           {/* Balance */}
           <div className="bg-background-primary border border-border-opaque rounded-2xl p-6 space-y-1">
             <span className="text-content-tertiary text-[9px] uppercase font-mono tracking-wider font-bold">Available to Withdraw</span>
-            <h3 className="text-3xl font-mono font-bold text-content-positive">{loading ? '₹—' : formatCurrency(availablePaise)}</h3>
+            <h3 className="text-3xl font-mono font-bold text-content-positive">{loading ? '₹—' : <FareDisplay amount={availablePaise} size="lg" />}</h3>
             <span className="text-[8px] font-mono text-content-tertiary block pt-0.5">Net ledger earnings minus pending payouts</span>
           </div>
 
@@ -171,7 +172,7 @@ export default function DriverPayoutsPage() {
           {(data?.payout_history ?? []).map((p) => (
             <div key={p.id} className="py-3 flex justify-between items-center text-xs font-mono">
               <div>
-                <span className="text-white block font-sans font-medium">{formatCurrency(p.amount_paise)}</span>
+                <FareDisplay amount={p.amount_paise} size="md" className="text-white block font-medium" />
                 <span className="text-content-tertiary text-[8px] block mt-0.5">
                   Requested {formatCompactDate(p.requested_at)}
                   {p.status === 'PAID' ? ` • Paid ${formatCompactDate(p.updated_at)}` : ''}

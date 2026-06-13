@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { useTripStore } from "@/lib/store/tripStore";
 import { ordersApi } from "@/lib/api/orders";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 
 type DispatchState = "BOOKING" | "SEARCHING" | "TIMEOUT";
 
@@ -202,9 +202,11 @@ function DispatchContent() {
             <div className="flex items-center gap-3 rounded-2xl bg-background-tertiary px-4 py-2.5">
               <span className="text-sm text-content-secondary">{tripLabel[tripType] ?? tripType}</span>
               <span className="h-1 w-1 rounded-full bg-content-secondary" />
-              <span className="text-sm font-semibold text-content-primary">
-                {formatCurrency(fareEstimate.fare_breakdown.estimated_total_paise)}
-              </span>
+              <FareDisplay
+                amount={fareEstimate.fare_breakdown.estimated_total_paise}
+                size="lg"
+                className="text-content-primary"
+              />
             </div>
           )}
 

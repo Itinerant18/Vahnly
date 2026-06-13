@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { ordersApi } from "@/lib/api/orders";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 import { Shimmer } from "@/components/account/States";
 
 const LINKS: { href: string; label: string; icon: string }[] = [
@@ -97,7 +97,7 @@ export default function AccountPage() {
           <div className="rounded-2xl bg-background-secondary p-3 text-center">
             <p className="text-xs text-content-secondary">Spent</p>
             {stats ? (
-              <p className="mt-1 text-sm font-bold text-content-primary">{formatCurrency(stats.spent)}</p>
+              <FareDisplay amount={stats.spent} size="md" className="mt-1 block font-bold text-content-primary" />
             ) : (
               <Shimmer className="mx-auto mt-1 h-6 w-14" />
             )}

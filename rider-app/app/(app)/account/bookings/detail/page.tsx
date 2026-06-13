@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { Shimmer, ErrorState } from "@/components/account/States";
 import { ordersApi } from "@/lib/api/orders";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 import type { Order } from "@/lib/api/types";
 
 function DetailBody() {
@@ -76,15 +76,15 @@ function DetailBody() {
         <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
           Bill
         </p>
-        <Row label="Base fare" value={formatCurrency(order.base_fare_paise)} />
+        <Row label="Base fare" value={<FareDisplay amount={order.base_fare_paise} size="sm" />} />
         {order.promo_discount_paise > 0 && (
-          <Row label="Promo discount" value={`−${formatCurrency(order.promo_discount_paise)}`} accent />
+          <Row label="Promo discount" value={<>−<FareDisplay amount={order.promo_discount_paise} size="sm" /></>} accent />
         )}
-        {order.rider_tip_paise > 0 && <Row label="Tip" value={formatCurrency(order.rider_tip_paise)} />}
+        {order.rider_tip_paise > 0 && <Row label="Tip" value={<FareDisplay amount={order.rider_tip_paise} size="sm" />} />}
         <div className="border-t border-border-opaque">
           <Row
             label="Total"
-            value={formatCurrency(order.base_fare_paise - order.promo_discount_paise + order.rider_tip_paise)}
+            value={<FareDisplay amount={order.base_fare_paise - order.promo_discount_paise + order.rider_tip_paise} size="sm" />}
             bold
           />
         </div>
@@ -129,7 +129,7 @@ function Point({ color, label, sub }: { color: string; label: string; sub: strin
   );
 }
 
-function Row({ label, value, accent, bold }: { label: string; value: string; accent?: boolean; bold?: boolean }) {
+function Row({ label, value, accent, bold }: { label: string; value: React.ReactNode; accent?: boolean; bold?: boolean }) {
   return (
     <div className="flex justify-between py-2.5">
       <span className={`text-sm ${bold ? "font-semibold text-content-primary" : "text-content-secondary"}`}>{label}</span>

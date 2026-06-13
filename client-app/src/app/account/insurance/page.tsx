@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { FareDisplay } from '@/components/ds';
 
 export default function RiderInsurancePage() {
   const t = useTranslations('accountInsurance');
@@ -113,7 +114,7 @@ export default function RiderInsurancePage() {
                 <span className="text-content-tertiary text-[8px] block mt-0.5">{c.date} • ID: {c.id}</span>
               </div>
               <div className="text-right">
-                {c.amount > 0 && <span className="text-white block font-bold">₹{c.amount.toFixed(2)}</span>}
+                {c.amount > 0 && <FareDisplay amount={c.amount * 100} size="md" className="text-white block font-bold" />}
                 <span className={`text-[8px] block mt-0.5 font-bold uppercase ${c.status === 'Settled' ? 'text-content-positive' : 'text-content-warning animate-pulse'}`}>
                   ● {c.status}
                 </span>

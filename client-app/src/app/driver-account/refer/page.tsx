@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
+import { FareDisplay } from '@/components/ds';
 
 export default function DriverReferPage() {
   const t = useTranslations('driverRefer');
@@ -60,7 +61,7 @@ export default function DriverReferPage() {
         </div>
         <div className="bg-background-primary border border-border-opaque p-5 rounded-2xl space-y-1 text-center font-mono">
           <span className="text-content-tertiary block text-[8px] uppercase">{t('totalReferralPayouts')}</span>
-          <span className="text-xl font-bold text-content-positive block mt-1">₹{stats.earnings.toFixed(2)}</span>
+          <FareDisplay amount={stats.earnings * 100} size="md" className="text-xl font-bold text-content-positive block mt-1" />
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { ResilientStreamManager } from '@/network/ResilientStreamManager';
 import { useAuthStore } from '@/store/useAuthStore';
 import { API_GATEWAY_BASE_URL } from '@/config';
 import { latLngToCell } from 'h3-js';
+import { FareDisplay } from '@/components/ds';
 
 interface DriverDetails {
   id: string;
@@ -496,7 +497,7 @@ export default function RiderDispatchPage() {
                 <div className="truncate"><span className="text-content-tertiary font-bold uppercase">{t('dropLabel')}</span> {bookingSpecs.dropoff || t('hourlyPack')}</div>
                 <div className="flex justify-between items-center text-content-positive font-bold border-t border-border-opaque pt-1.5 mt-1.5 text-xs">
                   <span>{t('upfrontPricing')}</span>
-                  <span>₹{bookingSpecs.fare.toFixed(2)}</span>
+                  <FareDisplay amount={bookingSpecs.fare * 100} size="md" />
                 </div>
               </div>
             )}

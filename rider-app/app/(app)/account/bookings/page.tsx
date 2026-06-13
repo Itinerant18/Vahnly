@@ -6,7 +6,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
 import { ordersApi } from "@/lib/api/orders";
 import { useBookingStore } from "@/lib/store/bookingStore";
-import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { FareDisplay } from "@/components/ds";
 import type { Order, TripStatus } from "@/lib/api/types";
 
 type Tab = "Upcoming" | "Completed" | "Cancelled";
@@ -63,9 +63,7 @@ function TripCard({ order, onRebook }: { order: Order; onRebook: () => void }) {
             </span>
           )}
         </p>
-        <p className="mt-2 text-base font-bold text-content-accent">
-          {formatCurrency(order.base_fare_paise)}
-        </p>
+        <FareDisplay amount={order.base_fare_paise} size="md" className="mt-2 block font-bold text-content-accent" />
       </button>
       <div className="mt-3 flex gap-2">
         <button

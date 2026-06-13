@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { API_GATEWAY_BASE_URL } from '@/config';
+import { FareDisplay } from '@/components/ds';
 
 function TripBillContent() {
   const t = useTranslations('riderTripBill');
@@ -159,41 +160,41 @@ function TripBillContent() {
 
           <div className="flex justify-between">
             <span>{t('lineBasePackage')}</span>
-            <span className="text-white">₹{billBreakdown.base.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.base * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineDistanceOverage')}</span>
-            <span className="text-white">₹{billBreakdown.overage.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.overage * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineWaitingFee')}</span>
-            <span className="text-white">₹{billBreakdown.waitingFee.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.waitingFee * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineNightCharge')}</span>
-            <span className="text-white">₹{billBreakdown.nightCharge.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.nightCharge * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineSurgeIndex')}</span>
-            <span className="text-white">₹{billBreakdown.surgeIndex.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.surgeIndex * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineCareSurcharge')}</span>
-            <span className="text-white">₹{billBreakdown.safetyMargin.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.safetyMargin * 100} size="md" className="text-white" />
           </div>
           <div className="flex justify-between">
             <span>{t('lineGstTax')}</span>
-            <span className="text-white">₹{billBreakdown.gstTax.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.gstTax * 100} size="md" className="text-white" />
           </div>
 
           <div className="flex justify-between text-content-tertiary border-t border-border-opaque pt-2.5">
             <span>{t('linePromoDiscount')}</span>
-            <span className="text-content-positive">-₹{billBreakdown.promoDiscount.toFixed(2)}</span>
+            <span className="text-content-positive">-<FareDisplay amount={billBreakdown.promoDiscount * 100} size="md" className="text-content-positive" /></span>
           </div>
 
           <div className="flex justify-between font-bold text-sm text-white border-t border-border-opaque pt-2.5">
             <span>{t('lineTotalPayable')}</span>
-            <span className="text-content-positive">₹{billBreakdown.total.toFixed(2)}</span>
+            <FareDisplay amount={billBreakdown.total * 100} size="md" className="text-content-positive" />
           </div>
         </div>
 

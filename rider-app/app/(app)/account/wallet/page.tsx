@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { Shimmer, SkeletonList, ErrorState, EmptyState } from "@/components/account/States";
 import { walletApi } from "@/lib/api/wallet";
+import { FareDisplay } from "@/components/ds";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 import type { Wallet, WalletTransaction } from "@/lib/api/types";
 
@@ -71,10 +72,10 @@ export default function WalletPage() {
             <p className="text-xs text-white/80">Wallet Balance</p>
             <span className="text-xl">👛</span>
           </div>
-          <p className="mt-2 text-3xl font-bold text-content-primary">{formatCurrency(wallet.balance_paise)}</p>
+          <FareDisplay amount={wallet.balance_paise} size="lg" className="mt-2 block font-bold text-content-primary" />
           {wallet.locked_paise > 0 && (
             <span className="mt-3 inline-block rounded-lg bg-black/20 px-2.5 py-1 text-xs text-content-primary">
-              🔒 {formatCurrency(wallet.locked_paise)} locked
+              🔒 <FareDisplay amount={wallet.locked_paise} size="sm" /> locked
             </span>
           )}
         </div>
@@ -116,7 +117,7 @@ export default function WalletPage() {
                 </div>
                 <p className={`text-sm font-semibold ${credit ? "text-content-positive" : "text-content-negative"}`}>
                   {credit ? "+" : "−"}
-                  {formatCurrency(Math.abs(t.amount_paise))}
+                  <FareDisplay amount={Math.abs(t.amount_paise)} size="md" />
                 </p>
               </div>
             );

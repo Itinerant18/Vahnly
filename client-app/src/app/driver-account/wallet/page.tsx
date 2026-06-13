@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getDriverWallet, type DriverWalletTxn } from '@/api/client';
-import { formatCurrency, formatCompactDate } from '@/lib/format';
+import { formatCompactDate } from '@/lib/format';
+import { FareDisplay } from '@/components/ds';
 
 // Maps a transaction description to a type icon. The driver wallet is system-managed
 // (toll/parking reimbursements, fuel card, referral bonuses) — no self top-up.
@@ -43,7 +44,7 @@ export default function DriverWalletPage() {
       {/* Passive balance card (gray — system-managed, not a spending wallet) */}
       <div className="bg-background-secondary/60 border border-border-opaque rounded-2xl p-6 space-y-1">
         <span className="text-content-secondary text-[9px] uppercase font-mono tracking-wider font-bold">Wallet Balance</span>
-        <h3 className="text-3xl font-mono font-bold text-content-primary">{loading ? '₹—' : formatCurrency(balancePaise)}</h3>
+        <h3 className="text-3xl font-mono font-bold text-content-primary">{loading ? '₹—' : <FareDisplay amount={balancePaise} size="lg" />}</h3>
         <span className="text-[8px] font-mono text-content-tertiary block pt-0.5">System-managed • no self top-up</span>
       </div>
 
@@ -69,7 +70,7 @@ export default function DriverWalletPage() {
                 </div>
               </div>
               <span className={`font-bold ${txn.entry_type === 'CREDIT' ? 'text-content-positive' : 'text-content-secondary'}`}>
-                {txn.entry_type === 'CREDIT' ? '+' : '-'}{formatCurrency(txn.amount_paise)}
+                {txn.entry_type === 'CREDIT' ? '+' : '-'}<FareDisplay amount={txn.amount_paise} size="sm" />
               </span>
             </div>
           ))}

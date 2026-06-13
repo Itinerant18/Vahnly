@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { FareDisplay } from '@/components/ds';
 
 export default function RiderWalletPage() {
   const t = useTranslations('accountWallet');
@@ -63,7 +64,7 @@ export default function RiderWalletPage() {
         <div className="bg-background-primary border border-border-opaque rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
           <div className="space-y-1">
             <span className="text-content-tertiary text-[9px] uppercase font-mono tracking-wider font-bold">{t('walletBalance')}</span>
-            <h3 className="text-3xl font-mono font-bold text-content-positive">₹{balance.toFixed(2)}</h3>
+            <h3 className="text-3xl font-mono font-bold text-content-positive"><FareDisplay amount={balance * 100} size="lg" /></h3>
             <span className="text-[8px] font-mono text-content-tertiary block pt-0.5">{t('autoDebitActive')}</span>
           </div>
 
@@ -136,7 +137,7 @@ export default function RiderWalletPage() {
                 <span className="text-content-tertiary text-[8px] block mt-0.5">{txn.date} • ID: {txn.id}</span>
               </div>
               <span className={`font-bold ${txn.amount > 0 ? 'text-content-positive' : 'text-content-secondary'}`}>
-                {txn.amount > 0 ? '+' : ''}₹{txn.amount.toFixed(2)}
+                {txn.amount > 0 ? '+' : ''}<FareDisplay amount={txn.amount * 100} size="sm" />
               </span>
             </div>
           ))}
