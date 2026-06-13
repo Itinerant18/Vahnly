@@ -69,13 +69,21 @@ spec:
                   key: aws-secret-access-key
             - name: SUPPORTED_REGIONS_MATRIX
               value: {{ .Values.gateway.supportedRegions | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.gateway.metricsPort | default 9090 | quote }}
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | quote }}
             {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: {{ .Values.gateway.httpPort }}
               name: http
+            - containerPort: {{ .Values.gateway.metricsPort | default 9090 }}
+              name: metrics
           livenessProbe:
             httpGet:
-              path: /health
+              # Lenient: only confirms the process is alive. A DB/Redis blip must
+              # not fail liveness (that would kill an otherwise-healthy pod).
+              path: /live
               port: http
             initialDelaySeconds: 10
             periodSeconds: 15

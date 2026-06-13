@@ -8,6 +8,7 @@ import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import { DriverTripManager } from '../../components/DriverTripManager';
+import { SentryErrorBoundary } from '../../components/SentryErrorBoundary';
 import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
 import { DriverDrawer } from '../../components/DriverDrawer';
 import { SosModal } from '../../components/SosModal';
@@ -1201,6 +1202,7 @@ export default function DriverTerminalPage() {
 
         {/* BOTTOM CONTROL SHEET */}
         <div className="mt-auto w-full z-10 bg-background-primary/95 border-t border-border-opaque p-4 sm:p-6 space-y-4 max-w-xl mx-auto rounded-t-lg shadow-elevation-3 backdrop-blur-sm">
+          <SentryErrorBoundary name="driver-trip-manager">
           <DriverTripManager
             activeTrip={activeTrip}
             stats={stats}
@@ -1249,6 +1251,7 @@ export default function DriverTerminalPage() {
             calculateTotalBill={calculateTotalBill}
             finalBill={finalBill}
           />
+          </SentryErrorBoundary>
         </div>
       </main>
 

@@ -28,6 +28,21 @@ import (
 
 const maxHungarianCommitWorkers = 16
 
+// observeDispatchLatency records dfu_dispatch_latency_seconds — time from order
+// creation (the order.created Kafka message timestamp) to driver assignment.
+// Guards against a zero/garbage producer timestamp and implausible values
+// (clock skew, replayed backlog) so the histogram stays meaningful.
+func observeDispatchLatency(orderCreated time.Time) {
+	if orderCreated.IsZero() {
+		return
+	}
+	latency := time.Since(orderCreated).Seconds()
+	if latency < 0 || latency > 3600 {
+		return
+	}
+	observability.DispatchLatencySeconds.Observe(latency)
+}
+
 type hungarianCommitResult struct {
 	match    matcher.MatchResult
 	err      error
@@ -320,6 +335,7 @@ func (c *OrderCreatedConsumer) executeMatchingBatch(ctx context.Context, orders 
 			}
 			observability.DBTransactionDurationSeconds.WithLabelValues("success").Observe(time.Since(txStart).Seconds())
 			observability.OrdersMatchedTotal.WithLabelValues("GREEDY", o.CityPrefix).Inc()
+			observeDispatchLatency(o.KafkaMessageContext.Time)
 			if err := c.evictAssignedDriver(ctx, o.CityPrefix, optimalMatch); err != nil {
 				log.Printf("Redis spatial eviction failed for driver %s: %v", optimalMatch.DriverID, err)
 			}
@@ -425,6 +441,9 @@ func (c *OrderCreatedConsumer) executeHungarianBatchPool(ctx context.Context, or
 				matchedCity = oEvent.CityPrefix
 			}
 			observability.OrdersMatchedTotal.WithLabelValues("HUNGARIAN", matchedCity).Inc()
+			if oEvent, found := orderMap[matchItem.OrderID]; found {
+				observeDispatchLatency(oEvent.KafkaMessageContext.Time)
+			}
 			matchedOrderIDs[matchItem.OrderID] = true
 			// Collect offset BEFORE emit — DB already mutated, partition must advance regardless
 			if oEvent, found := orderMap[matchItem.OrderID]; found {

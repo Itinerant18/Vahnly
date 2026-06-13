@@ -74,9 +74,25 @@ as `NEXT_PUBLIC_FCM_VAPID_KEY` and in GitHub Actions if web push is served from 
 | Secret | Description |
 |---|---|
 | `CODECOV_TOKEN` | Codecov upload token (backend coverage) |
-| `SENTRY_DSN_DRIVER` | Sentry DSN for the driver app |
-| `SENTRY_DSN_RIDER` | Sentry DSN for the rider app |
-| `SENTRY_DSN_ADMIN` | Sentry DSN for the admin dashboard |
+| `SENTRY_DSN_DRIVER` | Sentry DSN for the driver app → injected at build as `NEXT_PUBLIC_SENTRY_DSN` |
+| `SENTRY_DSN_RIDER` | Sentry DSN for the rider app → `NEXT_PUBLIC_SENTRY_DSN` |
+| `SENTRY_DSN_ADMIN` | Sentry DSN for the admin dashboard → `VITE_SENTRY_DSN` |
+| `SENTRY_AUTH_TOKEN` | Sentry auth token — only needed to upload source maps at build time (org:project scoped). Not required for error capture. |
+
+Sentry DSNs are **per-environment** — staging and production must use distinct DSNs
+(execution rule 2). The DSN is a public client key (safe in the bundle); the
+`SENTRY_AUTH_TOKEN` is the real secret and is build-time only.
+
+### Monitoring / Alertmanager (Kubernetes secrets, NOT GitHub Actions)
+
+Created in the `monitoring` namespace; referenced by `deploy/monitoring/`.
+
+| Secret | Description |
+|---|---|
+| `grafana-admin` | Grafana admin user/password (`admin-user`, `admin-password` keys) |
+| `alertmanager-pagerduty` | PagerDuty integration key for critical pages |
+| `alertmanager-slack` | Slack incoming-webhook URL for warnings |
+| `uptime-checker-webhook` | Optional webhook the uptime CronJob hits after 3 failures |
 
 ## Notes
 

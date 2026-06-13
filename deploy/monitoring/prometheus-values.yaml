@@ -1,0 +1,94 @@
+# Helm values for kube-prometheus-stack (Prometheus + Alertmanager + node-exporter
+# + kube-state-metrics + Grafana). Install:
+#
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace \
+#     -f deploy/monitoring/prometheus-values.yaml \
+#     -f deploy/monitoring/grafana-values.yaml
+#
+# Grafana sub-chart values live in grafana-values.yaml; alert rules in
+# alertmanager-rules.yaml (apply as a PrometheusRule CR). The gateway scrape
+# target is defined by deploy/monitoring/gateway-servicemonitor.yaml.
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+
+    # Persist 15 days of TSDB on a 20Gi volume.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+    # Discover every ServiceMonitor/PodMonitor in the cluster, not only those
+    # carrying the stack's release label. Lets the gateway ServiceMonitor in the
+    # app namespace be picked up.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Static fallback scrape configs for services that don't yet ship a
+    # ServiceMonitor. The gateway is scraped on its internal metrics port (9090);
+    # each microservice exposes /metrics on its own observability port. Tighten
+    # the target list as ServiceMonitors are added.
+    additionalScrapeConfigs:
+      - job_name: dfu-gateway
+        scrape_interval: 15s
+        metrics_path: /metrics
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [dfu-production, dfu-staging, dispatch]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: gateway
+          - source_labels: [__address__, __meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: .*;metrics
+
+# node-exporter (machine metrics) — bundled, enabled by default.
+nodeExporter:
+  enabled: true
+
+# kube-state-metrics (pod/deployment health) — bundled, enabled by default.
+kubeStateMetrics:
+  enabled: true
+
+# Alertmanager routing. SOS/critical → PagerDuty (immediate page); warnings →
+# Slack. Receivers reference secrets you create separately (see README).
+alertmanager:
+  config:
+    route:
+      receiver: slack-warnings
+      group_by: ['alertname', 'severity']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - matchers: ['severity = critical']
+          receiver: pagerduty-critical
+          group_wait: 0s
+          repeat_interval: 1h
+        - matchers: ['severity = warning']
+          receiver: slack-warnings
+    receivers:
+      - name: pagerduty-critical
+        pagerduty_configs:
+          - service_key_file: /etc/alertmanager/secrets/pagerduty/key
+      - name: slack-warnings
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/slack/webhook
+            channel: '#dfu-alerts'
+            send_resolved: true
+    # Mount the secrets referenced above (create them first — see README).
+    alertmanagerSpec:
+      secrets:
+        - alertmanager-pagerduty
+        - alertmanager-slack

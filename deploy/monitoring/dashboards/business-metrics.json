@@ -1,0 +1,71 @@
+{
+  "title": "DFU — Business Metrics",
+  "uid": "dfu-business",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "tags": ["dfu", "business"],
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "barchart",
+      "title": "Bookings per Hour (matched orders)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "sum(increase(dispatch_orders_matched_total[1h]))", "legendFormat": "bookings", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Dispatch Latency (p50 / p95)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(dfu_dispatch_latency_seconds_bucket[10m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(dfu_dispatch_latency_seconds_bucket[10m])) by (le))", "legendFormat": "p95", "refId": "B" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "heatmap",
+      "title": "Fare Distribution (paise)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(dfu_fare_amount_paise_bucket[1h])) by (le)", "format": "heatmap", "legendFormat": "{{le}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "SOS Alerts (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 1 }
+          ] }
+        }
+      },
+      "targets": [
+        { "expr": "sum(increase(dfu_sos_alerts_total[24h]))", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Cancellation Rate (proxy: cancel endpoint share)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "expr": "sum(rate(dfu_http_requests_total{path=~\".*cancel.*\"}[1h])) / sum(rate(dfu_http_requests_total{path=~\".*(orders|trip).*\"}[1h]))", "refId": "A" }
+      ]
+    }
+  ]
+}

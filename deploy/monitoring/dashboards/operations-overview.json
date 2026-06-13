@@ -1,0 +1,72 @@
+{
+  "title": "DFU — Operations Overview",
+  "uid": "dfu-ops-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "tags": ["dfu", "operations"],
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "gauge",
+      "title": "Active Trips by City",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "min": 0, "color": { "mode": "thresholds" } } },
+      "targets": [
+        { "expr": "sum by (city) (dfu_active_trips)", "legendFormat": "{{city}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "Online Drivers by City",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "min": 0, "color": { "mode": "thresholds" } } },
+      "targets": [
+        { "expr": "sum by (city) (dfu_online_drivers)", "legendFormat": "{{city}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP Request Rate (req/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum(rate(dfu_http_requests_total[5m]))", "legendFormat": "total", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Error Rate (5xx %)",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 0.01 }
+          ] }
+        }
+      },
+      "targets": [
+        { "expr": "sum(rate(dfu_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(dfu_http_requests_total[5m]))", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "p95 Response Time",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(dfu_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "A" }
+      ]
+    }
+  ]
+}

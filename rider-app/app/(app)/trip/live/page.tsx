@@ -2,6 +2,7 @@
 
 import { useTripStore } from "@/lib/store/tripStore";
 import LiveTripView from "../LiveTripView";
+import { SentryErrorBoundary } from "@/components/SentryErrorBoundary";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -14,5 +15,9 @@ export default function LiveTripPage() {
   }, [activeOrder, router]);
 
   if (!activeOrder) return null;
-  return <LiveTripView tripId={activeOrder.id} />;
+  return (
+    <SentryErrorBoundary name="rider-live-trip">
+      <LiveTripView tripId={activeOrder.id} />
+    </SentryErrorBoundary>
+  );
 }

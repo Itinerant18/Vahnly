@@ -1,0 +1,52 @@
+# Grafana sub-chart values (kube-prometheus-stack → grafana.*). Admin password is
+# pulled from a Kubernetes Secret — NEVER hardcode it here (execution rule 4).
+#
+# Create the secret first:
+#   kubectl -n monitoring create secret generic grafana-admin \
+#     --from-literal=admin-user=admin \
+#     --from-literal=admin-password="$(openssl rand -base64 24)"
+
+grafana:
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  # Provision the Prometheus datasource (the in-cluster Prometheus service).
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://kube-prom-stack-kube-prometheus-prometheus.monitoring.svc:9090
+          isDefault: true
+
+  # Load dashboards from ConfigMaps labeled grafana_dashboard=1. Apply the three
+  # dashboard JSONs in deploy/monitoring/dashboards/ as ConfigMaps:
+  #   kubectl -n monitoring create configmap dfu-dash-ops \
+  #     --from-file=deploy/monitoring/dashboards/operations-overview.json \
+  #     --dry-run=client -o yaml | kubectl label --local -f - grafana_dashboard=1 -o yaml | kubectl apply -f -
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: dfu
+          orgId: 1
+          folder: Drivers-for-u
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/dfu

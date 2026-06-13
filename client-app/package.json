@@ -25,6 +25,7 @@
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
+    "@sentry/nextjs": "^10.57.0",
     "firebase": "^12.14.0",
     "framer-motion": "^12.40.0",
     "h3-js": "^4.4.0",

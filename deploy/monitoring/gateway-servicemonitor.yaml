@@ -1,0 +1,40 @@
+# Metrics Service + ServiceMonitor for the gateway. The Service exposes the
+# internal metrics port (9090) inside the cluster; the ServiceMonitor tells the
+# Prometheus operator to scrape it every 15s. Apply into the app namespace:
+#   kubectl -n dfu-production apply -f deploy/monitoring/gateway-servicemonitor.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drivers-for-u-gateway-metrics
+  labels:
+    app: gateway
+    monitoring: enabled
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: drivers-for-u-gateway
+  labels:
+    release: kube-prom-stack
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+      monitoring: enabled
+  namespaceSelector:
+    matchNames:
+      - dfu-production
+      - dfu-staging
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

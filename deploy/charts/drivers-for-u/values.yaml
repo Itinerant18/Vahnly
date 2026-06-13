@@ -16,6 +16,12 @@ global:
 networkPolicy:
   enabled: true
 
+# Monitoring integration. namespace is where kube-prometheus-stack runs; the
+# gateway metrics NetworkPolicy allows scrapes only from this namespace (which
+# must carry the label name=<namespace>).
+monitoring:
+  namespace: monitoring
+
   # In-cluster connection strings. Every data-tier service is assumed to live in
   # the same namespace (dispatch). Keep kafkaBrokers consistent with the KEDA
   # ScaledObject bootstrapServers under dispatch.autoscaling.kafka below.
@@ -73,6 +79,9 @@ objectStorage:
 gateway:
   replicaCount: 4
   httpPort: 8080
+  # Internal Prometheus scrape port. Kept off httpPort so a NetworkPolicy can
+  # restrict /metrics to the monitoring namespace only (see networkpolicies.yaml).
+  metricsPort: 9090
   supportedRegions: "KOL,BLR"
   terminationGracePeriodSeconds: 15
   resources:

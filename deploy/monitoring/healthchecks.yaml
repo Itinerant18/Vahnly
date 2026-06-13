@@ -1,0 +1,139 @@
+# Synthetic uptime monitor (TASK 4). A CronJob probes the public API every minute
+# (looping twice ~30s apart, since CronJob granularity is 1 minute). On failure it
+# publishes system.health_check.failed to Kafka (via a REST proxy, if configured)
+# and, after 3 consecutive failures, calls the alert webhook (PagerDuty/Slack).
+#
+# Apply: kubectl -n dfu-production apply -f deploy/monitoring/healthchecks.yaml
+#
+# A blackbox-exporter + ProbeSuccess alert is the heavier production-grade path;
+# this CronJob is the self-contained version the brief asks for.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: uptime-checker
+---
+# State for the consecutive-failure counter lives in a ConfigMap the job patches.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uptime-checker-state
+data:
+  consecutive_failures: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: uptime-checker
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["uptime-checker-state"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: uptime-checker
+subjects:
+  - kind: ServiceAccount
+    name: uptime-checker
+roleRef:
+  kind: Role
+  name: uptime-checker
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: uptime-checker
+spec:
+  schedule: "* * * * *" # every minute (the script does two passes ~30s apart)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 110
+      template:
+        spec:
+          serviceAccountName: uptime-checker
+          restartPolicy: Never
+          containers:
+            - name: probe
+              image: alpine/k8s:1.29.4 # bundles curl + kubectl + jq
+              env:
+                - name: API_BASE
+                  value: "https://api.driversforu.com"
+                # Optional Kafka REST proxy for publishing the failure event.
+                - name: KAFKA_REST_PROXY_URL
+                  value: "" # e.g. http://kafka-rest.dispatch.svc:8082
+                # Alert webhook hit after 3 consecutive failures (Alertmanager
+                # generic receiver, PagerDuty Events API, or Slack incoming webhook).
+                - name: ALERT_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: uptime-checker-webhook
+                      key: url
+                      optional: true
+                - name: STATE_CM
+                  value: "uptime-checker-state"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -u
+                  fail=0
+
+                  check_once() {
+                    # 1) /health must be 200 with {"status":"ok"}
+                    body=$(curl -fsS --max-time 5 "$API_BASE/health" 2>/dev/null) || return 1
+                    echo "$body" | jq -e '.status == "ok"' >/dev/null 2>&1 || return 1
+
+                    # 2) fare-estimate with a mock payload must return 200
+                    curl -fsS --max-time 5 -X POST "$API_BASE/api/v1/fare-estimate" \
+                      -H 'Content-Type: application/json' \
+                      -d '{"pickup_lat":22.5726,"pickup_lng":88.3639,"drop_lat":22.5958,"drop_lng":88.2636,"car_type":"SEDAN"}' \
+                      >/dev/null 2>&1 || return 1
+                    return 0
+                  }
+
+                  # Two passes ~30s apart to approximate a 30s cadence.
+                  for i in 1 2; do
+                    if ! check_once; then fail=1; fi
+                    [ "$i" = "1" ] && sleep 30
+                  done
+
+                  if [ "$fail" = "1" ]; then
+                    echo "health check FAILED"
+
+                    # Publish system.health_check.failed (best-effort) if a REST proxy is set.
+                    if [ -n "$KAFKA_REST_PROXY_URL" ]; then
+                      curl -fsS --max-time 5 -X POST \
+                        "$KAFKA_REST_PROXY_URL/topics/system.health_check.failed" \
+                        -H 'Content-Type: application/vnd.kafka.json.v2+json' \
+                        -d "{\"records\":[{\"value\":{\"target\":\"$API_BASE\",\"at\":\"$(date -u +%FT%TZ)\"}}]}" \
+                        >/dev/null 2>&1 || echo "kafka publish failed"
+                    fi
+
+                    # Increment consecutive-failure counter.
+                    cur=$(kubectl get configmap "$STATE_CM" -o jsonpath='{.data.consecutive_failures}' 2>/dev/null || echo 0)
+                    next=$((cur + 1))
+                    kubectl patch configmap "$STATE_CM" --type merge \
+                      -p "{\"data\":{\"consecutive_failures\":\"$next\"}}" >/dev/null 2>&1 || true
+                    echo "consecutive failures: $next"
+
+                    # Page after 3 consecutive failures.
+                    if [ "$next" -ge 3 ] && [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
+                      curl -fsS --max-time 5 -X POST "$ALERT_WEBHOOK_URL" \
+                        -H 'Content-Type: application/json' \
+                        -d "{\"text\":\"DFU uptime check failed ${next}x — $API_BASE\"}" \
+                        >/dev/null 2>&1 || true
+                    fi
+                    exit 1
+                  fi
+
+                  # Success — reset the counter.
+                  kubectl patch configmap "$STATE_CM" --type merge \
+                    -p '{"data":{"consecutive_failures":"0"}}' >/dev/null 2>&1 || true
+                  echo "health check OK"

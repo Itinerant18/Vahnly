@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 
@@ -223,6 +225,7 @@ func main() {
 
 	// Bind global SOS broadcast callback to populate the admin incident panel queue
 	gatewayHttp.SOSCallback = func(tripID string, lat, lng float64) {
+		observability.SOSAlertsTotal.Inc()
 		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
 			OrderID:              tripID,
 			DriverID:             "drv-ambient-alpha",
@@ -246,6 +249,7 @@ func main() {
 	}
 
 	driverHttp.SOSCallback = func(driverID string, tripID string, lat, lng float64) {
+		observability.SOSAlertsTotal.Inc()
 		// Fetch driver name, vehicle, etc.
 		var driverName string
 		var licensePlate string
@@ -1040,30 +1044,118 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/team/reset-2fa", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleReset2FA))
 	mux.HandleFunc("GET /api/v1/admin/team/audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleGetAuditLogs))
 
-	// Kubernetes liveness/readiness probes (see Helm gateway-deployment).
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	// Health/probe endpoints. Liveness (/live) is lenient — it only confirms the
+	// process is alive, so a transient DB/Redis blip never gets the pod killed.
+	// Readiness (/ready) is strict — all dependencies must be reachable before the
+	// pod receives traffic. /health is the rich diagnostic (JSON, 503 when degraded)
+	// consumed by the uptime CronJob; nothing probes it, so its 503 won't kill pods.
+	startedAt := time.Now()
+	appVersion := getEnv("APP_VERSION", "dev")
+
+	// checkServices pings DB, Redis, and Kafka; returns per-service status and overall ok.
+	checkServices := func(ctx context.Context) (map[string]string, bool) {
+		services := map[string]string{}
+		allOK := true
+
+		dbCtx, dbCancel := context.WithTimeout(ctx, 2*time.Second)
+		defer dbCancel()
+		if err := dbPool.Ping(dbCtx); err != nil {
+			services["database"] = "error"
+			allOK = false
+		} else {
+			services["database"] = "ok"
+		}
+
+		rCtx, rCancel := context.WithTimeout(ctx, 2*time.Second)
+		defer rCancel()
+		if err := redisClusterClient.Ping(rCtx).Err(); err != nil {
+			services["redis"] = "error"
+			allOK = false
+		} else {
+			services["redis"] = "ok"
+		}
+
+		kCtx, kCancel := context.WithTimeout(ctx, 2*time.Second)
+		defer kCancel()
+		dialer := &net.Dialer{}
+		if conn, err := dialer.DialContext(kCtx, "tcp", brokersList[0]); err != nil {
+			services["kafka"] = "error"
+			allOK = false
+		} else {
+			_ = conn.Close()
+			services["kafka"] = "ok"
+		}
+
+		return services, allOK
+	}
+
+	// GET /live — lenient liveness probe.
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("alive"))
 	})
+
+	// GET /ready — strict readiness probe: every dependency must be ok.
 	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := dbPool.Ping(ctx); err != nil {
-			http.Error(w, "db_unreachable", http.StatusServiceUnavailable)
+		_, allOK := checkServices(r.Context())
+		if !allOK {
+			http.Error(w, "not_ready", http.StatusServiceUnavailable)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ready"))
 	})
 
+	// GET /health — rich JSON status for the uptime CronJob and dashboards.
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		services, allOK := checkServices(r.Context())
+		status := "ok"
+		code := http.StatusOK
+		if !allOK {
+			status = "degraded"
+			code = http.StatusServiceUnavailable
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":         status,
+			"services":       services,
+			"version":        appVersion,
+			"uptime_seconds": int(time.Since(startedAt).Seconds()),
+		})
+	})
+
 	corsMiddleware := middleware.NewCORSMiddleware()
+	metricsMiddleware := middleware.NewMetricsMiddleware()
 
 	server := &http.Server{
-		Addr:         ":" + httpPort,
-		Handler:      corsMiddleware.Handler(mux),
+		Addr: ":" + httpPort,
+		// Outermost layer times the full request (incl. CORS handling).
+		Handler:      metricsMiddleware.Handler(corsMiddleware.Handler(mux)),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
+
+	// Internal metrics listener on a dedicated port (default 9090). Kept off the
+	// public 8080 so a NetworkPolicy can restrict /metrics to Prometheus only.
+	metricsPort := getEnv("METRICS_PORT", "9090")
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsServer := &http.Server{
+		Addr:         ":" + metricsPort,
+		Handler:      metricsMux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+	go func() {
+		log.Printf("Internal metrics server listening on :%s/metrics", metricsPort)
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("metrics server error: %v", err)
+		}
+	}()
+
+	// Periodically sample business gauges (active trips, online drivers) from the DB.
+	go startBusinessMetricsSampler(mainCtx, dbPool)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -1085,6 +1177,7 @@ func main() {
 
 	// 2. Shut down the HTTP listener first so the load balancer stops routing new requests to this instance
 	_ = server.Shutdown(drainCtx)
+	_ = metricsServer.Shutdown(drainCtx)
 
 	// 3. Broadcast CloseGoingAway handshakes across all active persistent WebSocket sessions
 	handler.DrainAndSignalWebSockets(drainCtx)
@@ -1120,6 +1213,84 @@ func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client
 				continue
 			}
 			_ = client.Publish(ctx, gatewayHttp.RedisPubSubChannel, string(msg.Value)).Err()
+		}
+	}
+}
+
+// startBusinessMetricsSampler periodically refreshes the dfu_active_trips and
+// dfu_online_drivers gauges from Postgres. Sampling (rather than incrementing on
+// each state transition) keeps the gauges correct after restarts and avoids
+// threading metric calls through every trip/duty handler. Runs every 30s.
+func startBusinessMetricsSampler(ctx context.Context, pool *pgxpool.Pool) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	sample := func() {
+		sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		// Active trips by city. Statuses mirror activeTripStatuses in the driver
+		// self-service handler.
+		observability.ActiveTripsGauge.Reset()
+		rows, err := pool.Query(sctx, `
+			SELECT city_prefix, COUNT(*)
+			  FROM orders
+			 WHERE status::text = ANY($1)
+			 GROUP BY city_prefix`,
+			[]string{"ASSIGNED", "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP", "DELIVERING"})
+		if err == nil {
+			for rows.Next() {
+				var city string
+				var n float64
+				if rows.Scan(&city, &n) == nil {
+					observability.ActiveTripsGauge.WithLabelValues(city).Set(n)
+				}
+			}
+			rows.Close()
+		} else {
+			log.Printf("[METRICS] active trips sample failed: %v", err)
+		}
+
+		// Online drivers by city and transmission capability. Transmission mirrors
+		// the CASE used by the admin driver handler.
+		observability.OnlineDriversGauge.Reset()
+		drows, err := pool.Query(sctx, `
+			SELECT city_prefix,
+			       CASE
+			         WHEN has_manual_certification AND has_automatic_certification THEN 'BOTH'
+			         WHEN has_manual_certification THEN 'MANUAL'
+			         ELSE 'AUTOMATIC'
+			       END AS transmission,
+			       COUNT(*)
+			  FROM drivers
+			 WHERE current_state::text LIKE 'ONLINE%'
+			 GROUP BY city_prefix, transmission`)
+		if err == nil {
+			for drows.Next() {
+				var city, txn string
+				var n float64
+				if drows.Scan(&city, &txn, &n) == nil {
+					observability.OnlineDriversGauge.WithLabelValues(city, txn).Set(n)
+				}
+			}
+			drows.Close()
+		} else {
+			log.Printf("[METRICS] online drivers sample failed: %v", err)
+		}
+
+		// DB connection pool utilization — drives the "connections > 80% of pool" alert.
+		stat := pool.Stat()
+		observability.DBPoolConnections.Set(float64(stat.AcquiredConns()))
+		observability.DBPoolMaxConnections.Set(float64(stat.MaxConns()))
+	}
+
+	sample() // prime immediately so gauges aren't empty for the first 30s
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sample()
 		}
 	}
 }

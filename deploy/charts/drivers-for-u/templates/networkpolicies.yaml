@@ -30,6 +30,28 @@ spec:
         - protocol: TCP
           port: {{ .Values.gateway.httpPort }}
 ---
+# 2b. Metrics scrape isolation. The gateway exposes /metrics on its dedicated
+#     metricsPort (9090). Only allow ingress to that port from the monitoring
+#     namespace (Prometheus) — never from the internet or other app pods.
+#     Label the namespace: kubectl label ns monitoring name=monitoring
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-gateway-metrics-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.monitoring.namespace | default "monitoring" }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.gateway.metricsPort | default 9090 }}
+---
 # 3. Allow all app pods egress to DNS and to the data-tier ports only. This blocks
 #    a compromised pod from reaching arbitrary external endpoints.
 apiVersion: networking.k8s.io/v1

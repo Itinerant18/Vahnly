@@ -1,0 +1,121 @@
+# PrometheusRule consumed by the kube-prometheus-stack operator. Apply:
+#   kubectl -n monitoring apply -f deploy/monitoring/alertmanager-rules.yaml
+#
+# Routing (see prometheus-values.yaml alertmanager.config):
+#   severity=critical → PagerDuty (immediate page)   — incl. SOS
+#   severity=warning  → Slack (#dfu-alerts)
+#
+# Some warning rules depend on side-car exporters (kafka-exporter, redis-exporter).
+# They stay dormant (no series) until those exporters are deployed.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: drivers-for-u-alerts
+  labels:
+    release: kube-prom-stack
+spec:
+  groups:
+    - name: dfu-critical
+      rules:
+        - alert: GatewayHigh5xxRate
+          expr: |
+            sum(rate(dfu_http_requests_total{status=~"5.."}[5m]))
+              / sum(rate(dfu_http_requests_total[5m])) > 0.01
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Gateway 5xx rate above 1%"
+            description: "5xx error ratio is {{ $value | humanizePercentage }} over the last 5m (threshold 1% for 2m)."
+
+        - alert: DispatchLatencyP95High
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(dfu_dispatch_latency_seconds_bucket[10m])) by (le)) > 60
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Dispatch p95 latency above 60s"
+            description: "p95 order-to-assignment latency is {{ $value | humanizeDuration }} (threshold 60s)."
+
+        - alert: SOSAlertRaised
+          # We track SOS as a counter; any SOS in the last 5m pages immediately.
+          # True ack-tracking (unacknowledged > 5m) needs an ack gauge — see README.
+          expr: increase(dfu_sos_alerts_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Active SOS alert"
+            description: "{{ $value }} SOS alert(s) raised in the last 5 minutes — verify acknowledgement in the incident terminal."
+
+        - alert: DatabaseConnectionsNearLimit
+          expr: |
+            dfu_db_pool_connections / dfu_db_pool_max_connections > 0.8
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DB connection pool above 80%"
+            description: "Gateway pool usage is {{ $value | humanizePercentage }} of its ceiling (threshold 80%)."
+
+        - alert: PodCrashLooping
+          expr: |
+            max by (namespace, pod, container) (
+              kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
+            ) > 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod in CrashLoopBackOff"
+            description: "{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} is crash-looping."
+
+    - name: dfu-warning
+      rules:
+        - alert: LowDriverSupplyPeakHours
+          # Peak window ~ IST 08:30–22:30 → UTC 03:00–17:00.
+          expr: |
+            (sum by (city) (dfu_online_drivers) < 5)
+              and on() (hour() >= 3 < 17)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Low driver supply in {{ $labels.city }}"
+            description: "Only {{ $value }} online drivers in {{ $labels.city }} during peak hours (threshold 5)."
+
+        - alert: KafkaConsumerLagHigh
+          # Requires kafka-exporter (kafka_consumergroup_lag).
+          expr: max by (consumergroup, topic) (kafka_consumergroup_lag) > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kafka consumer lag above 1000"
+            description: "Group {{ $labels.consumergroup }} on {{ $labels.topic }} is lagging {{ $value }} messages."
+
+        - alert: RedisMemoryHigh
+          # Requires redis-exporter (redis_memory_used_bytes / redis_memory_max_bytes).
+          expr: |
+            redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis memory above 80%"
+            description: "Redis memory usage is {{ $value | humanizePercentage }} (threshold 80%)."
+
+        - alert: PaymentFailureRateHigh
+          # Proxy: 5xx ratio on payment endpoints. Replace with a dedicated
+          # dfu_payment_failures_total once payment outcomes are instrumented.
+          expr: |
+            sum(rate(dfu_http_requests_total{path=~".*payment.*",status=~"5.."}[10m]))
+              / sum(rate(dfu_http_requests_total{path=~".*payment.*"}[10m])) > 0.02
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Payment failure rate above 2%"
+            description: "Payment-endpoint 5xx ratio is {{ $value | humanizePercentage }} (threshold 2%)."

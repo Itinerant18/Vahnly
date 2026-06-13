@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { BookingSheet } from "@/components/booking/BookingSheet";
+import { SentryErrorBoundary } from "@/components/SentryErrorBoundary";
 import { useBookingStore } from "@/lib/store/bookingStore";
 
 // Leaflet must be lazily loaded — no SSR
@@ -67,7 +68,9 @@ export default function HomePage() {
       </div>
 
       {/* Booking bottom sheet — floats above map */}
-      <BookingSheet />
+      <SentryErrorBoundary name="rider-booking">
+        <BookingSheet />
+      </SentryErrorBoundary>
     </div>
   );
 }

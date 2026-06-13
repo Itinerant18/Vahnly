@@ -12,6 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/segmentio/kafka-go"
+
+	"github.com/platform/driver-delivery/internal/observability"
 )
 
 type FinalBill struct {
@@ -553,6 +555,14 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "commit_failed", http.StatusInternalServerError)
 		return
 	}
+
+	// Record the final fare distribution (best-effort, post-commit). trip_type is
+	// the rider's one-time car type when present, else STANDARD.
+	tripType := "STANDARD"
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COALESCE(NULLIF(one_time_car_type, ''), 'STANDARD') FROM orders WHERE id = $1::uuid`,
+		orderID).Scan(&tripType)
+	observability.FareAmountPaise.WithLabelValues(tripType, cityPrefix).Observe(float64(totalFarePaise))
 
 	// 6. Return DTO
 	bill := FinalBill{
