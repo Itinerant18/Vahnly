@@ -44,7 +44,7 @@ export function StatusBanner({ status }: { status: TripStatus | null }) {
     : { label: "Connecting…", cls: "bg-background-primary/90 text-content-secondary border border-border-opaque backdrop-blur-sm" };
 
   return (
-    <div className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 ${cfg.cls}`}>
+    <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 ${cfg.cls}`}>
       <span className="text-label-medium font-semibold">{cfg.label}</span>
     </div>
   );

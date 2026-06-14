@@ -257,7 +257,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
     <div className="space-y-4 text-left animate-enter">
 
       {/* ── Arrived status banner ── */}
-      <div className="flex items-center gap-3 bg-surface-positive border border-positive-200 rounded-sm px-4 py-3">
+      <div role="status" aria-live="polite" className="flex items-center gap-3 bg-surface-positive border border-positive-200 rounded-sm px-4 py-3">
         <span className="text-content-positive text-heading-medium">✓</span>
         <div>
           <p className="text-label-medium text-content-positive">You&apos;ve arrived at pickup</p>

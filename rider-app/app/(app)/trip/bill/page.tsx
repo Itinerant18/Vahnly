@@ -21,7 +21,7 @@ function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
   }, [onDone]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+    <div role="status" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
       <div className="flex flex-col items-center gap-4">
         <svg width="80" height="80" viewBox="0 0 80 80">
           <circle cx="40" cy="40" r="36" fill="var(--positive-400)" opacity="0.2" />

@@ -85,7 +85,7 @@ export default function RiderProfilePage() {
       {/* Account Overview Card */}
       <div className="bg-background-primary border border-border-opaque rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-center">
         {/* Avatar Picker & Compression Trigger */}
-        <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+        <div role="button" tabIndex={0} aria-label="Change profile photo" className="relative group cursor-pointer" onClick={handleAvatarClick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAvatarClick(); } }}>
           {avatar ? (
             <img 
               src={avatar} 
