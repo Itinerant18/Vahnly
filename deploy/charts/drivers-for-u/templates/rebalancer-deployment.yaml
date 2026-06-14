@@ -26,6 +26,7 @@ spec:
               value: "rebalancer"
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
+            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
             - name: CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: REBALANCER_HTTP_ADDR

@@ -33,6 +33,7 @@ spec:
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
+            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
             - name: TRITON_SERVER_URL
               value: {{ .Values.global.env.tritonServerUrl | quote }}
             - name: ALGORITHM_STRATEGY

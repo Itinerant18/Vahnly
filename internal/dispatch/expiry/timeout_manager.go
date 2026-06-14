@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
-	
+
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
 )
 
@@ -45,9 +45,30 @@ func (j *OfferTimeoutJanitor) StartJanitorLoop(ctx context.Context, cityPrefix s
 	}
 }
 
+// expirySweepLockKey is the pg_advisory_lock key that serializes the expiry sweep
+// across replicas. The rollback path (Kafka re-queue + driver cooldown) isn't
+// transactional, so rather than SKIP LOCKED per row we let a single replica own the
+// whole sweep each tick; if it dies, another acquires the lock on the next tick.
+const expirySweepLockKey int64 = 911001
+
 func (j *OfferTimeoutJanitor) SweepExpiredOffers(ctx context.Context, cityPrefix string) {
 	sweepCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
+
+	// Only one replica sweeps at a time. pg_try_advisory_lock is non-blocking, so a
+	// replica that loses the race simply skips this tick.
+	lockConn, err := j.dbPool.Acquire(sweepCtx)
+	if err != nil {
+		return
+	}
+	defer lockConn.Release()
+	var locked bool
+	if err := lockConn.QueryRow(sweepCtx, "SELECT pg_try_advisory_lock($1)", expirySweepLockKey).Scan(&locked); err != nil || !locked {
+		return
+	}
+	defer func() {
+		_, _ = lockConn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", expirySweepLockKey)
+	}()
 
 	// Locate orders stuck in ASSIGNED state past the allowed 15-second offer window
 	query := `

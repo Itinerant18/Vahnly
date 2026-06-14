@@ -94,6 +94,7 @@ func main() {
 
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:          nodeList,
+		Password:       os.Getenv("REDIS_PASSWORD"),
 		ReadOnly:       false,
 		RouteByLatency: true,
 		DialTimeout:    2 * time.Second,
@@ -581,6 +582,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/driver/notifications/preferences", authGuard.AuthenticateJWT(driverSelfServiceHandler.UpdateNotificationPrefs))
 	mux.HandleFunc("PATCH /api/v1/driver/profile/language", authGuard.AuthenticateJWT(driverSelfServiceHandler.UpdateLanguage))
 	mux.HandleFunc("POST /api/v1/driver/auth/change-password", authGuard.AuthenticateJWT(driverSelfServiceHandler.ChangePassword))
+	mux.HandleFunc("GET /api/v1/driver/me/export", authGuard.AuthenticateJWT(driverSelfServiceHandler.ExportMyData))
 	mux.HandleFunc("DELETE /api/v1/driver/account", authGuard.AuthenticateJWT(driverSelfServiceHandler.DeleteAccount))
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
@@ -616,6 +618,9 @@ func main() {
 
 	mux.HandleFunc("GET /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleGetMe))
 	mux.HandleFunc("PUT /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleUpdateMe))
+	// DPDP: rider self-service data export + account erasure.
+	mux.HandleFunc("GET /api/v1/rider/me/export", riderAuthMW.Require(riderAppHandler.HandleExportMyData))
+	mux.HandleFunc("DELETE /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleDeleteMyAccount))
 	mux.HandleFunc("POST /api/v1/rider/me/garage", riderAuthMW.Require(riderAppHandler.HandleAddCar))
 	mux.HandleFunc("GET /api/v1/rider/me/garage", riderAuthMW.Require(riderAppHandler.HandleListCars))
 	mux.HandleFunc("PUT /api/v1/rider/me/garage/{carId}", riderAuthMW.Require(riderAppHandler.HandleUpdateCar))

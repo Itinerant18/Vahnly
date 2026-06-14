@@ -1,0 +1,74 @@
+{{- if .Values.ingress.enabled }}
+# Public HTTPS entrypoint for the gateway. Requires an ingress controller (nginx)
+# and, for auto-renewed TLS, cert-manager with the referenced ClusterIssuer.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-gateway
+  labels:
+    app: gateway
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "drivers-for-u.name" . }}-gateway-svc
+                port:
+                  number: 80
+{{- if .Values.ingress.adminAllowlist.sourceRanges }}
+---
+# Admin API surface (/api/v1/admin) restricted to office/VPN CIDRs. nginx applies
+# whitelist-source-range per-Ingress, and this more-specific path is owned here, so
+# the allowlist applies only to admin traffic. The admin SPA itself is deployed
+# outside this chart — front it with the SAME allowlist (or a VPN) at its own
+# ingress/CDN. NOTE: if adminAllowlist.sourceRanges is empty this resource is not
+# rendered and /api/v1/admin falls through to the open main ingress above.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-gateway-admin
+  labels:
+    app: gateway
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.adminAllowlist.sourceRanges | quote }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api/v1/admin
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "drivers-for-u.name" . }}-gateway-svc
+                port:
+                  number: 80
+{{- end }}
+{{- end }}

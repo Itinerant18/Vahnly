@@ -1,11 +1,11 @@
 {{/* Expand the name of the chart. */}}
 {{- define "drivers-for-u.name" -}}
-{{- .Chart.Name | truncate 63 | trimSuffix "-" -}}
+{{- .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/* Create a default fully qualified app name. */}}
 {{- define "drivers-for-u.fullname" -}}
-{{- printf "%s-%s" .Release.Name .Chart.Name | truncate 63 | trimSuffix "-" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -46,5 +46,20 @@ plaintext for local/dev. Every producer & consumer reads these via kafkacfg.From
     secretKeyRef:
       name: {{ include "drivers-for-u.name" . }}-app-secrets
       key: kafka-sasl-password
+{{- end }}
+{{- end -}}
+
+{{/*
+Redis client auth env. Include inside any Redis-talking container's `env:` list.
+No-op when redis.authEnabled is false, so passwordless local/dev clusters keep
+working. Every Redis client reads REDIS_PASSWORD via redis.ClusterOptions.Password.
+*/}}
+{{- define "drivers-for-u.redisAuthEnv" -}}
+{{- if .Values.redis.authEnabled }}
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "drivers-for-u.name" . }}-app-secrets
+      key: redis-password
 {{- end }}
 {{- end -}}

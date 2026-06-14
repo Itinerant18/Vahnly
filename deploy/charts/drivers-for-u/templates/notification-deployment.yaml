@@ -29,5 +29,20 @@ spec:
                 secretKeyRef:
                   name: {{ include "drivers-for-u.name" . }}-db-credentials
                   key: database-url
+          ports:
+            - containerPort: 8080
+              name: health
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
             {{- toYaml .Values.notification.resources | nindent 12 }}

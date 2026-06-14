@@ -26,3 +26,20 @@ dispatch:
 
 ingestion:
   replicaCount: 3
+
+# Redis cluster requires AUTH in production; inject secrets.redisPassword via a
+# SealedSecret/--set so REDIS_PASSWORD is mounted into every Redis-talking pod.
+redis:
+  authEnabled: true
+
+# Public HTTPS entrypoint. Replace host + adminAllowlist.sourceRanges with the real
+# production domain and the office/VPN egress CIDRs before deploy. clusterIssuer must
+# match an installed cert-manager ClusterIssuer.
+ingress:
+  enabled: true
+  host: api.example.com # REPLACE with the production API hostname
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+  adminAllowlist:
+    sourceRanges: [] # REPLACE with office/VPN CIDRs, e.g. ["203.0.113.0/24"]

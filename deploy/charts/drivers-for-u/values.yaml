@@ -11,20 +11,10 @@ global:
   logLevel: warn
   metricsEnabled: true
 
-# Toggle baseline NetworkPolicies (default-deny ingress + scoped egress). Requires
-# a NetworkPolicy-enforcing CNI (Calico/Cilium).
-networkPolicy:
-  enabled: true
-
-# Monitoring integration. namespace is where kube-prometheus-stack runs; the
-# gateway metrics NetworkPolicy allows scrapes only from this namespace (which
-# must carry the label name=<namespace>).
-monitoring:
-  namespace: monitoring
-
-  # In-cluster connection strings. Every data-tier service is assumed to live in
-  # the same namespace (dispatch). Keep kafkaBrokers consistent with the KEDA
-  # ScaledObject bootstrapServers under dispatch.autoscaling.kafka below.
+  # In-cluster connection strings consumed by every service via .Values.global.env.
+  # Every data-tier service is assumed to live in the same namespace (dispatch).
+  # Keep kafkaBrokers consistent with the KEDA ScaledObject bootstrapServers under
+  # dispatch.autoscaling.kafka below.
   env:
     # sslmode=require encrypts without CA verification. Use verify-full only once
     # a CA bundle is mounted into the pods, otherwise the TLS handshake fails.
@@ -37,6 +27,17 @@ monitoring:
     kafkaBrokers: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
     redisClusterNodes: "redis-cluster.dispatch.svc.cluster.local:6379"
     tritonServerUrl: "triton-inference-service.dispatch.svc.cluster.local:8001"
+
+# Toggle baseline NetworkPolicies (default-deny ingress + scoped egress). Requires
+# a NetworkPolicy-enforcing CNI (Calico/Cilium).
+networkPolicy:
+  enabled: true
+
+# Monitoring integration. namespace is where kube-prometheus-stack runs; the
+# gateway metrics NetworkPolicy allows scrapes only from this namespace (which
+# must carry the label name=<namespace>).
+monitoring:
+  namespace: monitoring
 
 # Single multi-target image. The compiled binary is service-specific (built with
 # --build-arg TARGET_SERVICE=<svc>); publish one tag per service or override
@@ -56,6 +57,7 @@ secrets:
   awsSecretAccessKey: "REPLACE_ME_VIA_SEALED_SECRET"
   kafkaSaslUsername: "REPLACE_ME_VIA_SEALED_SECRET"
   kafkaSaslPassword: "REPLACE_ME_VIA_SEALED_SECRET"
+  redisPassword: "REPLACE_ME_VIA_SEALED_SECRET"
 
 # Kafka client security. Enable both for production SASL_SSL (PLAIN over TLS).
 # All producers/consumers read KAFKA_TLS_ENABLED + KAFKA_SASL_* via kafkacfg.
@@ -64,6 +66,39 @@ secrets:
 kafka:
   tlsEnabled: false
   saslEnabled: false
+
+# Redis client auth. Enable in production once the Redis cluster requires AUTH and
+# secrets.redisPassword is injected via SealedSecret. No-op (no REDIS_PASSWORD env)
+# when off, so passwordless local/dev clusters keep working.
+redis:
+  authEnabled: false
+
+# Database migrations run as a pre-install/pre-upgrade hook Job that gates the rollout
+# (schema is current before app pods start). Mirrors the docker-compose db-migrator.
+# Disable only if a separate process owns the schema.
+migrations:
+  hookEnabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
+# Public HTTPS ingress for the gateway. Disabled by default so local/dev installs
+# stay ClusterIP-only. In production set ingress.enabled=true with a real host, an
+# nginx ingress controller, and a cert-manager ClusterIssuer for auto-renewed TLS.
+# adminAllowlist.sourceRanges restricts /api/v1/admin to office/VPN CIDRs — LEAVE IT
+# SET in prod; an empty list leaves the admin API open via the main ingress.
+ingress:
+  enabled: false
+  className: nginx
+  host: api.example.com
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    clusterIssuer: letsencrypt-prod
+  adminAllowlist:
+    sourceRanges: []
 
 # Durable object storage for driver KYC documents. Leave bucket empty to fall back
 # to ephemeral local disk (NOT for production). endpoint is for S3-compatible
@@ -123,14 +158,18 @@ pricing:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "250m", memory: "128Mi" }
 
+# pruner/expiry/notification now run 2 replicas: each sweep is guarded against
+# concurrent double-processing — notification claims outbox rows with FOR UPDATE
+# SKIP LOCKED; pruner/expiry serialize each sweep with pg_try_advisory_lock (single
+# active sweeper, failover on the next tick). See INF-1b.
 pruner:
-  replicaCount: 1
+  replicaCount: 2
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "100m", memory: "128Mi" }
 
 reconciler:
-  replicaCount: 1
+  replicaCount: 2 # idempotent (events tagged reconciled:true) + has /health, /ready
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "100m", memory: "128Mi" }
@@ -143,13 +182,13 @@ surge:
     requests: { cpu: "250m", memory: "128Mi" }
 
 notification:
-  replicaCount: 1
+  replicaCount: 2
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "100m", memory: "128Mi" }
 
 expiry:
-  replicaCount: 1
+  replicaCount: 2
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "100m", memory: "128Mi" }
@@ -162,7 +201,7 @@ analytics:
     requests: { cpu: "250m", memory: "128Mi" }
 
 rebalancer:
-  replicaCount: 1
+  replicaCount: 2 # idempotent recompute (overwrites Redis keys / re-publishes nudges)
   httpAddr: ":8090"
   resources:
     limits: { cpu: "500m", memory: "256Mi" }

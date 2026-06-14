@@ -36,6 +36,7 @@ spec:
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
+            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
             - name: JWT_SECRET_SIGNING_KEY
               valueFrom:
                 secretKeyRef:

@@ -195,6 +195,40 @@ func (h *RiderHandler) HandleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, rider)
 }
 
+// ---- DPDP: data portability + erasure ----
+
+// HandleExportMyData returns the authenticated rider's personal data as a portable
+// JSON document (DPDP data-portability right).
+func (h *RiderHandler) HandleExportMyData(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	export, err := h.repo.ExportRiderData(r.Context(), id)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="my-data-export.json"`)
+	writeData(w, http.StatusOK, export)
+}
+
+// HandleDeleteMyAccount erases the rider's account: direct identifiers are scrubbed
+// and pure-PII tables purged, while financial/tax/trip records are retained for the
+// statutory window (DPDP right to erasure). Idempotent — a second call on an
+// already-deleted account returns 404 (no active rider row matched).
+func (h *RiderHandler) HandleDeleteMyAccount(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.repo.SoftDeleteRiderAccount(r.Context(), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "account deleted", "rider_id": id})
+}
+
 // ---- Garage ----
 
 func (h *RiderHandler) HandleAddCar(w http.ResponseWriter, r *http.Request) {

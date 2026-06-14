@@ -41,6 +41,13 @@ type RiderRepository interface {
 	UpdateRider(ctx context.Context, rider *domain.Rider) (*domain.Rider, error)
 	TouchLastLogin(ctx context.Context, riderID string) error
 
+	// ExportRiderData returns the rider's personal data across the rider domain as a
+	// portable JSON-serializable map (DPDP data-portability right).
+	ExportRiderData(ctx context.Context, riderID string) (map[string]any, error)
+	// SoftDeleteRiderAccount scrubs the rider's direct identifiers and purges
+	// pure-PII tables while retaining financial/audit rows (DPDP erasure right).
+	SoftDeleteRiderAccount(ctx context.Context, riderID string) error
+
 	CreateOTPSession(ctx context.Context, phone, otpHash, purpose string, ttl time.Duration) error
 	GetActiveOTPSession(ctx context.Context, phone, purpose string) (*domain.RiderOTPSession, error)
 	IncrementOTPAttempts(ctx context.Context, sessionID string) error
@@ -104,6 +111,102 @@ func scanRider(row rowScanner) (*domain.Rider, error) {
 		return nil, err
 	}
 	return &r, nil
+}
+
+// ExportRiderData assembles the rider's personal data across the rider domain by
+// reusing the existing point-read queries, so the export stays in sync with the
+// schema without duplicating SQL.
+func (p *postgresRiderRepo) ExportRiderData(ctx context.Context, riderID string) (map[string]any, error) {
+	rider, err := p.GetRiderByID(ctx, riderID)
+	if err != nil {
+		return nil, err
+	}
+	cars, err := p.GetGarageCars(ctx, riderID)
+	if err != nil {
+		return nil, err
+	}
+	places, err := p.GetSavedPlaces(ctx, riderID)
+	if err != nil {
+		return nil, err
+	}
+	contacts, err := p.GetEmergencyContacts(ctx, riderID)
+	if err != nil {
+		return nil, err
+	}
+	wallet, err := p.GetOrCreateWallet(ctx, riderID)
+	if err != nil {
+		return nil, err
+	}
+	txns, _, err := p.GetWalletTransactions(ctx, riderID, 100, 0)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"profile":             rider,
+		"garage":              cars,
+		"saved_places":        places,
+		"emergency_contacts":  contacts,
+		"wallet":              wallet,
+		"wallet_transactions": txns,
+		"exported_at":         time.Now().UTC(),
+	}, nil
+}
+
+// SoftDeleteRiderAccount anonymizes the retained rider row and purges pure-PII /
+// preference tables in a single transaction. Financial & audit rows (wallet,
+// wallet_transactions, promo_redemptions, insurance_claims, referrals, orders) are
+// intentionally retained for the statutory window and reference the scrubbed row.
+func (p *postgresRiderRepo) SoftDeleteRiderAccount(ctx context.Context, riderID string) error {
+	tx, err := p.dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Capture the original phone first: rider_otp_sessions is keyed by phone, and we
+	// are about to overwrite the phone with a tombstone. ErrNoRows => already deleted.
+	var phone string
+	if err := tx.QueryRow(ctx,
+		`SELECT phone FROM riders WHERE id = $1 AND deleted_at IS NULL`, riderID).Scan(&phone); err != nil {
+		return err
+	}
+
+	for _, q := range []string{
+		`DELETE FROM rider_saved_places          WHERE rider_id = $1`,
+		`DELETE FROM rider_emergency_contacts    WHERE rider_id = $1`,
+		`DELETE FROM rider_saved_payment_methods WHERE rider_id = $1`,
+		`DELETE FROM rider_device_tokens         WHERE rider_id = $1`,
+		`DELETE FROM rider_garage                WHERE rider_id = $1`,
+		`DELETE FROM rider_notifications         WHERE rider_id = $1`,
+	} {
+		if _, err := tx.Exec(ctx, q, riderID); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM rider_otp_sessions WHERE phone = $1`, phone); err != nil {
+		return err
+	}
+
+	// Scrub direct identifiers on the retained row. phone is NOT NULL + UNIQUE, so it
+	// gets a deterministic tombstone derived from the PK (fits VARCHAR(15): 'DEL_'+11).
+	if _, err := tx.Exec(ctx, `
+		UPDATE riders SET
+			name              = NULL,
+			email             = NULL,
+			gender            = NULL,
+			date_of_birth     = NULL,
+			profile_photo_url = NULL,
+			phone             = 'DEL_' || left(replace(id::text, '-', ''), 11),
+			phone_verified    = false,
+			email_verified    = false,
+			is_active         = false,
+			deleted_at        = now(),
+			updated_at        = now()
+		WHERE id = $1 AND deleted_at IS NULL`, riderID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (p *postgresRiderRepo) CreateRider(ctx context.Context, phone string) (*domain.Rider, error) {
