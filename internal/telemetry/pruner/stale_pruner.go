@@ -24,7 +24,7 @@ func envSeconds(key string, defSec int) time.Duration {
 }
 
 type StaleTelemetryPruner struct {
-	clusterClient *redis.ClusterClient
+	clusterClient  *redis.ClusterClient
 	dbPool         *pgxpool.Pool
 	pruneInterval  time.Duration
 	staleThreshold time.Duration
@@ -32,10 +32,10 @@ type StaleTelemetryPruner struct {
 
 func NewStaleTelemetryPruner(client *redis.ClusterClient, db *pgxpool.Pool) *StaleTelemetryPruner {
 	return &StaleTelemetryPruner{
-		clusterClient: client,
+		clusterClient:  client,
 		dbPool:         db,
 		pruneInterval:  envSeconds("PRUNER_INTERVAL_SECONDS", 30), // Sweep cadence (default 30s)
-		staleThreshold: envSeconds("PRUNER_STALE_SECONDS", 60),   // Evict sessions older than (default 60s)
+		staleThreshold: envSeconds("PRUNER_STALE_SECONDS", 60),    // Evict sessions older than (default 60s)
 	}
 }
 
@@ -63,22 +63,40 @@ func (p *StaleTelemetryPruner) StartPrunerLoop(ctx context.Context, cityPrefix s
 	}
 }
 
+// prunerSweepLockKey serializes the GC sweep across replicas via pg_advisory_lock,
+// so two pruner pods don't redundantly evict the same cells. Non-blocking: a replica
+// that loses the race skips this tick and tries again next interval.
+const prunerSweepLockKey int64 = 911002
+
 // ExecuteGarbageCollection clears memory metrics using high-velocity cluster pipelines
 func (p *StaleTelemetryPruner) ExecuteGarbageCollection(ctx context.Context, cityPrefix string, cells []string) {
 	// Constrain runtime contexts to protect the sub-500ms global SLA limits
 	pruneCtx, cancel := context.WithTimeout(ctx, 450*time.Millisecond)
 	defer cancel()
 
+	// Single-sweeper guard across replicas.
+	lockConn, err := p.dbPool.Acquire(pruneCtx)
+	if err != nil {
+		return
+	}
+	defer lockConn.Release()
+	var locked bool
+	if err := lockConn.QueryRow(pruneCtx, "SELECT pg_try_advisory_lock($1)", prunerSweepLockKey).Scan(&locked); err != nil || !locked {
+		return
+	}
+	defer func() {
+		_, _ = lockConn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", prunerSweepLockKey)
+	}()
+
 	now := time.Now().Unix()
 	maxStaleEpoch := now - int64(p.staleThreshold.Seconds())
 
 	pipe := p.clusterClient.Pipeline()
-	
+
 	// 1. Queue atomic sweeps across all tracked H3 spatial cell indices
 	for _, cell := range cells {
 		// Key syntax matches the scattered spatial tracking ZSET contract
 		zsetKey := fmt.Sprintf("drivers:zset:%s:%s", cityPrefix, cell)
-
 
 		// First, capture the stale driver IDs before evicting them to sync PostgreSQL
 		pipe.ZRangeByScore(pruneCtx, zsetKey, &redis.ZRangeBy{

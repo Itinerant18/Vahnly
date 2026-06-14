@@ -1,9 +1,9 @@
 # PodDisruptionBudgets keep a minimum number of pods serving during voluntary
-# disruptions (node drains, rolling updates). Only defined for services that run
-# >= 2 replicas; single-replica workers (pruner/expiry/notification) must first be
-# scaled to 2 before a PDB is meaningful (a PDB on a 1-replica Deployment would
-# block all node drains). See INF-1 for why those three are not yet scaled.
-{{- $svcs := list "gateway" "dispatch" "ingestion" "pricing" "surge" "reconciler" "rebalancer" }}
+# disruptions (node drains, rolling updates). Defined for every service that runs
+# >= 2 replicas (a PDB on a 1-replica Deployment would block all node drains).
+# pruner/expiry/notification became multi-replica once their sweeps were made
+# concurrency-safe (INF-1b).
+{{- $svcs := list "gateway" "dispatch" "ingestion" "pricing" "surge" "reconciler" "rebalancer" "pruner" "expiry" "notification" }}
 {{- range $svc := $svcs }}
 ---
 apiVersion: policy/v1
