@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -484,6 +486,25 @@ func main() {
 	wsTicket := middleware.NewWSTicketMiddleware(redisClusterClient, authGuard)
 
 	mux := http.NewServeMux()
+
+	// Reverse-proxy the analytics service's driver heatmap SSE so the admin dashboard
+	// can reach it same-origin through the gateway in production, with no dependency on a
+	// separate ingress route to the analytics service. FlushInterval -1 streams Server-Sent
+	// Events without buffering; the metrics middleware's statusRecorder preserves Flusher
+	// end-to-end. The upstream Access-Control-Allow-Origin is stripped so the gateway's CORS
+	// middleware remains the single source of that header.
+	analyticsSSEURL := getEnv("ANALYTICS_SSE_URL", "http://localhost:8089")
+	if analyticsTarget, perr := url.Parse(analyticsSSEURL); perr == nil {
+		analyticsProxy := httputil.NewSingleHostReverseProxy(analyticsTarget)
+		analyticsProxy.FlushInterval = -1
+		analyticsProxy.ModifyResponse = func(resp *http.Response) error {
+			resp.Header.Del("Access-Control-Allow-Origin")
+			return nil
+		}
+		mux.Handle("GET /api/v1/analytics/heatmap", analyticsProxy)
+	} else {
+		log.Printf("[GATEWAY] Invalid ANALYTICS_SSE_URL %q; heatmap SSE proxy disabled: %v", analyticsSSEURL, perr)
+	}
 
 	// Authentication / Access routes. Rider login is handled exclusively by the
 	// real OTP flow (/api/v1/rider/auth/send-otp + verify-otp); the old mock

@@ -80,6 +80,16 @@ export interface RiderRideCheck {
   data: { order_id: string; message: string };
 }
 
+export interface RiderFareUpdated {
+  type: "rider.fare.updated";
+  data: {
+    order_id: string;
+    new_estimate_paise: number;
+    added_component: "TOLL" | "PARKING" | "WAITING" | "OTHER";
+    amount_paise: number;
+  };
+}
+
 export type RiderWebSocketMessage =
   | RiderOrderAssigned
   | RiderDriverLocation
@@ -88,7 +98,8 @@ export type RiderWebSocketMessage =
   | RiderTripCompleted
   | RiderTripCancelled
   | RiderNotificationMessage
-  | RiderRideCheck;
+  | RiderRideCheck
+  | RiderFareUpdated;
 
 export type RiderWebSocketMessageType = RiderWebSocketMessage["type"];
 
@@ -101,6 +112,7 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set<RiderWebSocketMessageType>([
   "rider.trip.cancelled",
   "rider.notification",
   "rider.ride_check",
+  "rider.fare.updated",
 ]);
 
 export function isRiderWebSocketMessage(v: unknown): v is RiderWebSocketMessage {

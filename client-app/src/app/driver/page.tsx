@@ -108,6 +108,34 @@ export default function DriverTerminalPage() {
     }
   }, [connectionStatus]);
 
+  // Live ref to the active trip so the reconnect reconciler reads the latest value
+  // without re-subscribing on every trip change.
+  const activeTripRef = useRef(activeTrip);
+  useEffect(() => { activeTripRef.current = activeTrip; }, [activeTrip]);
+
+  // On every reconnect, reconcile local state against the server so a dropped socket can't
+  // strand the driver on a stale 15s offer (reconcilePendingOffer) or on a trip the server
+  // has already cancelled/completed while we were offline (no further frames would arrive).
+  useEffect(() => {
+    if (connectionStatus !== 'CONNECTED') return;
+    const tok = useAuthStore.getState().token;
+    if (!tok) return;
+    void useOfferStore.getState().reconcilePendingOffer(tok);
+    const trip = activeTripRef.current;
+    const duty = useDriverDutyStore.getState().dutyState;
+    if (trip?.order_id && (duty === 'EN_ROUTE' || duty === 'DELIVERING')) {
+      void getDriverOrder(tok, trip.order_id)
+        .then((order) => {
+          if (['CANCELLED', 'COMPLETED', 'EXPIRED'].includes((order.status || '').toUpperCase())) {
+            setActiveTrip(null);
+            useDriverDutyStore.getState().setDutyState('ONLINE');
+          }
+        })
+        .catch(() => { /* transient error — keep current state */ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus]);
+
   // Statistics polling state
   const [stats, setStats] = useState({
     trips_count: 0,

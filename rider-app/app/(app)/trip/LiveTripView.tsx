@@ -112,6 +112,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
   const driverBearing  = useTripStore((s) => s.driverBearing);
   const driverETA      = useTripStore((s) => s.driverETA);
   const tripStatus     = useTripStore((s) => s.tripStatus);
+  const fareEstimate   = useTripStore((s) => s.fareEstimatePaise);
 
   const [showSOS,     setShowSOS]     = useState(false);
   const [showShare,   setShowShare]   = useState(false);
@@ -129,8 +130,21 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
     const trip  = useTripStore.getState();
     const notif = useNotificationStore.getState();
 
+    // Cold start / hard refresh: rebuild trip state from the server up front so the
+    // screen isn't blank (and the pickup OTP is restored) even before the socket opens.
+    void trip.hydrateActiveOrder();
+    let hasConnected = false;
+
     const manager = new RiderStreamManager({
-      onStatusChange: (s) => trip.setWsConnected(s === "CONNECTED"),
+      onStatusChange: (s) => {
+        trip.setWsConnected(s === "CONNECTED");
+        if (s === "CONNECTED") {
+          // Resync on reconnect only — the first connect is already covered by the
+          // mount hydrate above. A dropped socket can't leave the rider on a stale trip.
+          if (hasConnected) void useTripStore.getState().hydrateActiveOrder();
+          hasConnected = true;
+        }
+      },
       onMessage: (msg: RiderWebSocketMessage) => {
         switch (msg.type) {
           case "rider.order.assigned":
@@ -161,6 +175,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             break;
           case "rider.trip.completed":
             trip.updateStatus("COMPLETED");
+            trip.clearPickupOtp();
             trip.setCompletedFare({
               orderId:         msg.data.order_id,
               totalFarePaise:  msg.data.total_fare_paise,
@@ -172,6 +187,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             break;
           case "rider.trip.cancelled":
             trip.updateStatus("CANCELLED");
+            trip.clearPickupOtp();
             setTimeout(() => router.replace("/home"), 1500);
             break;
           case "rider.notification":
@@ -188,6 +204,9 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             break;
           case "rider.ride_check":
             setRideCheckMsg(msg.data.message);
+            break;
+          case "rider.fare.updated":
+            trip.updateFareEstimate(msg.data.new_estimate_paise);
             break;
         }
       },
@@ -253,7 +272,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           <div className="flex items-center justify-between rounded-md bg-background-primary/90
             border border-border-opaque px-4 py-2.5 backdrop-blur-sm shadow-elevation-1">
             <span className="text-label-small text-content-secondary">Est. fare</span>
-            <FareDisplay amount={activeOrder.base_fare_paise} size="sm" />
+            <FareDisplay amount={fareEstimate ?? activeOrder.base_fare_paise} size="sm" />
           </div>
         )}
 
