@@ -727,3 +727,65 @@ func (h *DriverSelfServiceHandler) DeleteAccount(w http.ResponseWriter, r *http.
 	}
 	writeJSONResponse(w, http.StatusOK, map[string]any{"status": "ACCOUNT_DELETED"})
 }
+
+// GET /api/v1/driver/me/export
+// DPDP data-portability: returns the driver's own profile + vehicles as a portable
+// JSON document. Earnings/payout records stay available via the earnings APIs;
+// secrets (password hash, raw bank account number) are intentionally excluded.
+func (h *DriverSelfServiceHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var name, phone, email, dlNumber, bankName, bankIFSC, accountStatus *string
+	var createdAt *time.Time
+	if err := h.dbPool.QueryRow(ctx, `
+		SELECT name, phone, email, dl_number, bank_name, bank_ifsc, account_status, created_at
+		FROM drivers WHERE id = $1::uuid
+	`, driverID).Scan(&name, &phone, &email, &dlNumber, &bankName, &bankIFSC, &accountStatus, &createdAt); err != nil {
+		http.Error(w, "profile_query_failed", http.StatusInternalServerError)
+		return
+	}
+	profile := map[string]any{
+		"driver_id":      driverID,
+		"name":           name,
+		"phone":          phone,
+		"email":          email,
+		"dl_number":      dlNumber,
+		"bank_name":      bankName,
+		"bank_ifsc":      bankIFSC,
+		"account_status": accountStatus,
+		"created_at":     createdAt,
+	}
+
+	vehicles := make([]map[string]any, 0)
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT id::text, make, model, COALESCE(year, 0), COALESCE(fuel_type, ''),
+		       COALESCE(car_type, ''), license_plate, COALESCE(transmission, '')
+		FROM driver_vehicles WHERE driver_id = $1::uuid ORDER BY created_at DESC
+	`, driverID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id, mk, model, fuel, carType, plate, trans string
+			var year int
+			if rows.Scan(&id, &mk, &model, &year, &fuel, &carType, &plate, &trans) == nil {
+				vehicles = append(vehicles, map[string]any{
+					"id": id, "make": mk, "model": model, "year": year,
+					"fuel_type": fuel, "car_type": carType,
+					"license_plate": plate, "transmission": trans,
+				})
+			}
+		}
+	}
+
+	w.Header().Set("Content-Disposition", `attachment; filename="my-data-export.json"`)
+	writeJSONResponse(w, http.StatusOK, map[string]any{
+		"profile":     profile,
+		"vehicles":    vehicles,
+		"exported_at": time.Now().UTC(),
+	})
+}

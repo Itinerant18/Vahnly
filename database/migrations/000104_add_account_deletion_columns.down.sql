@@ -1,0 +1,2 @@
+ALTER TABLE riders  DROP COLUMN IF EXISTS deleted_at;
+ALTER TABLE drivers DROP COLUMN IF EXISTS deleted_at;
