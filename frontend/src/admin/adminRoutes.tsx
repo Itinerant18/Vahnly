@@ -127,7 +127,7 @@ const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense
     fallback={
       <div className="h-full flex items-center justify-center">
-        <div className="text-sm text-mute animate-pulse">Loading module…</div>
+        <div className="text-sm text-content-tertiary animate-pulse">Loading module…</div>
       </div>
     }
   >

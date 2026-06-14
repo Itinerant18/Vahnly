@@ -227,17 +227,17 @@ export const AdminTeamManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 text-ink bg-white font-sans max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 text-content-primary bg-white font-sans max-w-7xl mx-auto">
       
       {/* Upper Control Bar */}
-      <div className="flex justify-between items-center border-b border-canvas-soft pb-4">
+      <div className="flex justify-between items-center border-b border-background-secondary pb-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-ink">Administrative Team Control</h2>
-          <p className="text-body text-xs mt-1">Manage corporate accounts, security scopes, permissions, and compliance logs.</p>
+          <h2 className="text-xl font-bold tracking-tight text-content-primary">Administrative Team Control</h2>
+          <p className="text-content-secondary text-xs mt-1">Manage corporate accounts, security scopes, permissions, and compliance logs.</p>
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="bg-ink hover:bg-black-elevated text-on-dark font-medium py-2 px-5 rounded-pill text-xs transition active:scale-[0.98] cursor-pointer"
+          className="bg-content-primary hover:bg-gray-800 text-gray-0 font-medium py-2 px-5 rounded-pill text-xs transition active:scale-[0.98] cursor-pointer"
         >
           Invite Administrator
         </button>
@@ -245,7 +245,7 @@ export const AdminTeamManagement: React.FC = () => {
 
       {statusMsg && (
         <div className={`p-3.5 rounded-xl text-xs font-mono font-bold tracking-wide uppercase text-center ${
-          statusMsg.type === 'SUCCESS' ? 'bg-canvas-soft border border-surface-pressed text-ink' : 'bg-ink text-on-dark'
+          statusMsg.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-content-primary text-gray-0'
         }`}>
           {statusMsg.text}
         </div>
@@ -255,12 +255,12 @@ export const AdminTeamManagement: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left Side: Admins List Table */}
-        <div className="lg:col-span-2 bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
+        <div className="lg:col-span-2 bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
           <h3 className="text-sm font-bold tracking-tight">Active Administrators</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="text-mute uppercase text-[10px] tracking-wider border-b border-canvas-soft">
+                <tr className="text-content-tertiary uppercase text-[10px] tracking-wider border-b border-background-secondary">
                   <th className="pb-3 font-bold">Admin / Email</th>
                   <th className="pb-3 font-bold">Role</th>
                   <th className="pb-3 font-bold">City Scope</th>
@@ -268,26 +268,26 @@ export const AdminTeamManagement: React.FC = () => {
                   <th className="pb-3 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-canvas-soft text-xs">
+              <tbody className="divide-y divide-background-secondary text-xs">
                 {admins.map((admin) => (
                   <tr 
                     key={admin.id} 
-                    className={`hover:bg-canvas-softer transition cursor-pointer ${selectedAdminId === admin.id ? 'bg-canvas-softer' : ''}`}
+                    className={`hover:bg-background-tertiary transition cursor-pointer ${selectedAdminId === admin.id ? 'bg-background-tertiary' : ''}`}
                     onClick={() => handleAdminSelectForAudit(admin.id)}
                   >
                     <td className="py-3">
-                      <div className="font-bold text-ink">{admin.full_name}</div>
-                      <div className="text-[10px] text-body font-mono">{admin.email}</div>
+                      <div className="font-bold text-content-primary">{admin.full_name}</div>
+                      <div className="text-[10px] text-content-secondary font-mono">{admin.email}</div>
                     </td>
                     <td className="py-3 font-medium">
-                      <span className="bg-canvas-soft px-2.5 py-0.5 rounded-pill text-[10px] font-bold">
+                      <span className="bg-background-secondary px-2.5 py-0.5 rounded-pill text-[10px] font-bold">
                         {admin.role}
                       </span>
                     </td>
                     <td className="py-3 font-mono font-bold">{admin.city_scope}</td>
                     <td className="py-3">
                       <span className="flex items-center gap-1.5 font-medium">
-                        <span className={`w-2 h-2 rounded-full ${admin.is_active ? 'bg-status-online' : 'bg-status-alert'}`} />
+                        <span className={`w-2 h-2 rounded-full ${admin.is_active ? 'bg-status-online' : 'bg-status-negative'}`} />
                         {admin.is_active ? 'Active' : 'Suspended'}
                       </span>
                     </td>
@@ -300,13 +300,13 @@ export const AdminTeamManagement: React.FC = () => {
                             setEditCityScope(admin.city_scope);
                             setShowEditModal(true);
                           }}
-                          className="bg-canvas border border-canvas-soft text-ink font-bold px-3 py-1 rounded-pill text-[10px] hover:bg-canvas-soft"
+                          className="bg-background-primary border border-background-secondary text-content-primary font-bold px-3 py-1 rounded-pill text-[10px] hover:bg-background-secondary"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => resetMFA(admin.id)}
-                          className="bg-canvas border border-canvas-soft text-ink font-bold px-3 py-1 rounded-pill text-[10px] hover:bg-canvas-soft"
+                          className="bg-background-primary border border-background-secondary text-content-primary font-bold px-3 py-1 rounded-pill text-[10px] hover:bg-background-secondary"
                           title="Reset MFA Credentials"
                         >
                           2FA
@@ -314,7 +314,7 @@ export const AdminTeamManagement: React.FC = () => {
                         <button
                           onClick={() => toggleSuspend(admin)}
                           className={`font-bold px-3 py-1 rounded-pill text-[10px] text-white ${
-                            admin.is_active ? 'bg-black hover:bg-black-elevated' : 'bg-status-online'
+                            admin.is_active ? 'bg-black hover:bg-gray-800' : 'bg-status-online'
                           }`}
                         >
                           {admin.is_active ? 'Suspend' : 'Activate'}
@@ -329,13 +329,13 @@ export const AdminTeamManagement: React.FC = () => {
         </div>
 
         {/* Right Side: Audit Logs Timeline */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold tracking-tight">Security Audit Logs</h3>
             {selectedAdminId && (
               <button 
                 onClick={() => handleAdminSelectForAudit('')}
-                className="text-[10px] font-bold text-body hover:text-ink cursor-pointer"
+                className="text-[10px] font-bold text-content-secondary hover:text-content-primary cursor-pointer"
               >
                 Clear Filter
               </button>
@@ -344,17 +344,17 @@ export const AdminTeamManagement: React.FC = () => {
           
           <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
             {auditLogs.length === 0 ? (
-              <div className="text-center text-xs text-mute py-8">No security actions recorded in ledger.</div>
+              <div className="text-center text-xs text-content-tertiary py-8">No security actions recorded in ledger.</div>
             ) : (
               auditLogs.map((log) => (
-                <div key={log.id} className="border-l border-ink pl-3.5 space-y-1 py-1 relative">
-                  <div className="absolute w-2 h-2 rounded-full bg-ink -left-[4.5px] top-2" />
-                  <div className="flex justify-between items-center text-[10px] font-bold text-body">
+                <div key={log.id} className="border-l border-content-primary pl-3.5 space-y-1 py-1 relative">
+                  <div className="absolute w-2 h-2 rounded-full bg-content-primary -left-[4.5px] top-2" />
+                  <div className="flex justify-between items-center text-[10px] font-bold text-content-secondary">
                     <span className="font-mono">{log.action}</span>
                     <span className="font-mono font-normal">{new Date(log.created_at).toLocaleTimeString()}</span>
                   </div>
-                  <p className="text-xs text-ink font-medium leading-snug">{log.details}</p>
-                  <div className="text-[9px] text-mute flex justify-between font-mono">
+                  <p className="text-xs text-content-primary font-medium leading-snug">{log.details}</p>
+                  <div className="text-[9px] text-content-tertiary flex justify-between font-mono">
                     <span className="truncate max-w-[130px]" title={log.admin_email}>{log.admin_email}</span>
                     <span>IP: {log.ip_address}</span>
                   </div>
@@ -368,37 +368,37 @@ export const AdminTeamManagement: React.FC = () => {
       {/* Invite Admin Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-6 z-[60]">
-          <div className="bg-white rounded-xl border border-canvas-soft max-w-md w-full p-6 space-y-4 relative shadow-lg">
+          <div className="bg-white rounded-xl border border-background-secondary max-w-md w-full p-6 space-y-4 relative shadow-lg">
             <h3 className="text-sm font-bold tracking-tight">Invite Corporate Administrator</h3>
             
             <form onSubmit={handleInviteSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Full Name</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Full Name</label>
                 <input
                   type="text"
                   required
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none"
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
                 />
               </div>
               
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Email Address</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Email Address</label>
                 <input
                   type="email"
                   required
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Phone Number</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Phone Number</label>
                 <input
                   type="text"
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none"
                   placeholder="+91..."
                   value={invitePhone}
                   onChange={(e) => setInvitePhone(e.target.value)}
@@ -407,9 +407,9 @@ export const AdminTeamManagement: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Operating Hub</label>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Operating Hub</label>
                   <select
-                    className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none cursor-pointer"
+                    className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none cursor-pointer"
                     value={inviteRegion}
                     onChange={(e) => {
                       setInviteRegion(e.target.value);
@@ -422,9 +422,9 @@ export const AdminTeamManagement: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Assigned Role</label>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Assigned Role</label>
                   <select
-                    className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none cursor-pointer"
+                    className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none cursor-pointer"
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
                   >
@@ -436,28 +436,28 @@ export const AdminTeamManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Scoped Cities (comma separated)</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Scoped Cities (comma separated)</label>
                 <input
                   type="text"
                   required
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none font-mono"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none font-mono"
                   value={inviteCityScope}
                   onChange={(e) => setInviteCityScope(e.target.value)}
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-canvas-soft">
+              <div className="flex justify-end gap-2 pt-3 border-t border-background-secondary">
                 <button
                   type="button"
                   onClick={() => setShowInviteModal(false)}
-                  className="bg-canvas border border-canvas-soft text-ink py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
+                  className="bg-background-primary border border-background-secondary text-content-primary py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-ink hover:bg-black-elevated text-on-dark py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
+                  className="bg-content-primary hover:bg-gray-800 text-gray-0 py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
                 >
                   {isLoading ? 'Sending...' : 'Dispatched'}
                 </button>
@@ -470,15 +470,15 @@ export const AdminTeamManagement: React.FC = () => {
       {/* Edit Role Modal */}
       {showEditModal && editAdminUser && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-6 z-[60]">
-          <div className="bg-white rounded-xl border border-canvas-soft max-w-md w-full p-6 space-y-4 relative shadow-lg">
+          <div className="bg-white rounded-xl border border-background-secondary max-w-md w-full p-6 space-y-4 relative shadow-lg">
             <h3 className="text-sm font-bold tracking-tight">Configure Admin Permissions</h3>
-            <p className="text-body text-xs">Modifying: <strong>{editAdminUser.full_name}</strong> ({editAdminUser.email})</p>
+            <p className="text-content-secondary text-xs">Modifying: <strong>{editAdminUser.full_name}</strong> ({editAdminUser.email})</p>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Administrative Role</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Administrative Role</label>
                 <select
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none cursor-pointer"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none cursor-pointer"
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value)}
                 >
@@ -489,28 +489,28 @@ export const AdminTeamManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">Scoped Cities (comma separated)</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">Scoped Cities (comma separated)</label>
                 <input
                   type="text"
                   required
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none font-mono"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none font-mono"
                   value={editCityScope}
                   onChange={(e) => setEditCityScope(e.target.value)}
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-canvas-soft">
+              <div className="flex justify-end gap-2 pt-3 border-t border-background-secondary">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="bg-canvas border border-canvas-soft text-ink py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
+                  className="bg-background-primary border border-background-secondary text-content-primary py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-ink hover:bg-black-elevated text-on-dark py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
+                  className="bg-content-primary hover:bg-gray-800 text-gray-0 py-2 px-5 rounded-pill text-xs font-medium cursor-pointer"
                 >
                   {isLoading ? 'Saving...' : 'Save Parameters'}
                 </button>

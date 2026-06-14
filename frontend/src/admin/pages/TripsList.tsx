@@ -172,7 +172,7 @@ export const TripsList: React.FC = () => {
         <span onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
-            className="w-3.5 h-3.5 rounded border-canvas-soft text-ink focus:ring-0 focus:outline-none cursor-pointer"
+            className="w-3.5 h-3.5 rounded border-background-secondary text-content-primary focus:ring-0 focus:outline-none cursor-pointer"
             checked={selectedIds.includes(trip.id)}
             onChange={() => toggleSelect(trip.id)}
           />
@@ -182,7 +182,7 @@ export const TripsList: React.FC = () => {
     {
       key: 'id', header: 'Trip ID',
       render: (_v, trip) => (
-        <span className="font-mono text-mono-small text-ink font-semibold">
+        <span className="font-mono text-mono-small text-content-primary font-semibold">
           TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}
         </span>
       ),
@@ -191,23 +191,23 @@ export const TripsList: React.FC = () => {
     {
       key: 'customer_id', header: 'Rider',
       render: (_v, trip) => (
-        <span className="text-xs text-body">Rider-{trip.customer_id.substring(0, 4)}</span>
+        <span className="text-xs text-content-secondary">Rider-{trip.customer_id.substring(0, 4)}</span>
       ),
     },
     {
       key: 'driver_name', header: 'Driver',
       render: (_v, trip) => (
-        <span className="text-xs text-body font-medium">
+        <span className="text-xs text-content-secondary font-medium">
           {trip.driver_name}
-          <span className="block text-[10px] text-mute font-mono">{trip.plate}</span>
+          <span className="block text-[10px] text-content-tertiary font-mono">{trip.plate}</span>
         </span>
       ),
     },
     {
       key: 'city_prefix', header: 'City & Type',
       render: (_v, trip) => (
-        <span className="text-xs text-body">
-          <span className="block text-[10px] font-mono text-mute">{trip.city_prefix}</span>
+        <span className="text-xs text-content-secondary">
+          <span className="block text-[10px] font-mono text-content-tertiary">{trip.city_prefix}</span>
           <span className="capitalize">{trip.trip_type}</span>
         </span>
       ),
@@ -218,10 +218,10 @@ export const TripsList: React.FC = () => {
         <span
           className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider ${
             trip.status === 'COMPLETED'
-              ? 'bg-canvas-soft text-ink border border-canvas-soft'
+              ? 'bg-background-secondary text-content-primary border border-background-secondary'
               : trip.status === 'CANCELLED'
-              ? 'bg-canvas-soft text-mute'
-              : 'bg-ink text-on-dark'
+              ? 'bg-background-secondary text-content-tertiary'
+              : 'bg-content-primary text-gray-0'
           }`}
         >
           {trip.status === 'ARRIVED_AT_PICKUP' ? 'Arrived' : trip.status.toLowerCase()}
@@ -231,7 +231,7 @@ export const TripsList: React.FC = () => {
     {
       key: 'base_fare_paise', header: 'Fare',
       render: (_v, trip) => (
-        <span className="font-mono text-xs text-ink font-semibold">
+        <span className="font-mono text-xs text-content-primary font-semibold">
           ₹{(trip.base_fare_paise / 100).toFixed(2)}
         </span>
       ),
@@ -241,11 +241,11 @@ export const TripsList: React.FC = () => {
       render: (_v, trip) => (
         <span className="font-mono text-xs">
           {trip.rating > 0 ? (
-            <span className="text-ink font-medium">
-              {trip.rating} <span className="text-mute font-sans">★</span>
+            <span className="text-content-primary font-medium">
+              {trip.rating} <span className="text-content-tertiary font-sans">★</span>
             </span>
           ) : (
-            <span className="text-mute">—</span>
+            <span className="text-content-tertiary">—</span>
           )}
         </span>
       ),
@@ -253,7 +253,7 @@ export const TripsList: React.FC = () => {
     {
       key: 'payment_method', header: 'Payment',
       render: (_v, trip) => (
-        <span className="text-[10px] font-medium text-body">{trip.payment_method}</span>
+        <span className="text-[10px] font-medium text-content-secondary">{trip.payment_method}</span>
       ),
     },
     {
@@ -266,7 +266,7 @@ export const TripsList: React.FC = () => {
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center bg-canvas-soft border border-canvas-soft text-mute text-[9px] h-4 px-1.5 rounded-pill font-mono"
+                  className="inline-flex items-center bg-background-secondary border border-background-secondary text-content-tertiary text-[9px] h-4 px-1.5 rounded-pill font-mono"
                 >
                   {tag}
                 </span>
@@ -277,7 +277,7 @@ export const TripsList: React.FC = () => {
                     setSelectedIds([trip.id]);
                     setShowTagModal(true);
                   }}
-                  className="text-[9px] text-mute hover:text-ink font-mono opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
+                  className="text-[9px] text-content-tertiary hover:text-content-primary font-mono opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
                 >
                   + add
                 </button>
@@ -293,27 +293,27 @@ export const TripsList: React.FC = () => {
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Trips</h1>
-          <p className="text-xs text-mute mt-1">Manage and audit all vehicle bookings, states, and transactions</p>
+          <h1 className="text-2xl font-bold tracking-tight text-content-primary">Trips</h1>
+          <p className="text-xs text-content-tertiary mt-1">Manage and audit all vehicle bookings, states, and transactions</p>
         </div>
         <Link
           to="/trips/new"
-          className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
+          className="inline-flex items-center justify-center bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-4 hover:bg-gray-800 transition-colors"
         >
           + Manual Booking
         </Link>
       </div>
 
       {/* ---- Filters ---- */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-4">
+      <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {/* Search */}
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Search</label>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Search</label>
             <input
               type="text"
               placeholder="Trip ID, rider, driver, plate..."
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -321,9 +321,9 @@ export const TripsList: React.FC = () => {
 
           {/* Status */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Status</label>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Status</label>
             <select
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -339,9 +339,9 @@ export const TripsList: React.FC = () => {
 
           {/* City */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">City</label>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City</label>
             <select
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
               value={city}
               onChange={(e) => setCity(e.target.value)}
             >
@@ -355,9 +355,9 @@ export const TripsList: React.FC = () => {
 
           {/* Trip Type */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Trip Type</label>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Trip Type</label>
             <select
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
               value={tripType}
               onChange={(e) => setTripType(e.target.value)}
             >
@@ -371,9 +371,9 @@ export const TripsList: React.FC = () => {
 
           {/* Car Type */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Car Type</label>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Car Type</label>
             <select
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
               value={carType}
               onChange={(e) => setCarType(e.target.value)}
             >
@@ -386,19 +386,19 @@ export const TripsList: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex justify-between items-center border-t border-canvas-soft pt-3">
+        <div className="flex justify-between items-center border-t border-background-secondary pt-3">
           <div className="flex items-center space-x-4">
             {/* Payment Method */}
             <div className="flex items-center space-x-2">
-              <span className="text-xs text-body font-medium">Payment:</span>
+              <span className="text-xs text-content-secondary font-medium">Payment:</span>
               {['', 'Stripe', 'Razorpay', 'Cash'].map((pay) => (
                 <button
                   key={pay}
                   onClick={() => setPayment(pay)}
                   className={`text-[11px] h-6 px-3 rounded-pill transition-colors ${
                     payment === pay
-                      ? 'bg-ink text-on-dark font-medium'
-                      : 'bg-canvas-soft text-body hover:bg-canvas-softer'
+                      ? 'bg-content-primary text-gray-0 font-medium'
+                      : 'bg-background-secondary text-content-secondary hover:bg-background-tertiary'
                   }`}
                 >
                   {pay || 'All'}
@@ -410,11 +410,11 @@ export const TripsList: React.FC = () => {
             <label className="flex items-center space-x-2 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="w-3.5 h-3.5 rounded border-canvas-soft text-ink focus:ring-0 focus:outline-none"
+                className="w-3.5 h-3.5 rounded border-background-secondary text-content-primary focus:ring-0 focus:outline-none"
                 checked={ratingLess3}
                 onChange={(e) => setRatingLess3(e.target.checked)}
               />
-              <span className="text-xs text-body">Low Rating (★ &lt; 3)</span>
+              <span className="text-xs text-content-secondary">Low Rating (★ &lt; 3)</span>
             </label>
           </div>
 
@@ -428,7 +428,7 @@ export const TripsList: React.FC = () => {
               setPayment('');
               setRatingLess3(false);
             }}
-            className="text-[11px] text-mute hover:text-ink font-medium transition-colors"
+            className="text-[11px] text-content-tertiary hover:text-content-primary font-medium transition-colors"
           >
             Reset Filters
           </button>
@@ -437,30 +437,30 @@ export const TripsList: React.FC = () => {
 
       {/* ---- Bulk Action Bar ---- */}
       {selectedIds.length > 0 && (
-        <div className="bg-ink text-on-dark rounded-xl px-5 py-3 flex justify-between items-center animate-fade-in shadow-lg">
+        <div className="bg-content-primary text-gray-0 rounded-xl px-5 py-3 flex justify-between items-center animate-fade-in shadow-lg">
           <span className="text-xs font-mono font-medium">{selectedIds.length} trips selected</span>
           <div className="flex space-x-2">
             <button
               onClick={() => setShowTagModal(true)}
-              className="text-[11px] font-semibold bg-canvas-softer/20 hover:bg-canvas-softer/30 text-on-dark rounded-pill h-7 px-3 transition-colors"
+              className="text-[11px] font-semibold bg-background-tertiary/20 hover:bg-background-tertiary/30 text-gray-0 rounded-pill h-7 px-3 transition-colors"
             >
               Apply Tag
             </button>
             <button
               onClick={handleBulkRefund}
-              className="text-[11px] font-semibold bg-canvas-softer/20 hover:bg-canvas-softer/30 text-on-dark rounded-pill h-7 px-3 transition-colors"
+              className="text-[11px] font-semibold bg-background-tertiary/20 hover:bg-background-tertiary/30 text-gray-0 rounded-pill h-7 px-3 transition-colors"
             >
               Refund / Cancel
             </button>
             <button
               onClick={handleExportCSV}
-              className="text-[11px] font-semibold bg-on-dark text-ink hover:bg-canvas-softer rounded-pill h-7 px-3 transition-colors"
+              className="text-[11px] font-semibold bg-gray-0 text-content-primary hover:bg-background-tertiary rounded-pill h-7 px-3 transition-colors"
             >
               Export Selected CSV
             </button>
             <button
               onClick={() => setSelectedIds([])}
-              className="text-[11px] text-on-dark/60 hover:text-on-dark px-2 font-medium"
+              className="text-[11px] text-gray-0/60 hover:text-gray-0 px-2 font-medium"
             >
               Clear
             </button>
@@ -477,8 +477,8 @@ export const TripsList: React.FC = () => {
         onRowClick={(t) => navigate(`/trips/${t.id}`)}
         emptyState={
           <div className="flex flex-col items-center gap-1 text-center">
-            <span className="text-sm font-semibold text-ink">No trips matches found</span>
-            <span className="text-xs text-mute">Try modifying your filter matrix or search terms</span>
+            <span className="text-sm font-semibold text-content-primary">No trips matches found</span>
+            <span className="text-xs text-content-tertiary">Try modifying your filter matrix or search terms</span>
           </div>
         }
       />
@@ -486,15 +486,15 @@ export const TripsList: React.FC = () => {
       {/* ---- Tag Modal ---- */}
       {showTagModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-sm w-full space-y-4 shadow-xl">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
             <div>
-              <h3 className="text-sm font-bold text-ink">Apply Tag to Trips</h3>
-              <p className="text-xs text-mute mt-1">Specify a classification tag for the {selectedIds.length} selected orders</p>
+              <h3 className="text-sm font-bold text-content-primary">Apply Tag to Trips</h3>
+              <p className="text-xs text-content-tertiary mt-1">Specify a classification tag for the {selectedIds.length} selected orders</p>
             </div>
             <input
               type="text"
               placeholder="e.g. HIGH_FARE, ESCALATION, FRAUD"
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono uppercase"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono uppercase"
               value={bulkTagText}
               onChange={(e) => setBulkTagText(e.target.value.toUpperCase())}
             />
@@ -504,13 +504,13 @@ export const TripsList: React.FC = () => {
                   setShowTagModal(false);
                   setBulkTagText('');
                 }}
-                className="text-xs text-body hover:text-ink px-3"
+                className="text-xs text-content-secondary hover:text-content-primary px-3"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApplyBulkTag}
-                className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
                 disabled={!bulkTagText.trim()}
               >
                 Apply Tag

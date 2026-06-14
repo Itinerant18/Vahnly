@@ -19,10 +19,10 @@ const DASHBOARD_ICONS: Record<PrebuiltTab, string> = {
 function rupees(p: number) { return `₹${(p / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
 const KPI: React.FC<{ label: string; value: string | number; sub?: string; color?: string }> = ({ label, value, sub, color }) => (
-  <div className={`rounded-xl border p-4 ${color ? `border-${color}-200 bg-${color}-50` : 'border-canvas-soft bg-canvas'}`}>
-    <div className="text-xs text-mute uppercase tracking-wide">{label}</div>
-    <div className="text-2xl font-bold text-ink mt-1">{typeof value === 'number' ? value.toLocaleString() : value}</div>
-    {sub && <div className="text-xs text-body mt-0.5">{sub}</div>}
+  <div className={`rounded-xl border p-4 ${color ? `border-${color}-200 bg-${color}-50` : 'border-background-secondary bg-background-primary'}`}>
+    <div className="text-xs text-content-tertiary uppercase tracking-wide">{label}</div>
+    <div className="text-2xl font-bold text-content-primary mt-1">{typeof value === 'number' ? value.toLocaleString() : value}</div>
+    {sub && <div className="text-xs text-content-secondary mt-0.5">{sub}</div>}
   </div>
 );
 
@@ -73,25 +73,25 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-ink">Analytics & Reports</h1>
-          <p className="text-sm text-mute">Prebuilt dashboards and custom report builder</p>
+          <h1 className="text-xl font-bold text-content-primary">Analytics & Reports</h1>
+          <p className="text-sm text-content-tertiary">Prebuilt dashboards and custom report builder</p>
         </div>
         <div className="flex gap-2">
           {(['7d', '30d', '90d'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                period === p ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                period === p ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
               }`}>{p}</button>
           ))}
         </div>
       </div>
 
       {/* Top tabs */}
-      <div className="flex gap-1 border-b border-canvas-soft">
+      <div className="flex gap-1 border-b border-background-secondary">
         {(['prebuilt', 'custom', 'exports'] as ReportTab[]).map(t => (
           <button key={t} onClick={() => setMainTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-              mainTab === t ? 'border-accent text-accent' : 'border-transparent text-body hover:text-ink'
+              mainTab === t ? 'border-accent text-accent' : 'border-transparent text-content-secondary hover:text-content-primary'
             }`}>
             {t === 'prebuilt' ? 'Prebuilt Dashboards' : t === 'custom' ? 'Custom Reports' : 'Exports'}
           </button>
@@ -106,14 +106,14 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
             {(Object.keys(DASHBOARD_LABELS) as PrebuiltTab[]).map(d => (
               <button key={d} onClick={() => setActiveDB(d)}
                 className={`px-3 py-1.5 rounded-lg text-sm border transition-colors flex items-center gap-1.5 ${
-                  activeDB === d ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                  activeDB === d ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
                 }`}>
                 {DASHBOARD_ICONS[d]} {DASHBOARD_LABELS[d]}
               </button>
             ))}
           </div>
 
-          {loading && <div className="text-sm text-mute animate-pulse">Loading {DASHBOARD_LABELS[activeDB]} dashboard…</div>}
+          {loading && <div className="text-sm text-content-tertiary animate-pulse">Loading {DASHBOARD_LABELS[activeDB]} dashboard…</div>}
 
           {!loading && dbData && (
             <>
@@ -129,8 +129,8 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                     <KPI label="Revenue Today" value={rupees(dbData.today_revenue_paise ?? 0)} />
                   </div>
                   {chartPoints.length >= 2 && (
-                    <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                      <div className="text-sm font-semibold text-ink mb-3">Trips Over Period</div>
+                    <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                      <div className="text-sm font-semibold text-content-primary mb-3">Trips Over Period</div>
                       <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
                     </div>
                   )}
@@ -146,14 +146,14 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                     <KPI label="Total Trips" value={dbData.period_trips ?? 0} color="indigo" />
                   </div>
                   {chartPoints.length >= 2 && (
-                    <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                      <div className="text-sm font-semibold text-ink mb-3">Trip Volume Trend</div>
+                    <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                      <div className="text-sm font-semibold text-content-primary mb-3">Trip Volume Trend</div>
                       <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--positive-400)" fillColor="var(--positive-400)" />
                     </div>
                   )}
                   {dbData.daily_riders?.length > 0 && (
-                    <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                      <div className="text-sm font-semibold text-ink mb-3">Daily Active Riders</div>
+                    <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                      <div className="text-sm font-semibold text-content-primary mb-3">Daily Active Riders</div>
                       <SvgAreaChart
                         data={dbData.daily_riders.map((r: any) => ({ label: r.day?.slice(5) ?? '', value: r.riders ?? 0 }))}
                         height={120} strokeColor="var(--warning-400)" fillColor="var(--warning-400)"
@@ -175,7 +175,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                   </div>
                   <div className="flex gap-3">
                     <button onClick={() => exportCSV('revenue')}
-                      className="px-4 py-2 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">
+                      className="px-4 py-2 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">
                       ↓ Export Revenue CSV
                     </button>
                   </div>
@@ -192,8 +192,8 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                     <KPI label="Offline" value={dbData.state_counts.offline ?? 0} />
                   </div>
                   <KPI label="Active Drivers (period)" value={dbData.active_drivers_period ?? 0} />
-                  <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                    <div className="text-sm font-semibold text-ink mb-3">Driver State Distribution</div>
+                  <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                    <div className="text-sm font-semibold text-content-primary mb-3">Driver State Distribution</div>
                     <div className="space-y-2">
                       {[
                         { label: 'Available', value: dbData.state_counts.available ?? 0, color: 'bg-surface-positive0' },
@@ -205,11 +205,11 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                         const pct = Math.round((row.value / total) * 100);
                         return (
                           <div key={row.label} className="flex items-center gap-3">
-                            <div className="w-20 text-xs text-body shrink-0">{row.label}</div>
-                            <div className="flex-1 h-4 bg-canvas-soft rounded-sm overflow-hidden">
+                            <div className="w-20 text-xs text-content-secondary shrink-0">{row.label}</div>
+                            <div className="flex-1 h-4 bg-background-secondary rounded-sm overflow-hidden">
                               <div className={`h-full ${row.color}`} style={{ width: `${pct}%` }} />
                             </div>
-                            <div className="w-20 text-right text-xs text-ink font-mono">{row.value.toLocaleString()} ({pct}%)</div>
+                            <div className="w-20 text-right text-xs text-content-primary font-mono">{row.value.toLocaleString()} ({pct}%)</div>
                           </div>
                         );
                       })}
@@ -237,18 +237,18 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                     <KPI label="Pending Anomalies" value={dbData.anomalies ?? 0} />
                   </div>
                   {dbData.by_category?.length > 0 && (
-                    <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                      <div className="text-sm font-semibold text-ink mb-3">Incidents by Category</div>
+                    <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                      <div className="text-sm font-semibold text-content-primary mb-3">Incidents by Category</div>
                       <div className="space-y-2">
                         {dbData.by_category.map((c: any) => {
                           const maxVal = Math.max(...dbData.by_category.map((x: any) => x.count), 1);
                           return (
                             <div key={c.category} className="flex items-center gap-3">
-                              <div className="w-32 text-xs text-body shrink-0 truncate">{c.category}</div>
-                              <div className="flex-1 h-4 bg-canvas-soft rounded-sm overflow-hidden">
+                              <div className="w-32 text-xs text-content-secondary shrink-0 truncate">{c.category}</div>
+                              <div className="flex-1 h-4 bg-background-secondary rounded-sm overflow-hidden">
                                 <div className="h-full bg-negative-400" style={{ width: `${(c.count / maxVal) * 100}%` }} />
                               </div>
-                              <div className="w-8 text-right text-xs text-ink font-mono">{c.count}</div>
+                              <div className="w-8 text-right text-xs text-content-primary font-mono">{c.count}</div>
                             </div>
                           );
                         })}
@@ -268,17 +268,17 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
       {/* Exports */}
       {mainTab === 'exports' && (
         <div className="space-y-4">
-          <p className="text-sm text-mute">One-click CSV exports for common datasets. The date range above applies to all exports.</p>
+          <p className="text-sm text-content-tertiary">One-click CSV exports for common datasets. The date range above applies to all exports.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { label: 'Trips Export', report: 'trips', desc: 'All trips with fare, status, city, timestamps' },
               { label: 'Revenue Export', report: 'revenue', desc: 'Daily revenue by city for the selected period' },
             ].map(e => (
-              <div key={e.report} className="bg-canvas rounded-xl border border-canvas-soft p-5">
-                <div className="font-medium text-sm text-ink">{e.label}</div>
-                <div className="text-xs text-mute mt-1 mb-3">{e.desc}</div>
+              <div key={e.report} className="bg-background-primary rounded-xl border border-background-secondary p-5">
+                <div className="font-medium text-sm text-content-primary">{e.label}</div>
+                <div className="text-xs text-content-tertiary mt-1 mb-3">{e.desc}</div>
                 <button onClick={() => exportCSV(e.report)}
-                  className="px-4 py-2 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft w-full text-center">
+                  className="px-4 py-2 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary w-full text-center">
                   ↓ Download CSV
                 </button>
               </div>
@@ -304,7 +304,7 @@ interface ReportRow {
 }
 
 const mono = (v: unknown) => (
-  <span className="text-xs text-body font-mono">{String(v)}</span>
+  <span className="text-xs text-content-secondary font-mono">{String(v)}</span>
 );
 
 const buildColumns = (keys: string[]): ColumnDef<ReportRow>[] =>
@@ -348,24 +348,24 @@ const CustomReportBuilder: React.FC<{
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4">
-          <div className="text-sm font-semibold text-ink mb-3">Dimensions (Group By)</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4">
+          <div className="text-sm font-semibold text-content-primary mb-3">Dimensions (Group By)</div>
           <div className="flex flex-wrap gap-2">
             {DIMENSIONS.map(d => (
               <button key={d} onClick={() => toggle(dims, d, setDims)}
                 className={`px-3 py-1.5 rounded-lg text-xs border transition-colors font-mono ${
-                  dims.includes(d) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                  dims.includes(d) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
                 }`}>{d}</button>
             ))}
           </div>
         </div>
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4">
-          <div className="text-sm font-semibold text-ink mb-3">Metrics</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4">
+          <div className="text-sm font-semibold text-content-primary mb-3">Metrics</div>
           <div className="flex flex-wrap gap-2">
             {METRICS.map(m => (
               <button key={m} onClick={() => toggle(metrics, m, setMetrics)}
                 className={`px-3 py-1.5 rounded-lg text-xs border transition-colors font-mono ${
-                  metrics.includes(m) ? 'bg-surface-accent0 text-white border-border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                  metrics.includes(m) ? 'bg-surface-accent0 text-white border-border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
                 }`}>{m}</button>
             ))}
           </div>
@@ -383,7 +383,7 @@ const CustomReportBuilder: React.FC<{
         />
       )}
       {result && result.length === 0 && (
-        <div className="text-sm text-mute text-center py-8">No data for the selected configuration.</div>
+        <div className="text-sm text-content-tertiary text-center py-8">No data for the selected configuration.</div>
       )}
     </div>
   );

@@ -48,20 +48,20 @@ export const VirtualizedLedgerTable: React.FC<VirtualizedLedgerTableProps> = ({ 
 
   if (total === 0) {
     return (
-      <div className="border border-canvas-soft rounded-xl">
-        <div className={`${GRID} h-11 text-mute uppercase text-[10px] font-medium border-b border-canvas-soft tracking-wider`}>
+      <div className="border border-background-secondary rounded-xl">
+        <div className={`${GRID} h-11 text-content-tertiary uppercase text-[10px] font-medium border-b border-background-secondary tracking-wider`}>
           <span>Order ID</span><span>Region</span><span>Account</span><span>Type</span>
           <span className="text-right">Amount</span><span>Description</span>
         </div>
-        <div className="p-6 text-center text-body text-sm">No completed transactions on record.</div>
+        <div className="p-6 text-center text-content-secondary text-sm">No completed transactions on record.</div>
       </div>
     );
   }
 
   return (
-    <div className="border border-canvas-soft rounded-xl overflow-hidden">
+    <div className="border border-background-secondary rounded-xl overflow-hidden">
       {/* Sticky header */}
-      <div className={`${GRID} h-11 text-mute uppercase text-[10px] font-medium border-b border-canvas-soft tracking-wider bg-canvas`}>
+      <div className={`${GRID} h-11 text-content-tertiary uppercase text-[10px] font-medium border-b border-background-secondary tracking-wider bg-background-primary`}>
         <span>Order ID</span><span>Region</span><span>Account</span><span>Type</span>
         <span className="text-right">Amount</span><span>Description</span>
       </div>
@@ -75,22 +75,22 @@ export const VirtualizedLedgerTable: React.FC<VirtualizedLedgerTableProps> = ({ 
               <div
                 key={entry.id}
                 style={{ height: ROW_H }}
-                className={`${GRID} text-sm border-b border-canvas-soft hover:bg-canvas-softer transition`}
+                className={`${GRID} text-sm border-b border-background-secondary hover:bg-background-tertiary transition`}
               >
-                <span className="font-mono text-xs text-body truncate">{entry.order_id.slice(0, 16)}...</span>
+                <span className="font-mono text-xs text-content-secondary truncate">{entry.order_id.slice(0, 16)}...</span>
                 <span>
-                  <span className="bg-canvas-soft px-2 py-0.5 rounded-pill text-xs font-medium">{entry.city_prefix}</span>
+                  <span className="bg-background-secondary px-2 py-0.5 rounded-pill text-xs font-medium">{entry.city_prefix}</span>
                 </span>
-                <span className="text-body truncate">{entry.account_type}</span>
+                <span className="text-content-secondary truncate">{entry.account_type}</span>
                 <span>
                   <span className={`px-2 py-0.5 rounded-pill text-[10px] font-medium ${
-                    entry.entry_type === 'DEBIT' ? 'bg-ink text-on-dark' : 'bg-canvas-soft text-ink'
+                    entry.entry_type === 'DEBIT' ? 'bg-content-primary text-gray-0' : 'bg-background-secondary text-content-primary'
                   }`}>
                     {entry.entry_type}
                   </span>
                 </span>
                 <span className="text-right font-mono font-medium">₹{(entry.amount_paise / 100).toFixed(2)}</span>
-                <span className="text-body text-xs truncate">{entry.description}</span>
+                <span className="text-content-secondary text-xs truncate">{entry.description}</span>
               </div>
             ))}
           </div>

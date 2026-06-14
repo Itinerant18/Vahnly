@@ -136,20 +136,20 @@ export const DriversList: React.FC = () => {
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-ink">Drivers Directory</h1>
-					<p className="text-xs text-mute mt-1">Manage partner registrations, state triggers, performance metrics, and certifications</p>
+					<h1 className="text-2xl font-bold tracking-tight text-content-primary">Drivers Directory</h1>
+					<p className="text-xs text-content-tertiary mt-1">Manage partner registrations, state triggers, performance metrics, and certifications</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<button
 						onClick={handleExportCsv}
 						disabled={drivers.length === 0}
-						className="inline-flex items-center justify-center border border-canvas-soft text-ink text-xs font-semibold rounded-pill h-9 px-4 hover:bg-canvas-soft transition-colors disabled:opacity-40"
+						className="inline-flex items-center justify-center border border-background-secondary text-content-primary text-xs font-semibold rounded-pill h-9 px-4 hover:bg-background-secondary transition-colors disabled:opacity-40"
 					>
 						Export CSV
 					</button>
 					<Link
 						to="/drivers/onboarding"
-						className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors"
+						className="inline-flex items-center justify-center bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-4 hover:bg-gray-800 transition-colors"
 					>
 						Onboarding Queue →
 					</Link>
@@ -157,15 +157,15 @@ export const DriversList: React.FC = () => {
 			</div>
 
 			{/* ---- Filters Grid ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-4 shadow-sm">
+			<div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-4 shadow-sm">
 				<div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
 					{/* Text Search */}
 					<div className="col-span-1 md:col-span-2">
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Search</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Search</label>
 						<input
 							type="text"
 							placeholder="Search Name, Phone, Driver ID..."
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
@@ -173,9 +173,9 @@ export const DriversList: React.FC = () => {
 
 					{/* Status Selector */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Status</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Status</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={status}
 							onChange={(e) => setStatus(e.target.value)}
 						>
@@ -189,9 +189,9 @@ export const DriversList: React.FC = () => {
 
 					{/* City selector */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">City</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 							value={city}
 							onChange={(e) => setCity(e.target.value)}
 						>
@@ -205,9 +205,9 @@ export const DriversList: React.FC = () => {
 
 					{/* Transmission */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Transmission</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Transmission</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={transmission}
 							onChange={(e) => setTransmission(e.target.value)}
 						>
@@ -220,9 +220,9 @@ export const DriversList: React.FC = () => {
 
 					{/* Min Rating */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Min Rating</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Min Rating</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 							value={ratingMin}
 							onChange={(e) => setRatingMin(e.target.value)}
 						>
@@ -236,14 +236,14 @@ export const DriversList: React.FC = () => {
 				</div>
 
 				{/* Advanced numeric filters */}
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-canvas-soft">
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-background-secondary">
 					{/* Trips count */}
 					<div>
-						<label className="block text-[9px] uppercase text-mute font-semibold">Min Trips Completed</label>
+						<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min Trips Completed</label>
 						<input
 							type="number"
 							placeholder="e.g. 50"
-							className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+							className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 							value={tripsMin}
 							onChange={(e) => setTripsMin(e.target.value)}
 						/>
@@ -251,11 +251,11 @@ export const DriversList: React.FC = () => {
 
 					{/* Acceptance Rate */}
 					<div>
-						<label className="block text-[9px] uppercase text-mute font-semibold">Min Acceptance Rate (%)</label>
+						<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min Acceptance Rate (%)</label>
 						<input
 							type="number"
 							placeholder="e.g. 80"
-							className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+							className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 							value={acceptanceMin}
 							onChange={(e) => setAcceptanceMin(e.target.value)}
 						/>
@@ -263,11 +263,11 @@ export const DriversList: React.FC = () => {
 
 					{/* Cancellation Rate */}
 					<div>
-						<label className="block text-[9px] uppercase text-mute font-semibold">Max Cancellation Rate (%)</label>
+						<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Max Cancellation Rate (%)</label>
 						<input
 							type="number"
 							placeholder="e.g. 10"
-							className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+							className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 							value={cancellationMax}
 							onChange={(e) => setCancellationMax(e.target.value)}
 						/>
@@ -276,7 +276,7 @@ export const DriversList: React.FC = () => {
 					<div className="flex justify-end items-end pb-1.5 col-span-1">
 						<button
 							onClick={handleResetFilters}
-							className="text-[11px] text-mute hover:text-ink font-semibold transition-colors"
+							className="text-[11px] text-content-tertiary hover:text-content-primary font-semibold transition-colors"
 						>
 							Reset All Filters
 						</button>

@@ -241,7 +241,7 @@ export const TripDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-sm text-mute animate-pulse">Loading trip ledger details…</div>
+        <div className="text-sm text-content-tertiary animate-pulse">Loading trip ledger details…</div>
       </div>
     );
   }
@@ -249,9 +249,9 @@ export const TripDetail: React.FC = () => {
   if (!data) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-lg font-bold text-ink mb-1">Trip Record Missing</div>
-        <p className="text-xs text-mute max-w-sm">The requested Order UUID does not exist or you do not have permission to view it.</p>
-        <Link to="/trips" className="mt-4 text-xs font-semibold text-ink underline">Back to Trips List</Link>
+        <div className="text-lg font-bold text-content-primary mb-1">Trip Record Missing</div>
+        <p className="text-xs text-content-tertiary max-w-sm">The requested Order UUID does not exist or you do not have permission to view it.</p>
+        <Link to="/trips" className="mt-4 text-xs font-semibold text-content-primary underline">Back to Trips List</Link>
       </div>
     );
   }
@@ -261,48 +261,48 @@ export const TripDetail: React.FC = () => {
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
       {/* ---- Header & Actions ---- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-canvas-soft pb-4 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-background-secondary pb-4 gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <Link to="/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
-            <span className="text-xs text-mute font-mono">/</span>
-            <span className="text-xs text-ink font-semibold font-mono">TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}</span>
+            <Link to="/trips" className="text-xs text-content-tertiary hover:text-content-primary font-medium">Trips</Link>
+            <span className="text-xs text-content-tertiary font-mono">/</span>
+            <span className="text-xs text-content-primary font-semibold font-mono">TRP-{trip.city_prefix}-{trip.id.substring(trip.id.length - 4).toUpperCase()}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink mt-1 font-mono">{trip.id}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-content-primary mt-1 font-mono">{trip.id}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleAdminAction('reopen')}
             disabled={actionLoading || trip.status !== 'CANCELLED' && trip.status !== 'COMPLETED'}
-            className="text-[11px] font-semibold bg-canvas-soft hover:bg-canvas-softer text-ink rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
+            className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Reopen Trip
           </button>
           <button
             onClick={() => setShowReassignModal(true)}
             disabled={actionLoading || trip.status === 'COMPLETED' || trip.status === 'CANCELLED'}
-            className="text-[11px] font-semibold bg-canvas-soft hover:bg-canvas-softer text-ink rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
+            className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Reassign Driver
           </button>
           <button
             onClick={() => handleAdminAction('send-invoice')}
             disabled={actionLoading}
-            className="text-[11px] font-semibold bg-canvas-soft hover:bg-canvas-softer text-ink rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
+            className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Send Invoice
           </button>
           <button
             onClick={() => handleAdminAction('fraud')}
             disabled={actionLoading || trip.status === 'CANCELLED'}
-            className="text-[11px] font-semibold bg-canvas-soft hover:bg-canvas-softer text-ink rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
+            className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Mark Fraudulent
           </button>
           <button
             onClick={() => handleAdminAction('cancel')}
             disabled={actionLoading || trip.status === 'CANCELLED'}
-            className="text-[11px] font-semibold bg-ink hover:bg-black-elevated text-on-dark rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
+            className="text-[11px] font-semibold bg-content-primary hover:bg-gray-800 text-gray-0 rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Cancel & Refund
           </button>
@@ -316,10 +316,10 @@ export const TripDetail: React.FC = () => {
         <div className="lg:col-span-3 space-y-6">
           
           {/* Map Vector Polyline */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-            <div className="border-b border-canvas-soft px-4 py-3 flex justify-between items-center">
-              <span className="text-xs font-bold text-ink uppercase tracking-wider">Route Trajectory</span>
-              <span className="text-[10px] text-mute font-mono">H3 Cell: {trip.pickup_h3_cell}</span>
+          <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+            <div className="border-b border-background-secondary px-4 py-3 flex justify-between items-center">
+              <span className="text-xs font-bold text-content-primary uppercase tracking-wider">Route Trajectory</span>
+              <span className="text-[10px] text-content-tertiary font-mono">H3 Cell: {trip.pickup_h3_cell}</span>
             </div>
             <div className="h-72 relative">
               {mapData.hasGeo ? (
@@ -349,7 +349,7 @@ export const TripDetail: React.FC = () => {
                   )}
                 </MapContainer>
               ) : (
-                <div className="h-full bg-canvas-soft flex items-center justify-center text-xs text-mute">
+                <div className="h-full bg-background-secondary flex items-center justify-center text-xs text-content-tertiary">
                   No GPS breadcrumbs recorded for this trip.
                 </div>
               )}
@@ -357,21 +357,21 @@ export const TripDetail: React.FC = () => {
           </div>
 
           {/* Vertical Timeline Progress */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Trip Progression Timeline</h2>
-            <div className="relative border-l border-canvas-soft ml-3 pl-6 space-y-5 py-2">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Trip Progression Timeline</h2>
+            <div className="relative border-l border-background-secondary ml-3 pl-6 space-y-5 py-2">
               {timeline.map((event, idx) => (
                 <div key={event.event} className="relative">
                   {/* Step Dot */}
-                  <span className="absolute -left-[31px] top-1 bg-ink text-on-dark rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold border-2 border-canvas font-mono">
+                  <span className="absolute -left-[31px] top-1 bg-content-primary text-gray-0 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold border-2 border-background-primary font-mono">
                     {idx + 1}
                   </span>
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="text-xs font-bold text-ink">{event.event}</h4>
-                      <p className="text-[10px] text-mute mt-0.5">Status: <span className="capitalize">{event.status}</span></p>
+                      <h4 className="text-xs font-bold text-content-primary">{event.event}</h4>
+                      <p className="text-[10px] text-content-tertiary mt-0.5">Status: <span className="capitalize">{event.status}</span></p>
                     </div>
-                    <span className="text-[10px] text-mute font-mono bg-canvas-soft px-2 py-0.5 rounded-pill">
+                    <span className="text-[10px] text-content-tertiary font-mono bg-background-secondary px-2 py-0.5 rounded-pill">
                       {new Date(event.timestamp).toLocaleString()}
                     </span>
                   </div>
@@ -379,11 +379,11 @@ export const TripDetail: React.FC = () => {
               ))}
               {timeline.length < 8 && trip.status !== 'CANCELLED' && (
                 <div className="relative opacity-40">
-                  <span className="absolute -left-[31px] top-1 bg-canvas-soft text-body rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold border-2 border-canvas font-mono">
+                  <span className="absolute -left-[31px] top-1 bg-background-secondary text-content-secondary rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold border-2 border-background-primary font-mono">
                     {timeline.length + 1}
                   </span>
-                  <h4 className="text-xs font-medium text-body">Next Lifecycle Step</h4>
-                  <p className="text-[10px] text-mute mt-0.5">Pending system updates</p>
+                  <h4 className="text-xs font-medium text-content-secondary">Next Lifecycle Step</h4>
+                  <p className="text-[10px] text-content-tertiary mt-0.5">Pending system updates</p>
                 </div>
               )}
             </div>
@@ -392,50 +392,50 @@ export const TripDetail: React.FC = () => {
           {/* Connected Parties */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Rider Card */}
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-              <span className="text-[10px] font-bold text-mute uppercase tracking-wider block">Rider</span>
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+              <span className="text-[10px] font-bold text-content-tertiary uppercase tracking-wider block">Rider</span>
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-canvas-soft flex items-center justify-center font-bold text-ink">
+                <div className="w-10 h-10 rounded-full bg-background-secondary flex items-center justify-center font-bold text-content-primary">
                   R
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-ink">{rider.name}</h4>
-                  <p className="text-[11px] text-mute font-mono flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-content-primary">{rider.name}</h4>
+                  <p className="text-[11px] text-content-tertiary font-mono flex items-center gap-1.5">
                     {maskPhone(rider.phone)}
-                    <button onClick={() => copyText(rider.phone)} title="Copy phone" className="text-[10px] hover:text-ink">⧉</button>
+                    <button onClick={() => copyText(rider.phone)} title="Copy phone" className="text-[10px] hover:text-content-primary">⧉</button>
                   </p>
                 </div>
               </div>
-              <div className="border-t border-canvas-soft pt-2.5 flex justify-between text-[11px]">
-                <span className="text-mute">Customer ID</span>
-                <span className="font-mono text-ink font-semibold truncate max-w-[120px]">{rider.customer_id}</span>
+              <div className="border-t border-background-secondary pt-2.5 flex justify-between text-[11px]">
+                <span className="text-content-tertiary">Customer ID</span>
+                <span className="font-mono text-content-primary font-semibold truncate max-w-[120px]">{rider.customer_id}</span>
               </div>
               <div className="flex justify-between text-[11px]">
-                <span className="text-mute">Total Orders</span>
-                <span className="font-mono text-ink font-semibold">{rider.trip_count}</span>
+                <span className="text-content-tertiary">Total Orders</span>
+                <span className="font-mono text-content-primary font-semibold">{rider.trip_count}</span>
               </div>
             </div>
 
             {/* Driver Card */}
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-              <span className="text-[10px] font-bold text-mute uppercase tracking-wider block">Driver</span>
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+              <span className="text-[10px] font-bold text-content-tertiary uppercase tracking-wider block">Driver</span>
               {driver ? (
                 <>
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-canvas-soft flex items-center justify-center font-bold text-ink">
+                    <div className="w-10 h-10 rounded-full bg-background-secondary flex items-center justify-center font-bold text-content-primary">
                       D
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-ink">{driver.name}</h4>
-                      <p className="text-[11px] text-mute font-mono flex items-center gap-1.5">
+                      <h4 className="text-xs font-bold text-content-primary">{driver.name}</h4>
+                      <p className="text-[11px] text-content-tertiary font-mono flex items-center gap-1.5">
                         {maskPhone(driver.phone)}
-                        <button onClick={() => copyText(driver.phone)} title="Copy phone" className="text-[10px] hover:text-ink">⧉</button>
+                        <button onClick={() => copyText(driver.phone)} title="Copy phone" className="text-[10px] hover:text-content-primary">⧉</button>
                       </p>
                     </div>
                   </div>
-                  <div className="border-t border-canvas-soft pt-2.5 flex justify-between text-[11px]">
-                    <span className="text-mute">Verification</span>
-                    <span className="font-mono text-ink font-semibold">
+                  <div className="border-t border-background-secondary pt-2.5 flex justify-between text-[11px]">
+                    <span className="text-content-tertiary">Verification</span>
+                    <span className="font-mono text-content-primary font-semibold">
                       {driver.is_verified ? (
                         <span className="text-content-positive">Verified</span>
                       ) : (
@@ -444,37 +444,37 @@ export const TripDetail: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-mute">Platform Trips</span>
-                    <span className="font-mono text-ink font-semibold">{driver.trip_count}</span>
+                    <span className="text-content-tertiary">Platform Trips</span>
+                    <span className="font-mono text-content-primary font-semibold">{driver.trip_count}</span>
                   </div>
                 </>
               ) : (
                 <div className="h-full flex items-center justify-center text-center p-4">
-                  <span className="text-xs text-mute">No driver assigned to this order</span>
+                  <span className="text-xs text-content-tertiary">No driver assigned to this order</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Vehicle Info */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Vehicle Utilized</h2>
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Vehicle Utilized</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
               <div>
-                <span className="text-[10px] uppercase text-mute font-semibold">Model</span>
-                <span className="block text-xs font-bold text-ink mt-0.5">{vehicle.model}</span>
+                <span className="text-[10px] uppercase text-content-tertiary font-semibold">Model</span>
+                <span className="block text-xs font-bold text-content-primary mt-0.5">{vehicle.model}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase text-mute font-semibold">Classification</span>
-                <span className="block text-xs font-bold text-ink mt-0.5">{vehicle.type}</span>
+                <span className="text-[10px] uppercase text-content-tertiary font-semibold">Classification</span>
+                <span className="block text-xs font-bold text-content-primary mt-0.5">{vehicle.type}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase text-mute font-semibold">Plate Number</span>
-                <span className="block text-xs font-bold font-mono text-ink mt-0.5">{vehicle.plate}</span>
+                <span className="text-[10px] uppercase text-content-tertiary font-semibold">Plate Number</span>
+                <span className="block text-xs font-bold font-mono text-content-primary mt-0.5">{vehicle.plate}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase text-mute font-semibold">Transmission</span>
-                <span className="block text-xs font-bold text-ink mt-0.5">{vehicle.transmission}</span>
+                <span className="text-[10px] uppercase text-content-tertiary font-semibold">Transmission</span>
+                <span className="block text-xs font-bold text-content-primary mt-0.5">{vehicle.transmission}</span>
               </div>
             </div>
           </div>
@@ -485,44 +485,44 @@ export const TripDetail: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Fare Breakdown */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Fare Breakdown</h2>
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Fare Breakdown</h2>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-body">Base Fare</span>
-                <span className="font-mono text-ink">₹{fare_breakdown.base.toFixed(2)}</span>
+                <span className="text-content-secondary">Base Fare</span>
+                <span className="font-mono text-content-primary">₹{fare_breakdown.base.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-body">Distance Fare</span>
-                <span className="font-mono text-ink">₹{fare_breakdown.distance.toFixed(2)}</span>
+                <span className="text-content-secondary">Distance Fare</span>
+                <span className="font-mono text-content-primary">₹{fare_breakdown.distance.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-body">Time Fare</span>
-                <span className="font-mono text-ink">₹{fare_breakdown.time.toFixed(2)}</span>
+                <span className="text-content-secondary">Time Fare</span>
+                <span className="font-mono text-content-primary">₹{fare_breakdown.time.toFixed(2)}</span>
               </div>
               {fare_breakdown.surge > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-body">Surge Multiplier (x{trip.surge_multiplier})</span>
-                  <span className="font-mono text-ink">₹{fare_breakdown.surge.toFixed(2)}</span>
+                  <span className="text-content-secondary">Surge Multiplier (x{trip.surge_multiplier})</span>
+                  <span className="font-mono text-content-primary">₹{fare_breakdown.surge.toFixed(2)}</span>
                 </div>
               )}
               {fare_breakdown.care > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-body">D4M Care protection fee</span>
-                  <span className="font-mono text-ink">₹{fare_breakdown.care.toFixed(2)}</span>
+                  <span className="text-content-secondary">D4M Care protection fee</span>
+                  <span className="font-mono text-content-primary">₹{fare_breakdown.care.toFixed(2)}</span>
                 </div>
               )}
               {fare_breakdown.promo < 0 && (
                 <div className="flex justify-between">
-                  <span className="text-body">Promo applied ({trip.promo_applied})</span>
-                  <span className="font-mono text-ink">₹{fare_breakdown.promo.toFixed(2)}</span>
+                  <span className="text-content-secondary">Promo applied ({trip.promo_applied})</span>
+                  <span className="font-mono text-content-primary">₹{fare_breakdown.promo.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-body">GST tax (5%)</span>
-                <span className="font-mono text-ink">₹{fare_breakdown.tax.toFixed(2)}</span>
+                <span className="text-content-secondary">GST tax (5%)</span>
+                <span className="font-mono text-content-primary">₹{fare_breakdown.tax.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between border-t border-canvas-soft pt-2.5 font-bold text-sm text-ink">
+              <div className="flex justify-between border-t border-background-secondary pt-2.5 font-bold text-sm text-content-primary">
                 <span>Total Fare</span>
                 <span className="font-mono">₹{fare_breakdown.total.toFixed(2)}</span>
               </div>
@@ -530,16 +530,16 @@ export const TripDetail: React.FC = () => {
           </div>
 
           {/* Adjustments Form */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Adjustment Console</h2>
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Adjustment Console</h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Adjustment Type</label>
-                <div className="flex space-x-1 bg-canvas-soft p-0.5 rounded-pill border border-canvas-soft">
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Adjustment Type</label>
+                <div className="flex space-x-1 bg-background-secondary p-0.5 rounded-pill border border-background-secondary">
                   <button
                     onClick={() => setAdjustmentType('refund')}
                     className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
-                      adjustmentType === 'refund' ? 'bg-ink text-on-dark' : 'text-body hover:bg-canvas-softer/50'
+                      adjustmentType === 'refund' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
                     Refund
@@ -547,7 +547,7 @@ export const TripDetail: React.FC = () => {
                   <button
                     onClick={() => setAdjustmentType('waive')}
                     className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
-                      adjustmentType === 'waive' ? 'bg-ink text-on-dark' : 'text-body hover:bg-canvas-softer/50'
+                      adjustmentType === 'waive' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
                     Waive Fee
@@ -555,7 +555,7 @@ export const TripDetail: React.FC = () => {
                   <button
                     onClick={() => setAdjustmentType('bonus')}
                     className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
-                      adjustmentType === 'bonus' ? 'bg-ink text-on-dark' : 'text-body hover:bg-canvas-softer/50'
+                      adjustmentType === 'bonus' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
                     Add Bonus
@@ -563,21 +563,21 @@ export const TripDetail: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Amount (INR)</label>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Amount (INR)</label>
                 <input
                   type="text"
                   placeholder="₹0.00"
-                  className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
                   value={adjustmentAmt}
                   onChange={(e) => setAdjustmentAmt(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Reason (required, audited)</label>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Reason (required, audited)</label>
                 <input
                   type="text"
                   placeholder="e.g. Rider overcharged on surge"
-                  className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink"
+                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
                 />
@@ -585,7 +585,7 @@ export const TripDetail: React.FC = () => {
               <button
                 onClick={handleApplyAdjustment}
                 disabled={actionLoading}
-                className="w-full bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 hover:bg-black-elevated transition-colors disabled:opacity-40"
+                className="w-full bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 hover:bg-gray-800 transition-colors disabled:opacity-40"
               >
                 {actionLoading ? 'Applying…' : 'Apply Adjustment'}
               </button>
@@ -593,19 +593,19 @@ export const TripDetail: React.FC = () => {
           </div>
 
           {/* Payment Attempts */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Payment History</h2>
-            <div className="space-y-3 divide-y divide-canvas-soft">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Payment History</h2>
+            <div className="space-y-3 divide-y divide-background-secondary">
               {payment_attempts.map((attempt) => (
                 <div key={attempt.txn_id} className="pt-2.5 first:pt-0 flex justify-between items-start text-xs">
                   <div>
-                    <span className="font-mono block font-bold text-ink">{attempt.txn_id}</span>
-                    <span className="text-[10px] text-mute block mt-0.5">
+                    <span className="font-mono block font-bold text-content-primary">{attempt.txn_id}</span>
+                    <span className="text-[10px] text-content-tertiary block mt-0.5">
                       {new Date(attempt.timestamp).toLocaleString()} ({attempt.provider})
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="font-mono block text-ink font-semibold">₹{attempt.amount.toFixed(2)}</span>
+                    <span className="font-mono block text-content-primary font-semibold">₹{attempt.amount.toFixed(2)}</span>
                     <span
                       className={`text-[9px] uppercase font-bold tracking-wider ${
                         attempt.status === 'SUCCEEDED' ? 'text-content-positive' : 'text-content-negative'
@@ -621,17 +621,17 @@ export const TripDetail: React.FC = () => {
 
           {/* Issues */}
           {issues.length > 0 && (
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-              <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Associated Complaints</h2>
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+              <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Associated Complaints</h2>
               <div className="space-y-3">
                 {issues.map((issue) => (
-                  <div key={issue.id} className="bg-canvas-soft border border-canvas-soft rounded-lg p-3 space-y-1.5">
+                  <div key={issue.id} className="bg-background-secondary border border-background-secondary rounded-lg p-3 space-y-1.5">
                     <div className="flex justify-between items-center text-[10px] font-mono">
-                      <span className="font-bold text-ink">{issue.id}</span>
+                      <span className="font-bold text-content-primary">{issue.id}</span>
                       <span className="text-content-negative font-bold uppercase">{issue.severity}</span>
                     </div>
-                    <h4 className="text-xs font-bold text-ink">{issue.title}</h4>
-                    <div className="flex justify-between text-[10px] text-mute">
+                    <h4 className="text-xs font-bold text-content-primary">{issue.title}</h4>
+                    <div className="flex justify-between text-[10px] text-content-tertiary">
                       <span>Category: {issue.category}</span>
                       <span>Assignee: {issue.agent}</span>
                     </div>
@@ -642,17 +642,17 @@ export const TripDetail: React.FC = () => {
           )}
 
           {/* Audit Logs */}
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Audit logs</h2>
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Audit logs</h2>
             <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
               {audit_logs.map((logItem, idx) => (
                 <div key={idx} className="text-xs">
-                  <div className="flex justify-between text-[10px] text-mute font-mono">
+                  <div className="flex justify-between text-[10px] text-content-tertiary font-mono">
                     <span>{new Date(logItem.timestamp).toLocaleString()}</span>
                     <span>Actor: {logItem.actor}</span>
                   </div>
-                  <h4 className="font-bold text-ink mt-0.5">{logItem.action}</h4>
-                  <p className="text-[10px] text-body mt-0.5">{logItem.details}</p>
+                  <h4 className="font-bold text-content-primary mt-0.5">{logItem.action}</h4>
+                  <p className="text-[10px] text-content-secondary mt-0.5">{logItem.details}</p>
                 </div>
               ))}
             </div>
@@ -665,17 +665,17 @@ export const TripDetail: React.FC = () => {
       {/* ---- Reassign Driver Modal ---- */}
       {showReassignModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-sm w-full space-y-4 shadow-xl">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
             <div>
-              <h3 className="text-sm font-bold text-ink">Reassign Driver</h3>
-              <p className="text-xs text-mute mt-1">Search and assign another driver to this order</p>
+              <h3 className="text-sm font-bold text-content-primary">Reassign Driver</h3>
+              <p className="text-xs text-content-tertiary mt-1">Search and assign another driver to this order</p>
             </div>
             <div>
-              <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Driver UUID</label>
+              <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Driver UUID</label>
               <input
                 type="text"
                 placeholder="e.g. 5b1a5239-ab20-42d7-b50a-ea77419a84fb"
-                className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+                className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
                 value={reassignDriverId}
                 onChange={(e) => setReassignDriverId(e.target.value)}
               />
@@ -686,13 +686,13 @@ export const TripDetail: React.FC = () => {
                   setShowReassignModal(false);
                   setReassignDriverId('');
                 }}
-                className="text-xs text-body hover:text-ink px-3"
+                className="text-xs text-content-secondary hover:text-content-primary px-3"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReassignDriver}
-                className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
                 disabled={!reassignDriverId.trim()}
               >
                 Reassign

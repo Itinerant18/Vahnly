@@ -94,9 +94,9 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
       className={`relative h-[52px] w-full rounded-pill border select-none overflow-hidden ${
         confirmed
           ? tone === 'destructive'
-            ? 'bg-ink border-ink'
-            : 'bg-canvas-soft border-surface-pressed'
-          : 'bg-canvas-soft border-canvas-soft'
+            ? 'bg-content-primary border-content-primary'
+            : 'bg-background-secondary border-surface-pressed'
+          : 'bg-background-secondary border-background-secondary'
       } ${disabled ? 'opacity-40' : ''}`}
     >
       {/* Fill trail that grows behind the thumb */}
@@ -112,9 +112,9 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
         className={`absolute inset-0 flex items-center justify-center text-xs font-medium uppercase tracking-wider pointer-events-none ${
           confirmed
             ? tone === 'destructive'
-              ? 'text-on-dark'
-              : 'text-ink'
-            : 'text-body'
+              ? 'text-gray-0'
+              : 'text-content-primary'
+            : 'text-content-secondary'
         }`}
         style={{ opacity: confirmed ? 1 : 1 - pct * 0.8 }}
       >
@@ -144,13 +144,13 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
               onConfirm();
             }
           }}
-          className={`absolute top-1 left-1 h-[44px] w-[44px] rounded-full bg-ink flex items-center justify-center shadow-sm ${
+          className={`absolute top-1 left-1 h-[44px] w-[44px] rounded-full bg-content-primary flex items-center justify-center shadow-sm ${
             disabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'
           }`}
           style={{ transform: `translateX(${offset}px)`, transition: draggingRef.current ? 'none' : 'transform 160ms cubic-bezier(0.16,1,0.3,1)' }}
         >
           {/* Chevron primitive — no emoji */}
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-on-dark">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-gray-0">
             <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>

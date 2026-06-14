@@ -96,7 +96,7 @@ export const SettingsDashboard: React.FC = () => {
     <div className="p-6 flex gap-6 h-full">
       {/* Sidebar nav */}
       <div className="w-52 shrink-0 space-y-1">
-        <div className="text-xs font-semibold text-mute uppercase tracking-wide px-3 mb-3">Configuration</div>
+        <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide px-3 mb-3">Configuration</div>
         {defaultGroups.map(g => (
           <button
             key={g.key}
@@ -104,7 +104,7 @@ export const SettingsDashboard: React.FC = () => {
             className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
               activeGroup === g.key
                 ? 'bg-accent/10 text-accent font-medium'
-                : 'text-body hover:text-ink hover:bg-canvas-soft'
+                : 'text-content-secondary hover:text-content-primary hover:bg-background-secondary'
             }`}
           >
             {g.label}
@@ -115,8 +115,8 @@ export const SettingsDashboard: React.FC = () => {
       {/* Settings panel */}
       <div className="flex-1 space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-ink">{activeGroupData.label}</h1>
-          <p className="text-sm text-mute">{activeGroupData.description}</p>
+          <h1 className="text-xl font-bold text-content-primary">{activeGroupData.label}</h1>
+          <p className="text-sm text-content-tertiary">{activeGroupData.description}</p>
         </div>
 
         <div className="space-y-4">
@@ -125,16 +125,16 @@ export const SettingsDashboard: React.FC = () => {
             const val = values[vk];
 
             return (
-              <div key={s.key} className="bg-canvas rounded-xl border border-canvas-soft p-5 flex items-center justify-between gap-4">
+              <div key={s.key} className="bg-background-primary rounded-xl border border-background-secondary p-5 flex items-center justify-between gap-4">
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-ink">{s.label}</div>
-                  {s.description && <div className="text-xs text-mute mt-0.5">{s.description}</div>}
+                  <div className="text-sm font-medium text-content-primary">{s.label}</div>
+                  {s.description && <div className="text-xs text-content-tertiary mt-0.5">{s.description}</div>}
                 </div>
                 <div className="shrink-0">
                   {s.type === 'toggle' && (
                     <button
                       onClick={() => set(activeGroupData.key, s.key, !val)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${val ? 'bg-accent' : 'bg-canvas-soft'}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${val ? 'bg-accent' : 'bg-background-secondary'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${val ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
@@ -144,7 +144,7 @@ export const SettingsDashboard: React.FC = () => {
                       type="number"
                       value={String(val)}
                       onChange={e => set(activeGroupData.key, s.key, parseFloat(e.target.value))}
-                      className="w-28 border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink text-right focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="w-28 border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary text-right focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   )}
                   {s.type === 'text' && (
@@ -152,14 +152,14 @@ export const SettingsDashboard: React.FC = () => {
                       type="text"
                       value={String(val)}
                       onChange={e => set(activeGroupData.key, s.key, e.target.value)}
-                      className="w-56 border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="w-56 border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   )}
                   {s.type === 'select' && s.options && (
                     <select
                       value={String(val)}
                       onChange={e => set(activeGroupData.key, s.key, e.target.value)}
-                      className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
                     >
                       {s.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
@@ -178,7 +178,7 @@ export const SettingsDashboard: React.FC = () => {
             Save Changes
           </button>
           {saved && <span className="text-sm text-content-positive">✓ Settings saved</span>}
-          <span className="text-xs text-mute ml-auto">Some settings require a gateway restart to take effect.</span>
+          <span className="text-xs text-content-tertiary ml-auto">Some settings require a gateway restart to take effect.</span>
         </div>
       </div>
     </div>

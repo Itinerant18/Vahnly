@@ -50,9 +50,9 @@ function CheckpointCard({
   onAdjust: () => void;
 }) {
   return (
-    <div className="flex-1 bg-canvas-softer border border-canvas-soft rounded-xl p-4 space-y-2">
+    <div className="flex-1 bg-background-tertiary border border-background-secondary rounded-xl p-4 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider font-bold text-mute">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider font-bold text-content-tertiary">{label}</span>
         {cp && (
           <button type="button" onClick={onAdjust} className="text-[9px] text-content-accent hover:underline font-bold uppercase tracking-wider">
             Adjust
@@ -61,23 +61,23 @@ function CheckpointCard({
       </div>
       {cp ? (
         <>
-          <div className="font-mono font-bold text-ink text-lg">{cp.odometer_value.toLocaleString()} km</div>
-          <div className="text-[10px] text-body">Fuel: {cp.fuel_percentage}% · {new Date(cp.captured_at).toLocaleString()}</div>
+          <div className="font-mono font-bold text-content-primary text-lg">{cp.odometer_value.toLocaleString()} km</div>
+          <div className="text-[10px] text-content-secondary">Fuel: {cp.fuel_percentage}% · {new Date(cp.captured_at).toLocaleString()}</div>
           {cp.photo_url ? (
             <button type="button" onClick={() => onZoom(cp.photo_url)} className="block w-full">
               <img
                 src={cp.photo_url}
                 alt={`${label} odometer`}
-                className="mt-1 h-24 w-full object-cover rounded-md border border-canvas-soft hover:opacity-90 transition cursor-zoom-in"
+                className="mt-1 h-24 w-full object-cover rounded-md border border-background-secondary hover:opacity-90 transition cursor-zoom-in"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
             </button>
           ) : (
-            <div className="mt-1 h-24 w-full rounded-md border border-dashed border-canvas-soft flex items-center justify-center text-[10px] text-mute">No photo</div>
+            <div className="mt-1 h-24 w-full rounded-md border border-dashed border-background-secondary flex items-center justify-center text-[10px] text-content-tertiary">No photo</div>
           )}
         </>
       ) : (
-        <div className="py-6 text-center text-[10px] text-mute font-mono">Not captured</div>
+        <div className="py-6 text-center text-[10px] text-content-tertiary font-mono">Not captured</div>
       )}
     </div>
   );
@@ -152,10 +152,10 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
   };
 
   if (loading) {
-    return <div className="text-[11px] text-mute font-mono animate-pulse py-4">Loading odometer audit…</div>;
+    return <div className="text-[11px] text-content-tertiary font-mono animate-pulse py-4">Loading odometer audit…</div>;
   }
   if (!audit) {
-    return <div className="text-[11px] text-mute py-4">No odometer audit available for this trip.</div>;
+    return <div className="text-[11px] text-content-tertiary py-4">No odometer audit available for this trip.</div>;
   }
 
   const variance = audit.variance_pct;
@@ -166,9 +166,9 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
       : { cls: 'bg-surface-positive text-content-positive border-positive-400', text: `Variance ${variance?.toFixed(1)}% — balanced` };
 
   return (
-    <div className="border-t border-canvas-soft pt-4 mt-2 space-y-3">
+    <div className="border-t border-background-secondary pt-4 mt-2 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider font-bold text-mute">Odometer / mileage audit</span>
+        <span className="text-[10px] uppercase tracking-wider font-bold text-content-tertiary">Odometer / mileage audit</span>
         <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${badge.cls}`}>{badge.text}</span>
       </div>
 
@@ -185,17 +185,17 @@ export function OdometerVerificationPanel({ orderId, onAuditState }: Props) {
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-        <div className="bg-canvas-softer rounded-md p-2">
-          <div className="text-mute">Reported</div>
-          <div className="font-mono font-bold text-ink">{audit.reported_km != null ? `${audit.reported_km} km` : '—'}</div>
+        <div className="bg-background-tertiary rounded-md p-2">
+          <div className="text-content-tertiary">Reported</div>
+          <div className="font-mono font-bold text-content-primary">{audit.reported_km != null ? `${audit.reported_km} km` : '—'}</div>
         </div>
-        <div className="bg-canvas-softer rounded-md p-2">
-          <div className="text-mute">Expected (×{audit.road_factor})</div>
-          <div className="font-mono font-bold text-ink">{audit.expected_km} km</div>
+        <div className="bg-background-tertiary rounded-md p-2">
+          <div className="text-content-tertiary">Expected (×{audit.road_factor})</div>
+          <div className="font-mono font-bold text-content-primary">{audit.expected_km} km</div>
         </div>
-        <div className="bg-canvas-softer rounded-md p-2">
-          <div className="text-mute">Tolerance</div>
-          <div className="font-mono font-bold text-ink">±{audit.tolerance_pct}%</div>
+        <div className="bg-background-tertiary rounded-md p-2">
+          <div className="text-content-tertiary">Tolerance</div>
+          <div className="font-mono font-bold text-content-primary">±{audit.tolerance_pct}%</div>
         </div>
       </div>
 

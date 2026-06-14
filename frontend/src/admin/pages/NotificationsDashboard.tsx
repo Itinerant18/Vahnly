@@ -284,11 +284,11 @@ export function NotificationsDashboard() {
   ] as const;
 
   return (
-    <div className="flex flex-col h-full bg-canvas">
+    <div className="flex flex-col h-full bg-background-primary">
       {/* Header */}
       <div className="px-6 pt-5 pb-3 border-b border-border">
-        <h1 className="text-xl font-semibold text-ink">Notifications Center</h1>
-        <p className="text-sm text-mute mt-0.5">System alerts, routing rules, and delivery channel configuration</p>
+        <h1 className="text-xl font-semibold text-content-primary">Notifications Center</h1>
+        <p className="text-sm text-content-tertiary mt-0.5">System alerts, routing rules, and delivery channel configuration</p>
 
         {/* Stats bar */}
         {stats && (
@@ -298,10 +298,10 @@ export function NotificationsDashboard() {
                 <span>{stats.by_severity[s]} {s}</span>
               </div>
             ))}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-canvas-soft text-mute border border-border">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-background-secondary text-content-tertiary border border-border">
               {stats.fired_today} fired today · {stats.fired_this_week} this week
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-canvas-soft text-mute border border-border">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-background-secondary text-content-tertiary border border-border">
               {stats.active_rules}/{stats.total_rules} rules active
             </div>
           </div>
@@ -313,7 +313,7 @@ export function NotificationsDashboard() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-1.5 rounded-t text-sm font-medium transition ${tab === t.key ? 'bg-ink text-on-dark' : 'text-mute hover:text-ink hover:bg-canvas-soft'}`}
+              className={`px-4 py-1.5 rounded-t text-sm font-medium transition ${tab === t.key ? 'bg-content-primary text-gray-0' : 'text-content-tertiary hover:text-content-primary hover:bg-background-secondary'}`}
             >
               {t.label}
             </button>
@@ -328,15 +328,15 @@ export function NotificationsDashboard() {
           <div className="w-96 flex flex-col border-r border-border overflow-hidden">
             {/* Filters */}
             <div className="px-3 py-2 border-b border-border flex gap-2 flex-wrap">
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-canvas">
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-background-primary">
                 <option value="">All Status</option>
                 {['UNREAD','READ','ACKNOWLEDGED','RESOLVED'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-canvas">
+              <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-background-primary">
                 <option value="">All Severity</option>
                 {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <select value={filterType} onChange={e => setFilterType(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-canvas">
+              <select value={filterType} onChange={e => setFilterType(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-background-primary">
                 <option value="">All Types</option>
                 {ALERT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -355,13 +355,13 @@ export function NotificationsDashboard() {
             {/* Notification list */}
             <div className="flex-1 overflow-y-auto">
               {notifications.length === 0 && (
-                <div className="flex items-center justify-center h-full text-sm text-mute">No notifications</div>
+                <div className="flex items-center justify-center h-full text-sm text-content-tertiary">No notifications</div>
               )}
               {notifications.map(n => (
                 <div
                   key={n.id}
                   onClick={() => openNotif(n)}
-                  className={`flex items-start gap-2 px-3 py-3 border-b border-border cursor-pointer hover:bg-canvas-soft transition ${selectedNotif?.id === n.id ? 'bg-canvas-soft' : ''} ${n.status === 'UNREAD' ? 'bg-surface-accent/40' : ''}`}
+                  className={`flex items-start gap-2 px-3 py-3 border-b border-border cursor-pointer hover:bg-background-secondary transition ${selectedNotif?.id === n.id ? 'bg-background-secondary' : ''} ${n.status === 'UNREAD' ? 'bg-surface-accent/40' : ''}`}
                 >
                   <input
                     type="checkbox"
@@ -376,8 +376,8 @@ export function NotificationsDashboard() {
                       <SeverityBadge s={n.severity} />
                       <StatusBadge s={n.status} />
                     </div>
-                    <p className="text-xs font-medium text-ink truncate">{n.title}</p>
-                    <p className="text-[11px] text-mute mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+                    <p className="text-xs font-medium text-content-primary truncate">{n.title}</p>
+                    <p className="text-[11px] text-content-tertiary mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
@@ -387,7 +387,7 @@ export function NotificationsDashboard() {
           {/* Right: detail */}
           <div className="flex-1 overflow-y-auto p-6">
             {!selectedNotif ? (
-              <div className="flex flex-col items-center justify-center h-full text-mute">
+              <div className="flex flex-col items-center justify-center h-full text-content-tertiary">
                 <span className="text-4xl mb-3">🔔</span>
                 <p className="text-sm">Select a notification to view details</p>
               </div>
@@ -396,26 +396,26 @@ export function NotificationsDashboard() {
                 <div className="flex items-start gap-3 mb-4">
                   <span className="text-3xl">{ALERT_ICONS[selectedNotif.alert_type] ?? '🔔'}</span>
                   <div>
-                    <h2 className="text-base font-semibold text-ink">{selectedNotif.title}</h2>
+                    <h2 className="text-base font-semibold text-content-primary">{selectedNotif.title}</h2>
                     <div className="flex items-center gap-2 mt-1">
                       <SeverityBadge s={selectedNotif.severity} />
                       <StatusBadge s={selectedNotif.status} />
-                      <span className="text-xs text-mute">{new Date(selectedNotif.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-content-tertiary">{new Date(selectedNotif.created_at).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-sm text-ink mb-4">{selectedNotif.body}</p>
+                <p className="text-sm text-content-primary mb-4">{selectedNotif.body}</p>
 
                 {/* Metadata */}
-                <div className="bg-canvas-soft border border-border rounded p-3 mb-4">
-                  <p className="text-xs font-medium text-mute mb-2">Metadata</p>
-                  <pre className="text-xs font-mono text-ink overflow-x-auto">{JSON.stringify(selectedNotif.metadata, null, 2)}</pre>
+                <div className="bg-background-secondary border border-border rounded p-3 mb-4">
+                  <p className="text-xs font-medium text-content-tertiary mb-2">Metadata</p>
+                  <pre className="text-xs font-mono text-content-primary overflow-x-auto">{JSON.stringify(selectedNotif.metadata, null, 2)}</pre>
                 </div>
 
                 {/* Delivery status */}
                 <div className="mb-4">
-                  <p className="text-xs font-medium text-mute mb-2">Delivery Status</p>
+                  <p className="text-xs font-medium text-content-tertiary mb-2">Delivery Status</p>
                   <div className="flex gap-2 flex-wrap">
                     {Object.entries(selectedNotif.delivery_status ?? {}).map(([ch, st]) => (
                       <span key={ch} className={`px-2 py-1 rounded text-xs font-medium ${st === 'SENT' ? 'bg-surface-positive text-content-positive' : st === 'FAILED' ? 'bg-surface-negative text-content-negative' : 'bg-background-secondary text-content-secondary'}`}>
@@ -448,12 +448,12 @@ export function NotificationsDashboard() {
       {tab === 'rules' && (
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-ink">Alert Rules</h2>
+            <h2 className="text-base font-semibold text-content-primary">Alert Rules</h2>
             <div className="flex gap-2">
               <select
                 onChange={e => e.target.value && simulate(e.target.value)}
                 defaultValue=""
-                className="text-xs border border-border rounded px-2 py-1.5 bg-canvas text-mute"
+                className="text-xs border border-border rounded px-2 py-1.5 bg-background-primary text-content-tertiary"
               >
                 <option value="">🧪 Simulate alert…</option>
                 {ALERT_TYPES.map(t => <option key={t} value={t}>{ALERT_ICONS[t]} {t}</option>)}
@@ -463,7 +463,7 @@ export function NotificationsDashboard() {
 
           <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
-              <thead className="bg-canvas-soft border-b border-border text-xs text-mute">
+              <thead className="bg-background-secondary border-b border-border text-xs text-content-tertiary">
                 <tr>
                   <th className="text-left px-4 py-2.5">Alert Type</th>
                   <th className="text-left px-4 py-2.5">Severity</th>
@@ -477,30 +477,30 @@ export function NotificationsDashboard() {
               </thead>
               <tbody>
                 {rules.map(rule => (
-                  <tr key={rule.id} className="border-b border-border hover:bg-canvas-soft">
+                  <tr key={rule.id} className="border-b border-border hover:bg-background-secondary">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{ALERT_ICONS[rule.alert_type] ?? '🔔'}</span>
                         <div>
-                          <p className="font-medium text-ink text-xs">{rule.name}</p>
-                          <p className="text-[10px] text-mute">{rule.alert_type}</p>
+                          <p className="font-medium text-content-primary text-xs">{rule.name}</p>
+                          <p className="text-[10px] text-content-tertiary">{rule.alert_type}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3"><SeverityBadge s={rule.severity} /></td>
-                    <td className="px-4 py-3 text-xs text-mute">
+                    <td className="px-4 py-3 text-xs text-content-tertiary">
                       {rule.threshold_value != null ? `${rule.threshold_value} ${rule.threshold_unit}` : '—'}
                       {rule.window_minutes > 0 && <span className="block text-[10px]">{rule.window_minutes} min window</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
                         {(rule.channels ?? []).map(ch => (
-                          <span key={ch} className="px-1.5 py-0.5 bg-canvas-soft border border-border rounded text-[10px] text-ink">{ch}</span>
+                          <span key={ch} className="px-1.5 py-0.5 bg-background-secondary border border-border rounded text-[10px] text-content-primary">{ch}</span>
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-mute text-center">{rule.recipient_count}</td>
-                    <td className="px-4 py-3 text-xs text-mute">
+                    <td className="px-4 py-3 text-xs text-content-tertiary text-center">{rule.recipient_count}</td>
+                    <td className="px-4 py-3 text-xs text-content-tertiary">
                       {rule.last_fired_at ? new Date(rule.last_fired_at).toLocaleString() : 'Never'}
                       <span className="block text-[10px]">{rule.fired_count} total</span>
                     </td>
@@ -519,37 +519,37 @@ export function NotificationsDashboard() {
           {/* Edit rule modal */}
           {editingRule && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-              <div className="bg-canvas rounded-lg shadow-xl w-full max-w-md p-6">
-                <h3 className="font-semibold text-ink mb-4">{ALERT_ICONS[editingRule.alert_type]} Edit: {editingRule.name}</h3>
+              <div className="bg-background-primary rounded-lg shadow-xl w-full max-w-md p-6">
+                <h3 className="font-semibold text-content-primary mb-4">{ALERT_ICONS[editingRule.alert_type]} Edit: {editingRule.name}</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-mute block mb-1">Severity</label>
+                    <label className="text-xs text-content-tertiary block mb-1">Severity</label>
                     <select value={editingRule.severity} onChange={e => setEditingRule({ ...editingRule, severity: e.target.value })} className="w-full text-sm border border-border rounded px-2 py-1.5">
                       {['LOW','MEDIUM','HIGH','CRITICAL'].map(s => <option key={s}>{s}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-xs text-mute block mb-1">Threshold Value</label>
+                      <label className="text-xs text-content-tertiary block mb-1">Threshold Value</label>
                       <input type="number" value={editingRule.threshold_value ?? ''} onChange={e => setEditingRule({ ...editingRule, threshold_value: parseFloat(e.target.value) || undefined })} className="w-full text-sm border border-border rounded px-2 py-1.5" />
                     </div>
                     <div>
-                      <label className="text-xs text-mute block mb-1">Unit</label>
+                      <label className="text-xs text-content-tertiary block mb-1">Unit</label>
                       <input value={editingRule.threshold_unit} onChange={e => setEditingRule({ ...editingRule, threshold_unit: e.target.value })} className="w-full text-sm border border-border rounded px-2 py-1.5" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-xs text-mute block mb-1">Window (min)</label>
+                      <label className="text-xs text-content-tertiary block mb-1">Window (min)</label>
                       <input type="number" value={editingRule.window_minutes} onChange={e => setEditingRule({ ...editingRule, window_minutes: parseInt(e.target.value) || 0 })} className="w-full text-sm border border-border rounded px-2 py-1.5" />
                     </div>
                     <div>
-                      <label className="text-xs text-mute block mb-1">Cooldown (min)</label>
+                      <label className="text-xs text-content-tertiary block mb-1">Cooldown (min)</label>
                       <input type="number" value={editingRule.cooldown_minutes} onChange={e => setEditingRule({ ...editingRule, cooldown_minutes: parseInt(e.target.value) || 0 })} className="w-full text-sm border border-border rounded px-2 py-1.5" />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-mute block mb-1">Channels</label>
+                    <label className="text-xs text-content-tertiary block mb-1">Channels</label>
                     <div className="flex gap-2">
                       {CHANNELS.map(ch => (
                         <label key={ch} className="flex items-center gap-1.5 text-xs cursor-pointer">
@@ -564,8 +564,8 @@ export function NotificationsDashboard() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={saveRule} className="flex-1 bg-ink text-on-dark text-sm py-1.5 rounded font-medium hover:bg-ink/90">Save</button>
-                  <button onClick={() => setEditingRule(null)} className="px-4 text-sm py-1.5 border border-border rounded text-mute hover:bg-canvas-soft">Cancel</button>
+                  <button onClick={saveRule} className="flex-1 bg-content-primary text-gray-0 text-sm py-1.5 rounded font-medium hover:bg-content-primary/90">Save</button>
+                  <button onClick={() => setEditingRule(null)} className="px-4 text-sm py-1.5 border border-border rounded text-content-tertiary hover:bg-background-secondary">Cancel</button>
                 </div>
               </div>
             </div>
@@ -576,10 +576,10 @@ export function NotificationsDashboard() {
       {/* Tab: Recipients */}
       {tab === 'recipients' && (
         <div className="flex-1 overflow-y-auto p-6 max-w-2xl">
-          <h2 className="text-base font-semibold text-ink mb-4">Manage Recipients</h2>
+          <h2 className="text-base font-semibold text-content-primary mb-4">Manage Recipients</h2>
           <div className="mb-4">
-            <label className="text-xs text-mute block mb-1">Select Alert Rule</label>
-            <select value={selectedRuleId} onChange={e => setSelectedRuleId(e.target.value)} className="w-full text-sm border border-border rounded px-3 py-2 bg-canvas">
+            <label className="text-xs text-content-tertiary block mb-1">Select Alert Rule</label>
+            <select value={selectedRuleId} onChange={e => setSelectedRuleId(e.target.value)} className="w-full text-sm border border-border rounded px-3 py-2 bg-background-primary">
               <option value="">— choose a rule —</option>
               {rules.map(r => <option key={r.id} value={r.id}>{ALERT_ICONS[r.alert_type]} {r.name}</option>)}
             </select>
@@ -589,7 +589,7 @@ export function NotificationsDashboard() {
             <>
               <div className="rounded border border-border overflow-hidden mb-4">
                 <table className="w-full text-sm">
-                  <thead className="bg-canvas-soft border-b border-border text-xs text-mute">
+                  <thead className="bg-background-secondary border-b border-border text-xs text-content-tertiary">
                     <tr>
                       <th className="text-left px-4 py-2.5">Email</th>
                       <th className="text-left px-4 py-2.5">Phone</th>
@@ -599,13 +599,13 @@ export function NotificationsDashboard() {
                   </thead>
                   <tbody>
                     {recipients.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-4 text-center text-xs text-mute">No recipients configured</td></tr>
+                      <tr><td colSpan={4} className="px-4 py-4 text-center text-xs text-content-tertiary">No recipients configured</td></tr>
                     )}
                     {recipients.map(rec => (
                       <tr key={rec.id} className="border-b border-border">
                         <td className="px-4 py-2.5 text-xs">{rec.email}</td>
-                        <td className="px-4 py-2.5 text-xs text-mute">{rec.phone || '—'}</td>
-                        <td className="px-4 py-2.5 text-xs text-mute">{rec.slack_user_id || '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.phone || '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.slack_user_id || '—'}</td>
                         <td className="px-4 py-2.5">
                           <button onClick={() => removeRecipient(rec.id)} className="text-xs text-content-negative hover:underline">Remove</button>
                         </td>
@@ -615,14 +615,14 @@ export function NotificationsDashboard() {
                 </table>
               </div>
 
-              <div className="border border-border rounded p-4 bg-canvas-soft">
-                <p className="text-xs font-medium text-ink mb-3">Add Recipient</p>
+              <div className="border border-border rounded p-4 bg-background-secondary">
+                <p className="text-xs font-medium text-content-primary mb-3">Add Recipient</p>
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <input placeholder="Email *" value={newRecip.email} onChange={e => setNewRecip({ ...newRecip, email: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-canvas" />
-                  <input placeholder="Phone" value={newRecip.phone} onChange={e => setNewRecip({ ...newRecip, phone: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-canvas" />
-                  <input placeholder="Slack @user or ID" value={newRecip.slack_user_id} onChange={e => setNewRecip({ ...newRecip, slack_user_id: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-canvas" />
+                  <input placeholder="Email *" value={newRecip.email} onChange={e => setNewRecip({ ...newRecip, email: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
+                  <input placeholder="Phone" value={newRecip.phone} onChange={e => setNewRecip({ ...newRecip, phone: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
+                  <input placeholder="Slack @user or ID" value={newRecip.slack_user_id} onChange={e => setNewRecip({ ...newRecip, slack_user_id: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
                 </div>
-                <button onClick={addRecipient} disabled={!newRecip.email} className="px-4 py-1.5 bg-ink text-on-dark text-sm rounded disabled:opacity-50 font-medium hover:bg-ink/90">
+                <button onClick={addRecipient} disabled={!newRecip.email} className="px-4 py-1.5 bg-content-primary text-gray-0 text-sm rounded disabled:opacity-50 font-medium hover:bg-content-primary/90">
                   Add Recipient
                 </button>
               </div>
@@ -634,7 +634,7 @@ export function NotificationsDashboard() {
       {/* Tab: Channels */}
       {tab === 'channels' && (
         <div className="flex-1 overflow-y-auto p-6">
-          <h2 className="text-base font-semibold text-ink mb-4">Delivery Channel Configuration</h2>
+          <h2 className="text-base font-semibold text-content-primary mb-4">Delivery Channel Configuration</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {channels.map(ch => {
               const edit = channelEdits[ch.channel] ?? {};
@@ -648,9 +648,9 @@ export function NotificationsDashboard() {
               const fields = channelFields[ch.channel] ?? [];
 
               return (
-                <div key={ch.channel} className={`border rounded-lg p-5 bg-canvas ${isEnabled ? 'border-positive-400' : 'border-border'}`}>
+                <div key={ch.channel} className={`border rounded-lg p-5 bg-background-primary ${isEnabled ? 'border-positive-400' : 'border-border'}`}>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-ink text-sm">{channelLabels[ch.channel] ?? ch.channel}</h3>
+                    <h3 className="font-semibold text-content-primary text-sm">{channelLabels[ch.channel] ?? ch.channel}</h3>
                     <Toggle
                       checked={isEnabled}
                       onChange={() => setChannelEdits(prev => ({ ...prev, [ch.channel]: { ...prev[ch.channel], is_enabled: !isEnabled } }))}
@@ -659,22 +659,22 @@ export function NotificationsDashboard() {
                   <div className="space-y-2.5 mb-4">
                     {fields.map(f => (
                       <div key={f.key}>
-                        <label className="text-[10px] text-mute block mb-0.5">{f.label}</label>
+                        <label className="text-[10px] text-content-tertiary block mb-0.5">{f.label}</label>
                         <input
                           type={f.type ?? 'text'}
                           value={(edit[f.key] as string | number) ?? ''}
                           onChange={e => setChannelEdits(prev => ({ ...prev, [ch.channel]: { ...prev[ch.channel], [f.key]: e.target.value } }))}
-                          className="w-full text-xs border border-border rounded px-2 py-1.5 bg-canvas font-mono"
+                          className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background-primary font-mono"
                         />
                       </div>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => saveChannel(ch.channel)} className="flex-1 bg-ink text-on-dark text-xs py-1.5 rounded font-medium hover:bg-ink/90">Save</button>
-                    <button onClick={() => testChannel(ch.channel)} className="px-3 text-xs py-1.5 border border-border rounded text-mute hover:bg-canvas-soft">Test</button>
+                    <button onClick={() => saveChannel(ch.channel)} className="flex-1 bg-content-primary text-gray-0 text-xs py-1.5 rounded font-medium hover:bg-content-primary/90">Save</button>
+                    <button onClick={() => testChannel(ch.channel)} className="px-3 text-xs py-1.5 border border-border rounded text-content-tertiary hover:bg-background-secondary">Test</button>
                   </div>
                   {ch.updated_at && (
-                    <p className="text-[10px] text-mute mt-2">Last updated: {new Date(ch.updated_at).toLocaleString()}</p>
+                    <p className="text-[10px] text-content-tertiary mt-2">Last updated: {new Date(ch.updated_at).toLocaleString()}</p>
                   )}
                 </div>
               );

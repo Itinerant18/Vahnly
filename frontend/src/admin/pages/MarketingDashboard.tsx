@@ -627,15 +627,15 @@ export const MarketingDashboard: React.FC = () => {
 	};
 
 	return (
-		<div className="w-full h-full flex flex-col bg-canvas text-ink font-sans">
+		<div className="w-full h-full flex flex-col bg-background-primary text-content-primary font-sans">
 			{/* ---- Header ---- */}
-			<header className="h-[72px] min-h-[72px] border-b border-canvas-soft flex justify-between items-center px-6 bg-canvas">
+			<header className="h-[72px] min-h-[72px] border-b border-background-secondary flex justify-between items-center px-6 bg-background-primary">
 				<div className="flex items-center gap-6">
-					<h1 className="text-xl font-bold tracking-tight text-ink flex items-center gap-2">
+					<h1 className="text-xl font-bold tracking-tight text-content-primary flex items-center gap-2">
 						Campaigns & Marketing Console
-						{loading && <span className="text-xs text-mute font-normal animate-pulse">(syncing...)</span>}
+						{loading && <span className="text-xs text-content-tertiary font-normal animate-pulse">(syncing...)</span>}
 					</h1>
-					<nav className="flex bg-canvas-softer p-1 rounded-pill-tab">
+					<nav className="flex bg-background-tertiary p-1 rounded-pill-tab">
 						{([
 							{ key: 'CAMPAIGNS', label: 'Campaign Builder' },
 							{ key: 'SEGMENTS', label: 'Audience Segments' },
@@ -650,7 +650,7 @@ export const MarketingDashboard: React.FC = () => {
 									setActiveAnalyticsId(null);
 								}}
 								className={`px-4 py-1.5 rounded-pill text-xs font-semibold tracking-wide transition ${
-									activeTab === tab.key ? 'bg-canvas text-ink shadow-sm' : 'text-body hover:text-ink'
+									activeTab === tab.key ? 'bg-background-primary text-content-primary shadow-sm' : 'text-content-secondary hover:text-content-primary'
 								}`}
 							>
 								{tab.label}
@@ -666,32 +666,32 @@ export const MarketingDashboard: React.FC = () => {
 				{activeTab === 'CAMPAIGNS' && (
 					<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
 						{/* Left / Center: Campaign Builder Form */}
-						<div className="xl:col-span-1 bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm">
-							<div className="border-b border-canvas-soft pb-2">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body">Create Campaign Blast</h2>
-								<p className="text-[10px] text-mute">Design multi-variant A/B campaign options.</p>
+						<div className="xl:col-span-1 bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm">
+							<div className="border-b border-background-secondary pb-2">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Create Campaign Blast</h2>
+								<p className="text-[10px] text-content-tertiary">Design multi-variant A/B campaign options.</p>
 							</div>
 
-							<form onSubmit={submitCampaign} className="space-y-4 text-xs text-body">
+							<form onSubmit={submitCampaign} className="space-y-4 text-xs text-content-secondary">
 								<div className="space-y-1">
-									<label className="block text-[10px] uppercase font-bold text-mute">Campaign Name</label>
+									<label className="block text-[10px] uppercase font-bold text-content-tertiary">Campaign Name</label>
 									<input
 										type="text"
 										required
 										placeholder="e.g. BLR Weekend Off"
 										value={newCampaign.name}
 										onChange={e => setNewCampaign({ ...newCampaign, name: e.target.value })}
-										className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-semibold"
+										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-semibold"
 									/>
 								</div>
 
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Target Audience Segment</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Target Audience Segment</label>
 										<select
 											value={newCampaign.segment_id}
 											onChange={e => setNewCampaign({ ...newCampaign, segment_id: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="">All Segment Users</option>
 											{segments.map(s => (
@@ -700,11 +700,11 @@ export const MarketingDashboard: React.FC = () => {
 										</select>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Delivery Channel</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Delivery Channel</label>
 										<select
 											value={newCampaign.channel}
 											onChange={e => setNewCampaign({ ...newCampaign, channel: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="PUSH">Push Notification</option>
 											<option value="SMS">SMS Message</option>
@@ -717,11 +717,11 @@ export const MarketingDashboard: React.FC = () => {
 
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Schedule Type</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Schedule Type</label>
 										<select
 											value={newCampaign.schedule_type}
 											onChange={e => setNewCampaign({ ...newCampaign, schedule_type: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="IMMEDIATE">Immediate Blast</option>
 											<option value="SCHEDULED">Scheduled Date/Time</option>
@@ -732,38 +732,38 @@ export const MarketingDashboard: React.FC = () => {
 
 									{newCampaign.schedule_type === 'SCHEDULED' && (
 										<div className="space-y-1">
-											<label className="block text-[10px] uppercase font-bold text-mute">Schedule Time</label>
+											<label className="block text-[10px] uppercase font-bold text-content-tertiary">Schedule Time</label>
 											<input
 												type="datetime-local"
 												required
 												value={newCampaign.schedule_time}
 												onChange={e => setNewCampaign({ ...newCampaign, schedule_time: e.target.value })}
-												className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono"
+												className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono"
 											/>
 										</div>
 									)}
 
 									{newCampaign.schedule_type === 'RECURRING' && (
 										<div className="space-y-1">
-											<label className="block text-[10px] uppercase font-bold text-mute">Cron Expression</label>
+											<label className="block text-[10px] uppercase font-bold text-content-tertiary">Cron Expression</label>
 											<input
 												type="text"
 												required
 												placeholder="0 9 * * 1-5"
 												value={newCampaign.recurrence_cron}
 												onChange={e => setNewCampaign({ ...newCampaign, recurrence_cron: e.target.value })}
-												className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-mono"
+												className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-mono"
 											/>
 										</div>
 									)}
 
 									{newCampaign.schedule_type === 'TRIGGER_BASED' && (
 										<div className="space-y-1">
-											<label className="block text-[10px] uppercase font-bold text-mute">Trigger Event Code</label>
+											<label className="block text-[10px] uppercase font-bold text-content-tertiary">Trigger Event Code</label>
 											<select
 												value={newCampaign.trigger_event}
 												onChange={e => setNewCampaign({ ...newCampaign, trigger_event: e.target.value })}
-												className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+												className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 											>
 												<option value="">Select Event...</option>
 												<option value="USER_SIGNUP">User Signup Complete</option>
@@ -775,24 +775,24 @@ export const MarketingDashboard: React.FC = () => {
 								</div>
 
 								{/* A/B Test Variant Section */}
-								<div className="border-t border-canvas-soft pt-3 space-y-3">
+								<div className="border-t border-background-secondary pt-3 space-y-3">
 									<div className="flex justify-between items-center">
-										<label className="block text-[10px] uppercase font-bold text-mute">A/B Split Test Variants</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">A/B Split Test Variants</label>
 										<button
 											type="button"
 											onClick={addFormVariant}
-											className="text-[10px] font-bold text-ink underline"
+											className="text-[10px] font-bold text-content-primary underline"
 										>
 											+ Add Variant
 										</button>
 									</div>
 
 									{newCampaignVariants.map((v, idx) => (
-										<div key={idx} className="p-3 bg-canvas-softer rounded-lg border border-canvas-soft space-y-2">
+										<div key={idx} className="p-3 bg-background-tertiary rounded-lg border border-background-secondary space-y-2">
 											<div className="flex justify-between items-center">
-												<span className="font-bold font-mono text-[10px] text-ink">{v.name}</span>
+												<span className="font-bold font-mono text-[10px] text-content-primary">{v.name}</span>
 												<div className="flex items-center gap-1">
-													<label className="text-[9px] text-mute uppercase font-bold">Weight:</label>
+													<label className="text-[9px] text-content-tertiary uppercase font-bold">Weight:</label>
 													<input
 														type="number"
 														step="0.05"
@@ -801,7 +801,7 @@ export const MarketingDashboard: React.FC = () => {
 														required
 														value={v.weight}
 														onChange={e => updateFormVariant(idx, 'weight', parseFloat(e.target.value))}
-														className="w-12 h-6 rounded bg-canvas border border-canvas-soft text-center font-mono font-bold"
+														className="w-12 h-6 rounded bg-background-primary border border-background-secondary text-center font-mono font-bold"
 													/>
 												</div>
 											</div>
@@ -812,14 +812,14 @@ export const MarketingDashboard: React.FC = () => {
 													placeholder="Title Template / Subject line"
 													value={v.content.title_template || ''}
 													onChange={e => updateFormVariant(idx, 'title_template', e.target.value)}
-													className="w-full h-7 rounded bg-canvas border border-canvas-soft px-2 font-semibold"
+													className="w-full h-7 rounded bg-background-primary border border-background-secondary px-2 font-semibold"
 												/>
 												<textarea
 													required
 													placeholder="Body Template / Message content"
 													value={v.content.body_template || ''}
 													onChange={e => updateFormVariant(idx, 'body_template', e.target.value)}
-													className="w-full h-12 rounded bg-canvas border border-canvas-soft p-2 font-semibold resize-none"
+													className="w-full h-12 rounded bg-background-primary border border-background-secondary p-2 font-semibold resize-none"
 												/>
 											</div>
 										</div>
@@ -827,43 +827,43 @@ export const MarketingDashboard: React.FC = () => {
 								</div>
 
 								{/* Throttling & Quiet Hours */}
-								<div className="border-t border-canvas-soft pt-3 grid grid-cols-3 gap-2">
+								<div className="border-t border-background-secondary pt-3 grid grid-cols-3 gap-2">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Throttle limit/hr</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Throttle limit/hr</label>
 										<input
 											type="number"
 											value={newCampaign.throttling_limit}
 											onChange={e => setNewCampaign({ ...newCampaign, throttling_limit: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono font-bold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono font-bold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Quiet Start (hr)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Quiet Start (hr)</label>
 										<input
 											type="number"
 											min="0"
 											max="23"
 											value={newCampaign.quiet_hours_start}
 											onChange={e => setNewCampaign({ ...newCampaign, quiet_hours_start: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Quiet End (hr)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Quiet End (hr)</label>
 										<input
 											type="number"
 											min="0"
 											max="23"
 											value={newCampaign.quiet_hours_end}
 											onChange={e => setNewCampaign({ ...newCampaign, quiet_hours_end: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono"
 										/>
 									</div>
 								</div>
 
 								<button
 									type="submit"
-									className="w-full bg-ink text-on-dark text-xs font-bold py-2 rounded-md hover:bg-black-elevated transition shadow-sm active:scale-[0.97]"
+									className="w-full bg-content-primary text-gray-0 text-xs font-bold py-2 rounded-md hover:bg-gray-800 transition shadow-sm active:scale-[0.97]"
 								>
 									🚀 Register Campaign (Draft)
 								</button>
@@ -872,12 +872,12 @@ export const MarketingDashboard: React.FC = () => {
 
 						{/* Right: Active Campaigns & Analytics Queue */}
 						<div className="xl:col-span-2 space-y-4">
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">Campaign Registry & Performance</h2>
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Campaign Registry & Performance</h2>
 								
-								<div className="divide-y divide-canvas-soft">
+								<div className="divide-y divide-background-secondary">
 									{campaigns.length === 0 ? (
-										<div className="p-12 text-center text-xs text-mute font-semibold select-none">No campaigns built yet</div>
+										<div className="p-12 text-center text-xs text-content-tertiary font-semibold select-none">No campaigns built yet</div>
 									) : (
 										campaigns.map(c => {
 											const isAnalyticsOpen = activeAnalyticsId === c.id;
@@ -886,27 +886,27 @@ export const MarketingDashboard: React.FC = () => {
 													<div className="flex justify-between items-start">
 														<div className="space-y-1">
 															<div className="flex items-center gap-2">
-																<h3 className="text-sm font-bold text-ink">{c.name}</h3>
+																<h3 className="text-sm font-bold text-content-primary">{c.name}</h3>
 																<span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border ${
 																	c.status === 'ACTIVE' 
 																		? 'bg-surface-positive text-content-positive border-positive-400' 
 																		: c.status === 'PAUSED' 
 																		? 'bg-surface-warning text-content-warning border-warning-400'
-																		: 'bg-canvas-soft text-mute border-canvas-soft'
+																		: 'bg-background-secondary text-content-tertiary border-background-secondary'
 																}`}>
 																	{c.status}
 																</span>
 															</div>
-															<p className="text-[10px] text-mute font-mono">
-																Channel: <span className="text-ink font-semibold">{c.channel}</span> | 
-																Segment: <span className="text-ink font-semibold">{c.segment_name || 'All Users'}</span> | 
-																Type: <span className="text-ink font-semibold">{c.schedule_type}</span>
+															<p className="text-[10px] text-content-tertiary font-mono">
+																Channel: <span className="text-content-primary font-semibold">{c.channel}</span> | 
+																Segment: <span className="text-content-primary font-semibold">{c.segment_name || 'All Users'}</span> | 
+																Type: <span className="text-content-primary font-semibold">{c.schedule_type}</span>
 															</p>
 														</div>
 														<div className="flex items-center gap-2 text-[10px] font-bold">
 															<button
 																onClick={() => viewCampaignAnalytics(c.id)}
-																className="bg-canvas-soft border border-canvas-soft hover:border-ink px-2.5 py-1 rounded transition"
+																className="bg-background-secondary border border-background-secondary hover:border-content-primary px-2.5 py-1 rounded transition"
 															>
 																{isAnalyticsOpen ? 'Hide Metrics 📊' : 'View Metrics 📊'}
 															</button>
@@ -930,10 +930,10 @@ export const MarketingDashboard: React.FC = () => {
 
 													{/* Variant Analytics dropdown */}
 													{isAnalyticsOpen && (
-														<div className="bg-canvas-softer rounded-lg border border-canvas-soft p-4 space-y-4 animate-fade-in text-xs">
+														<div className="bg-background-tertiary rounded-lg border border-background-secondary p-4 space-y-4 animate-fade-in text-xs">
 															<div className="flex justify-between items-center">
-																<h4 className="font-bold text-ink uppercase tracking-wider text-[10px]">A/B Test Live Conversion Metrics</h4>
-																<span className="text-[9px] text-mute uppercase font-mono">Click to inject test conversions</span>
+																<h4 className="font-bold text-content-primary uppercase tracking-wider text-[10px]">A/B Test Live Conversion Metrics</h4>
+																<span className="text-[9px] text-content-tertiary uppercase font-mono">Click to inject test conversions</span>
 															</div>
 															
 															<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -944,31 +944,31 @@ export const MarketingDashboard: React.FC = () => {
 																	const bookingRate = metric.clicked > 0 ? ((metric.booking / metric.clicked) * 100).toFixed(1) : '0';
 
 																	return (
-																		<div key={v.id || idx} className="bg-canvas border border-canvas-soft p-3 rounded-lg space-y-2">
-																			<div className="flex justify-between items-center border-b border-canvas-soft pb-1">
-																				<span className="font-bold text-ink text-[11px]">{v.name} ({Math.round(v.weight * 100)}% weight)</span>
+																		<div key={v.id || idx} className="bg-background-primary border border-background-secondary p-3 rounded-lg space-y-2">
+																			<div className="flex justify-between items-center border-b border-background-secondary pb-1">
+																				<span className="font-bold text-content-primary text-[11px]">{v.name} ({Math.round(v.weight * 100)}% weight)</span>
 																				<div className="flex gap-1">
 																					<button
 																						onClick={() => simulateConversion(c.id, v.id || 0, 'DELIVERED')}
-																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold"
+																						className="text-[8px] uppercase bg-background-secondary border px-1 rounded font-bold"
 																					>
 																						Deliv
 																					</button>
 																					<button
 																						onClick={() => simulateConversion(c.id, v.id || 0, 'OPENED')}
-																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold"
+																						className="text-[8px] uppercase bg-background-secondary border px-1 rounded font-bold"
 																					>
 																						Open
 																					</button>
 																					<button
 																						onClick={() => simulateConversion(c.id, v.id || 0, 'CLICKED')}
-																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold"
+																						className="text-[8px] uppercase bg-background-secondary border px-1 rounded font-bold"
 																					>
 																						Click
 																					</button>
 																					<button
 																						onClick={() => simulateConversion(c.id, v.id || 0, 'BOOKING')}
-																						className="text-[8px] uppercase bg-canvas-soft border px-1 rounded font-bold text-content-positive"
+																						className="text-[8px] uppercase bg-background-secondary border px-1 rounded font-bold text-content-positive"
 																					>
 																						Book
 																					</button>
@@ -976,21 +976,21 @@ export const MarketingDashboard: React.FC = () => {
 																			</div>
 
 																			<div className="grid grid-cols-4 gap-1 text-center font-mono text-[10px]">
-																				<div className="bg-canvas-softer p-1 rounded">
-																					<span className="block font-bold text-ink">{metric.delivered}</span>
-																					<span className="text-[8px] text-mute uppercase">Deliv</span>
+																				<div className="bg-background-tertiary p-1 rounded">
+																					<span className="block font-bold text-content-primary">{metric.delivered}</span>
+																					<span className="text-[8px] text-content-tertiary uppercase">Deliv</span>
 																				</div>
-																				<div className="bg-canvas-softer p-1 rounded">
-																					<span className="block font-bold text-ink">{metric.opened}</span>
-																					<span className="text-[8px] text-mute uppercase">Opens ({openRate}%)</span>
+																				<div className="bg-background-tertiary p-1 rounded">
+																					<span className="block font-bold text-content-primary">{metric.opened}</span>
+																					<span className="text-[8px] text-content-tertiary uppercase">Opens ({openRate}%)</span>
 																				</div>
-																				<div className="bg-canvas-softer p-1 rounded">
-																					<span className="block font-bold text-ink">{metric.clicked}</span>
-																					<span className="text-[8px] text-mute uppercase">Clicks ({clickRate}%)</span>
+																				<div className="bg-background-tertiary p-1 rounded">
+																					<span className="block font-bold text-content-primary">{metric.clicked}</span>
+																					<span className="text-[8px] text-content-tertiary uppercase">Clicks ({clickRate}%)</span>
 																				</div>
-																				<div className="bg-canvas-softer p-1 rounded">
-																					<span className="block font-bold text-ink text-content-positive">{metric.booking}</span>
-																					<span className="text-[8px] text-mute uppercase">Book ({bookingRate}%)</span>
+																				<div className="bg-background-tertiary p-1 rounded">
+																					<span className="block font-bold text-content-primary text-content-positive">{metric.booking}</span>
+																					<span className="text-[8px] text-content-tertiary uppercase">Book ({bookingRate}%)</span>
 																				</div>
 																			</div>
 																		</div>
@@ -1013,66 +1013,66 @@ export const MarketingDashboard: React.FC = () => {
 				{activeTab === 'SEGMENTS' && (
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 						{/* Audience Segmentation Engine */}
-						<div className="lg:col-span-1 bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm text-xs">
-							<div className="border-b border-canvas-soft pb-2">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body">Audience Query Filters</h2>
-								<p className="text-[10px] text-mute">Set parameters to filter rider or driver targets</p>
+						<div className="lg:col-span-1 bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm text-xs">
+							<div className="border-b border-background-secondary pb-2">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Audience Query Filters</h2>
+								<p className="text-[10px] text-content-tertiary">Set parameters to filter rider or driver targets</p>
 							</div>
 
-							<div className="space-y-3 text-body">
+							<div className="space-y-3 text-content-secondary">
 								<div className="grid grid-cols-2 gap-2">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Target City</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Target City</label>
 										<input
 											type="text"
 											placeholder="Kolkata"
 											value={estimatorFilters.city}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, city: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-semibold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Min Trips Completed</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Min Trips Completed</label>
 										<input
 											type="number"
 											placeholder="10"
 											value={estimatorFilters.min_trips}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, min_trips: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono font-bold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono font-bold"
 										/>
 									</div>
 								</div>
 
 								<div className="grid grid-cols-2 gap-2">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Last Active (Max Days)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Last Active (Max Days)</label>
 										<input
 											type="number"
 											placeholder="30"
 											value={estimatorFilters.last_active_days}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, last_active_days: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Minimum LTV (₹)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Minimum LTV (₹)</label>
 										<input
 											type="number"
 											placeholder="1000"
 											value={estimatorFilters.min_ltv}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, min_ltv: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono"
 										/>
 									</div>
 								</div>
 
 								<div className="grid grid-cols-2 gap-2">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Car Type Owned</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Car Type Owned</label>
 										<select
 											value={estimatorFilters.car_type}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, car_type: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="">Any type...</option>
 											<option value="Hatchback">Hatchback</option>
@@ -1082,11 +1082,11 @@ export const MarketingDashboard: React.FC = () => {
 										</select>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Transmission Type</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Transmission Type</label>
 										<select
 											value={estimatorFilters.transmission}
 											onChange={e => setEstimatorFilters({ ...estimatorFilters, transmission: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="">Any transmission...</option>
 											<option value="MANUAL">MANUAL</option>
@@ -1100,14 +1100,14 @@ export const MarketingDashboard: React.FC = () => {
 										type="button"
 										onClick={runEstimateSize}
 										disabled={estimating}
-										className="flex-1 bg-canvas-soft hover:bg-canvas-softer border border-canvas-soft text-ink font-bold py-2 rounded-md transition disabled:opacity-50"
+										className="flex-1 bg-background-secondary hover:bg-background-tertiary border border-background-secondary text-content-primary font-bold py-2 rounded-md transition disabled:opacity-50"
 									>
 										{estimating ? 'Calculating...' : 'Estimate Size'}
 									</button>
 									<button
 										type="button"
 										onClick={() => setShowSaveSegmentModal(true)}
-										className="flex-1 bg-ink text-on-dark font-bold py-2 rounded-md hover:bg-black-elevated transition"
+										className="flex-1 bg-content-primary text-gray-0 font-bold py-2 rounded-md hover:bg-gray-800 transition"
 									>
 										💾 Save Segment
 									</button>
@@ -1123,35 +1123,35 @@ export const MarketingDashboard: React.FC = () => {
 						</div>
 
 						{/* Saved Audience segments list */}
-						<div className="lg:col-span-2 bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4 text-xs">
-							<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">Saved Segments Registry</h2>
+						<div className="lg:col-span-2 bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4 text-xs">
+							<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Saved Segments Registry</h2>
 							
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{segments.map(s => (
-									<div key={s.id} className="p-4 bg-canvas-softer border border-canvas-soft rounded-xl space-y-3 flex flex-col justify-between">
+									<div key={s.id} className="p-4 bg-background-tertiary border border-background-secondary rounded-xl space-y-3 flex flex-col justify-between">
 										<div className="space-y-1">
 											<div className="flex justify-between items-start">
-												<h3 className="font-bold text-ink text-sm">{s.name}</h3>
+												<h3 className="font-bold text-content-primary text-sm">{s.name}</h3>
 												<button
 													onClick={() => deleteSegment(s.id)}
-													className="text-status-alert text-[10px] hover:underline"
+													className="text-status-negative text-[10px] hover:underline"
 												>
 													Delete
 												</button>
 											</div>
-											<p className="text-body text-[11px]">{s.description || 'No description'}</p>
+											<p className="text-content-secondary text-[11px]">{s.description || 'No description'}</p>
 										</div>
 
-										<div className="bg-canvas border border-canvas-soft p-2.5 rounded-lg font-mono text-[9px] text-mute space-y-1 leading-relaxed">
-											<span className="font-bold uppercase text-[8px] text-body block mb-1">Filters Applied:</span>
+										<div className="bg-background-primary border border-background-secondary p-2.5 rounded-lg font-mono text-[9px] text-content-tertiary space-y-1 leading-relaxed">
+											<span className="font-bold uppercase text-[8px] text-content-secondary block mb-1">Filters Applied:</span>
 											{Object.entries(s.filters).map(([k, v]) => (
-												<div key={k}>{k}: <span className="text-ink font-semibold">{JSON.stringify(v)}</span></div>
+												<div key={k}>{k}: <span className="text-content-primary font-semibold">{JSON.stringify(v)}</span></div>
 											))}
 										</div>
 
 										<div className="flex justify-between items-center text-[10px] pt-1">
-											<span className="font-mono font-extrabold text-ink bg-canvas border border-canvas-soft px-2 py-0.5 rounded-md">Size: ~{s.size} users</span>
-											<span className="text-mute">{new Date(s.created_at).toLocaleDateString()}</span>
+											<span className="font-mono font-extrabold text-content-primary bg-background-primary border border-background-secondary px-2 py-0.5 rounded-md">Size: ~{s.size} users</span>
+											<span className="text-content-tertiary">{new Date(s.created_at).toLocaleDateString()}</span>
 										</div>
 									</div>
 								))}
@@ -1164,66 +1164,66 @@ export const MarketingDashboard: React.FC = () => {
 				{activeTab === 'BANNERS' && (
 					<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
 						{/* In-app banner creator */}
-						<div className="xl:col-span-1 bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm text-xs">
-							<div className="border-b border-canvas-soft pb-2">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body">New In-App Placement</h2>
-								<p className="text-[10px] text-mute">Broadcast banner promotions directly inside the user app</p>
+						<div className="xl:col-span-1 bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm text-xs">
+							<div className="border-b border-background-secondary pb-2">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">New In-App Placement</h2>
+								<p className="text-[10px] text-content-tertiary">Broadcast banner promotions directly inside the user app</p>
 							</div>
 
-							<form onSubmit={submitBanner} className="space-y-4 text-body">
+							<form onSubmit={submitBanner} className="space-y-4 text-content-secondary">
 								<div className="space-y-1">
-									<label className="block text-[10px] uppercase font-bold text-mute">Banner Title</label>
+									<label className="block text-[10px] uppercase font-bold text-content-tertiary">Banner Title</label>
 									<input
 										type="text"
 										required
 										placeholder="e.g. Safe Ride Pledge"
 										value={newBanner.title}
 										onChange={e => setNewBanner({ ...newBanner, title: e.target.value })}
-										className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-semibold"
+										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-semibold"
 									/>
 								</div>
 
 								<div className="space-y-1">
-									<label className="block text-[10px] uppercase font-bold text-mute">Banner Body Text</label>
+									<label className="block text-[10px] uppercase font-bold text-content-tertiary">Banner Body Text</label>
 									<textarea
 										required
 										placeholder="Details about discount or info..."
 										value={newBanner.body}
 										onChange={e => setNewBanner({ ...newBanner, body: e.target.value })}
-										className="w-full h-16 rounded bg-canvas-soft border border-canvas-soft p-2.5 focus:outline-none focus:border-ink font-semibold resize-none"
+										className="w-full h-16 rounded bg-background-secondary border border-background-secondary p-2.5 focus:outline-none focus:border-content-primary font-semibold resize-none"
 									/>
 								</div>
 
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Image URL</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Image URL</label>
 										<input
 											type="text"
 											placeholder="https://aws.s3/banner.png"
 											value={newBanner.image_url}
 											onChange={e => setNewBanner({ ...newBanner, image_url: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Deep Link Redirect</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Deep Link Redirect</label>
 										<input
 											type="text"
 											placeholder="d4m://promos/SURE_RIDE"
 											value={newBanner.deep_link}
 											onChange={e => setNewBanner({ ...newBanner, deep_link: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3"
 										/>
 									</div>
 								</div>
 
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Placement Location</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Placement Location</label>
 										<select
 											value={newBanner.placement}
 											onChange={e => setNewBanner({ ...newBanner, placement: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="HOME_SCREEN">Home Screen</option>
 											<option value="BOOKING_CONFIRM">Booking Confirm Panel</option>
@@ -1231,11 +1231,11 @@ export const MarketingDashboard: React.FC = () => {
 										</select>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Target Segment</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Target Segment</label>
 										<select
 											value={newBanner.segment_id}
 											onChange={e => setNewBanner({ ...newBanner, segment_id: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
 										>
 											<option value="">All Users</option>
 											{segments.map(s => (
@@ -1247,30 +1247,30 @@ export const MarketingDashboard: React.FC = () => {
 
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">Start Date</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">Start Date</label>
 										<input
 											type="datetime-local"
 											required
 											value={newBanner.start_time}
 											onChange={e => setNewBanner({ ...newBanner, start_time: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[10px] uppercase font-bold text-mute">End Date</label>
+										<label className="block text-[10px] uppercase font-bold text-content-tertiary">End Date</label>
 										<input
 											type="datetime-local"
 											required
 											value={newBanner.end_time}
 											onChange={e => setNewBanner({ ...newBanner, end_time: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono"
 										/>
 									</div>
 								</div>
 
 								<button
 									type="submit"
-									className="w-full bg-ink text-on-dark text-xs font-bold py-2 rounded-md hover:bg-black-elevated transition shadow-sm active:scale-[0.97]"
+									className="w-full bg-content-primary text-gray-0 text-xs font-bold py-2 rounded-md hover:bg-gray-800 transition shadow-sm active:scale-[0.97]"
 								>
 									🚀 Publish Banner Card
 								</button>
@@ -1278,36 +1278,36 @@ export const MarketingDashboard: React.FC = () => {
 						</div>
 
 						{/* In-app banner list */}
-						<div className="xl:col-span-2 bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4 text-xs">
-							<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">Active In-App Broadcasts</h2>
+						<div className="xl:col-span-2 bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4 text-xs">
+							<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Active In-App Broadcasts</h2>
 							
 							<div className="space-y-4">
 								{banners.map(b => (
-									<div key={b.id} className="p-4 bg-canvas-softer border border-canvas-soft rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+									<div key={b.id} className="p-4 bg-background-tertiary border border-background-secondary rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 										<div className="space-y-2">
 											<div className="flex items-center gap-2">
-												<h3 className="font-bold text-ink text-sm">{b.title}</h3>
-												<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-canvas border border-canvas-soft">{b.placement}</span>
+												<h3 className="font-bold text-content-primary text-sm">{b.title}</h3>
+												<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-background-primary border border-background-secondary">{b.placement}</span>
 												{b.segment_name && (
 													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-positive0/10 text-content-positive border border-positive-400/20">{b.segment_name}</span>
 												)}
 											</div>
-											<p className="text-body font-mono text-[11px] leading-relaxed max-w-xl">"{b.body}"</p>
-											{b.deep_link && <p className="text-[10px] text-mute font-mono">Link: {b.deep_link}</p>}
-											<p className="text-[9px] text-mute font-mono">
+											<p className="text-content-secondary font-mono text-[11px] leading-relaxed max-w-xl">"{b.body}"</p>
+											{b.deep_link && <p className="text-[10px] text-content-tertiary font-mono">Link: {b.deep_link}</p>}
+											<p className="text-[9px] text-content-tertiary font-mono">
 												Active: {new Date(b.start_time).toLocaleString()} - {new Date(b.end_time).toLocaleString()}
 											</p>
 										</div>
 
 										<div className="flex items-center gap-2">
 											<span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-												b.status === 'ACTIVE' ? 'bg-surface-positive0/10 text-content-positive border border-positive-400/20' : 'bg-canvas-soft text-mute border border-canvas-soft'
+												b.status === 'ACTIVE' ? 'bg-surface-positive0/10 text-content-positive border border-positive-400/20' : 'bg-background-secondary text-content-tertiary border border-background-secondary'
 											}`}>
 												{b.status}
 											</span>
 											<button
 												onClick={() => toggleBannerStatus(b.id, b.status)}
-												className="bg-canvas border border-canvas-soft hover:border-ink font-bold px-2.5 py-1 rounded transition"
+												className="bg-background-primary border border-background-secondary hover:border-content-primary font-bold px-2.5 py-1 rounded transition"
 											>
 												Toggle Status
 											</button>
@@ -1325,63 +1325,63 @@ export const MarketingDashboard: React.FC = () => {
 						{/* Template Creators columns */}
 						<div className="space-y-6 xl:col-span-1">
 							{/* Push template creator */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm text-xs">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">New Push Notification Template</h2>
-								<form onSubmit={submitPushTemplate} className="space-y-3 text-body">
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm text-xs">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">New Push Notification Template</h2>
+								<form onSubmit={submitPushTemplate} className="space-y-3 text-content-secondary">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Template Name</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Template Name</label>
 										<input
 											type="text"
 											required
 											placeholder="Promo Push"
 											value={newPushTemplate.name}
 											onChange={e => setNewPushTemplate({ ...newPushTemplate, name: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-semibold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Title Template</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Title Template</label>
 										<input
 											type="text"
 											required
 											placeholder="Hey {first_name}!"
 											value={newPushTemplate.title_template}
 											onChange={e => setNewPushTemplate({ ...newPushTemplate, title_template: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-semibold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Body Template</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Body Template</label>
 										<textarea
 											required
 											placeholder="Enjoy {discount}% discount today."
 											value={newPushTemplate.body_template}
 											onChange={e => setNewPushTemplate({ ...newPushTemplate, body_template: e.target.value })}
-											className="w-full h-12 rounded bg-canvas-soft border border-canvas-soft p-2 focus:outline-none focus:border-ink font-semibold resize-none"
+											className="w-full h-12 rounded bg-background-secondary border border-background-secondary p-2 focus:outline-none focus:border-content-primary font-semibold resize-none"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Variables (comma separated)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Variables (comma separated)</label>
 										<input
 											type="text"
 											placeholder="first_name, discount"
 											value={newPushTemplate.variables}
 											onChange={e => setNewPushTemplate({ ...newPushTemplate, variables: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-mono"
 										/>
 									</div>
-									<button type="submit" className="w-full bg-ink text-on-dark font-bold py-1.5 rounded-md hover:bg-black-elevated transition">
+									<button type="submit" className="w-full bg-content-primary text-gray-0 font-bold py-1.5 rounded-md hover:bg-gray-800 transition">
 										Create Push Template
 									</button>
 								</form>
 							</div>
 
 							{/* DLT SMS Template creator */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm text-xs">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">DLT SMS Registry (TRAI India)</h2>
-								<form onSubmit={submitSMSTemplate} className="space-y-3 text-body">
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm text-xs">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">DLT SMS Registry (TRAI India)</h2>
+								<form onSubmit={submitSMSTemplate} className="space-y-3 text-content-secondary">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">DLT Sender ID (6-char headers)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">DLT Sender ID (6-char headers)</label>
 										<input
 											type="text"
 											required
@@ -1389,83 +1389,83 @@ export const MarketingDashboard: React.FC = () => {
 											placeholder="DFUSMS"
 											value={newSmsTemplate.sender_id}
 											onChange={e => setNewSmsTemplate({ ...newSmsTemplate, sender_id: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono font-bold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono font-bold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">DLT Template ID</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">DLT Template ID</label>
 										<input
 											type="text"
 											required
 											placeholder="1407161234567890123"
 											value={newSmsTemplate.dlt_template_id}
 											onChange={e => setNewSmsTemplate({ ...newSmsTemplate, dlt_template_id: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono font-bold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono font-bold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">DLT Approved Template Content</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">DLT Approved Template Content</label>
 										<textarea
 											required
 											placeholder="Your OTP is {#var#}. Use it to verify."
 											value={newSmsTemplate.approved_content}
 											onChange={e => setNewSmsTemplate({ ...newSmsTemplate, approved_content: e.target.value })}
-											className="w-full h-16 rounded bg-canvas-soft border border-canvas-soft p-2 focus:outline-none focus:border-ink font-semibold resize-none"
+											className="w-full h-16 rounded bg-background-secondary border border-background-secondary p-2 focus:outline-none focus:border-content-primary font-semibold resize-none"
 										/>
 									</div>
-									<button type="submit" className="w-full bg-ink text-on-dark font-bold py-1.5 rounded-md hover:bg-black-elevated transition">
+									<button type="submit" className="w-full bg-content-primary text-gray-0 font-bold py-1.5 rounded-md hover:bg-gray-800 transition">
 										Register DLT Template
 									</button>
 								</form>
 							</div>
 
 							{/* HTML Email template creator */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm text-xs">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">HTML Email Editor</h2>
-								<form onSubmit={submitEmailTemplate} className="space-y-3 text-body">
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm text-xs">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">HTML Email Editor</h2>
+								<form onSubmit={submitEmailTemplate} className="space-y-3 text-content-secondary">
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Template Name</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Template Name</label>
 										<input
 											type="text"
 											required
 											placeholder="Welcome Email"
 											value={newEmailTemplate.name}
 											onChange={e => setNewEmailTemplate({ ...newEmailTemplate, name: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Subject Line</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Subject Line</label>
 										<input
 											type="text"
 											required
 											placeholder="Welcome to Drivers-for-u!"
 											value={newEmailTemplate.subject}
 											onChange={e => setNewEmailTemplate({ ...newEmailTemplate, subject: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-semibold"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">HTML Source Content</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">HTML Source Content</label>
 										<textarea
 											required
 											placeholder="<html>..."
 											value={newEmailTemplate.html_content}
 											onChange={e => setNewEmailTemplate({ ...newEmailTemplate, html_content: e.target.value })}
-											className="w-full h-32 rounded bg-canvas-soft border border-canvas-soft p-2 focus:outline-none focus:border-ink font-mono resize-none"
+											className="w-full h-32 rounded bg-background-secondary border border-background-secondary p-2 focus:outline-none focus:border-content-primary font-mono resize-none"
 										/>
 									</div>
 									<div className="space-y-1">
-										<label className="block text-[9px] uppercase font-bold text-mute">Variables (comma separated)</label>
+										<label className="block text-[9px] uppercase font-bold text-content-tertiary">Variables (comma separated)</label>
 										<input
 											type="text"
 											placeholder="first_name"
 											value={newEmailTemplate.variables}
 											onChange={e => setNewEmailTemplate({ ...newEmailTemplate, variables: e.target.value })}
-											className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-mono"
+											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-mono"
 										/>
 									</div>
-									<button type="submit" className="w-full bg-ink text-on-dark font-bold py-1.5 rounded-md hover:bg-black-elevated transition">
+									<button type="submit" className="w-full bg-content-primary text-gray-0 font-bold py-1.5 rounded-md hover:bg-gray-800 transition">
 										Create Email Template
 									</button>
 								</form>
@@ -1475,22 +1475,22 @@ export const MarketingDashboard: React.FC = () => {
 						{/* Right columns: Lists of templates */}
 						<div className="space-y-6 xl:col-span-2 text-xs">
 							{/* Push templates list */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">Push Templates</h2>
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Push Templates</h2>
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{pushTemplates.map(t => (
-										<div key={t.id} className="p-3 bg-canvas-softer border border-canvas-soft rounded-lg space-y-2">
+										<div key={t.id} className="p-3 bg-background-tertiary border border-background-secondary rounded-lg space-y-2">
 											<div className="flex justify-between items-center">
-												<span className="font-bold text-ink font-mono">{t.name}</span>
-												<span className="text-[9px] text-mute font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
+												<span className="font-bold text-content-primary font-mono">{t.name}</span>
+												<span className="text-[9px] text-content-tertiary font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
 											</div>
-											<div className="bg-canvas border border-canvas-soft p-2 rounded text-[11px] font-mono leading-relaxed">
-												<span className="block font-bold text-ink">Title: {t.title_template}</span>
-												<span className="block text-body mt-1">Body: {t.body_template}</span>
+											<div className="bg-background-primary border border-background-secondary p-2 rounded text-[11px] font-mono leading-relaxed">
+												<span className="block font-bold text-content-primary">Title: {t.title_template}</span>
+												<span className="block text-content-secondary mt-1">Body: {t.body_template}</span>
 											</div>
 											<div className="flex flex-wrap gap-1">
 												{t.variables.map(v => (
-													<span key={v} className="bg-canvas border border-canvas-soft text-mute px-1.5 py-0.5 rounded font-mono text-[9px]">
+													<span key={v} className="bg-background-primary border border-background-secondary text-content-tertiary px-1.5 py-0.5 rounded font-mono text-[9px]">
 														{`{${v}}`}
 													</span>
 												))}
@@ -1501,21 +1501,21 @@ export const MarketingDashboard: React.FC = () => {
 							</div>
 
 							{/* DLT SMS templates list */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">DLT SMS Templates</h2>
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">DLT SMS Templates</h2>
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{smsTemplates.map(t => (
-										<div key={t.id} className="p-3 bg-canvas-softer border border-canvas-soft rounded-lg space-y-2">
+										<div key={t.id} className="p-3 bg-background-tertiary border border-background-secondary rounded-lg space-y-2">
 											<div className="flex justify-between items-center text-[10px] font-mono">
-												<span className="font-bold text-ink">Sender: {t.sender_id}</span>
-												<span className="text-mute">DLT: {t.dlt_template_id}</span>
+												<span className="font-bold text-content-primary">Sender: {t.sender_id}</span>
+												<span className="text-content-tertiary">DLT: {t.dlt_template_id}</span>
 											</div>
-											<p className="p-2.5 bg-canvas border border-canvas-soft rounded text-[11px] font-mono leading-relaxed">
+											<p className="p-2.5 bg-background-primary border border-background-secondary rounded text-[11px] font-mono leading-relaxed">
 												"{t.approved_content}"
 											</p>
 											<div className="flex justify-between items-center text-[9px]">
 												<span className="text-content-positive bg-surface-positive0/10 border border-positive-400/20 px-1 rounded font-bold uppercase">{t.status}</span>
-												<span className="text-mute font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
+												<span className="text-content-tertiary font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
 											</div>
 										</div>
 									))}
@@ -1523,19 +1523,19 @@ export const MarketingDashboard: React.FC = () => {
 							</div>
 
 							{/* Email Templates list */}
-							<div className="bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">HTML Email Templates</h2>
+							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">HTML Email Templates</h2>
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{emailTemplates.map(t => (
-										<div key={t.id} className="p-3 bg-canvas-softer border border-canvas-soft rounded-lg space-y-2">
+										<div key={t.id} className="p-3 bg-background-tertiary border border-background-secondary rounded-lg space-y-2">
 											<div className="flex justify-between items-center">
-												<span className="font-bold text-ink font-mono">{t.name}</span>
-												<span className="text-[9px] text-mute font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
+												<span className="font-bold text-content-primary font-mono">{t.name}</span>
+												<span className="text-[9px] text-content-tertiary font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
 											</div>
-											<div className="bg-canvas border border-canvas-soft p-2 rounded text-[11px] font-mono">
-												<span className="block font-bold text-ink">Subject: {t.subject}</span>
+											<div className="bg-background-primary border border-background-secondary p-2 rounded text-[11px] font-mono">
+												<span className="block font-bold text-content-primary">Subject: {t.subject}</span>
 											</div>
-											<div className="h-16 overflow-y-auto border border-canvas-soft bg-canvas rounded p-2 text-[9px] font-mono text-mute whitespace-pre-wrap">
+											<div className="h-16 overflow-y-auto border border-background-secondary bg-background-primary rounded p-2 text-[9px] font-mono text-content-tertiary whitespace-pre-wrap">
 												{t.html_content}
 											</div>
 										</div>
@@ -1550,40 +1550,40 @@ export const MarketingDashboard: React.FC = () => {
 				{activeTab === 'DOMAINS' && (
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start text-xs">
 						{/* Domain Creator */}
-						<div className="lg:col-span-1 bg-canvas border border-canvas-soft rounded-xl p-5 space-y-4 shadow-sm">
-							<div className="border-b border-canvas-soft pb-2">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-body">Add Sending Domain</h2>
-								<p className="text-[10px] text-mute">Register your sender domains to setup SPF, DKIM and DMARC verification.</p>
+						<div className="lg:col-span-1 bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4 shadow-sm">
+							<div className="border-b border-background-secondary pb-2">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Add Sending Domain</h2>
+								<p className="text-[10px] text-content-tertiary">Register your sender domains to setup SPF, DKIM and DMARC verification.</p>
 							</div>
 
-							<form onSubmit={submitDomain} className="space-y-4 text-body">
+							<form onSubmit={submitDomain} className="space-y-4 text-content-secondary">
 								<div className="space-y-1">
-									<label className="block text-[10px] uppercase font-bold text-mute">Domain Name</label>
+									<label className="block text-[10px] uppercase font-bold text-content-tertiary">Domain Name</label>
 									<input
 										type="text"
 										required
 										placeholder="e.g. notifications.driversforu.com"
 										value={newDomain.domain}
 										onChange={e => setNewDomain({ ...newDomain, domain: e.target.value })}
-										className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 focus:outline-none focus:border-ink font-mono font-bold"
+										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono font-bold"
 									/>
 								</div>
-								<button type="submit" className="w-full bg-ink text-on-dark font-bold py-2 rounded-md hover:bg-black-elevated transition shadow-sm active:scale-[0.97]">
+								<button type="submit" className="w-full bg-content-primary text-gray-0 font-bold py-2 rounded-md hover:bg-gray-800 transition shadow-sm active:scale-[0.97]">
 									Register Domain Header
 								</button>
 							</form>
 						</div>
 
 						{/* Domain list */}
-						<div className="lg:col-span-2 bg-canvas border border-canvas-soft rounded-xl p-5 shadow-sm space-y-4">
-							<h2 className="text-xs font-bold uppercase tracking-wider text-body border-b border-canvas-soft pb-2">Verified Sender Domain Registry</h2>
+						<div className="lg:col-span-2 bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
+							<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Verified Sender Domain Registry</h2>
 							
 							<div className="space-y-4">
 								{domains.map(d => (
-									<div key={d.id} className="p-4 bg-canvas-softer border border-canvas-soft rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+									<div key={d.id} className="p-4 bg-background-tertiary border border-background-secondary rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 										<div className="space-y-2">
 											<div className="flex items-center gap-2">
-												<h3 className="font-bold text-ink text-sm font-mono">{d.domain}</h3>
+												<h3 className="font-bold text-content-primary text-sm font-mono">{d.domain}</h3>
 												{d.verified ? (
 													<span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-positive0/10 text-content-positive border border-positive-400/20">Verified</span>
 												) : (
@@ -1592,12 +1592,12 @@ export const MarketingDashboard: React.FC = () => {
 											</div>
 											
 											<div className="grid grid-cols-2 gap-4 text-[10px] font-mono">
-												<div className="bg-canvas border border-canvas-soft px-3 py-1.5 rounded flex justify-between items-center w-48">
-													<span className="text-mute font-bold uppercase text-[8px]">DKIM:</span>
+												<div className="bg-background-primary border border-background-secondary px-3 py-1.5 rounded flex justify-between items-center w-48">
+													<span className="text-content-tertiary font-bold uppercase text-[8px]">DKIM:</span>
 													<span className={d.dkim_status === 'VERIFIED' ? 'text-content-positive font-bold' : 'text-content-warning font-bold'}>{d.dkim_status}</span>
 												</div>
-												<div className="bg-canvas border border-canvas-soft px-3 py-1.5 rounded flex justify-between items-center w-48">
-													<span className="text-mute font-bold uppercase text-[8px]">SPF:</span>
+												<div className="bg-background-primary border border-background-secondary px-3 py-1.5 rounded flex justify-between items-center w-48">
+													<span className="text-content-tertiary font-bold uppercase text-[8px]">SPF:</span>
 													<span className={d.spf_status === 'VERIFIED' ? 'text-content-positive font-bold' : 'text-content-warning font-bold'}>{d.spf_status}</span>
 												</div>
 											</div>
@@ -1606,7 +1606,7 @@ export const MarketingDashboard: React.FC = () => {
 										{!d.verified && (
 											<button
 												onClick={() => verifyDomain(d.id)}
-												className="bg-ink text-on-dark font-bold px-3 py-1.5 rounded-md hover:bg-black-elevated transition shadow-sm active:scale-[0.97]"
+												className="bg-content-primary text-gray-0 font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 transition shadow-sm active:scale-[0.97]"
 											>
 												🔍 Verify DNS TXT Records
 											</button>
@@ -1622,36 +1622,36 @@ export const MarketingDashboard: React.FC = () => {
 			{/* Save segment Modal */}
 			{showSaveSegmentModal && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm animate-fade-in">
-					<div className="bg-canvas border border-canvas-soft p-6 rounded-xl w-[400px] shadow-2xl space-y-4 text-xs">
-						<h3 className="font-bold text-ink text-sm border-b border-canvas-soft pb-2 uppercase tracking-wider">Save Audience Segment</h3>
-						<form onSubmit={saveAudienceSegment} className="space-y-4 text-body">
+					<div className="bg-background-primary border border-background-secondary p-6 rounded-xl w-[400px] shadow-2xl space-y-4 text-xs">
+						<h3 className="font-bold text-content-primary text-sm border-b border-background-secondary pb-2 uppercase tracking-wider">Save Audience Segment</h3>
+						<form onSubmit={saveAudienceSegment} className="space-y-4 text-content-secondary">
 							<div className="space-y-1">
-								<label className="block text-[9px] uppercase font-bold text-mute">Segment Name</label>
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Segment Name</label>
 								<input
 									type="text"
 									required
 									value={newSegmentForm.name}
 									onChange={e => setNewSegmentForm({ ...newSegmentForm, name: e.target.value })}
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-3 font-semibold focus:outline-none"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold focus:outline-none"
 								/>
 							</div>
 							<div className="space-y-1">
-								<label className="block text-[9px] uppercase font-bold text-mute">Segment Description</label>
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Segment Description</label>
 								<textarea
 									value={newSegmentForm.description}
 									onChange={e => setNewSegmentForm({ ...newSegmentForm, description: e.target.value })}
-									className="w-full h-16 rounded bg-canvas-soft border border-canvas-soft p-2 focus:outline-none resize-none"
+									className="w-full h-16 rounded bg-background-secondary border border-background-secondary p-2 focus:outline-none resize-none"
 								/>
 							</div>
 							<div className="flex gap-2 justify-end">
 								<button
 									type="button"
 									onClick={() => setShowSaveSegmentModal(false)}
-									className="bg-canvas-soft hover:bg-canvas-softer text-ink font-bold px-3 py-1.5 rounded border border-canvas-soft"
+									className="bg-background-secondary hover:bg-background-tertiary text-content-primary font-bold px-3 py-1.5 rounded border border-background-secondary"
 								>
 									Cancel
 								</button>
-								<button type="submit" className="bg-ink text-on-dark font-bold px-4 py-1.5 rounded hover:bg-black-elevated transition">
+								<button type="submit" className="bg-content-primary text-gray-0 font-bold px-4 py-1.5 rounded hover:bg-gray-800 transition">
 									Save
 								</button>
 							</div>

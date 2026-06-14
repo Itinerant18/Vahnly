@@ -35,7 +35,7 @@ function statusBadge(s: string) {
     APPROVED: 'bg-surface-positive text-content-positive',
     REJECTED: 'bg-surface-negative text-content-negative',
   };
-  const cls = map[s] ?? 'bg-canvas-soft text-body';
+  const cls = map[s] ?? 'bg-background-secondary text-content-secondary';
   return <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>{s}</span>;
 }
 
@@ -118,8 +118,8 @@ export const ComplianceDashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-ink">Compliance & KYC</h1>
-        <p className="text-sm text-mute">Driver document verification and background check queue</p>
+        <h1 className="text-xl font-bold text-content-primary">Compliance & KYC</h1>
+        <p className="text-sm text-content-tertiary">Driver document verification and background check queue</p>
       </div>
 
       {actionMsg && (
@@ -136,7 +136,7 @@ export const ComplianceDashboard: React.FC = () => {
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                statusFilter === s ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                statusFilter === s ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
               }`}
             >
               {s}
@@ -148,36 +148,36 @@ export const ComplianceDashboard: React.FC = () => {
           placeholder="Search by name or phone…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <span className="ml-auto text-xs text-mute self-center">{total} drivers</span>
+        <span className="ml-auto text-xs text-content-tertiary self-center">{total} drivers</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Driver List */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-          <div className="px-4 py-3 border-b border-canvas-soft text-xs font-semibold text-mute uppercase tracking-wide">
+        <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+          <div className="px-4 py-3 border-b border-background-secondary text-xs font-semibold text-content-tertiary uppercase tracking-wide">
             Verification Queue
           </div>
-          {loading && <div className="p-6 text-sm text-mute animate-pulse">Loading…</div>}
+          {loading && <div className="p-6 text-sm text-content-tertiary animate-pulse">Loading…</div>}
           {!loading && drivers.length === 0 && (
-            <div className="p-6 text-sm text-mute text-center">No drivers in this queue.</div>
+            <div className="p-6 text-sm text-content-tertiary text-center">No drivers in this queue.</div>
           )}
-          <div className="divide-y divide-canvas-soft/50">
+          <div className="divide-y divide-background-secondary/50">
             {drivers.map(d => (
               <button
                 key={d.id}
                 onClick={() => openDetail(d.id)}
-                className={`w-full text-left px-4 py-3 hover:bg-canvas-soft/30 transition-colors ${selected?.id === d.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}
+                className={`w-full text-left px-4 py-3 hover:bg-background-secondary/30 transition-colors ${selected?.id === d.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-sm text-ink">{d.name}</div>
-                    <div className="text-xs text-mute">{d.phone} · {d.city_prefix} · DL: {d.dl_number}</div>
+                    <div className="font-medium text-sm text-content-primary">{d.name}</div>
+                    <div className="text-xs text-content-tertiary">{d.phone} · {d.city_prefix} · DL: {d.dl_number}</div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     {statusBadge(d.background_check_status)}
-                    <div className="text-[10px] text-mute">{new Date(d.created_at).toLocaleDateString('en-IN')}</div>
+                    <div className="text-[10px] text-content-tertiary">{new Date(d.created_at).toLocaleDateString('en-IN')}</div>
                   </div>
                 </div>
               </button>
@@ -186,10 +186,10 @@ export const ComplianceDashboard: React.FC = () => {
         </div>
 
         {/* Detail Panel */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          {detailLoading && <div className="text-sm text-mute animate-pulse">Loading driver details…</div>}
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          {detailLoading && <div className="text-sm text-content-tertiary animate-pulse">Loading driver details…</div>}
           {!detailLoading && !selected && (
-            <div className="flex flex-col items-center justify-center h-40 text-mute text-sm">
+            <div className="flex flex-col items-center justify-center h-40 text-content-tertiary text-sm">
               <div className="text-3xl mb-2">📋</div>
               Select a driver to review their KYC documents
             </div>
@@ -198,26 +198,26 @@ export const ComplianceDashboard: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold text-ink">{selected.name}</div>
-                  <div className="text-xs text-mute">{selected.phone} · {selected.city_prefix}</div>
+                  <div className="font-semibold text-content-primary">{selected.name}</div>
+                  <div className="text-xs text-content-tertiary">{selected.phone} · {selected.city_prefix}</div>
                 </div>
                 {statusBadge(selected.background_check_status)}
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-canvas-soft/50 rounded-lg p-3">
-                  <div className="text-xs text-mute mb-1">DL Number</div>
-                  <div className="font-mono text-ink">{selected.dl_number}</div>
+                <div className="bg-background-secondary/50 rounded-lg p-3">
+                  <div className="text-xs text-content-tertiary mb-1">DL Number</div>
+                  <div className="font-mono text-content-primary">{selected.dl_number}</div>
                 </div>
-                <div className="bg-canvas-soft/50 rounded-lg p-3">
-                  <div className="text-xs text-mute mb-1">Applied</div>
-                  <div className="text-body">{new Date(selected.created_at).toLocaleDateString('en-IN')}</div>
+                <div className="bg-background-secondary/50 rounded-lg p-3">
+                  <div className="text-xs text-content-tertiary mb-1">Applied</div>
+                  <div className="text-content-secondary">{new Date(selected.created_at).toLocaleDateString('en-IN')}</div>
                 </div>
               </div>
 
               {/* Document placeholders */}
               <div>
-                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-2">Documents</div>
+                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-2">Documents</div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: 'Driving License', url: selected.license_doc_url },
@@ -225,12 +225,12 @@ export const ComplianceDashboard: React.FC = () => {
                     { label: 'Address Proof', url: selected.address_proof_url },
                     { label: 'Selfie', url: selected.selfie_url },
                   ].map(doc => (
-                    <div key={doc.label} className="bg-canvas-soft/50 rounded-lg p-3 text-center">
+                    <div key={doc.label} className="bg-background-secondary/50 rounded-lg p-3 text-center">
                       <div className="text-2xl mb-1">{doc.url ? '📄' : '❌'}</div>
-                      <div className="text-xs text-body">{doc.label}</div>
+                      <div className="text-xs text-content-secondary">{doc.label}</div>
                       {doc.url
                         ? <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent hover:underline">View</a>
-                        : <div className="text-[10px] text-mute">Not uploaded</div>
+                        : <div className="text-[10px] text-content-tertiary">Not uploaded</div>
                       }
                     </div>
                   ))}
@@ -246,7 +246,7 @@ export const ComplianceDashboard: React.FC = () => {
                         placeholder="Rejection reason (required)…"
                         value={rejectReason}
                         onChange={e => setRejectReason(e.target.value)}
-                        className="w-full border border-canvas-soft rounded-lg px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none focus:ring-1 focus:ring-negative-400"
+                        className="w-full border border-background-secondary rounded-lg px-3 py-2 text-sm bg-background-primary text-content-primary resize-none focus:outline-none focus:ring-1 focus:ring-negative-400"
                         rows={2}
                       />
                       <div className="flex gap-2">
@@ -257,7 +257,7 @@ export const ComplianceDashboard: React.FC = () => {
                         >
                           Confirm Reject
                         </button>
-                        <button onClick={() => setShowRejectInput(false)} className="px-4 py-2 rounded-lg text-sm border border-canvas-soft text-body hover:bg-canvas-soft">
+                        <button onClick={() => setShowRejectInput(false)} className="px-4 py-2 rounded-lg text-sm border border-background-secondary text-content-secondary hover:bg-background-secondary">
                           Cancel
                         </button>
                       </div>
@@ -280,7 +280,7 @@ export const ComplianceDashboard: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-mute italic">This application has already been {selected.background_check_status.toLowerCase()}.</div>
+                <div className="text-xs text-content-tertiary italic">This application has already been {selected.background_check_status.toLowerCase()}.</div>
               )}
             </div>
           )}

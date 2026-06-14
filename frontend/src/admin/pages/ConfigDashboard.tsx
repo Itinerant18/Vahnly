@@ -84,12 +84,12 @@ export const ConfigDashboard: React.FC = () => {
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar */}
-      <div className="w-52 shrink-0 p-4 border-r border-canvas-soft space-y-1">
-        <div className="text-xs font-semibold text-mute uppercase tracking-wide px-2 mb-3">Configuration</div>
+      <div className="w-52 shrink-0 p-4 border-r border-background-secondary space-y-1">
+        <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide px-2 mb-3">Configuration</div>
         {NAV.map(n => (
           <button key={n.key} onClick={() => setSection(n.key)}
             className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              section === n.key ? 'bg-accent/10 text-accent font-medium' : 'text-body hover:text-ink hover:bg-canvas-soft'
+              section === n.key ? 'bg-accent/10 text-accent font-medium' : 'text-content-secondary hover:text-content-primary hover:bg-background-secondary'
             }`}>
             <span>{n.icon}</span>{n.label}
           </button>
@@ -140,22 +140,22 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-lg font-bold text-ink">Global Settings</h2><p className="text-sm text-mute">Brand, locale, support, and legal configuration</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Global Settings</h2><p className="text-sm text-content-tertiary">Brand, locale, support, and legal configuration</p></div>
         {saved && <span className="text-sm text-content-positive">✓ Saved</span>}
       </div>
       {categories.map(cat => (
-        <div key={cat} className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-4">
+        <div key={cat} className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-ink capitalize">{cat}</div>
+            <div className="text-sm font-semibold text-content-primary capitalize">{cat}</div>
             {isSuperAdmin && <button onClick={() => save(cat)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium hover:bg-accent/90">Save {cat}</button>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {settings.filter(s => s.category === cat).map(s => (
               <div key={s.key}>
-                <label className="text-xs text-mute">{s.description || s.key}</label>
+                <label className="text-xs text-content-tertiary">{s.description || s.key}</label>
                 {s.data_type === 'boolean' ? (
                   <button onClick={() => setLocalValues(v => ({ ...v, [s.key]: localValues[s.key] === 'true' ? 'false' : 'true' }))}
-                    className={`mt-1 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${localValues[s.key] === 'true' ? 'bg-accent' : 'bg-canvas-soft'}`}>
+                    className={`mt-1 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${localValues[s.key] === 'true' ? 'bg-accent' : 'bg-background-secondary'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${localValues[s.key] === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 ) : (
@@ -163,7 +163,7 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
                     value={localValues[s.key] ?? ''}
                     onChange={e => setLocalValues(v => ({ ...v, [s.key]: e.target.value }))}
                     disabled={!isSuperAdmin}
-                    className="mt-1 w-full border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="mt-1 w-full border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 )}
               </div>
@@ -204,19 +204,19 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-lg font-bold text-ink">Feature Flags</h2><p className="text-sm text-mute">Toggle features, set rollout %, city scope</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Feature Flags</h2><p className="text-sm text-content-tertiary">Toggle features, set rollout %, city scope</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ id: 0, flag_key: '', name: '', description: '', is_enabled: false, rollout_percentage: 0, target_cities: [], target_roles: [], is_kill_switch: false, updated_at: '' })}
           className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ New Flag</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">{editing.id ? 'Edit' : 'New'} Feature Flag</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">{editing.id ? 'Edit' : 'New'} Feature Flag</div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs text-mute">Flag Key</label><input value={editing.flag_key} onChange={e => setEditing({ ...editing, flag_key: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm font-mono bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Name</label><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Rollout % (0–100)</label><input type="number" min={0} max={100} value={editing.rollout_percentage} onChange={e => setEditing({ ...editing, rollout_percentage: Number(e.target.value) })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
-            <div><label className="text-xs text-mute">Target Cities (comma-separated)</label><input value={editing.target_cities.join(',')} onChange={e => setEditing({ ...editing, target_cities: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="KOL,BLR" className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm font-mono bg-canvas text-ink focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Flag Key</label><input value={editing.flag_key} onChange={e => setEditing({ ...editing, flag_key: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm font-mono bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Name</label><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Rollout % (0–100)</label><input type="number" min={0} max={100} value={editing.rollout_percentage} onChange={e => setEditing({ ...editing, rollout_percentage: Number(e.target.value) })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Target Cities (comma-separated)</label><input value={editing.target_cities.join(',')} onChange={e => setEditing({ ...editing, target_cities: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="KOL,BLR" className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm font-mono bg-background-primary text-content-primary focus:outline-none" /></div>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={editing.is_enabled} onChange={e => setEditing({ ...editing, is_enabled: e.target.checked })} /> Enabled</label>
@@ -224,30 +224,30 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
           </div>
           <div className="flex gap-2">
             <button onClick={saveEditing} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {flags.map(flag => (
-          <div key={flag.flag_key} className={`bg-canvas rounded-xl border p-4 flex items-center gap-4 ${flag.is_kill_switch ? 'border-negative-400' : 'border-canvas-soft'}`}>
+          <div key={flag.flag_key} className={`bg-background-primary rounded-xl border p-4 flex items-center gap-4 ${flag.is_kill_switch ? 'border-negative-400' : 'border-background-secondary'}`}>
             <button onClick={() => isSuperAdmin && toggle(flag)}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${flag.is_enabled ? (flag.is_kill_switch ? 'bg-surface-negative0' : 'bg-accent') : 'bg-canvas-soft'} ${!isSuperAdmin ? 'cursor-default' : 'cursor-pointer'}`}>
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${flag.is_enabled ? (flag.is_kill_switch ? 'bg-surface-negative0' : 'bg-accent') : 'bg-background-secondary'} ${!isSuperAdmin ? 'cursor-default' : 'cursor-pointer'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${flag.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-ink">{flag.name}</span>
+                <span className="text-sm font-medium text-content-primary">{flag.name}</span>
                 {flag.is_kill_switch && <span className="text-[10px] bg-surface-negative text-content-negative px-1.5 py-0.5 rounded font-medium">KILL SWITCH</span>}
-                <span className="text-xs text-mute font-mono">{flag.flag_key}</span>
+                <span className="text-xs text-content-tertiary font-mono">{flag.flag_key}</span>
               </div>
-              <div className="text-xs text-mute mt-0.5">{flag.description}</div>
-              {flag.target_cities.length > 0 && <div className="text-[10px] text-mute mt-0.5">Cities: {flag.target_cities.join(', ')}</div>}
+              <div className="text-xs text-content-tertiary mt-0.5">{flag.description}</div>
+              {flag.target_cities.length > 0 && <div className="text-[10px] text-content-tertiary mt-0.5">Cities: {flag.target_cities.join(', ')}</div>}
             </div>
             <div className="text-right shrink-0">
-              <div className="text-sm font-mono text-ink">{flag.rollout_percentage}%</div>
-              <div className="text-xs text-mute">rollout</div>
+              <div className="text-sm font-mono text-content-primary">{flag.rollout_percentage}%</div>
+              <div className="text-xs text-content-tertiary">rollout</div>
               {isSuperAdmin && <button onClick={() => setEditing(flag)} className="text-xs text-accent hover:underline mt-1">Edit</button>}
             </div>
           </div>
@@ -284,22 +284,22 @@ const AppVersionsSection: React.FC<{ base: string; headers: Record<string, strin
   const androidVersions = versions.filter(v => v.platform === 'ANDROID');
 
   const PlatformList: React.FC<{ label: string; versions: AppVersion[] }> = ({ label, versions }) => (
-    <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-      <div className="px-4 py-3 border-b border-canvas-soft font-semibold text-sm text-ink">{label}</div>
-      {versions.length === 0 && <div className="p-4 text-xs text-mute">No versions.</div>}
+    <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+      <div className="px-4 py-3 border-b border-background-secondary font-semibold text-sm text-content-primary">{label}</div>
+      {versions.length === 0 && <div className="p-4 text-xs text-content-tertiary">No versions.</div>}
       {versions.map(v => (
-        <div key={v.id} className={`flex items-center gap-3 px-4 py-3 border-b border-canvas-soft/50 ${v.is_latest ? 'bg-accent/5' : ''}`}>
+        <div key={v.id} className={`flex items-center gap-3 px-4 py-3 border-b border-background-secondary/50 ${v.is_latest ? 'bg-accent/5' : ''}`}>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-medium text-ink">{v.version_string}</span>
+              <span className="font-mono text-sm font-medium text-content-primary">{v.version_string}</span>
               {v.is_latest && <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded font-medium">LATEST</span>}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RELEASE_COLORS[v.release_type] ?? 'bg-canvas-soft text-body'}`}>{v.release_type}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RELEASE_COLORS[v.release_type] ?? 'bg-background-secondary text-content-secondary'}`}>{v.release_type}</span>
             </div>
-            <div className="text-xs text-mute mt-0.5">Build {v.build_number} · Min: {v.min_supported_version || '—'}</div>
-            {v.release_notes && <div className="text-xs text-body mt-0.5 truncate max-w-sm">{v.release_notes}</div>}
+            <div className="text-xs text-content-tertiary mt-0.5">Build {v.build_number} · Min: {v.min_supported_version || '—'}</div>
+            {v.release_notes && <div className="text-xs text-content-secondary mt-0.5 truncate max-w-sm">{v.release_notes}</div>}
           </div>
           <div className="text-right shrink-0">
-            <div className="text-xs text-mute">{new Date(v.created_at).toLocaleDateString('en-IN')}</div>
+            <div className="text-xs text-content-tertiary">{new Date(v.created_at).toLocaleDateString('en-IN')}</div>
             {isSuperAdmin && !v.is_latest && <button onClick={() => setLatest(v.id)} className="text-xs text-accent hover:underline mt-1">Set Latest</button>}
           </div>
         </div>
@@ -310,12 +310,12 @@ const AppVersionsSection: React.FC<{ base: string; headers: Record<string, strin
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-lg font-bold text-ink">App Version Management</h2><p className="text-sm text-mute">Force update, optional update, min version</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">App Version Management</h2><p className="text-sm text-content-tertiary">Force update, optional update, min version</p></div>
         {isSuperAdmin && <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Add Version</button>}
       </div>
       {showAdd && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">New Release</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">New Release</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { label: 'Platform', type: 'select', key: 'platform', options: ['iOS', 'ANDROID'] },
@@ -325,26 +325,26 @@ const AppVersionsSection: React.FC<{ base: string; headers: Record<string, strin
               { label: 'Min Supported', type: 'text', key: 'min_supported_version', placeholder: '3.0.0' },
             ].map(f => (
               <div key={f.key}>
-                <label className="text-xs text-mute">{f.label}</label>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
                 {f.type === 'select'
                   ? <select value={String((newV as any)[f.key] ?? '')} onChange={e => setNewV({ ...newV, [f.key]: e.target.value })}
-                      className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                      className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                       {f.options!.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   : <input type={f.type} placeholder={f.placeholder} value={String((newV as any)[f.key] ?? '')}
                       onChange={e => setNewV({ ...newV, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
-                      className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />}
+                      className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />}
               </div>
             ))}
           </div>
           <div>
-            <label className="text-xs text-mute">Release Notes</label>
+            <label className="text-xs text-content-tertiary">Release Notes</label>
             <textarea value={newV.release_notes || ''} onChange={e => setNewV({ ...newV, release_notes: e.target.value })} rows={2}
-              className="mt-1 w-full border border-canvas-soft rounded px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none focus:ring-1 focus:ring-accent" />
+              className="mt-1 w-full border border-background-secondary rounded px-3 py-2 text-sm bg-background-primary text-content-primary resize-none focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
           <div className="flex gap-2">
             <button onClick={addVersion} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Add Version</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
@@ -391,63 +391,63 @@ const IntegrationsSection: React.FC<{ base: string; headers: Record<string, stri
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h2 className="text-lg font-bold text-ink">Integrations</h2><p className="text-sm text-mute">API keys, webhooks, health monitoring</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Integrations</h2><p className="text-sm text-content-tertiary">API keys, webhooks, health monitoring</p></div>
         <div className="flex gap-1 flex-wrap">
-          <button onClick={() => setCatFilter('')} className={`px-2.5 py-1 rounded text-xs border ${!catFilter ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>All</button>
+          <button onClick={() => setCatFilter('')} className={`px-2.5 py-1 rounded text-xs border ${!catFilter ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>All</button>
           {INTEGRATION_CATEGORIES.map(c => (
-            <button key={c} onClick={() => setCatFilter(c)} className={`px-2.5 py-1 rounded text-xs border capitalize ${catFilter === c ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{c}</button>
+            <button key={c} onClick={() => setCatFilter(c)} className={`px-2.5 py-1 rounded text-xs border capitalize ${catFilter === c ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{c}</button>
           ))}
         </div>
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="font-semibold text-sm text-ink">{editing.logo_emoji} {editing.display_name}</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="font-semibold text-sm text-content-primary">{editing.logo_emoji} {editing.display_name}</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-mute">API Key (will be masked)</label>
+              <label className="text-xs text-content-tertiary">API Key (will be masked)</label>
               <input type="password" placeholder="Enter to update…" onChange={e => setEditing({ ...editing, api_key_masked: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm font-mono bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm font-mono bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
             <div>
-              <label className="text-xs text-mute">Webhook URL</label>
+              <label className="text-xs text-content-tertiary">Webhook URL</label>
               <input value={editing.webhook_url} onChange={e => setEditing({ ...editing, webhook_url: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm font-mono bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm font-mono bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.is_enabled} onChange={e => setEditing({ ...editing, is_enabled: e.target.checked })} /> Enable integration</label>
           <div className="flex gap-2">
             <button onClick={saveEditing} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {integrations.map(ig => (
-          <div key={ig.integration_key} className={`bg-canvas rounded-xl border p-4 space-y-3 ${ig.is_enabled ? 'border-canvas-soft' : 'border-canvas-soft opacity-70'}`}>
+          <div key={ig.integration_key} className={`bg-background-primary rounded-xl border p-4 space-y-3 ${ig.is_enabled ? 'border-background-secondary' : 'border-background-secondary opacity-70'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{ig.logo_emoji}</span>
                 <div>
-                  <div className="text-sm font-medium text-ink">{ig.display_name}</div>
-                  <div className="text-[10px] text-mute capitalize">{ig.category}</div>
+                  <div className="text-sm font-medium text-content-primary">{ig.display_name}</div>
+                  <div className="text-[10px] text-content-tertiary capitalize">{ig.category}</div>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ig.is_enabled ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                   {ig.is_enabled ? 'ENABLED' : 'DISABLED'}
                 </span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${HEALTH_COLORS[ig.health_status] ?? 'bg-canvas-soft text-body'}`}>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${HEALTH_COLORS[ig.health_status] ?? 'bg-background-secondary text-content-secondary'}`}>
                   {ig.health_status}
                 </span>
               </div>
             </div>
-            {ig.api_key_masked && <div className="text-xs text-mute font-mono truncate">{ig.api_key_masked}</div>}
+            {ig.api_key_masked && <div className="text-xs text-content-tertiary font-mono truncate">{ig.api_key_masked}</div>}
             <div className="flex gap-2">
-              {isSuperAdmin && <button onClick={() => setEditing(ig)} className="flex-1 text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft">Configure</button>}
+              {isSuperAdmin && <button onClick={() => setEditing(ig)} className="flex-1 text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">Configure</button>}
               <button onClick={() => healthCheck(ig.integration_key)} disabled={healthChecking === ig.integration_key}
-                className="flex-1 text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft disabled:opacity-50">
+                className="flex-1 text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary disabled:opacity-50">
                 {healthChecking === ig.integration_key ? '…' : 'Health Check'}
               </button>
             </div>
@@ -481,66 +481,66 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h2 className="text-lg font-bold text-ink">Notification Templates</h2><p className="text-sm text-mute">Push, SMS, Email, WhatsApp with variable substitution</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Notification Templates</h2><p className="text-sm text-content-tertiary">Push, SMS, Email, WhatsApp with variable substitution</p></div>
         <div className="flex gap-1">
           {['', 'PUSH', 'SMS', 'EMAIL', 'WHATSAPP'].map(c => (
-            <button key={c} onClick={() => setChannel(c)} className={`px-2.5 py-1 rounded text-xs border ${channel === c ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{c || 'All'}</button>
+            <button key={c} onClick={() => setChannel(c)} className={`px-2.5 py-1 rounded text-xs border ${channel === c ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{c || 'All'}</button>
           ))}
         </div>
         {isSuperAdmin && <button onClick={() => setEditing({ channel: 'PUSH', language_code: 'en', is_active: true, variables: [] })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Template</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">Template Editor</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Template Editor</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { label: 'Key', k: 'template_key', mono: true }, { label: 'Name', k: 'name' },
               { label: 'Event Trigger', k: 'event_trigger' },
             ].map(f => (
               <div key={f.k}>
-                <label className="text-xs text-mute">{f.label}</label>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
                 <input value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: e.target.value })}
-                  className={`mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent ${f.mono ? 'font-mono' : ''}`} />
+                  className={`mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent ${f.mono ? 'font-mono' : ''}`} />
               </div>
             ))}
             <div>
-              <label className="text-xs text-mute">Channel</label>
+              <label className="text-xs text-content-tertiary">Channel</label>
               <select value={editing.channel || 'PUSH'} onChange={e => setEditing({ ...editing, channel: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['PUSH','SMS','EMAIL','WHATSAPP'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
           {(editing.channel === 'PUSH' || editing.channel === 'EMAIL') && (
-            <div><label className="text-xs text-mute">Title Template</label><input value={editing.title_template || ''} onChange={e => setEditing({ ...editing, title_template: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Title Template</label><input value={editing.title_template || ''} onChange={e => setEditing({ ...editing, title_template: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
           )}
-          <div><label className="text-xs text-mute">Body Template (use {'{{variable}}'} for substitution)</label>
+          <div><label className="text-xs text-content-tertiary">Body Template (use {'{{variable}}'} for substitution)</label>
             <textarea value={editing.body_template || ''} onChange={e => setEditing({ ...editing, body_template: e.target.value })} rows={4}
-              className="mt-1 w-full border border-canvas-soft rounded px-3 py-2 text-sm font-mono bg-canvas text-ink resize-none focus:outline-none focus:ring-1 focus:ring-accent" />
+              className="mt-1 w-full border border-background-secondary rounded px-3 py-2 text-sm font-mono bg-background-primary text-content-primary resize-none focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
           <div className="flex gap-2">
             <button onClick={save} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {templates.map(t => (
-          <div key={t.id} className="bg-canvas rounded-xl border border-canvas-soft p-4 flex items-start gap-3">
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${CHANNEL_COLORS[t.channel] ?? 'bg-canvas-soft text-body'}`}>{t.channel}</span>
+          <div key={t.id} className="bg-background-primary rounded-xl border border-background-secondary p-4 flex items-start gap-3">
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${CHANNEL_COLORS[t.channel] ?? 'bg-background-secondary text-content-secondary'}`}>{t.channel}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-ink">{t.name}</span>
-                <span className="text-xs text-mute font-mono">{t.template_key}</span>
+                <span className="text-sm font-medium text-content-primary">{t.name}</span>
+                <span className="text-xs text-content-tertiary font-mono">{t.template_key}</span>
                 {!t.is_active && <span className="text-[10px] bg-background-secondary text-content-secondary px-1.5 py-0.5 rounded">inactive</span>}
               </div>
-              {t.title_template && <div className="text-xs text-body mt-0.5">Title: <span className="font-medium">{t.title_template}</span></div>}
-              <div className="text-xs text-mute mt-0.5 truncate">{t.body_template}</div>
+              {t.title_template && <div className="text-xs text-content-secondary mt-0.5">Title: <span className="font-medium">{t.title_template}</span></div>}
+              <div className="text-xs text-content-tertiary mt-0.5 truncate">{t.body_template}</div>
               {t.variables.length > 0 && (
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {t.variables.map(v => <span key={v} className="text-[10px] font-mono border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{`{{${v}}}`}</span>)}
+                  {t.variables.map(v => <span key={v} className="text-[10px] font-mono border border-background-secondary rounded px-1.5 py-0.5 text-content-tertiary">{`{{${v}}}`}</span>)}
                 </div>
               )}
             </div>
@@ -557,15 +557,15 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
 // action buttons (Edit / Disable / Enable, gated by isSuperAdmin) are appended
 // inside the component since they depend on component state/handlers.
 const CANCEL_RULE_COLUMNS: ColumnDef<CancelRule>[] = [
-  { key: 'rule_name', header: 'Rule', render: (v) => <span className="text-xs font-medium text-ink">{String(v)}</span> },
-  { key: 'applies_to', header: 'Applies To', render: (v) => <span className="text-xs text-body">{String(v)}</span> },
+  { key: 'rule_name', header: 'Rule', render: (v) => <span className="text-xs font-medium text-content-primary">{String(v)}</span> },
+  { key: 'applies_to', header: 'Applies To', render: (v) => <span className="text-xs text-content-secondary">{String(v)}</span> },
   {
     key: 'is_active', header: 'Status',
     render: (_v, r) => <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${r.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{r.is_active ? 'ON' : 'OFF'}</span>,
   },
   {
     key: 'minutes_elapsed_min', header: 'Time Window', type: 'numeric',
-    render: (_v, r) => <span className="text-xs text-mute font-mono">{r.minutes_elapsed_min}–{r.minutes_elapsed_max === 999999 ? '∞' : r.minutes_elapsed_max}m</span>,
+    render: (_v, r) => <span className="text-xs text-content-tertiary font-mono">{r.minutes_elapsed_min}–{r.minutes_elapsed_max === 999999 ? '∞' : r.minutes_elapsed_max}m</span>,
   },
   {
     key: 'cancellation_fee_pct', header: 'Fee', type: 'numeric',
@@ -575,7 +575,7 @@ const CANCEL_RULE_COLUMNS: ColumnDef<CancelRule>[] = [
     key: 'refund_pct', header: 'Refund', type: 'numeric',
     render: (v) => <span className="text-xs font-mono">{Number(v)}%</span>,
   },
-  { key: 'party_at_fault', header: 'Fault', render: (v) => <span className="text-xs text-mute">{String(v)}</span> },
+  { key: 'party_at_fault', header: 'Fault', render: (v) => <span className="text-xs text-content-tertiary">{String(v)}</span> },
 ];
 
 const CancelRulesSection: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
@@ -610,7 +610,7 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
         isSuperAdmin ? (
           <div className="flex gap-2 justify-end">
             <button onClick={(e) => { e.stopPropagation(); setEditing(row); }} className="text-xs text-accent hover:underline">Edit</button>
-            <button onClick={(e) => { e.stopPropagation(); toggle(row); }} className="text-xs text-mute hover:text-body">{row.is_active ? 'Disable' : 'Enable'}</button>
+            <button onClick={(e) => { e.stopPropagation(); toggle(row); }} className="text-xs text-content-tertiary hover:text-content-secondary">{row.is_active ? 'Disable' : 'Enable'}</button>
           </div>
         ) : null
       ),
@@ -620,15 +620,15 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-lg font-bold text-ink">Cancellation & Refund Rules</h2><p className="text-sm text-mute">Rules engine evaluated in priority order</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Cancellation & Refund Rules</h2><p className="text-sm text-content-tertiary">Rules engine evaluated in priority order</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ applies_to: 'RIDER', trip_status_at_cancel: 'CREATED', minutes_elapsed_min: 0, minutes_elapsed_max: 999999, cancellation_fee_pct: 0, cancellation_fee_fixed_paise: 0, refund_pct: 100, party_at_fault: 'NONE', is_active: true, priority: 0 })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Rule</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">{editing.id ? 'Edit' : 'New'} Cancellation Rule</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">{editing.id ? 'Edit' : 'New'} Cancellation Rule</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div className="col-span-2 md:col-span-3"><label className="text-xs text-mute">Rule Name</label><input value={editing.rule_name || ''} onChange={e => setEditing({ ...editing, rule_name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div className="col-span-2 md:col-span-3"><label className="text-xs text-content-tertiary">Rule Name</label><input value={editing.rule_name || ''} onChange={e => setEditing({ ...editing, rule_name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
             {[
               { label: 'Applies To', k: 'applies_to', type: 'select', options: ['RIDER','DRIVER','BOTH'] },
               { label: 'Trip Status', k: 'trip_status_at_cancel', type: 'text' },
@@ -641,18 +641,18 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
               { label: 'Priority', k: 'priority', type: 'number' },
             ].map(f => (
               <div key={f.k}>
-                <label className="text-xs text-mute">{f.label}</label>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
                 {f.type === 'select'
-                  ? <select value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                  ? <select value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                       {f.options!.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
-                  : <input type="number" value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: f.k.includes('pct') || f.k.includes('paise') ? Number(e.target.value) : Number(e.target.value) })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" />}
+                  : <input type="number" value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: f.k.includes('pct') || f.k.includes('paise') ? Number(e.target.value) : Number(e.target.value) })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" />}
               </div>
             ))}
           </div>
           <div className="flex gap-2">
             <button onClick={save} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
@@ -691,13 +691,13 @@ const RatingRulesSection: React.FC<{ base: string; headers: Record<string, strin
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-lg font-bold text-ink">Rating Threshold Rules</h2><p className="text-sm text-mute">Auto-warning, suspend, ban triggers based on rating</p></div>
+        <div><h2 className="text-lg font-bold text-content-primary">Rating Threshold Rules</h2><p className="text-sm text-content-tertiary">Auto-warning, suspend, ban triggers based on rating</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ applies_to: 'DRIVER', threshold_type: 'WARNING', min_trips_required: 10, rating_below: 4.0, action: 'SEND_WARNING', cooldown_days: 0, is_active: true })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Rule</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">Rating Threshold Rule</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Rating Threshold Rule</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { label: 'Applies To', k: 'applies_to', type: 'select', options: ['DRIVER','RIDER'] },
@@ -708,33 +708,33 @@ const RatingRulesSection: React.FC<{ base: string; headers: Record<string, strin
               { label: 'Cooldown (days)', k: 'cooldown_days', type: 'number' },
             ].map(f => (
               <div key={f.k}>
-                <label className="text-xs text-mute">{f.label}</label>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
                 {f.type === 'select'
-                  ? <select value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                  ? <select value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                       {f.options!.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
-                  : <input type="number" step={f.k === 'rating_below' ? '0.1' : '1'} value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: Number(e.target.value) })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" />}
+                  : <input type="number" step={f.k === 'rating_below' ? '0.1' : '1'} value={String((editing as any)[f.k] ?? '')} onChange={e => setEditing({ ...editing, [f.k]: Number(e.target.value) })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" />}
               </div>
             ))}
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.is_active ?? true} onChange={e => setEditing({ ...editing, is_active: e.target.checked })} /> Active</label>
           <div className="flex gap-2">
             <button onClick={save} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {['DRIVER', 'RIDER'].map(entity => (
-          <div key={entity} className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-            <div className="px-4 py-3 border-b border-canvas-soft text-sm font-semibold text-ink">{entity} Rules</div>
+          <div key={entity} className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+            <div className="px-4 py-3 border-b border-background-secondary text-sm font-semibold text-content-primary">{entity} Rules</div>
             {rules.filter(r => r.applies_to === entity).map(rule => (
-              <div key={rule.id} className={`flex items-center gap-3 px-4 py-3 border-b border-canvas-soft/50 ${!rule.is_active ? 'opacity-50' : ''}`}>
-                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${THRESHOLD_COLORS[rule.threshold_type] ?? 'bg-canvas-soft text-body'}`}>{rule.threshold_type}</span>
+              <div key={rule.id} className={`flex items-center gap-3 px-4 py-3 border-b border-background-secondary/50 ${!rule.is_active ? 'opacity-50' : ''}`}>
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${THRESHOLD_COLORS[rule.threshold_type] ?? 'bg-background-secondary text-content-secondary'}`}>{rule.threshold_type}</span>
                 <div className="flex-1">
-                  <div className="text-sm font-mono text-ink">Rating &lt; {rule.rating_below.toFixed(2)}</div>
-                  <div className="text-xs text-mute">{rule.action} · {rule.min_trips_required}+ trips · {rule.cooldown_days}d cooldown</div>
+                  <div className="text-sm font-mono text-content-primary">Rating &lt; {rule.rating_below.toFixed(2)}</div>
+                  <div className="text-xs text-content-tertiary">{rule.action} · {rule.min_trips_required}+ trips · {rule.cooldown_days}d cooldown</div>
                 </div>
                 {isSuperAdmin && <button onClick={() => setEditing(rule)} className="text-xs text-accent hover:underline">Edit</button>}
               </div>

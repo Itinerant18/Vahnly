@@ -154,15 +154,15 @@ export const ManualBooking: React.FC = () => {
 
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
-      <div className="flex items-center space-x-2 border-b border-canvas-soft pb-4">
-        <Link to="/trips" className="text-xs text-mute hover:text-ink font-medium">Trips</Link>
-        <span className="text-xs text-mute font-mono">/</span>
-        <span className="text-xs text-ink font-semibold">New Booking</span>
+      <div className="flex items-center space-x-2 border-b border-background-secondary pb-4">
+        <Link to="/trips" className="text-xs text-content-tertiary hover:text-content-primary font-medium">Trips</Link>
+        <span className="text-xs text-content-tertiary font-mono">/</span>
+        <span className="text-xs text-content-primary font-semibold">New Booking</span>
       </div>
 
-      <div className="max-w-xl mx-auto bg-canvas rounded-xl border border-canvas-soft overflow-hidden shadow-sm">
+      <div className="max-w-xl mx-auto bg-background-primary rounded-xl border border-background-secondary overflow-hidden shadow-sm">
         {/* Step Indicator Header */}
-        <div className="bg-canvas-soft border-b border-canvas-soft px-5 py-3 flex justify-between items-center text-[10px] uppercase font-bold tracking-wider text-mute font-mono">
+        <div className="bg-background-secondary border-b border-background-secondary px-5 py-3 flex justify-between items-center text-[10px] uppercase font-bold tracking-wider text-content-tertiary font-mono">
           <span>Step {step} of 6</span>
           <span>
             {step === 1 && 'Rider Details'}
@@ -180,35 +180,35 @@ export const ManualBooking: React.FC = () => {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Search or Register Rider</h3>
-                <p className="text-xs text-mute mt-1">Designate a customer UUID associated with this manual booking</p>
+                <h3 className="text-sm font-bold text-content-primary">Search or Register Rider</h3>
+                <p className="text-xs text-content-tertiary mt-1">Designate a customer UUID associated with this manual booking</p>
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Customer UUID</label>
+                  <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Customer UUID</label>
                   <input
                     type="text"
                     placeholder="Enter customer UUID..."
-                    className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+                    className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Rider Phone</label>
+                  <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Rider Phone</label>
                   <input
                     type="text"
                     placeholder="Enter phone number..."
-                    className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+                    className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
                     value={riderPhone}
                     onChange={(e) => setRiderPhone(e.target.value)}
                   />
                 </div>
                 <div className="flex items-center space-x-2 pt-2">
-                  <span className="text-xs text-mute">or</span>
+                  <span className="text-xs text-content-tertiary">or</span>
                   <button
                     onClick={handleGenerateRider}
-                    className="text-xs text-ink font-semibold hover:underline"
+                    className="text-xs text-content-primary font-semibold hover:underline"
                   >
                     Generate Random Profile
                   </button>
@@ -221,14 +221,14 @@ export const ManualBooking: React.FC = () => {
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Choose Vehicle Details</h3>
-                <p className="text-xs text-mute mt-1">Select a car from the dispatch fleet or enter custom plates</p>
+                <h3 className="text-sm font-bold text-content-primary">Choose Vehicle Details</h3>
+                <p className="text-xs text-content-tertiary mt-1">Select a car from the dispatch fleet or enter custom plates</p>
               </div>
-              <div className="flex space-x-2 bg-canvas-soft p-1 rounded-pill border border-canvas-soft mb-2">
+              <div className="flex space-x-2 bg-background-secondary p-1 rounded-pill border border-background-secondary mb-2">
                 <button
                   onClick={() => setCarMode('garage')}
                   className={`flex-1 text-xs font-semibold h-8 rounded-pill transition-colors ${
-                    carMode === 'garage' ? 'bg-ink text-on-dark' : 'text-body hover:bg-canvas-softer/50'
+                    carMode === 'garage' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                   }`}
                 >
                   Select from Garage
@@ -236,7 +236,7 @@ export const ManualBooking: React.FC = () => {
                 <button
                   onClick={() => setCarMode('onetime')}
                   className={`flex-1 text-xs font-semibold h-8 rounded-pill transition-colors ${
-                    carMode === 'onetime' ? 'bg-ink text-on-dark' : 'text-body hover:bg-canvas-softer/50'
+                    carMode === 'onetime' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                   }`}
                 >
                   One-time Custom Entry
@@ -260,42 +260,42 @@ export const ManualBooking: React.FC = () => {
                       }}
                       className={`w-full text-left p-3 rounded-xl border flex justify-between items-center text-xs transition-colors ${
                         carPlate === v.plate
-                          ? 'border-ink bg-canvas-softer'
-                          : 'border-canvas-soft hover:bg-canvas-softer/50'
+                          ? 'border-content-primary bg-background-tertiary'
+                          : 'border-background-secondary hover:bg-background-tertiary/50'
                       }`}
                     >
                       <div>
-                        <span className="font-bold text-ink block">{v.model}</span>
-                        <span className="text-[10px] text-mute font-mono">{v.plate}</span>
+                        <span className="font-bold text-content-primary block">{v.model}</span>
+                        <span className="text-[10px] text-content-tertiary font-mono">{v.plate}</span>
                       </div>
-                      <span className="bg-canvas-soft border border-canvas-soft px-2.5 py-0.5 rounded-pill font-mono font-semibold">{v.type}</span>
+                      <span className="bg-background-secondary border border-background-secondary px-2.5 py-0.5 rounded-pill font-mono font-semibold">{v.type}</span>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Make / Model</label>
+                    <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Make / Model</label>
                     <input
                       type="text"
-                      className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink"
+                      className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
                       value={carModel}
                       onChange={(e) => setCarModel(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase text-mute font-semibold mb-1">License Plate</label>
+                    <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">License Plate</label>
                     <input
                       type="text"
-                      className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono uppercase"
+                      className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono uppercase"
                       value={carPlate}
                       onChange={(e) => setCarPlate(e.target.value.toUpperCase())}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Car Class</label>
+                    <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Car Class</label>
                     <select
-                      className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+                      className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
                       value={carType}
                       onChange={(e) => setCarType(e.target.value)}
                     >
@@ -314,15 +314,15 @@ export const ManualBooking: React.FC = () => {
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Trip Scoping & Addresses</h3>
-                <p className="text-xs text-mute mt-1">Specify destination route details and scheduling</p>
+                <h3 className="text-sm font-bold text-content-primary">Trip Scoping & Addresses</h3>
+                <p className="text-xs text-content-tertiary mt-1">Specify destination route details and scheduling</p>
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] uppercase text-mute font-semibold mb-1">City Hub</label>
+                    <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">City Hub</label>
                     <select
-                      className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                      className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
                       value={cityPrefix}
                       onChange={(e) => setCityPrefix(e.target.value)}
                     >
@@ -333,9 +333,9 @@ export const ManualBooking: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Trip Type</label>
+                    <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Trip Type</label>
                     <select
-                      className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+                      className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
                       value={tripType}
                       onChange={(e) => setTripType(e.target.value)}
                     >
@@ -347,19 +347,19 @@ export const ManualBooking: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Pickup Address</label>
+                  <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Pickup Address</label>
                   <input
                     type="text"
-                    className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink"
+                    className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
                     value={pickupAddress}
                     onChange={(e) => setPickupAddress(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Dropoff Address</label>
+                  <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Dropoff Address</label>
                   <input
                     type="text"
-                    className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink"
+                    className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
                     value={dropoffAddress}
                     onChange={(e) => setDropoffAddress(e.target.value)}
                   />
@@ -372,19 +372,19 @@ export const ManualBooking: React.FC = () => {
           {step === 4 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Fare Quote Estimator</h3>
-                <p className="text-xs text-mute mt-1">Review the estimated fare or apply overrides for manual bookings</p>
+                <h3 className="text-sm font-bold text-content-primary">Fare Quote Estimator</h3>
+                <p className="text-xs text-content-tertiary mt-1">Review the estimated fare or apply overrides for manual bookings</p>
               </div>
-              <div className="bg-canvas-soft rounded-xl p-5 border border-canvas-soft space-y-4 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-mute font-mono">Calculated Fare Quote</div>
-                <div className="text-4xl font-bold font-mono text-ink">₹{baseFareINR}</div>
-                <p className="text-xs text-mute">Distance: 12.4 km · Traffic Index: Normal</p>
+              <div className="bg-background-secondary rounded-xl p-5 border border-background-secondary space-y-4 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-content-tertiary font-mono">Calculated Fare Quote</div>
+                <div className="text-4xl font-bold font-mono text-content-primary">₹{baseFareINR}</div>
+                <p className="text-xs text-content-tertiary">Distance: 12.4 km · Traffic Index: Normal</p>
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Custom Fare Override (INR)</label>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Custom Fare Override (INR)</label>
                 <input
                   type="number"
-                  className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono text-center"
+                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono text-center"
                   value={baseFareINR}
                   onChange={(e) => setBaseFareINR(Number(e.target.value))}
                 />
@@ -396,23 +396,23 @@ export const ManualBooking: React.FC = () => {
           {step === 5 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Assign Driver</h3>
-                <p className="text-xs text-mute mt-1">Select from currently online available drivers or leave empty for auto-matching</p>
+                <h3 className="text-sm font-bold text-content-primary">Assign Driver</h3>
+                <p className="text-xs text-content-tertiary mt-1">Select from currently online available drivers or leave empty for auto-matching</p>
               </div>
               {driversLoading ? (
-                <div className="p-12 text-center text-xs text-mute animate-pulse">Scanning available drivers...</div>
+                <div className="p-12 text-center text-xs text-content-tertiary animate-pulse">Scanning available drivers...</div>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   <button
                     onClick={() => setAssignedDriverId('')}
                     className={`w-full text-left p-3 rounded-xl border flex justify-between items-center text-xs transition-colors ${
                       assignedDriverId === ''
-                        ? 'border-ink bg-canvas-softer font-bold'
-                        : 'border-canvas-soft hover:bg-canvas-softer/50'
+                        ? 'border-content-primary bg-background-tertiary font-bold'
+                        : 'border-background-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
                     <span>Auto-Dispatch (Engine Match)</span>
-                    <span className="text-[10px] text-mute font-mono">system assignment</span>
+                    <span className="text-[10px] text-content-tertiary font-mono">system assignment</span>
                   </button>
                   {availableDrivers.map((drv) => (
                     <button
@@ -420,15 +420,15 @@ export const ManualBooking: React.FC = () => {
                       onClick={() => setAssignedDriverId(drv.id)}
                       className={`w-full text-left p-3 rounded-xl border flex justify-between items-center text-xs transition-colors ${
                         assignedDriverId === drv.id
-                          ? 'border-ink bg-canvas-softer font-bold'
-                          : 'border-canvas-soft hover:bg-canvas-softer/50'
+                          ? 'border-content-primary bg-background-tertiary font-bold'
+                          : 'border-background-secondary hover:bg-background-tertiary/50'
                       }`}
                     >
                       <div>
-                        <span className="block text-ink">{drv.name}</span>
-                        <span className="block text-[10px] text-mute font-mono">{drv.phone}</span>
+                        <span className="block text-content-primary">{drv.name}</span>
+                        <span className="block text-[10px] text-content-tertiary font-mono">{drv.phone}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-mute truncate max-w-[120px]">{drv.id}</span>
+                      <span className="text-[10px] font-mono text-content-tertiary truncate max-w-[120px]">{drv.id}</span>
                     </button>
                   ))}
                 </div>
@@ -440,33 +440,33 @@ export const ManualBooking: React.FC = () => {
           {step === 6 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-ink">Confirm Booking Parameters</h3>
-                <p className="text-xs text-mute mt-1">Audit the finalized parameters before executing insertion</p>
+                <h3 className="text-sm font-bold text-content-primary">Confirm Booking Parameters</h3>
+                <p className="text-xs text-content-tertiary mt-1">Audit the finalized parameters before executing insertion</p>
               </div>
-              <div className="bg-canvas-soft border border-canvas-soft rounded-xl p-4 space-y-2 text-xs">
+              <div className="bg-background-secondary border border-background-secondary rounded-xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-mute">Rider UUID:</span>
-                  <span className="font-mono text-ink font-semibold truncate max-w-[200px]">{customerId}</span>
+                  <span className="text-content-tertiary">Rider UUID:</span>
+                  <span className="font-mono text-content-primary font-semibold truncate max-w-[200px]">{customerId}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-mute">Vehicle Selected:</span>
-                  <span className="text-ink font-semibold">{carModel} ({carPlate})</span>
+                  <span className="text-content-tertiary">Vehicle Selected:</span>
+                  <span className="text-content-primary font-semibold">{carModel} ({carPlate})</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-mute">City prefix:</span>
-                  <span className="text-ink font-semibold font-mono">{cityPrefix}</span>
+                  <span className="text-content-tertiary">City prefix:</span>
+                  <span className="text-content-primary font-semibold font-mono">{cityPrefix}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-mute">Type of Trip:</span>
-                  <span className="text-ink font-semibold capitalize">{tripType}</span>
+                  <span className="text-content-tertiary">Type of Trip:</span>
+                  <span className="text-content-primary font-semibold capitalize">{tripType}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-mute">Base Fare:</span>
-                  <span className="text-ink font-semibold font-mono">₹{baseFareINR.toFixed(2)}</span>
+                  <span className="text-content-tertiary">Base Fare:</span>
+                  <span className="text-content-primary font-semibold font-mono">₹{baseFareINR.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-mute">Assigned Driver:</span>
-                  <span className="text-ink font-semibold font-mono">
+                  <span className="text-content-tertiary">Assigned Driver:</span>
+                  <span className="text-content-primary font-semibold font-mono">
                     {assignedDriverId ? assignedDriverId : 'Auto-dispatch pool'}
                   </span>
                 </div>
@@ -475,11 +475,11 @@ export const ManualBooking: React.FC = () => {
           )}
 
           {/* Footer Controls */}
-          <div className="flex justify-between border-t border-canvas-soft pt-4">
+          <div className="flex justify-between border-t border-background-secondary pt-4">
             <button
               onClick={() => step > 1 && setStep(step - 1)}
               disabled={step === 1}
-              className="text-xs text-body hover:text-ink font-semibold px-3 disabled:opacity-40 h-9"
+              className="text-xs text-content-secondary hover:text-content-primary font-semibold px-3 disabled:opacity-40 h-9"
             >
               Back
             </button>
@@ -492,7 +492,7 @@ export const ManualBooking: React.FC = () => {
                   }
                   setStep(step + 1);
                 }}
-                className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-5 hover:bg-black-elevated transition-colors"
+                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-5 hover:bg-gray-800 transition-colors"
               >
                 Continue
               </button>
@@ -500,7 +500,7 @@ export const ManualBooking: React.FC = () => {
               <button
                 onClick={handleConfirmBooking}
                 disabled={loading}
-                className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-5 hover:bg-black-elevated transition-colors"
+                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-5 hover:bg-gray-800 transition-colors"
               >
                 {loading ? 'Creating Ride...' : 'Confirm & Dispatch'}
               </button>

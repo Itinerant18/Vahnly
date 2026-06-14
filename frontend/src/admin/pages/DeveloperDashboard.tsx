@@ -64,14 +64,14 @@ export const DeveloperDashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-ink">Developer / API</h1>
-        <p className="text-sm text-mute">API keys, webhooks, request logs, and status page management</p>
+        <h1 className="text-xl font-bold text-content-primary">Developer / API</h1>
+        <p className="text-sm text-content-tertiary">API keys, webhooks, request logs, and status page management</p>
       </div>
-      <div className="flex gap-1 border-b border-canvas-soft">
+      <div className="flex gap-1 border-b border-background-secondary">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-              tab === t.key ? 'border-accent text-accent' : 'border-transparent text-body hover:text-ink'
+              tab === t.key ? 'border-accent text-accent' : 'border-transparent text-content-secondary hover:text-content-primary'
             }`}>
             {t.icon} {t.label}
           </button>
@@ -119,71 +119,71 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-mute">Plaintext keys are shown ONCE at creation and cannot be retrieved again.</p>
+        <p className="text-sm text-content-tertiary">Plaintext keys are shown ONCE at creation and cannot be retrieved again.</p>
         {isSuperAdmin && <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Generate Key</button>}
       </div>
 
       {createdKey && (
         <div className="bg-surface-positive border border-positive-400 rounded-xl p-4 space-y-2">
           <div className="text-sm font-semibold text-content-positive">✓ Key created — copy it now, it won't be shown again!</div>
-          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdKey}</div>
+          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-content-primary break-all">{createdKey}</div>
           <button onClick={() => { navigator.clipboard.writeText(createdKey); setCreatedKey(null); }}
             className="px-3 py-1.5 bg-positive-400 text-white rounded text-xs font-medium hover:bg-positive-400">Copy & Dismiss</button>
         </div>
       )}
 
       {showCreate && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">New API Key</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">New API Key</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className="text-xs text-mute">Name</label><input value={newKey.name} onChange={e => setNewKey({ ...newKey, name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Owner Type</label>
-              <select value={newKey.owner_type} onChange={e => setNewKey({ ...newKey, owner_type: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            <div><label className="text-xs text-content-tertiary">Name</label><input value={newKey.name} onChange={e => setNewKey({ ...newKey, name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Owner Type</label>
+              <select value={newKey.owner_type} onChange={e => setNewKey({ ...newKey, owner_type: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['CORPORATE','PARTNER','INTERNAL'].map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div><label className="text-xs text-mute">Owner Name</label><input value={newKey.owner_name} onChange={e => setNewKey({ ...newKey, owner_name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Rate Limit / min</label><input type="number" value={newKey.rate_limit_per_min} onChange={e => setNewKey({ ...newKey, rate_limit_per_min: Number(e.target.value) })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Owner Name</label><input value={newKey.owner_name} onChange={e => setNewKey({ ...newKey, owner_name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Rate Limit / min</label><input type="number" value={newKey.rate_limit_per_min} onChange={e => setNewKey({ ...newKey, rate_limit_per_min: Number(e.target.value) })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
           </div>
           <div>
-            <label className="text-xs text-mute">Scopes</label>
+            <label className="text-xs text-content-tertiary">Scopes</label>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {SCOPES_ALL.map(s => (
                 <button key={s} onClick={() => setNewKey({ ...newKey, scopes: newKey.scopes.includes(s) ? newKey.scopes.filter((x: string) => x !== s) : [...newKey.scopes, s] })}
-                  className={`px-2.5 py-1 rounded text-xs border font-mono ${newKey.scopes.includes(s) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{s}</button>
+                  className={`px-2.5 py-1 rounded text-xs border font-mono ${newKey.scopes.includes(s) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{s}</button>
               ))}
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newKey.is_sandbox} onChange={e => setNewKey({ ...newKey, is_sandbox: e.target.checked })} /> Sandbox key (cannot access production data)</label>
           <div className="flex gap-2">
             <button onClick={createKey} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Generate</button>
-            <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {keys.filter(k => !k.is_sandbox).map(k => (
-          <div key={k.id} className={`bg-canvas rounded-xl border border-canvas-soft p-4 flex items-center gap-4 ${!k.is_active ? 'opacity-60' : ''}`}>
+          <div key={k.id} className={`bg-background-primary rounded-xl border border-background-secondary p-4 flex items-center gap-4 ${!k.is_active ? 'opacity-60' : ''}`}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-sm text-ink">{k.name}</span>
-                <span className="font-mono text-xs bg-canvas-soft px-2 py-0.5 rounded text-mute">{k.key_prefix}…</span>
+                <span className="font-medium text-sm text-content-primary">{k.name}</span>
+                <span className="font-mono text-xs bg-background-secondary px-2 py-0.5 rounded text-content-tertiary">{k.key_prefix}…</span>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${k.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{k.is_active ? 'ACTIVE' : 'REVOKED'}</span>
-                <span className="text-xs text-mute">{k.owner_name}</span>
+                <span className="text-xs text-content-tertiary">{k.owner_name}</span>
               </div>
-              <div className="flex gap-3 mt-1 text-xs text-mute flex-wrap">
+              <div className="flex gap-3 mt-1 text-xs text-content-tertiary flex-wrap">
                 <span>{k.rate_limit_per_min}/min</span>
                 <span>{k.quota_monthly.toLocaleString()}/month</span>
                 <span>Last used: {relTime(k.last_used_at)}</span>
               </div>
               <div className="flex gap-1 mt-1.5 flex-wrap">
-                {k.scopes.map(s => <span key={s} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 font-mono text-mute">{s}</span>)}
+                {k.scopes.map(s => <span key={s} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 font-mono text-content-tertiary">{s}</span>)}
               </div>
             </div>
             {isSuperAdmin && (
               <div className="flex gap-2 shrink-0">
-                <button onClick={() => toggleKey(k)} className="text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft">{k.is_active ? 'Disable' : 'Enable'}</button>
+                <button onClick={() => toggleKey(k)} className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">{k.is_active ? 'Disable' : 'Enable'}</button>
                 <button onClick={() => revokeKey(k.id)} className="text-xs border border-negative-400 text-content-negative rounded px-2 py-1 hover:bg-surface-negative">Revoke</button>
               </div>
             )}
@@ -229,63 +229,63 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-mute">Subscribe to platform events via HTTP POST webhooks. Signed with HMAC-SHA256.</p>
+        <p className="text-sm text-content-tertiary">Subscribe to platform events via HTTP POST webhooks. Signed with HMAC-SHA256.</p>
         {isSuperAdmin && <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Add Webhook</button>}
       </div>
 
       {createdSecret && (
         <div className="bg-surface-positive border border-positive-400 rounded-xl p-4 space-y-2">
           <div className="text-sm font-semibold text-content-positive">✓ Webhook created — save the signing secret!</div>
-          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-ink break-all">{createdSecret}</div>
+          <div className="bg-white border border-positive-400 rounded-lg px-4 py-2.5 font-mono text-sm text-content-primary break-all">{createdSecret}</div>
           <button onClick={() => { navigator.clipboard.writeText(createdSecret); setCreatedSecret(null); }}
             className="px-3 py-1.5 bg-positive-400 text-white rounded text-xs font-medium hover:bg-positive-400">Copy & Dismiss</button>
         </div>
       )}
 
       {showCreate && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">New Webhook</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">New Webhook</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div><label className="text-xs text-mute">Name</label><input value={newWh.name} onChange={e => setNewWh({ ...newWh, name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Endpoint URL</label><input value={newWh.endpoint_url} onChange={e => setNewWh({ ...newWh, endpoint_url: e.target.value })} placeholder="https://your-server.com/hooks" className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm font-mono bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Name</label><input value={newWh.name} onChange={e => setNewWh({ ...newWh, name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Endpoint URL</label><input value={newWh.endpoint_url} onChange={e => setNewWh({ ...newWh, endpoint_url: e.target.value })} placeholder="https://your-server.com/hooks" className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm font-mono bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
           </div>
           <div>
-            <label className="text-xs text-mute">Subscribe to events</label>
+            <label className="text-xs text-content-tertiary">Subscribe to events</label>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {availableEvents.map(ev => (
                 <button key={ev} onClick={() => setNewWh({ ...newWh, subscribed_events: newWh.subscribed_events.includes(ev) ? newWh.subscribed_events.filter((x: string) => x !== ev) : [...newWh.subscribed_events, ev] })}
-                  className={`px-2.5 py-1 rounded text-xs border font-mono ${newWh.subscribed_events.includes(ev) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{ev}</button>
+                  className={`px-2.5 py-1 rounded text-xs border font-mono ${newWh.subscribed_events.includes(ev) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{ev}</button>
               ))}
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={createWebhook} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Create</button>
-            <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {webhooks.map(wh => (
-          <div key={wh.id} className={`bg-canvas rounded-xl border border-canvas-soft p-4 ${!wh.is_active ? 'opacity-60' : ''}`}>
+          <div key={wh.id} className={`bg-background-primary rounded-xl border border-background-secondary p-4 ${!wh.is_active ? 'opacity-60' : ''}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm text-ink">{wh.name}</span>
+                  <span className="font-medium text-sm text-content-primary">{wh.name}</span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${wh.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{wh.is_active ? 'ACTIVE' : 'PAUSED'}</span>
                   {wh.failure_count > 0 && <span className="text-[10px] bg-surface-negative text-content-negative px-1.5 py-0.5 rounded">{wh.failure_count} failures</span>}
                 </div>
-                <div className="text-xs font-mono text-mute mt-0.5 truncate max-w-md">{wh.endpoint_url}</div>
+                <div className="text-xs font-mono text-content-tertiary mt-0.5 truncate max-w-md">{wh.endpoint_url}</div>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {wh.subscribed_events.map(ev => <span key={ev} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 font-mono text-mute">{ev}</span>)}
+                  {wh.subscribed_events.map(ev => <span key={ev} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 font-mono text-content-tertiary">{ev}</span>)}
                 </div>
-                <div className="text-xs text-mute mt-1">Secret: <span className="font-mono">{wh.signing_secret}</span> · Last fired: {relTime(wh.last_triggered_at)}{wh.last_status_code ? ` (${wh.last_status_code})` : ''}</div>
+                <div className="text-xs text-content-tertiary mt-1">Secret: <span className="font-mono">{wh.signing_secret}</span> · Last fired: {relTime(wh.last_triggered_at)}{wh.last_status_code ? ` (${wh.last_status_code})` : ''}</div>
               </div>
               <div className="flex gap-2 shrink-0">
-                <button onClick={() => testWebhook(wh.id)} disabled={testing === wh.id} className="text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft disabled:opacity-50">
+                <button onClick={() => testWebhook(wh.id)} disabled={testing === wh.id} className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary disabled:opacity-50">
                   {testing === wh.id ? '…' : 'Test'}
                 </button>
-                {isSuperAdmin && <button onClick={() => toggleWebhook(wh)} className="text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft">{wh.is_active ? 'Pause' : 'Resume'}</button>}
+                {isSuperAdmin && <button onClick={() => toggleWebhook(wh)} className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">{wh.is_active ? 'Pause' : 'Resume'}</button>}
               </div>
             </div>
           </div>
@@ -299,23 +299,23 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
 const LOG_COLUMNS: ColumnDef<APILogEntry>[] = [
   {
     key: 'created_at', header: 'Time', type: 'date',
-    render: (v) => <span className="text-xs text-mute">{relTime(v as string | null)}</span>,
+    render: (v) => <span className="text-xs text-content-tertiary">{relTime(v as string | null)}</span>,
   },
   {
     key: 'key_prefix', header: 'Key',
     render: (v, r) => (
-      <span className="font-mono text-mono-small text-body">
+      <span className="font-mono text-mono-small text-content-secondary">
         {String(v)}{r.is_sandbox && <span className="ml-1 text-[10px] bg-surface-warning text-content-warning px-1 rounded">sandbox</span>}
       </span>
     ),
   },
   {
     key: 'method', header: 'Method',
-    render: (v) => <span className="font-mono text-mono-small font-medium text-body">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small font-medium text-content-secondary">{String(v)}</span>,
   },
   {
     key: 'path', header: 'Path',
-    render: (v) => <span className="font-mono text-mono-small text-mute truncate max-w-xs block">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small text-content-tertiary truncate max-w-xs block">{String(v)}</span>,
   },
   {
     key: 'status_code', header: 'Status', type: 'numeric',
@@ -324,7 +324,7 @@ const LOG_COLUMNS: ColumnDef<APILogEntry>[] = [
   { key: 'response_time_ms', header: 'RT (ms)', type: 'numeric' },
   {
     key: 'ip_address', header: 'IP',
-    render: (v) => <span className="font-mono text-mono-small text-mute">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small text-content-tertiary">{String(v)}</span>,
   },
 ];
 
@@ -351,18 +351,18 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
         <input placeholder="Filter by key prefix…" value={keyFilter} onChange={e => { setKeyFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
         <input placeholder="Status code (e.g. 429)…" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
-        <span className="ml-auto text-xs text-mute self-center">{total.toLocaleString()} requests</span>
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
+        <span className="ml-auto text-xs text-content-tertiary self-center">{total.toLocaleString()} requests</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-4 gap-3">
           {[['Total', total.toLocaleString()], ['Error Rate', `${stats.error_rate?.toFixed(1) ?? 0}%`], ['Avg RT', `${stats.avg_response_ms?.toFixed(0) ?? 0}ms`], ['p99 RT', `${stats.p99_response_ms?.toFixed(0) ?? 0}ms`]].map(([l, v]) => (
-            <div key={l} className="bg-canvas border border-canvas-soft rounded-xl p-3 text-center">
-              <div className="text-xs text-mute">{l}</div>
-              <div className="text-lg font-bold text-ink mt-0.5">{v}</div>
+            <div key={l} className="bg-background-primary border border-background-secondary rounded-xl p-3 text-center">
+              <div className="text-xs text-content-tertiary">{l}</div>
+              <div className="text-lg font-bold text-content-primary mt-0.5">{v}</div>
             </div>
           ))}
         </div>
@@ -375,9 +375,9 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
       />
       {Math.ceil(total / PAGE_SIZE) > 1 && (
         <div className="flex justify-between text-sm">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-canvas-soft rounded-lg text-body disabled:opacity-40 hover:bg-canvas-soft">Prev</button>
-          <span className="text-mute">Page {page + 1}</span>
-          <button disabled={page >= Math.ceil(total / PAGE_SIZE) - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-canvas-soft rounded-lg text-body disabled:opacity-40 hover:bg-canvas-soft">Next</button>
+          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 border border-background-secondary rounded-lg text-content-secondary disabled:opacity-40 hover:bg-background-secondary">Prev</button>
+          <span className="text-content-tertiary">Page {page + 1}</span>
+          <button disabled={page >= Math.ceil(total / PAGE_SIZE) - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 border border-background-secondary rounded-lg text-content-secondary disabled:opacity-40 hover:bg-background-secondary">Next</button>
         </div>
       )}
     </div>
@@ -403,23 +403,23 @@ const SandboxTab: React.FC<{ base: string; headers: Record<string, string>; isSu
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[['Base URL', `${API_GATEWAY_BASE_URL}/api/v1`], ['Auth', 'X-API-Key: {your-sandbox-key}'], ['Trip Webhook', 'Fires to your endpoint but does not charge real users'], ['Rate Limits', '1000 req/min in sandbox (vs prod limits)']].map(([k, v]) => (
-          <div key={k} className="bg-canvas border border-canvas-soft rounded-xl p-4">
-            <div className="text-xs text-mute uppercase tracking-wide">{k}</div>
-            <div className="text-sm font-mono text-ink mt-1">{v}</div>
+          <div key={k} className="bg-background-primary border border-background-secondary rounded-xl p-4">
+            <div className="text-xs text-content-tertiary uppercase tracking-wide">{k}</div>
+            <div className="text-sm font-mono text-content-primary mt-1">{v}</div>
           </div>
         ))}
       </div>
       <div>
-        <div className="text-sm font-semibold text-ink mb-2">Sandbox API Keys</div>
-        {sandboxKeys.length === 0 && <div className="text-sm text-mute">No sandbox keys yet. Create one from the API Keys tab.</div>}
+        <div className="text-sm font-semibold text-content-primary mb-2">Sandbox API Keys</div>
+        {sandboxKeys.length === 0 && <div className="text-sm text-content-tertiary">No sandbox keys yet. Create one from the API Keys tab.</div>}
         {sandboxKeys.map(k => (
-          <div key={k.id} className="bg-canvas border border-canvas-soft rounded-xl p-4 flex items-center gap-3">
+          <div key={k.id} className="bg-background-primary border border-background-secondary rounded-xl p-4 flex items-center gap-3">
             <span className="text-2xl">🧪</span>
             <div>
-              <div className="text-sm font-medium text-ink">{k.name}</div>
-              <div className="font-mono text-xs text-mute">{k.key_prefix}…</div>
+              <div className="text-sm font-medium text-content-primary">{k.name}</div>
+              <div className="font-mono text-xs text-content-tertiary">{k.key_prefix}…</div>
             </div>
-            <div className="ml-auto text-xs text-mute">Created {relTime(k.created_at)}</div>
+            <div className="ml-auto text-xs text-content-tertiary">Created {relTime(k.created_at)}</div>
           </div>
         ))}
       </div>
@@ -460,70 +460,70 @@ const StatusPageTab: React.FC<{ base: string; headers: Record<string, string>; i
           <div className={`font-semibold text-sm ${systemOK ? 'text-content-positive' : 'text-content-negative'}`}>
             {systemOK ? 'All Systems Operational' : `${openIncidents.length} Active Incident${openIncidents.length > 1 ? 's' : ''}`}
           </div>
-          <div className="text-xs text-mute">Updated {new Date().toLocaleTimeString('en-IN')}</div>
+          <div className="text-xs text-content-tertiary">Updated {new Date().toLocaleTimeString('en-IN')}</div>
         </div>
         {isSuperAdmin && <button onClick={() => setEditing({ severity: 'MINOR', status: 'INVESTIGATING', affected_components: [] })} className="ml-auto px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Incident</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">{editing.id ? 'Update' : 'New'} Incident</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">{editing.id ? 'Update' : 'New'} Incident</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="md:col-span-2"><label className="text-xs text-mute">Title</label><input value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Severity</label>
-              <select value={editing.severity || 'MINOR'} onChange={e => setEditing({ ...editing, severity: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            <div className="md:col-span-2"><label className="text-xs text-content-tertiary">Title</label><input value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Severity</label>
+              <select value={editing.severity || 'MINOR'} onChange={e => setEditing({ ...editing, severity: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['MINOR','MAJOR','CRITICAL'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div><label className="text-xs text-mute">Status</label>
-              <select value={editing.status || 'INVESTIGATING'} onChange={e => setEditing({ ...editing, status: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            <div><label className="text-xs text-content-tertiary">Status</label>
+              <select value={editing.status || 'INVESTIGATING'} onChange={e => setEditing({ ...editing, status: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['INVESTIGATING','IDENTIFIED','MONITORING','RESOLVED'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="md:col-span-2"><label className="text-xs text-mute">Description</label><textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={2} className="mt-1 w-full border border-canvas-soft rounded px-3 py-2 text-sm bg-canvas text-ink resize-none focus:outline-none" /></div>
+            <div className="md:col-span-2"><label className="text-xs text-content-tertiary">Description</label><textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={2} className="mt-1 w-full border border-background-secondary rounded px-3 py-2 text-sm bg-background-primary text-content-primary resize-none focus:outline-none" /></div>
           </div>
           <div>
-            <label className="text-xs text-mute">Affected Components</label>
+            <label className="text-xs text-content-tertiary">Affected Components</label>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {COMPONENTS.map(c => (
                 <button key={c} onClick={() => {
                   const cur = editing.affected_components || [];
                   setEditing({ ...editing, affected_components: cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c] });
-                }} className={`px-2.5 py-1 rounded text-xs border font-mono ${(editing.affected_components || []).includes(c) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{c}</button>
+                }} className={`px-2.5 py-1 rounded text-xs border font-mono ${(editing.affected_components || []).includes(c) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{c}</button>
               ))}
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={save} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {incidents.map(inc => (
-          <div key={inc.id} className="bg-canvas rounded-xl border border-canvas-soft p-4">
+          <div key={inc.id} className="bg-background-primary rounded-xl border border-background-secondary p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${SEVERITY_COLORS[inc.severity] ?? 'bg-canvas-soft text-body'}`}>{inc.severity}</span>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${INCIDENT_STATUS[inc.status] ?? 'bg-canvas-soft text-body'}`}>{inc.status}</span>
-                  <span className="text-sm font-medium text-ink">{inc.title}</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${SEVERITY_COLORS[inc.severity] ?? 'bg-background-secondary text-content-secondary'}`}>{inc.severity}</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${INCIDENT_STATUS[inc.status] ?? 'bg-background-secondary text-content-secondary'}`}>{inc.status}</span>
+                  <span className="text-sm font-medium text-content-primary">{inc.title}</span>
                 </div>
-                <p className="text-xs text-mute mt-1">{inc.description}</p>
+                <p className="text-xs text-content-tertiary mt-1">{inc.description}</p>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {inc.affected_components.map(c => <span key={c} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 font-mono text-mute">{c}</span>)}
+                  {inc.affected_components.map(c => <span key={c} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 font-mono text-content-tertiary">{c}</span>)}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-xs text-mute">{relTime(inc.started_at)}</div>
+                <div className="text-xs text-content-tertiary">{relTime(inc.started_at)}</div>
                 {inc.resolved_at && <div className="text-xs text-content-positive">Resolved {relTime(inc.resolved_at)}</div>}
                 {isSuperAdmin && <button onClick={() => setEditing(inc)} className="text-xs text-accent hover:underline mt-1">Update</button>}
               </div>
             </div>
           </div>
         ))}
-        {incidents.length === 0 && <div className="text-center py-8 text-sm text-mute">No incidents recorded.</div>}
+        {incidents.length === 0 && <div className="text-center py-8 text-sm text-content-tertiary">No incidents recorded.</div>}
       </div>
     </div>
   );

@@ -303,16 +303,16 @@ export const DispatchDashboard: React.FC = () => {
 	return (
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold tracking-tight text-ink">Dispatch & Zones Configuration</h1>
-				<p className="text-xs text-mute mt-1">Configure service area polygons, sub-zones, routing matching parameters, and restricted geofences</p>
+				<h1 className="text-2xl font-bold tracking-tight text-content-primary">Dispatch & Zones Configuration</h1>
+				<p className="text-xs text-content-tertiary mt-1">Configure service area polygons, sub-zones, routing matching parameters, and restricted geofences</p>
 			</div>
 
 			{/* Navigation Tabs */}
-			<div className="flex border-b border-canvas-soft bg-canvas rounded-xl p-1 shadow-sm max-w-lg">
+			<div className="flex border-b border-background-secondary bg-background-primary rounded-xl p-1 shadow-sm max-w-lg">
 				<button
 					onClick={() => setActiveTab('cities')}
 					className={`flex-1 h-9 rounded-pill text-xs font-semibold transition-colors ${
-						activeTab === 'cities' ? 'bg-canvas-soft text-ink border-canvas-soft border' : 'text-mute hover:text-ink'
+						activeTab === 'cities' ? 'bg-background-secondary text-content-primary border-background-secondary border' : 'text-content-tertiary hover:text-content-primary'
 					}`}
 				>
 					Cities & Service Areas
@@ -320,7 +320,7 @@ export const DispatchDashboard: React.FC = () => {
 				<button
 					onClick={() => setActiveTab('zones')}
 					className={`flex-1 h-9 rounded-pill text-xs font-semibold transition-colors ${
-						activeTab === 'zones' ? 'bg-canvas-soft text-ink border-canvas-soft border' : 'text-mute hover:text-ink'
+						activeTab === 'zones' ? 'bg-background-secondary text-content-primary border-background-secondary border' : 'text-content-tertiary hover:text-content-primary'
 					}`}
 				>
 					Sub-Zones
@@ -328,7 +328,7 @@ export const DispatchDashboard: React.FC = () => {
 				<button
 					onClick={() => setActiveTab('geofences')}
 					className={`flex-1 h-9 rounded-pill text-xs font-semibold transition-colors ${
-						activeTab === 'geofences' ? 'bg-canvas-soft text-ink border-canvas-soft border' : 'text-mute hover:text-ink'
+						activeTab === 'geofences' ? 'bg-background-secondary text-content-primary border-background-secondary border' : 'text-content-tertiary hover:text-content-primary'
 					}`}
 				>
 					Geofences
@@ -336,7 +336,7 @@ export const DispatchDashboard: React.FC = () => {
 				<button
 					onClick={() => setActiveTab('rules')}
 					className={`flex-1 h-9 rounded-pill text-xs font-semibold transition-colors ${
-						activeTab === 'rules' ? 'bg-canvas-soft text-ink border-canvas-soft border' : 'text-mute hover:text-ink'
+						activeTab === 'rules' ? 'bg-background-secondary text-content-primary border-background-secondary border' : 'text-content-tertiary hover:text-content-primary'
 					}`}
 				>
 					Rules Engine
@@ -344,16 +344,16 @@ export const DispatchDashboard: React.FC = () => {
 			</div>
 
 			{loading ? (
-				<div className="p-12 text-center text-xs text-mute animate-pulse">Loading dispatch configurations...</div>
+				<div className="p-12 text-center text-xs text-content-tertiary animate-pulse">Loading dispatch configurations...</div>
 			) : (
 				<>
 					{/* TAB: CITIES & SERVICE AREAS */}
 					{activeTab === 'cities' && (
 						<div className="space-y-6">
-							<div className="flex justify-between items-center bg-canvas p-4 rounded-xl border border-canvas-soft shadow-sm">
+							<div className="flex justify-between items-center bg-background-primary p-4 rounded-xl border border-background-secondary shadow-sm">
 								<div>
-									<h2 className="text-sm font-bold text-ink">Active Service Cities</h2>
-									<p className="text-[11px] text-mute">Manage core operating regional polygons and active service slots</p>
+									<h2 className="text-sm font-bold text-content-primary">Active Service Cities</h2>
+									<p className="text-[11px] text-content-tertiary">Manage core operating regional polygons and active service slots</p>
 								</div>
 								<button
 									onClick={() => {
@@ -362,7 +362,7 @@ export const DispatchDashboard: React.FC = () => {
 										setNewCityCoordsText('22.5726 88.3639, 22.5800 88.3700, 22.5900 88.3500');
 										setShowCityModal(true);
 									}}
-									className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+									className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 								>
 									Add Regional City +
 								</button>
@@ -370,29 +370,29 @@ export const DispatchDashboard: React.FC = () => {
 
 							<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 								{/* Left: Cities Table list */}
-								<div className="lg:col-span-2 bg-canvas rounded-xl border border-canvas-soft overflow-hidden shadow-sm">
+								<div className="lg:col-span-2 bg-background-primary rounded-xl border border-background-secondary overflow-hidden shadow-sm">
 									<table className="w-full text-left border-collapse text-xs">
 										<thead>
-											<tr className="border-b border-canvas-soft bg-canvas-soft">
-												<th className="p-3 text-[10px] font-semibold uppercase text-mute">Prefix</th>
-												<th className="p-3 text-[10px] font-semibold uppercase text-mute">City Name</th>
-												<th className="p-3 text-[10px] font-semibold uppercase text-mute">Operating Hours</th>
-												<th className="p-3 text-[10px] font-semibold uppercase text-mute">Trip Types</th>
-												<th className="p-3 text-[10px] font-semibold uppercase text-mute">Status</th>
+											<tr className="border-b border-background-secondary bg-background-secondary">
+												<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Prefix</th>
+												<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">City Name</th>
+												<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Operating Hours</th>
+												<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Trip Types</th>
+												<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Status</th>
 											</tr>
 										</thead>
-										<tbody className="divide-y divide-canvas-soft">
+										<tbody className="divide-y divide-background-secondary">
 											{cities.map((city) => (
-												<tr key={city.city_prefix} className="hover:bg-canvas-softer transition-colors">
-													<td className="p-3 font-mono font-bold text-ink">{city.city_prefix}</td>
-													<td className="p-3 font-semibold text-ink">{city.city_name}</td>
-													<td className="p-3 font-mono text-body">
+												<tr key={city.city_prefix} className="hover:bg-background-tertiary transition-colors">
+													<td className="p-3 font-mono font-bold text-content-primary">{city.city_prefix}</td>
+													<td className="p-3 font-semibold text-content-primary">{city.city_name}</td>
+													<td className="p-3 font-mono text-content-secondary">
 														{city.operating_hours_start} - {city.operating_hours_end}
 													</td>
 													<td className="p-3">
 														<div className="flex flex-wrap gap-1.5">
 															{city.supported_trip_types.map((type) => (
-																<span key={type} className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-2 py-0.5 text-mute font-bold">
+																<span key={type} className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-2 py-0.5 text-content-tertiary font-bold">
 																	{type}
 																</span>
 															))}
@@ -400,9 +400,9 @@ export const DispatchDashboard: React.FC = () => {
 													</td>
 													<td className="p-3">
 														<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2.5 tracking-wider ${
-															city.is_active ? 'bg-canvas text-ink border-canvas-soft' : 'bg-canvas-soft text-mute border-canvas-soft'
+															city.is_active ? 'bg-background-primary text-content-primary border-background-secondary' : 'bg-background-secondary text-content-tertiary border-background-secondary'
 														}`}>
-															<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${city.is_active ? 'bg-status-online' : 'bg-mute'}`} />
+															<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${city.is_active ? 'bg-status-online' : 'bg-content-tertiary'}`} />
 															{city.is_active ? 'active' : 'disabled'}
 														</span>
 													</td>
@@ -413,28 +413,28 @@ export const DispatchDashboard: React.FC = () => {
 								</div>
 
 								{/* Right: City Boundary Vector Visualizer (Mock Map) */}
-								<div className="bg-canvas p-4 rounded-xl border border-canvas-soft shadow-sm flex flex-col justify-between space-y-4">
+								<div className="bg-background-primary p-4 rounded-xl border border-background-secondary shadow-sm flex flex-col justify-between space-y-4">
 									<div>
-										<h3 className="text-xs font-bold text-ink uppercase tracking-wider">Service Boundary Map</h3>
-										<p className="text-[10px] text-mute">Geometric layout visualization of city boundary coordinates</p>
+										<h3 className="text-xs font-bold text-content-primary uppercase tracking-wider">Service Boundary Map</h3>
+										<p className="text-[10px] text-content-tertiary">Geometric layout visualization of city boundary coordinates</p>
 									</div>
 
-									<div className="aspect-square bg-canvas-soft rounded-xl border border-canvas-soft flex items-center justify-center relative overflow-hidden">
+									<div className="aspect-square bg-background-secondary rounded-xl border border-background-secondary flex items-center justify-center relative overflow-hidden">
 										{/* Mock SVG Map coordinates */}
 										<svg className="w-full h-full p-4" viewBox="0 0 100 100">
-											<polygon points="50,20 80,45 70,80 30,80 20,45" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-ink stroke-dasharray-[2,2]" />
-											<circle cx="50" cy="20" r="2" className="fill-ink" />
-											<circle cx="80" cy="45" r="2" className="fill-ink" />
-											<circle cx="70" cy="80" r="2" className="fill-ink" />
-											<circle cx="30" cy="80" r="2" className="fill-ink" />
-											<circle cx="20" cy="45" r="2" className="fill-ink" />
+											<polygon points="50,20 80,45 70,80 30,80 20,45" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-content-primary stroke-dasharray-[2,2]" />
+											<circle cx="50" cy="20" r="2" className="fill-content-primary" />
+											<circle cx="80" cy="45" r="2" className="fill-content-primary" />
+											<circle cx="70" cy="80" r="2" className="fill-content-primary" />
+											<circle cx="30" cy="80" r="2" className="fill-content-primary" />
+											<circle cx="20" cy="45" r="2" className="fill-content-primary" />
 										</svg>
-										<div className="absolute bottom-2 right-2 bg-canvas px-2 py-1 rounded border border-canvas-soft text-[9px] font-mono text-mute">
+										<div className="absolute bottom-2 right-2 bg-background-primary px-2 py-1 rounded border border-background-secondary text-[9px] font-mono text-content-tertiary">
 											Lon/Lat Vector Scaled
 										</div>
 									</div>
 
-									<div className="text-[10px] text-mute">
+									<div className="text-[10px] text-content-tertiary">
 										Select a city prefix on the rules engine tab to adjust its matching radius coordinates.
 									</div>
 								</div>
@@ -445,10 +445,10 @@ export const DispatchDashboard: React.FC = () => {
 					{/* TAB: SUB-ZONES */}
 					{activeTab === 'zones' && (
 						<div className="space-y-6">
-							<div className="flex justify-between items-center bg-canvas p-4 rounded-xl border border-canvas-soft shadow-sm">
+							<div className="flex justify-between items-center bg-background-primary p-4 rounded-xl border border-background-secondary shadow-sm">
 								<div>
-									<h2 className="text-sm font-bold text-ink">Sub-Zones inside Cities</h2>
-									<p className="text-[11px] text-mute">Create rules overrides (airports, stations, high demand points) within regional bounds</p>
+									<h2 className="text-sm font-bold text-content-primary">Sub-Zones inside Cities</h2>
+									<p className="text-[11px] text-content-tertiary">Create rules overrides (airports, stations, high demand points) within regional bounds</p>
 								</div>
 								<button
 									onClick={() => {
@@ -457,47 +457,47 @@ export const DispatchDashboard: React.FC = () => {
 										setZoneCoordsText('22.5600 88.3500, 22.5650 88.3550, 22.5550 88.3600');
 										setShowZoneModal(true);
 									}}
-									className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+									className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 								>
 									Add Sub-Zone +
 								</button>
 							</div>
 
-							<div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden shadow-sm">
+							<div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden shadow-sm">
 								<table className="w-full text-left border-collapse text-xs">
 									<thead>
-										<tr className="border-b border-canvas-soft bg-canvas-soft">
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Zone Name</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">City prefix</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Policy rules</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute text-center">Surge floor</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Allowed Transmissions</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Notes</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Status</th>
+										<tr className="border-b border-background-secondary bg-background-secondary">
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Zone Name</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">City prefix</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Policy rules</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary text-center">Surge floor</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Allowed Transmissions</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Notes</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Status</th>
 										</tr>
 									</thead>
-									<tbody className="divide-y divide-canvas-soft">
+									<tbody className="divide-y divide-background-secondary">
 										{subZonesOnly.map((z) => (
-											<tr key={z.id || z.zone_name} className="hover:bg-canvas-softer transition-colors">
-												<td className="p-3 font-semibold text-ink">{z.zone_name}</td>
-												<td className="p-3 font-mono font-semibold text-body">{z.city_prefix}</td>
+											<tr key={z.id || z.zone_name} className="hover:bg-background-tertiary transition-colors">
+												<td className="p-3 font-semibold text-content-primary">{z.zone_name}</td>
+												<td className="p-3 font-mono font-semibold text-content-secondary">{z.city_prefix}</td>
 												<td className="p-3">
-													<span className="text-[10px] uppercase font-bold text-ink bg-canvas-soft px-2 py-0.5 rounded border border-canvas-soft">
+													<span className="text-[10px] uppercase font-bold text-content-primary bg-background-secondary px-2 py-0.5 rounded border border-background-secondary">
 														{z.policy_type.replace('_', ' ').toLowerCase()}
 													</span>
 												</td>
-												<td className="p-3 font-mono font-bold text-ink text-center">
+												<td className="p-3 font-mono font-bold text-content-primary text-center">
 													{z.surge_multiplier.toFixed(2)}x
 												</td>
-												<td className="p-3 uppercase font-semibold text-mute text-[10px]">
+												<td className="p-3 uppercase font-semibold text-content-tertiary text-[10px]">
 													{z.allowed_transmissions}
 												</td>
-												<td className="p-3 text-mute max-w-xs truncate">{z.notes || '—'}</td>
+												<td className="p-3 text-content-tertiary max-w-xs truncate">{z.notes || '—'}</td>
 												<td className="p-3">
 													<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${
-														z.is_active ? 'bg-canvas text-ink border-canvas-soft' : 'bg-canvas-soft text-mute border-canvas-soft'
+														z.is_active ? 'bg-background-primary text-content-primary border-background-secondary' : 'bg-background-secondary text-content-tertiary border-background-secondary'
 													}`}>
-														<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${z.is_active ? 'bg-status-online' : 'bg-mute'}`} />
+														<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${z.is_active ? 'bg-status-online' : 'bg-content-tertiary'}`} />
 														{z.is_active ? 'active' : 'disabled'}
 													</span>
 												</td>
@@ -512,10 +512,10 @@ export const DispatchDashboard: React.FC = () => {
 					{/* TAB: RESTRICTED GEOFENCES */}
 					{activeTab === 'geofences' && (
 						<div className="space-y-6">
-							<div className="flex justify-between items-center bg-canvas p-4 rounded-xl border border-canvas-soft shadow-sm">
+							<div className="flex justify-between items-center bg-background-primary p-4 rounded-xl border border-background-secondary shadow-sm">
 								<div>
-									<h2 className="text-sm font-bold text-ink">Restricted Geofence Blacklists</h2>
-									<p className="text-[11px] text-mute">Establish sensitive polygons blocklisting pickup/drop operations or enforcing surcharges</p>
+									<h2 className="text-sm font-bold text-content-primary">Restricted Geofence Blacklists</h2>
+									<p className="text-[11px] text-content-tertiary">Establish sensitive polygons blocklisting pickup/drop operations or enforcing surcharges</p>
 								</div>
 								<button
 									onClick={() => {
@@ -524,41 +524,41 @@ export const DispatchDashboard: React.FC = () => {
 										setZoneCoordsText('22.5400 88.3300, 22.5450 88.3350, 22.5350 88.3400');
 										setShowZoneModal(true);
 									}}
-									className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+									className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 								>
 									Add Restricted Fence +
 								</button>
 							</div>
 
-							<div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden shadow-sm">
+							<div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden shadow-sm">
 								<table className="w-full text-left border-collapse text-xs">
 									<thead>
-										<tr className="border-b border-canvas-soft bg-canvas-soft">
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Fence Name</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">City Shard</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Restrictions</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Coordinates Polygon</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Notes</th>
-											<th className="p-3 text-[10px] font-semibold uppercase text-mute">Status</th>
+										<tr className="border-b border-background-secondary bg-background-secondary">
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Fence Name</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">City Shard</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Restrictions</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Coordinates Polygon</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Notes</th>
+											<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Status</th>
 										</tr>
 									</thead>
-									<tbody className="divide-y divide-canvas-soft">
+									<tbody className="divide-y divide-background-secondary">
 										{geofencesOnly.map((z) => (
-											<tr key={z.id || z.zone_name} className="hover:bg-canvas-softer transition-colors">
-												<td className="p-3 font-semibold text-ink text-status-alert">{z.zone_name}</td>
-												<td className="p-3 font-mono font-semibold text-body">{z.city_prefix}</td>
+											<tr key={z.id || z.zone_name} className="hover:bg-background-tertiary transition-colors">
+												<td className="p-3 font-semibold text-content-primary text-status-negative">{z.zone_name}</td>
+												<td className="p-3 font-mono font-semibold text-content-secondary">{z.city_prefix}</td>
 												<td className="p-3">
-													<span className="text-[9px] uppercase font-bold text-on-dark bg-status-alert px-2 py-0.5 rounded-pill tracking-wider">
+													<span className="text-[9px] uppercase font-bold text-gray-0 bg-status-negative px-2 py-0.5 rounded-pill tracking-wider">
 														BLOCK ALL DISPATCH
 													</span>
 												</td>
-												<td className="p-3 font-mono text-mute text-[10px]">
+												<td className="p-3 font-mono text-content-tertiary text-[10px]">
 													{z.polygon_coordinates ? `${z.polygon_coordinates.length} vertices` : 'None'}
 												</td>
-												<td className="p-3 text-mute max-w-xs truncate">{z.notes || '—'}</td>
+												<td className="p-3 text-content-tertiary max-w-xs truncate">{z.notes || '—'}</td>
 												<td className="p-3">
-													<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider bg-canvas border-canvas-soft text-ink`}>
-														<span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-status-alert" />
+													<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider bg-background-primary border-background-secondary text-content-primary`}>
+														<span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-status-negative" />
 														blocked
 													</span>
 												</td>
@@ -573,15 +573,15 @@ export const DispatchDashboard: React.FC = () => {
 					{/* TAB: DISPATCH RULES ENGINE */}
 					{activeTab === 'rules' && (
 						<div className="space-y-6">
-							<div className="flex justify-between items-center bg-canvas p-4 rounded-xl border border-canvas-soft shadow-sm">
+							<div className="flex justify-between items-center bg-background-primary p-4 rounded-xl border border-background-secondary shadow-sm">
 								<div>
-									<h2 className="text-sm font-bold text-ink">Rules & Radius Configurations</h2>
-									<p className="text-[11px] text-mute">Modify dispatch filters, wait limits, eligibility thresholds, and priority strategy per city</p>
+									<h2 className="text-sm font-bold text-content-primary">Rules & Radius Configurations</h2>
+									<p className="text-[11px] text-content-tertiary">Modify dispatch filters, wait limits, eligibility thresholds, and priority strategy per city</p>
 								</div>
 								<div className="flex items-center space-x-3">
-									<label className="text-[10px] uppercase font-bold text-mute font-sans">Select City Shard:</label>
+									<label className="text-[10px] uppercase font-bold text-content-tertiary font-sans">Select City Shard:</label>
 									<select
-										className="h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono font-bold"
+										className="h-8 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono font-bold"
 										value={selectedRulesCity}
 										onChange={(e) => setSelectedRulesCity(e.target.value)}
 									>
@@ -595,19 +595,19 @@ export const DispatchDashboard: React.FC = () => {
 							</div>
 
 							{rulesLoading || !rules ? (
-								<div className="p-12 text-center text-xs text-mute animate-pulse">Fetching rules parameters...</div>
+								<div className="p-12 text-center text-xs text-content-tertiary animate-pulse">Fetching rules parameters...</div>
 							) : (
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-canvas p-6 rounded-xl border border-canvas-soft shadow-sm">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-background-primary p-6 rounded-xl border border-background-secondary shadow-sm">
 									{/* Column 1: Matching Radius & Dispatch Waits */}
 									<div className="space-y-5">
-										<h3 className="text-xs font-bold uppercase text-ink border-b border-canvas-soft pb-2 tracking-wider">Matching Radius & Timing</h3>
+										<h3 className="text-xs font-bold uppercase text-content-primary border-b border-background-secondary pb-2 tracking-wider">Matching Radius & Timing</h3>
 
 										{/* Radius Sliders */}
 										<div className="space-y-4">
-											<h4 className="text-[10px] font-bold text-mute uppercase">Matching Radius bounds (km)</h4>
+											<h4 className="text-[10px] font-bold text-content-tertiary uppercase">Matching Radius bounds (km)</h4>
 											{Object.keys(rules.matching_radius_map || {}).map((tripType) => (
 												<div key={tripType} className="flex items-center justify-between space-x-4">
-													<label className="text-xs capitalize font-semibold text-body w-32">{tripType}</label>
+													<label className="text-xs capitalize font-semibold text-content-secondary w-32">{tripType}</label>
 													<input
 														type="range"
 														min="1"
@@ -629,7 +629,7 @@ export const DispatchDashboard: React.FC = () => {
 															});
 														}}
 													/>
-													<span className="text-xs font-mono font-bold text-ink w-12 text-right">
+													<span className="text-xs font-mono font-bold text-content-primary w-12 text-right">
 														{rules.matching_radius_map[tripType].toFixed(1)} km
 													</span>
 												</div>
@@ -639,10 +639,10 @@ export const DispatchDashboard: React.FC = () => {
 										<div className="grid grid-cols-2 gap-4">
 											{/* Max Wait Time */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Max Match Wait Time (seconds)</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Max Match Wait Time (seconds)</label>
 												<input
 													type="number"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 													value={rules.max_wait_time_seconds}
 													onChange={(e) => {
 														const val = parseInt(e.target.value) || 0;
@@ -653,10 +653,10 @@ export const DispatchDashboard: React.FC = () => {
 
 											{/* Max Retries */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Max Match Retries</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Max Match Retries</label>
 												<input
 													type="number"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 													value={rules.max_retries}
 													onChange={(e) => {
 														const val = parseInt(e.target.value) || 0;
@@ -669,18 +669,18 @@ export const DispatchDashboard: React.FC = () => {
 
 									{/* Column 2: Driver Eligibility & Priorities */}
 									<div className="space-y-5">
-										<h3 className="text-xs font-bold uppercase text-ink border-b border-canvas-soft pb-2 tracking-wider">Driver Eligibility & Strategy</h3>
+										<h3 className="text-xs font-bold uppercase text-content-primary border-b border-background-secondary pb-2 tracking-wider">Driver Eligibility & Strategy</h3>
 
 										<div className="grid grid-cols-2 gap-4">
 											{/* Min Rating */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Min Driver Rating Threshold</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Min Driver Rating Threshold</label>
 												<input
 													type="number"
 													step="0.1"
 													min="3.0"
 													max="5.0"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono font-bold"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono font-bold"
 													value={rules.min_driver_rating}
 													onChange={(e) => {
 														const val = parseFloat(e.target.value) || 0;
@@ -691,12 +691,12 @@ export const DispatchDashboard: React.FC = () => {
 
 											{/* Min Acceptance */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Min Acceptance Rate (%)</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Min Acceptance Rate (%)</label>
 												<input
 													type="number"
 													min="0"
 													max="100"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 													value={Math.round(rules.min_driver_acceptance_rate * 100)}
 													onChange={(e) => {
 														const val = (parseInt(e.target.value) || 0) / 100;
@@ -709,9 +709,9 @@ export const DispatchDashboard: React.FC = () => {
 										<div className="grid grid-cols-2 gap-4">
 											{/* Transmission Matching */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Transmission Match Rules</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Transmission Match Rules</label>
 												<select
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 													value={rules.transmission_capability}
 													onChange={(e) => {
 														const val = e.target.value;
@@ -725,9 +725,9 @@ export const DispatchDashboard: React.FC = () => {
 
 											{/* Dispatch Priority */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Prioritization Strategy</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Prioritization Strategy</label>
 												<select
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 													value={rules.priority_order}
 													onChange={(e) => {
 														const val = e.target.value;
@@ -741,13 +741,13 @@ export const DispatchDashboard: React.FC = () => {
 											</div>
 										</div>
 
-										<div className="grid grid-cols-2 gap-4 border-t border-canvas-soft pt-3">
+										<div className="grid grid-cols-2 gap-4 border-t border-background-secondary pt-3">
 											{/* Outstation Window */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Outstation Pre-assignment (mins)</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Outstation Pre-assignment (mins)</label>
 												<input
 													type="number"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 													value={rules.outstation_pre_assignment_minutes}
 													onChange={(e) => {
 														const val = parseInt(e.target.value) || 0;
@@ -758,12 +758,12 @@ export const DispatchDashboard: React.FC = () => {
 
 											{/* Advance Payment % */}
 											<div>
-												<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Outstation Advance Deposit %</label>
+												<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Outstation Advance Deposit %</label>
 												<input
 													type="number"
 													min="0"
 													max="100"
-													className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+													className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 													value={rules.outstation_advance_payment_pct}
 													onChange={(e) => {
 														const val = parseInt(e.target.value) || 0;
@@ -775,10 +775,10 @@ export const DispatchDashboard: React.FC = () => {
 									</div>
 
 									{/* Save Action */}
-									<div className="col-span-1 md:col-span-2 flex justify-end pt-4 border-t border-canvas-soft">
+									<div className="col-span-1 md:col-span-2 flex justify-end pt-4 border-t border-background-secondary">
 										<button
 											onClick={handleSaveRules}
-											className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-6 hover:bg-black-elevated transition-colors"
+											className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-6 hover:bg-gray-800 transition-colors"
 										>
 											Commit Dispatch Rules Engine Changes
 										</button>
@@ -793,30 +793,30 @@ export const DispatchDashboard: React.FC = () => {
 			{/* City Creation Modal */}
 			{showCityModal && (
 				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
-					<div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-md w-full space-y-4 shadow-xl">
+					<div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-md w-full space-y-4 shadow-xl">
 						<div>
-							<h3 className="text-sm font-bold text-ink font-sans">Add Regional City Hub</h3>
-							<p className="text-[11px] text-mute mt-1">Register prefix codes and establish vector polygon geofences</p>
+							<h3 className="text-sm font-bold text-content-primary font-sans">Add Regional City Hub</h3>
+							<p className="text-[11px] text-content-tertiary mt-1">Register prefix codes and establish vector polygon geofences</p>
 						</div>
 
 						<div className="grid grid-cols-2 gap-3">
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">City Prefix (Code)</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City Prefix (Code)</label>
 								<input
 									type="text"
 									placeholder="e.g. KOL"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono uppercase font-bold"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono uppercase font-bold"
 									value={newCityPrefix}
 									onChange={(e) => setNewCityPrefix(e.target.value)}
 								/>
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">City Name</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City Name</label>
 								<input
 									type="text"
 									placeholder="e.g. Kolkata"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-semibold"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-semibold"
 									value={newCityName}
 									onChange={(e) => setNewCityName(e.target.value)}
 								/>
@@ -825,32 +825,32 @@ export const DispatchDashboard: React.FC = () => {
 
 						<div className="grid grid-cols-3 gap-3">
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Timezone</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Timezone</label>
 								<input
 									type="text"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={newCityTimezone}
 									onChange={(e) => setNewCityTimezone(e.target.value)}
 								/>
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Hours Start</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Hours Start</label>
 								<input
 									type="text"
 									placeholder="00:00"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={newCityHoursStart}
 									onChange={(e) => setNewCityHoursStart(e.target.value)}
 								/>
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Hours End</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Hours End</label>
 								<input
 									type="text"
 									placeholder="23:59"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={newCityHoursEnd}
 									onChange={(e) => setNewCityHoursEnd(e.target.value)}
 								/>
@@ -859,13 +859,13 @@ export const DispatchDashboard: React.FC = () => {
 
 						{/* Supported Trip Types Checkboxes */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1.5 font-semibold">Supported Trip Types</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-semibold">Supported Trip Types</label>
 							<div className="flex flex-wrap gap-3">
 								{['in-city round', 'one-way', 'mini-outstation', 'outstation'].map((type) => (
-									<label key={type} className="flex items-center space-x-1.5 text-xs font-semibold text-ink cursor-pointer">
+									<label key={type} className="flex items-center space-x-1.5 text-xs font-semibold text-content-primary cursor-pointer">
 										<input
 											type="checkbox"
-											className="w-4 h-4 rounded border-canvas-soft accent-ink"
+											className="w-4 h-4 rounded border-background-secondary accent-ink"
 											checked={newCityTripTypes.includes(type)}
 											onChange={() => toggleTripType(type)}
 										/>
@@ -877,13 +877,13 @@ export const DispatchDashboard: React.FC = () => {
 
 						{/* Supported Car Types Checkboxes */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1.5 font-semibold">Supported Car Classes</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-semibold">Supported Car Classes</label>
 							<div className="flex flex-wrap gap-4">
 								{['Hatchback', 'Sedan', 'SUV', 'Premium'].map((type) => (
-									<label key={type} className="flex items-center space-x-1.5 text-xs font-semibold text-ink cursor-pointer">
+									<label key={type} className="flex items-center space-x-1.5 text-xs font-semibold text-content-primary cursor-pointer">
 										<input
 											type="checkbox"
-											className="w-4 h-4 rounded border-canvas-soft accent-ink"
+											className="w-4 h-4 rounded border-background-secondary accent-ink"
 											checked={newCityCarTypes.includes(type)}
 											onChange={() => toggleCarType(type)}
 										/>
@@ -898,37 +898,37 @@ export const DispatchDashboard: React.FC = () => {
 							<input
 								type="checkbox"
 								id="newCityActiveCheckbox"
-								className="w-4 h-4 rounded border-canvas-soft accent-ink cursor-pointer"
+								className="w-4 h-4 rounded border-background-secondary accent-ink cursor-pointer"
 								checked={newCityActive}
 								onChange={(e) => setNewCityActive(e.target.checked)}
 							/>
-							<label htmlFor="newCityActiveCheckbox" className="text-xs font-semibold text-ink cursor-pointer">
+							<label htmlFor="newCityActiveCheckbox" className="text-xs font-semibold text-content-primary cursor-pointer">
 								Active Operating Status
 							</label>
 						</div>
 
 						{/* Boundary Coordinates Polygon Input */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Geofence Polygon Points (lat lon, lat lon...)</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Geofence Polygon Points (lat lon, lat lon...)</label>
 							<textarea
 								rows={2}
-								className="w-full rounded bg-canvas-soft border border-canvas-soft p-2 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+								className="w-full rounded bg-background-secondary border border-background-secondary p-2 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 								value={newCityCoordsText}
 								onChange={(e) => setNewCityCoordsText(e.target.value)}
 							/>
-							<span className="text-[9px] text-mute mt-1 block">Specify vertices clockwise, closed automatically on save</span>
+							<span className="text-[9px] text-content-tertiary mt-1 block">Specify vertices clockwise, closed automatically on save</span>
 						</div>
 
-						<div className="flex justify-end space-x-2 border-t border-canvas-soft pt-3">
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
 							<button
 								onClick={() => setShowCityModal(false)}
-								className="text-xs text-body hover:text-ink px-3"
+								className="text-xs text-content-secondary hover:text-content-primary px-3"
 							>
 								Cancel
 							</button>
 							<button
 								onClick={handleSaveCity}
-								className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+								className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 							>
 								Commit Shard
 							</button>
@@ -940,30 +940,30 @@ export const DispatchDashboard: React.FC = () => {
 			{/* Zone / Geofence Creation Modal */}
 			{showZoneModal && (
 				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
-					<div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-md w-full space-y-4 shadow-xl">
+					<div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-md w-full space-y-4 shadow-xl">
 						<div>
-							<h3 className="text-sm font-bold text-ink font-sans">
+							<h3 className="text-sm font-bold text-content-primary font-sans">
 								{zonePolicy === 'BLACKLIST_BLOCK' ? 'Add Restricted Geofence Blacklist' : 'Add Sub-Zone Rules'}
 							</h3>
-							<p className="text-[11px] text-mute mt-1">Configure vector boundaries and match policies</p>
+							<p className="text-[11px] text-content-tertiary mt-1">Configure vector boundaries and match policies</p>
 						</div>
 
 						<div className="grid grid-cols-2 gap-3">
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Zone/Fence Name</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Zone/Fence Name</label>
 								<input
 									type="text"
 									placeholder="e.g. Airport Area"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-semibold"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-semibold"
 									value={zoneName}
 									onChange={(e) => setZoneName(e.target.value)}
 								/>
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">City Shard</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City Shard</label>
 								<select
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono font-bold"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono font-bold"
 									value={zoneCity}
 									onChange={(e) => setZoneCity(e.target.value)}
 								>
@@ -977,9 +977,9 @@ export const DispatchDashboard: React.FC = () => {
 						{zonePolicy !== 'BLACKLIST_BLOCK' && (
 							<div className="grid grid-cols-2 gap-3">
 								<div>
-									<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Policy Action Rule</label>
+									<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Policy Action Rule</label>
 									<select
-										className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 										value={zonePolicy}
 										onChange={(e) => setZonePolicy(e.target.value)}
 									>
@@ -990,13 +990,13 @@ export const DispatchDashboard: React.FC = () => {
 								</div>
 
 								<div>
-									<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Surge Floor Multiplier</label>
+									<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Surge Floor Multiplier</label>
 									<input
 										type="number"
 										step="0.1"
 										min="1.0"
 										max="4.0"
-										className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 										value={zoneSurge}
 										onChange={(e) => setZoneSurge(parseFloat(e.target.value) || 1.00)}
 									/>
@@ -1006,9 +1006,9 @@ export const DispatchDashboard: React.FC = () => {
 
 						{zonePolicy === 'TRANSMISSION_RESTRICT' && (
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Enforced Transmission Cert</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Enforced Transmission Cert</label>
 								<select
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 									value={zoneTransmission}
 									onChange={(e) => setZoneTransmission(e.target.value)}
 								>
@@ -1024,21 +1024,21 @@ export const DispatchDashboard: React.FC = () => {
 							<input
 								type="checkbox"
 								id="zoneActiveCheckbox"
-								className="w-4 h-4 rounded border-canvas-soft accent-ink cursor-pointer"
+								className="w-4 h-4 rounded border-background-secondary accent-ink cursor-pointer"
 								checked={zoneActive}
 								onChange={(e) => setZoneActive(e.target.checked)}
 							/>
-							<label htmlFor="zoneActiveCheckbox" className="text-xs font-semibold text-ink cursor-pointer">
+							<label htmlFor="zoneActiveCheckbox" className="text-xs font-semibold text-content-primary cursor-pointer">
 								Zone Enabled & Active
 							</label>
 						</div>
 
 						{/* Geofence Points */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Boundary Coordinates Polygon (lat lon, lat lon...)</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Boundary Coordinates Polygon (lat lon, lat lon...)</label>
 							<textarea
 								rows={2}
-								className="w-full rounded bg-canvas-soft border border-canvas-soft p-2 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+								className="w-full rounded bg-background-secondary border border-background-secondary p-2 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 								value={zoneCoordsText}
 								onChange={(e) => setZoneCoordsText(e.target.value)}
 							/>
@@ -1046,26 +1046,26 @@ export const DispatchDashboard: React.FC = () => {
 
 						{/* Notes */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Notes / Audit Remarks</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Notes / Audit Remarks</label>
 							<input
 								type="text"
 								placeholder="e.g. Enforcing airport toll rules override"
-								className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+								className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 								value={zoneNotes}
 								onChange={(e) => setZoneNotes(e.target.value)}
 							/>
 						</div>
 
-						<div className="flex justify-end space-x-2 border-t border-canvas-soft pt-3">
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
 							<button
 								onClick={() => setShowZoneModal(false)}
-								className="text-xs text-body hover:text-ink px-3"
+								className="text-xs text-content-secondary hover:text-content-primary px-3"
 							>
 								Cancel
 							</button>
 							<button
 								onClick={handleSaveZone}
-								className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors"
+								className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 							>
 								Upsert Zone
 							</button>

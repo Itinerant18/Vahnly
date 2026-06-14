@@ -73,7 +73,7 @@ const PROMO_COLUMNS = (
   {
     key: 'is_active', header: 'Status', type: 'status',
     render: (_v, r) => (
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-pill ${r.is_active ? 'text-status-online bg-status-online/10' : 'text-mute bg-canvas-soft'}`}>
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-pill ${r.is_active ? 'text-status-online bg-status-online/10' : 'text-content-tertiary bg-background-secondary'}`}>
         {r.is_active ? 'Active' : 'Inactive'}
       </span>
     ),
@@ -83,7 +83,7 @@ const PROMO_COLUMNS = (
     render: (_v, r) => canCreate ? (
       <button
         onClick={(e) => { e.stopPropagation(); toggleActive(r); }}
-        className="text-[11px] font-semibold text-ink underline"
+        className="text-[11px] font-semibold text-content-primary underline"
       >
         {r.is_active ? 'Deactivate' : 'Activate'}
       </button>
@@ -137,11 +137,11 @@ export const PromoCodesManager: React.FC = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-ink">Promo Codes</h1>
-          <p className="text-xs text-mute mt-0.5">Create and manage discount codes</p>
+          <h1 className="text-lg font-bold text-content-primary">Promo Codes</h1>
+          <p className="text-xs text-content-tertiary mt-0.5">Create and manage discount codes</p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowModal(true)} className="h-9 px-4 rounded-pill bg-ink text-canvas text-xs font-semibold">
+          <button onClick={() => setShowModal(true)} className="h-9 px-4 rounded-pill bg-content-primary text-background-primary text-xs font-semibold">
             + New Promo
           </button>
         )}
@@ -181,9 +181,9 @@ export const PromoCodesManager: React.FC = () => {
 };
 
 const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-canvas border border-canvas-soft rounded-xl p-4">
-    <div className="text-[10px] font-semibold uppercase tracking-wider text-mute">{label}</div>
-    <div className="text-xl font-bold text-ink mt-1">{value}</div>
+  <div className="bg-background-primary border border-background-secondary rounded-xl p-4">
+    <div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">{label}</div>
+    <div className="text-xl font-bold text-content-primary mt-1">{value}</div>
   </div>
 );
 
@@ -238,18 +238,18 @@ const CreatePromoModal: React.FC<{ onClose: () => void; onCreated: () => void }>
     }
   };
 
-  const input = 'h-9 w-full rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink';
+  const input = 'h-9 w-full rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-canvas rounded-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-base font-bold text-ink">Create Promo Code</h2>
+      <div className="w-full max-w-lg bg-background-primary rounded-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-base font-bold text-content-primary">Create Promo Code</h2>
 
         <div>
           <Label>Code</Label>
           <div className="flex gap-2">
             <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME50" className={input} />
-            <button onClick={() => setCode(randomCode())} className="h-9 px-3 rounded-pill border border-ink text-ink text-[11px] font-semibold whitespace-nowrap">
+            <button onClick={() => setCode(randomCode())} className="h-9 px-3 rounded-pill border border-content-primary text-content-primary text-[11px] font-semibold whitespace-nowrap">
               Generate
             </button>
           </div>
@@ -262,7 +262,7 @@ const CreatePromoModal: React.FC<{ onClose: () => void; onCreated: () => void }>
               <button
                 key={t}
                 onClick={() => setDiscountType(t)}
-                className={`flex-1 h-9 rounded-pill text-xs font-semibold ${discountType === t ? 'bg-ink text-canvas' : 'bg-canvas-soft text-mute'}`}
+                className={`flex-1 h-9 rounded-pill text-xs font-semibold ${discountType === t ? 'bg-content-primary text-background-primary' : 'bg-background-secondary text-content-tertiary'}`}
               >
                 {t === 'FLAT' ? 'Flat (₹)' : 'Percentage (%)'}
               </button>
@@ -297,16 +297,16 @@ const CreatePromoModal: React.FC<{ onClose: () => void; onCreated: () => void }>
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-ink">
+        <label className="flex items-center gap-2 text-xs text-content-primary">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Active immediately
         </label>
 
-        {error && <p className="text-xs text-status-alert">{error}</p>}
+        {error && <p className="text-xs text-status-negative">{error}</p>}
 
         <div className="flex gap-2 pt-2">
-          <button onClick={onClose} className="flex-1 h-10 rounded-pill bg-canvas-soft text-ink text-xs font-semibold">Cancel</button>
-          <button onClick={submit} disabled={saving} className="flex-1 h-10 rounded-pill bg-ink text-canvas text-xs font-semibold disabled:opacity-50">
+          <button onClick={onClose} className="flex-1 h-10 rounded-pill bg-background-secondary text-content-primary text-xs font-semibold">Cancel</button>
+          <button onClick={submit} disabled={saving} className="flex-1 h-10 rounded-pill bg-content-primary text-background-primary text-xs font-semibold disabled:opacity-50">
             {saving ? 'Creating…' : 'Create Promo'}
           </button>
         </div>
@@ -316,5 +316,5 @@ const CreatePromoModal: React.FC<{ onClose: () => void; onCreated: () => void }>
 };
 
 const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="text-[10px] font-semibold uppercase tracking-wider text-mute mb-1">{children}</div>
+  <div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary mb-1">{children}</div>
 );

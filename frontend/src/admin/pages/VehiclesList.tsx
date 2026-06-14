@@ -30,14 +30,14 @@ export interface Vehicle {
 // Preserve the page's specific document-status colors (VERIFIED / EXPIRING_SOON / EXPIRED).
 const getStatusDotColor = (status: string) => {
 	if (status === 'VERIFIED') return 'bg-status-online';
-	if (status === 'EXPIRING_SOON') return 'bg-status-warn';
-	return 'bg-status-alert';
+	if (status === 'EXPIRING_SOON') return 'bg-status-pending';
+	return 'bg-status-negative';
 };
 
 const getStatusLabelColor = (status: string) => {
-	if (status === 'VERIFIED') return 'text-ink border-canvas-soft bg-canvas';
-	if (status === 'EXPIRING_SOON') return 'text-status-warn border-canvas-soft bg-canvas-soft';
-	return 'text-status-alert border-canvas-soft bg-canvas-soft';
+	if (status === 'VERIFIED') return 'text-content-primary border-background-secondary bg-background-primary';
+	if (status === 'EXPIRING_SOON') return 'text-status-pending border-background-secondary bg-background-secondary';
+	return 'text-status-negative border-background-secondary bg-background-secondary';
 };
 
 const DocStatusCell: React.FC<{ status: string; expiry: string }> = ({ status, expiry }) => (
@@ -46,7 +46,7 @@ const DocStatusCell: React.FC<{ status: string; expiry: string }> = ({ status, e
 			<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(status)}`} />
 			{status.replace('_', ' ').toLowerCase()}
 		</span>
-		<span className="block text-[10px] text-mute font-mono mt-1">
+		<span className="block text-[10px] text-content-tertiary font-mono mt-1">
 			Exp: {new Date(expiry).toLocaleDateString([], { year: 'numeric', month: 'short' })}
 		</span>
 	</>
@@ -72,14 +72,14 @@ const buildVehicleColumns = (
 		key: 'model', header: 'Model & Type', sortable: true,
 		render: (_v, v) => (
 			<div>
-				<div className="font-semibold text-ink">{v.model}</div>
-				<div className="text-[10px] text-mute flex items-center space-x-1.5 font-semibold uppercase mt-0.5">
+				<div className="font-semibold text-content-primary">{v.model}</div>
+				<div className="text-[10px] text-content-tertiary flex items-center space-x-1.5 font-semibold uppercase mt-0.5">
 					<span>{v.type}</span>
-					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span className="w-1 h-1 rounded-full bg-content-tertiary" />
 					<span>{v.transmission}</span>
-					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span className="w-1 h-1 rounded-full bg-content-tertiary" />
 					<span>{v.fuel}</span>
-					<span className="w-1 h-1 rounded-full bg-mute" />
+					<span className="w-1 h-1 rounded-full bg-content-tertiary" />
 					<span className="font-mono">{v.year}</span>
 				</div>
 			</div>
@@ -93,20 +93,20 @@ const buildVehicleColumns = (
 					<Link
 						to={`/drivers/${v.owner_id}`}
 						onClick={(e) => e.stopPropagation()}
-						className="hover:underline font-semibold text-ink"
+						className="hover:underline font-semibold text-content-primary"
 					>
-						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Driver</span>
+						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-1.5 text-content-tertiary ml-1 font-bold">Driver</span>
 					</Link>
 				) : (
 					<Link
 						to={`/riders/${v.owner_id}`}
 						onClick={(e) => e.stopPropagation()}
-						className="hover:underline font-semibold text-ink"
+						className="hover:underline font-semibold text-content-primary"
 					>
-						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-canvas-soft border border-canvas-soft rounded-pill px-1.5 text-mute ml-1 font-bold">Rider</span>
+						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-1.5 text-content-tertiary ml-1 font-bold">Rider</span>
 					</Link>
 				)}
-				<span className="block text-[10px] text-mute font-mono mt-0.5">{v.city} Shard</span>
+				<span className="block text-[10px] text-content-tertiary font-mono mt-0.5">{v.city} Shard</span>
 			</div>
 		),
 	},
@@ -128,12 +128,12 @@ const buildVehicleColumns = (
 		render: (_v, v) => (
 			v.flagged_issues && v.flagged_issues.length > 0 ? (
 				<div className="relative group inline-block">
-					<span className="cursor-help underline decoration-dotted text-status-alert font-semibold">
+					<span className="cursor-help underline decoration-dotted text-status-negative font-semibold">
 						{v.flagged_issues.length} {v.flagged_issues.length === 1 ? 'Issue' : 'Issues'}
 					</span>
-					<div className="hidden group-hover:block absolute z-20 bottom-full left-0 mb-2 w-64 bg-canvas border border-canvas-soft p-3 rounded-xl shadow-xl text-left">
-						<h4 className="text-[10px] uppercase font-bold tracking-wider text-mute mb-2">Driver Flagged Issues</h4>
-						<ul className="list-disc pl-4 space-y-1.5 text-[11px] text-ink font-sans">
+					<div className="hidden group-hover:block absolute z-20 bottom-full left-0 mb-2 w-64 bg-background-primary border border-background-secondary p-3 rounded-xl shadow-xl text-left">
+						<h4 className="text-[10px] uppercase font-bold tracking-wider text-content-tertiary mb-2">Driver Flagged Issues</h4>
+						<ul className="list-disc pl-4 space-y-1.5 text-[11px] text-content-primary font-sans">
 							{v.flagged_issues.map((issue, idx) => (
 								<li key={idx}>{issue}</li>
 							))}
@@ -141,7 +141,7 @@ const buildVehicleColumns = (
 					</div>
 				</div>
 			) : (
-				<span className="text-mute">—</span>
+				<span className="text-content-tertiary">—</span>
 			)
 		),
 	},
@@ -151,12 +151,12 @@ const buildVehicleColumns = (
 			<>
 				<button
 					onClick={(e) => { e.stopPropagation(); openOverrideModal(v); }}
-					className="inline-flex items-center justify-center border border-canvas-soft hover:border-ink hover:bg-canvas-soft text-[10px] font-bold rounded-pill h-7 px-3 transition-colors"
+					className="inline-flex items-center justify-center border border-background-secondary hover:border-content-primary hover:bg-background-secondary text-[10px] font-bold rounded-pill h-7 px-3 transition-colors"
 				>
 					Override
 				</button>
 				{v.reminder_sent_at && (
-					<span className="block text-[9px] text-mute mt-1 font-mono">
+					<span className="block text-[9px] text-content-tertiary mt-1 font-mono">
 						Alerted: {new Date(v.reminder_sent_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
 					</span>
 				)}
@@ -325,28 +325,28 @@ export const VehiclesList: React.FC = () => {
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-ink">Vehicles & Fleet Directory</h1>
-					<p className="text-xs text-mute mt-1">Manage active rider garage cars, one-time fleet trip vehicles, document expiration statuses, and service updates</p>
+					<h1 className="text-2xl font-bold tracking-tight text-content-primary">Vehicles & Fleet Directory</h1>
+					<p className="text-xs text-content-tertiary mt-1">Manage active rider garage cars, one-time fleet trip vehicles, document expiration statuses, and service updates</p>
 				</div>
 				<button
 					onClick={handleSendReminders}
 					disabled={sendingReminders}
-					className="inline-flex items-center justify-center bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 px-4 hover:bg-black-elevated transition-colors disabled:opacity-50"
+					className="inline-flex items-center justify-center bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-4 hover:bg-gray-800 transition-colors disabled:opacity-50"
 				>
 					{sendingReminders ? 'Sending Reminders...' : 'Send Expiry Reminders ✉'}
 				</button>
 			</div>
 
 			{/* ---- Filters Grid ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-4 shadow-sm">
+			<div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-4 shadow-sm">
 				<div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
 					{/* Search Text */}
 					<div className="col-span-1 md:col-span-2">
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Search</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Search</label>
 						<input
 							type="text"
 							placeholder="Search License Plate, Model, Owner..."
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
@@ -354,9 +354,9 @@ export const VehiclesList: React.FC = () => {
 
 					{/* Vehicle Type */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Type</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Type</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={type}
 							onChange={(e) => setType(e.target.value)}
 						>
@@ -370,9 +370,9 @@ export const VehiclesList: React.FC = () => {
 
 					{/* Transmission */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Transmission</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Transmission</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={transmission}
 							onChange={(e) => setTransmission(e.target.value)}
 						>
@@ -384,9 +384,9 @@ export const VehiclesList: React.FC = () => {
 
 					{/* Fuel Type */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Fuel</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Fuel</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={fuel}
 							onChange={(e) => setFuel(e.target.value)}
 						>
@@ -400,33 +400,33 @@ export const VehiclesList: React.FC = () => {
 
 					{/* Year */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Year</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Year</label>
 						<input
 							type="number"
 							placeholder="e.g. 2021"
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 							value={year}
 							onChange={(e) => setYear(e.target.value)}
 						/>
 					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center justify-between pt-2 border-t border-canvas-soft gap-4">
+				<div className="flex flex-wrap items-center justify-between pt-2 border-t border-background-secondary gap-4">
 					<div className="flex items-center space-x-4">
-						<label className="flex items-center space-x-2 text-xs font-semibold text-ink cursor-pointer">
+						<label className="flex items-center space-x-2 text-xs font-semibold text-content-primary cursor-pointer">
 							<input
 								type="checkbox"
-								className="w-4 h-4 rounded border-canvas-soft accent-ink"
+								className="w-4 h-4 rounded border-background-secondary accent-ink"
 								checked={rcExpiredOnly}
 								onChange={(e) => setRcExpiredOnly(e.target.checked)}
 							/>
 							<span>RC Expired Only</span>
 						</label>
 
-						<label className="flex items-center space-x-2 text-xs font-semibold text-ink cursor-pointer">
+						<label className="flex items-center space-x-2 text-xs font-semibold text-content-primary cursor-pointer">
 							<input
 								type="checkbox"
-								className="w-4 h-4 rounded border-canvas-soft accent-ink"
+								className="w-4 h-4 rounded border-background-secondary accent-ink"
 								checked={insExpiredOnly}
 								onChange={(e) => setInsExpiredOnly(e.target.checked)}
 							/>
@@ -436,7 +436,7 @@ export const VehiclesList: React.FC = () => {
 
 					<button
 						onClick={handleResetFilters}
-						className="text-[11px] text-mute hover:text-ink font-semibold transition-colors"
+						className="text-[11px] text-content-tertiary hover:text-content-primary font-semibold transition-colors"
 					>
 						Reset All Filters
 					</button>
@@ -461,18 +461,18 @@ export const VehiclesList: React.FC = () => {
 			{/* Override Settings Modal */}
 			{selectedVehicle && (
 				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
-					<div className="bg-canvas rounded-xl border border-canvas-soft p-5 max-w-md w-full space-y-4 shadow-xl">
+					<div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-md w-full space-y-4 shadow-xl">
 						<div>
-							<h3 className="text-sm font-bold text-ink font-sans">Manual Override: <span className="font-mono text-xs">{selectedVehicle.plate}</span></h3>
-							<p className="text-[11px] text-mute mt-1">Directly adjust verification status, expiration parameters, and flagged issues</p>
+							<h3 className="text-sm font-bold text-content-primary font-sans">Manual Override: <span className="font-mono text-xs">{selectedVehicle.plate}</span></h3>
+							<p className="text-[11px] text-content-tertiary mt-1">Directly adjust verification status, expiration parameters, and flagged issues</p>
 						</div>
 
 						<div className="grid grid-cols-2 gap-3">
 							{/* RC status */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">RC Status</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">RC Status</label>
 								<select
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 									value={overrideRcStatus}
 									onChange={(e) => setOverrideRcStatus(e.target.value)}
 								>
@@ -484,10 +484,10 @@ export const VehiclesList: React.FC = () => {
 
 							{/* RC Expiry */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">RC Expiry Date</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">RC Expiry Date</label>
 								<input
 									type="date"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={overrideRcExpiry}
 									onChange={(e) => setOverrideRcExpiry(e.target.value)}
 								/>
@@ -495,9 +495,9 @@ export const VehiclesList: React.FC = () => {
 
 							{/* Insurance status */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Insurance Status</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Insurance Status</label>
 								<select
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 									value={overrideInsStatus}
 									onChange={(e) => setOverrideInsStatus(e.target.value)}
 								>
@@ -509,10 +509,10 @@ export const VehiclesList: React.FC = () => {
 
 							{/* Insurance Expiry */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Insurance Expiry Date</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Insurance Expiry Date</label>
 								<input
 									type="date"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={overrideInsExpiry}
 									onChange={(e) => setOverrideInsExpiry(e.target.value)}
 								/>
@@ -520,9 +520,9 @@ export const VehiclesList: React.FC = () => {
 
 							{/* PUC status */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">PUC Status</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">PUC Status</label>
 								<select
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 									value={overridePucStatus}
 									onChange={(e) => setOverridePucStatus(e.target.value)}
 								>
@@ -534,10 +534,10 @@ export const VehiclesList: React.FC = () => {
 
 							{/* PUC Expiry */}
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">PUC Expiry Date</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">PUC Expiry Date</label>
 								<input
 									type="date"
-									className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 									value={overridePucExpiry}
 									onChange={(e) => setOverridePucExpiry(e.target.value)}
 								/>
@@ -546,10 +546,10 @@ export const VehiclesList: React.FC = () => {
 
 						{/* Last Serviced */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Last Serviced Date</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Last Serviced Date</label>
 							<input
 								type="date"
-								className="w-full h-8 rounded bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+								className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 								value={overrideLastServiced}
 								onChange={(e) => setOverrideLastServiced(e.target.value)}
 							/>
@@ -557,27 +557,27 @@ export const VehiclesList: React.FC = () => {
 
 						{/* Flagged issues text list */}
 						<div>
-							<label className="block text-[9px] uppercase tracking-wider text-mute mb-1 font-semibold">Flagged Issues (comma-separated)</label>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Flagged Issues (comma-separated)</label>
 							<input
 								type="text"
 								placeholder="e.g. Brake pads wearing out, Left tail light bulb broken"
-								className="w-full h-9 rounded bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+								className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 								value={overrideIssuesText}
 								onChange={(e) => setOverrideIssuesText(e.target.value)}
 							/>
 						</div>
 
-						<div className="flex justify-end space-x-2 border-t border-canvas-soft pt-3">
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
 							<button
 								onClick={() => setSelectedVehicle(null)}
-								className="text-xs text-body hover:text-ink px-3"
+								className="text-xs text-content-secondary hover:text-content-primary px-3"
 								disabled={overrideLoading}
 							>
 								Cancel
 							</button>
 							<button
 								onClick={handleSaveOverride}
-								className="bg-ink text-on-dark text-xs font-semibold rounded-pill h-8 px-4 hover:bg-black-elevated transition-colors disabled:opacity-50"
+								className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors disabled:opacity-50"
 								disabled={overrideLoading}
 							>
 								{overrideLoading ? 'Saving...' : 'Apply Overrides'}

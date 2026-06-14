@@ -315,21 +315,21 @@ export const ActiveTripRadar: React.FC = () => {
   };
 
   return (
-    <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft shadow-sm space-y-4 lg:col-span-3">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-canvas-soft pb-4">
+    <div className="bg-background-tertiary rounded-xl p-6 border border-background-secondary shadow-sm space-y-4 lg:col-span-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-background-secondary pb-4">
         <div>
-          <h2 className="text-lg font-bold text-ink font-move flex items-center gap-2">
+          <h2 className="text-lg font-bold text-content-primary font-move flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-black"></span>
             </span>
             Real-time Active Trip Radar
           </h2>
-          <p className="text-xs text-body">Live dispatch operations control-board & manual order cancellation overrides</p>
+          <p className="text-xs text-content-secondary">Live dispatch operations control-board & manual order cancellation overrides</p>
         </div>
         <button
           onClick={fetchActiveOrders}
-          className="bg-white hover:bg-canvas-softer text-[10px] font-bold py-2 px-5 rounded-full border border-canvas-soft text-ink uppercase tracking-wider transition duration-200 cursor-pointer"
+          className="bg-white hover:bg-background-tertiary text-[10px] font-bold py-2 px-5 rounded-full border border-background-secondary text-content-primary uppercase tracking-wider transition duration-200 cursor-pointer"
         >
           Refresh Radar
         </button>
@@ -342,10 +342,10 @@ export const ActiveTripRadar: React.FC = () => {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-canvas-soft bg-white">
+      <div className="overflow-x-auto rounded-xl border border-background-secondary bg-white">
         <table className="w-full text-left text-xs font-mono border-collapse">
           <thead>
-            <tr className="bg-canvas-softer text-mute uppercase text-[9px] font-bold border-b border-canvas-soft">
+            <tr className="bg-background-tertiary text-content-tertiary uppercase text-[9px] font-bold border-b border-background-secondary">
               <th className="p-4">Order ID</th>
               <th className="p-4">Region</th>
               <th className="p-4">H3 Pick-up Cell</th>
@@ -357,30 +357,30 @@ export const ActiveTripRadar: React.FC = () => {
               <th className="p-4 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-canvas-soft text-ink">
+          <tbody className="divide-y divide-background-secondary text-content-primary">
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-body italic leading-relaxed">
+                <td colSpan={9} className="p-6 text-center text-content-secondary italic leading-relaxed">
                   Zero active bookings currently routed through matching channels.
                 </td>
               </tr>
             ) : (
               orders.map((order) => (
-                <tr key={order.id} className={`transition ${stagnantOrders.has(order.id) ? 'bg-surface-warning hover:bg-surface-warning/70' : 'hover:bg-canvas-softer/50'}`}>
-                  <td className="p-4 text-body select-all">
+                <tr key={order.id} className={`transition ${stagnantOrders.has(order.id) ? 'bg-surface-warning hover:bg-surface-warning/70' : 'hover:bg-background-tertiary/50'}`}>
+                  <td className="p-4 text-content-secondary select-all">
                     <div>{order.id.slice(0, 18)}...</div>
                     {(order.status !== 'COMPLETED' && order.status !== 'CANCELLED') && (
-                      <div className="text-[9px] text-mute font-normal mt-0.5">
+                      <div className="text-[9px] text-content-tertiary font-normal mt-0.5">
                         Pos: {order.pickup_lat.toFixed(4)}, {order.pickup_lng.toFixed(4)}
                       </div>
                     )}
                   </td>
                   <td className="p-4">
-                    <span className="bg-canvas-soft border border-surface-pressed text-ink px-2 py-0.5 rounded text-[10px] font-bold select-none">
+                    <span className="bg-background-secondary border border-surface-pressed text-content-primary px-2 py-0.5 rounded text-[10px] font-bold select-none">
                       {order.city_prefix}
                     </span>
                   </td>
-                  <td className="p-4 font-bold text-body">{order.pickup_h3_cell}</td>
+                  <td className="p-4 font-bold text-content-secondary">{order.pickup_h3_cell}</td>
                   <td className="p-4 text-center">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
@@ -390,7 +390,7 @@ export const ActiveTripRadar: React.FC = () => {
                           ? 'bg-surface-accent text-content-accent'
                           : order.status === 'DELIVERING'
                           ? 'bg-black text-white'
-                          : 'bg-canvas-soft text-ink'
+                          : 'bg-background-secondary text-content-primary'
                       }`}
                     >
                       {order.status === 'CREATED' && (
@@ -399,13 +399,13 @@ export const ActiveTripRadar: React.FC = () => {
                       {order.status}
                     </span>
                   </td>
-                  <td className="p-4 text-body font-mono">
+                  <td className="p-4 text-content-secondary font-mono">
                     {order.assigned_driver_id ? (
-                      <span className="bg-canvas-soft text-ink px-2 py-0.5 rounded text-[10px] font-bold">
+                      <span className="bg-background-secondary text-content-primary px-2 py-0.5 rounded text-[10px] font-bold">
                         {order.assigned_driver_id.slice(0, 12)}...
                       </span>
                     ) : (
-                      <span className="text-mute italic text-[10px]">Unassigned</span>
+                      <span className="text-content-tertiary italic text-[10px]">Unassigned</span>
                     )}
                   </td>
                   <td className="p-4 text-right font-bold font-mono">
@@ -429,12 +429,12 @@ export const ActiveTripRadar: React.FC = () => {
                       <button
                         onClick={() => handleForceCancelOrder(order.id)}
                         disabled={isLoading}
-                        className="bg-black hover:bg-black-elevated disabled:opacity-40 text-white font-bold py-1.5 px-3.5 rounded-full transition text-[9px] uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                        className="bg-black hover:bg-gray-800 disabled:opacity-40 text-white font-bold py-1.5 px-3.5 rounded-full transition text-[9px] uppercase tracking-wider active:scale-[0.98] cursor-pointer"
                       >
                         Force Cancel
                       </button>
                     ) : (
-                      <span className="text-mute text-[9px] uppercase tracking-wider">Terminal</span>
+                      <span className="text-content-tertiary text-[9px] uppercase tracking-wider">Terminal</span>
                     )}
                   </td>
                 </tr>
@@ -446,7 +446,7 @@ export const ActiveTripRadar: React.FC = () => {
 
       {message && (
         <div className={`p-3 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-          message.status === 'SUCCESS' ? 'bg-canvas-soft border border-surface-pressed text-ink' : 'bg-black text-white'
+          message.status === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-black text-white'
         }`}>
           {message.text}
         </div>

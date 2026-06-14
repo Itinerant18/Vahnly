@@ -33,11 +33,11 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 function moduleBadge(module: string) {
-  const cls = MODULE_COLORS[module] ?? 'bg-canvas-soft text-body';
+  const cls = MODULE_COLORS[module] ?? 'bg-background-secondary text-content-secondary';
   return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${cls}`}>{module || '—'}</span>;
 }
 function actionBadge(action: string) {
-  const cls = ACTION_COLORS[action] ?? 'bg-canvas-soft text-body';
+  const cls = ACTION_COLORS[action] ?? 'bg-background-secondary text-content-secondary';
   return <span className={`text-[11px] font-mono font-medium px-2 py-0.5 rounded ${cls}`}>{action}</span>;
 }
 function relTime(iso: string) {
@@ -57,16 +57,16 @@ const AUDIT_COLUMNS: ColumnDef<AuditEntry>[] = [
   {
     key: 'created_at', header: 'When',
     render: (v) => (
-      <span className="text-xs text-mute whitespace-nowrap" title={new Date(String(v)).toLocaleString()}>{relTime(String(v))}</span>
+      <span className="text-xs text-content-tertiary whitespace-nowrap" title={new Date(String(v)).toLocaleString()}>{relTime(String(v))}</span>
     ),
   },
   {
     key: 'admin_email', header: 'Admin',
-    render: (v) => <span className="font-mono text-mono-small text-body">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small text-content-secondary">{String(v)}</span>,
   },
   {
     key: 'admin_role', header: 'Role',
-    render: (v) => <span className="text-xs text-mute">{String(v)}</span>,
+    render: (v) => <span className="text-xs text-content-tertiary">{String(v)}</span>,
   },
   {
     key: 'module', header: 'Module',
@@ -79,7 +79,7 @@ const AUDIT_COLUMNS: ColumnDef<AuditEntry>[] = [
   {
     key: 'entity_type', header: 'Entity',
     render: (_v, r) => (
-      <span className="text-xs text-mute">
+      <span className="text-xs text-content-tertiary">
         {r.entity_type && <span>{r.entity_type}</span>}
         {r.entity_id && <span className="ml-1 font-mono text-[10px]">{r.entity_id.slice(0, 12)}{r.entity_id.length > 12 ? '…' : ''}</span>}
       </span>
@@ -87,11 +87,11 @@ const AUDIT_COLUMNS: ColumnDef<AuditEntry>[] = [
   },
   {
     key: 'ip_address', header: 'IP',
-    render: (v) => <span className="font-mono text-mono-small text-mute">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small text-content-tertiary">{String(v)}</span>,
   },
   {
     key: '_expand', header: '', width: 20,
-    render: () => <span className="text-xs text-mute">▼</span>,
+    render: () => <span className="text-xs text-content-tertiary">▼</span>,
   },
 ];
 
@@ -177,11 +177,11 @@ export const AuditLogsDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-ink">Audit Logs</h1>
-          <p className="text-sm text-mute">Tamper-evident record of every admin action — who, what, when, where</p>
+          <h1 className="text-xl font-bold text-content-primary">Audit Logs</h1>
+          <p className="text-sm text-content-tertiary">Tamper-evident record of every admin action — who, what, when, where</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={exportCSV} className="px-3 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">↓ Export CSV</button>
+          <button onClick={exportCSV} className="px-3 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">↓ Export CSV</button>
           {isSuperAdmin && <button onClick={() => setShowRetention(!showRetention)} className="px-3 py-1.5 border border-negative-400 text-content-negative rounded-lg text-sm hover:bg-surface-negative">Retention</button>}
         </div>
       </div>
@@ -191,10 +191,10 @@ export const AuditLogsDashboard: React.FC = () => {
         <div className="bg-surface-negative border border-negative-400 rounded-xl p-4 space-y-3">
           <div className="text-sm font-semibold text-content-negative">Retention Policy Cleanup</div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-body">Delete logs older than</span>
+            <span className="text-sm text-content-secondary">Delete logs older than</span>
             <input type="number" value={retentionDays} onChange={e => setRetentionDays(Number(e.target.value))} min={90}
-              className="w-24 border border-negative-400 rounded px-3 py-1.5 text-sm bg-white text-ink focus:outline-none" />
-            <span className="text-sm text-body">days</span>
+              className="w-24 border border-negative-400 rounded px-3 py-1.5 text-sm bg-white text-content-primary focus:outline-none" />
+            <span className="text-sm text-content-secondary">days</span>
             <button onClick={runCleanup} className="px-4 py-1.5 bg-negative-400 text-white rounded-lg text-sm font-medium hover:bg-negative-400">Delete</button>
           </div>
           {cleanupMsg && <div className="text-sm text-content-negative">{cleanupMsg}</div>}
@@ -205,24 +205,24 @@ export const AuditLogsDashboard: React.FC = () => {
       <div className="flex flex-wrap gap-2">
         <input type="text" placeholder="Filter by admin email…" value={searchEmail}
           onChange={e => { setSearchEmail(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-52 focus:outline-none focus:ring-1 focus:ring-accent" />
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-52 focus:outline-none focus:ring-1 focus:ring-accent" />
         <select value={moduleFilter} onChange={e => { setModuleFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
           <option value="">All modules</option>
           {modules.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
         <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
           <option value="">All actions</option>
           {distinctActions.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <input type="text" placeholder="Entity type (DRIVER, ORDER…)" value={entityTypeFilter}
           onChange={e => { setEntityTypeFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
         <input type="text" placeholder="Role" value={roleFilter}
           onChange={e => { setRoleFilter(e.target.value); setPage(0); }}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-32 focus:outline-none focus:ring-1 focus:ring-accent" />
-        <span className="ml-auto text-xs text-mute self-center">{total.toLocaleString()} entries</span>
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-32 focus:outline-none focus:ring-1 focus:ring-accent" />
+        <span className="ml-auto text-xs text-content-tertiary self-center">{total.toLocaleString()} entries</span>
       </div>
 
       {/* Table */}
@@ -232,7 +232,7 @@ export const AuditLogsDashboard: React.FC = () => {
         loading={loading}
         rowKey={(r) => r.id}
         onRowClick={(r) => setExpanded(expanded === r.id ? null : r.id)}
-        emptyState={<span className="text-mute text-sm">No audit logs found.</span>}
+        emptyState={<span className="text-content-tertiary text-sm">No audit logs found.</span>}
       />
 
       {/* Expanded row detail (Details / Before / After) */}
@@ -240,32 +240,32 @@ export const AuditLogsDashboard: React.FC = () => {
         const entry = logs.find(e => e.id === expanded);
         if (!entry) return null;
         return (
-          <div className="bg-canvas-soft/20 border border-canvas-soft rounded-xl px-6 pb-4 pt-3">
+          <div className="bg-background-secondary/20 border border-background-secondary rounded-xl px-6 pb-4 pt-3">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Details */}
               <div>
-                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Details</div>
-                <div className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs text-body font-mono whitespace-pre-wrap break-all">
+                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Details</div>
+                <div className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs text-content-secondary font-mono whitespace-pre-wrap break-all">
                   {entry.details || '—'}
                 </div>
               </div>
               {/* Before */}
               <div>
-                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">Before</div>
-                <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Before</div>
+                <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
                   {fmtJSON(entry.before_value)}
                 </pre>
               </div>
               {/* After */}
               <div>
-                <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-1">After</div>
-                <pre className="bg-canvas border border-canvas-soft rounded-lg p-3 text-xs font-mono text-body overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">After</div>
+                <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
                   {fmtJSON(entry.after_value)}
                 </pre>
               </div>
             </div>
             {entry.user_agent && (
-              <div className="mt-2 text-[10px] text-mute font-mono truncate">UA: {entry.user_agent}</div>
+              <div className="mt-2 text-[10px] text-content-tertiary font-mono truncate">UA: {entry.user_agent}</div>
             )}
           </div>
         );
@@ -275,26 +275,26 @@ export const AuditLogsDashboard: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
           <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
-            className="px-3 py-1.5 rounded-lg border border-canvas-soft text-body disabled:opacity-40 hover:bg-canvas-soft">Previous</button>
-          <span className="text-mute">Page {page + 1} / {totalPages}</span>
+            className="px-3 py-1.5 rounded-lg border border-background-secondary text-content-secondary disabled:opacity-40 hover:bg-background-secondary">Previous</button>
+          <span className="text-content-tertiary">Page {page + 1} / {totalPages}</span>
           <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}
-            className="px-3 py-1.5 rounded-lg border border-canvas-soft text-body disabled:opacity-40 hover:bg-canvas-soft">Next</button>
+            className="px-3 py-1.5 rounded-lg border border-background-secondary text-content-secondary disabled:opacity-40 hover:bg-background-secondary">Next</button>
         </div>
       )}
 
       {/* Action frequency sidebar */}
       {actionMeta.length > 0 && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4">
-          <div className="text-sm font-semibold text-ink mb-3">Action Frequency (last 90 days)</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4">
+          <div className="text-sm font-semibold text-content-primary mb-3">Action Frequency (last 90 days)</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {actionMeta.slice(0, 12).map(a => (
               <button key={`${a.module}:${a.action}`} onClick={() => { setActionFilter(a.action); setModuleFilter(a.module); setPage(0); }}
-                className="flex items-center justify-between text-xs border border-canvas-soft rounded-lg px-3 py-2 hover:bg-canvas-soft text-left">
+                className="flex items-center justify-between text-xs border border-background-secondary rounded-lg px-3 py-2 hover:bg-background-secondary text-left">
                 <div>
-                  <div className="font-mono text-body">{a.action}</div>
-                  {a.module && <div className="text-mute text-[10px]">{a.module}</div>}
+                  <div className="font-mono text-content-secondary">{a.action}</div>
+                  {a.module && <div className="text-content-tertiary text-[10px]">{a.module}</div>}
                 </div>
-                <span className="font-mono text-ink font-medium">{a.count}</span>
+                <span className="font-mono text-content-primary font-medium">{a.count}</span>
               </button>
             ))}
           </div>

@@ -565,26 +565,26 @@ export const MarketplaceOrchestrator: React.FC = () => {
   );
 
   return (
-    <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft shadow-sm space-y-6 lg:col-span-3">
+    <div className="bg-background-tertiary rounded-xl p-6 border border-background-secondary shadow-sm space-y-6 lg:col-span-3">
       
       {/* Tab controls */}
-      <div className="flex border-b border-canvas-soft text-xs font-bold tracking-wider uppercase justify-between items-center">
+      <div className="flex border-b border-background-secondary text-xs font-bold tracking-wider uppercase justify-between items-center">
         <div className="flex">
           <button
             onClick={() => { setActiveControlTab('GEOFENCE'); setLogResponse(null); }}
-            className={`pb-3 pr-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'GEOFENCE' ? 'border-b-2 border-black text-ink font-bold' : 'text-mute hover:text-ink font-normal'}`}
+            className={`pb-3 pr-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'GEOFENCE' ? 'border-b-2 border-black text-content-primary font-bold' : 'text-content-tertiary hover:text-content-primary font-normal'}`}
           >
             ● Dynamic Geofence Editor
           </button>
           <button
             onClick={() => { setActiveControlTab('MANUAL_MATCH'); setLogResponse(null); }}
-            className={`pb-3 px-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'MANUAL_MATCH' ? 'border-b-2 border-black text-ink font-bold' : 'text-mute hover:text-ink font-normal'}`}
+            className={`pb-3 px-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'MANUAL_MATCH' ? 'border-b-2 border-black text-content-primary font-bold' : 'text-content-tertiary hover:text-content-primary font-normal'}`}
           >
             ⚙️ Manual Inversion Override
           </button>
           <button
             onClick={() => { setActiveControlTab('FRAUD_RADAR'); setLogResponse(null); }}
-            className={`pb-3 px-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'FRAUD_RADAR' ? 'border-b-2 border-black text-ink font-bold' : 'text-mute hover:text-ink font-normal'}`}
+            className={`pb-3 px-6 text-left transition cursor-pointer bg-transparent border-none outline-none ${activeControlTab === 'FRAUD_RADAR' ? 'border-b-2 border-black text-content-primary font-bold' : 'text-content-tertiary hover:text-content-primary font-normal'}`}
           >
             ▲ Telemetry Fraud Risk Radar
           </button>
@@ -601,7 +601,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
       </div>
 
       {/* Dynamic Tab Contents */}
-      <div className="bg-white border border-canvas-soft rounded-xl p-6 min-h-[300px]">
+      <div className="bg-white border border-background-secondary rounded-xl p-6 min-h-[300px]">
         {activeControlTab === 'GEOFENCE' && (
           <div className="text-left space-y-4">
             <div className="p-4 bg-accent-400 border border-border-accent rounded-xl text-xs text-accent-400 leading-relaxed flex justify-between items-center">
@@ -622,14 +622,14 @@ export const MarketplaceOrchestrator: React.FC = () => {
                 <div 
                   key={zone.id}
                   onClick={() => { selectGeofenceZone(zone); setIsStudioExpanded(true); }}
-                  className="p-4 rounded-xl border border-canvas-soft hover:bg-gray-800 transition cursor-pointer space-y-3"
+                  className="p-4 rounded-xl border border-background-secondary hover:bg-gray-800 transition cursor-pointer space-y-3"
                 >
                   <div className="flex justify-between items-center">
                     <strong className="text-xs font-mono">{zone.zone_name}</strong>
                     {getPolicyBadge(zone.policy_type)}
                   </div>
-                  <div className="text-[10px] text-body font-mono">
-                    Coords: <strong className="text-ink">{zone.polygon_coordinates.length} Nodes</strong>
+                  <div className="text-[10px] text-content-secondary font-mono">
+                    Coords: <strong className="text-content-primary">{zone.polygon_coordinates.length} Nodes</strong>
                   </div>
                   {zone.policy_type === 'SURGE_FLOOR_FORCE' && (
                     <div className="text-[10px] font-mono text-accent-400 font-bold">
@@ -637,7 +637,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
                     </div>
                   )}
                   {zone.notes && (
-                    <p className="text-[10px] text-mute italic border-t border-gray-800 pt-2">{zone.notes}</p>
+                    <p className="text-[10px] text-content-tertiary italic border-t border-gray-800 pt-2">{zone.notes}</p>
                   )}
                 </div>
               ))}
@@ -647,15 +647,15 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
         {activeControlTab === 'MANUAL_MATCH' && (
           <form onSubmit={submitManualOverrideMatch} className="max-w-xl text-left space-y-4 mx-auto">
-            <div className="p-4 bg-canvas-softer border border-canvas-soft rounded-xl text-[11px] text-body leading-relaxed mb-2">
+            <div className="p-4 bg-background-tertiary border border-background-secondary rounded-xl text-[11px] text-content-secondary leading-relaxed mb-2">
               <strong>ALGORITHMIC OVERRIDE RULES:</strong> Executing a force-match manual bypass breaks ongoing Kuhn-Munkres matrix generation sweeps, binds the target order context directly to the operator, and terminates concurrent matching threads instantly.
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Target Order UUID</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Target Order UUID</label>
                 <input
                   type="text"
-                  className="w-full bg-canvas-softer border border-canvas-soft rounded-xl p-3 text-xs font-mono text-ink placeholder-mute focus:outline-none"
+                  className="w-full bg-background-tertiary border border-background-secondary rounded-xl p-3 text-xs font-mono text-content-primary placeholder-content-tertiary focus:outline-none"
                   placeholder="Paste unfulfilled order id..."
                   value={overrideOrderID}
                   onChange={(e) => setOverrideOrderID(e.target.value)}
@@ -663,10 +663,10 @@ export const MarketplaceOrchestrator: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Target Operator Driver UUID</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Target Operator Driver UUID</label>
                 <input
                   type="text"
-                  className="w-full bg-canvas-softer border border-canvas-soft rounded-xl p-3 text-xs font-mono text-ink placeholder-mute focus:outline-none"
+                  className="w-full bg-background-tertiary border border-background-secondary rounded-xl p-3 text-xs font-mono text-content-primary placeholder-content-tertiary focus:outline-none"
                   placeholder="Paste available operator id..."
                   value={overrideDriverID}
                   onChange={(e) => setOverrideDriverID(e.target.value)}
@@ -677,7 +677,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-black hover:bg-black-elevated text-white font-bold py-3.5 px-4 rounded-full transition text-xs uppercase tracking-wider cursor-pointer mt-2 border-none"
+              className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 px-4 rounded-full transition text-xs uppercase tracking-wider cursor-pointer mt-2 border-none"
             >
               Force Override Algorithmic Constraints
             </button>
@@ -686,37 +686,37 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
         {activeControlTab === 'FRAUD_RADAR' && (
           <div className="space-y-4 text-left">
-            <div className="flex justify-between items-center border-b border-canvas-soft pb-2">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-body">High-Variance Velocity Stream Exceptions</span>
-              <button onClick={fetchLiveFraudAnomalies} className="text-[10px] font-bold uppercase tracking-wider border border-canvas-soft bg-transparent px-3 py-1 rounded-full hover:bg-canvas-softer transition cursor-pointer">
+            <div className="flex justify-between items-center border-b border-background-secondary pb-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-content-secondary">High-Variance Velocity Stream Exceptions</span>
+              <button onClick={fetchLiveFraudAnomalies} className="text-[10px] font-bold uppercase tracking-wider border border-background-secondary bg-transparent px-3 py-1 rounded-full hover:bg-background-tertiary transition cursor-pointer">
                 Refresh Radar Logs
               </button>
             </div>
             {fraudAlerts.length === 0 ? (
-              <div className="py-12 text-center text-xs text-body italic">Zero telemetry tracking anomalies reported on current shards.</div>
+              <div className="py-12 text-center text-xs text-content-secondary italic">Zero telemetry tracking anomalies reported on current shards.</div>
             ) : (
-              <div className="divide-y divide-canvas-soft">
+              <div className="divide-y divide-background-secondary">
                 {fraudAlerts.map((alert) => (
-                  <div key={alert.driver_id} className="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-canvas-softer/30 transition px-2 rounded-xl">
+                  <div key={alert.driver_id} className="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-background-tertiary/30 transition px-2 rounded-xl">
                     <div className="space-y-1 text-left">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-ink font-move">{alert.driver_name}</span>
+                        <span className="text-xs font-bold text-content-primary font-move">{alert.driver_name}</span>
                         <span className="bg-black text-white px-2 py-0.5 rounded text-[8px] font-mono font-bold tracking-wide uppercase">
                           ⚠️ {alert.violation_type.replace('_', ' ')}
                         </span>
                       </div>
-                      <p className="text-[10px] font-mono text-mute">UUID: {alert.driver_id}</p>
-                      <p className="text-xs text-body italic mt-1 leading-relaxed">Analysis: {alert.last_ping_text}</p>
+                      <p className="text-[10px] font-mono text-content-tertiary">UUID: {alert.driver_id}</p>
+                      <p className="text-xs text-content-secondary italic mt-1 leading-relaxed">Analysis: {alert.last_ping_text}</p>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto items-center">
-                      <div className="bg-canvas-softer border border-canvas-soft p-2 rounded-lg text-center min-w-[70px] font-mono select-none">
-                        <span className="text-[7px] text-mute block font-bold uppercase tracking-tight">Variance</span>
+                      <div className="bg-background-tertiary border border-background-secondary p-2 rounded-lg text-center min-w-[70px] font-mono select-none">
+                        <span className="text-[7px] text-content-tertiary block font-bold uppercase tracking-tight">Variance</span>
                         <span className="text-xs font-bold text-black">{alert.variance_score}%</span>
                       </div>
                       <button
                         onClick={() => executeFraudLockoutAction(alert.driver_id, 'SUSPEND')}
                         type="button"
-                        className="bg-black hover:bg-black-elevated text-white font-bold px-4 py-2.5 text-[10px] uppercase tracking-wider rounded-lg border border-black cursor-pointer active:scale-95 transition"
+                        className="bg-black hover:bg-gray-800 text-white font-bold px-4 py-2.5 text-[10px] uppercase tracking-wider rounded-lg border border-black cursor-pointer active:scale-95 transition"
                       >
                         Terminate Session
                       </button>
@@ -731,7 +731,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
       {logResponse && (
         <div className={`p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-          logResponse.startsWith('SUCCESS') || logResponse.startsWith('COMPLIANCE') ? 'bg-canvas-soft border border-surface-pressed text-ink' : 'bg-black text-white'
+          logResponse.startsWith('SUCCESS') || logResponse.startsWith('COMPLIANCE') ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-black text-white'
         }`}>
           {logResponse}
         </div>

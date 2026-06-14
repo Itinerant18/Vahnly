@@ -38,7 +38,7 @@ type Tab = 'accounts' | 'employees' | 'policies' | 'invoices' | 'analytics';
 
 const PLAN_COLORS: Record<string, string> = { STANDARD: 'bg-background-secondary text-content-secondary', PREMIUM: 'bg-surface-accent text-content-accent', ENTERPRISE: 'bg-surface-accent text-content-accent' };
 const INV_STATUS: Record<string, string> = { DRAFT: 'bg-background-secondary text-content-secondary', SENT: 'bg-surface-accent text-content-accent', PAID: 'bg-surface-positive text-content-positive', OVERDUE: 'bg-surface-negative text-content-negative', CANCELLED: 'bg-background-secondary text-content-tertiary' };
-const ROLE_COLORS: Record<string, string> = { ADMIN: 'bg-surface-accent text-content-accent', MANAGER: 'bg-surface-accent text-content-accent', EMPLOYEE: 'bg-canvas-soft text-body' };
+const ROLE_COLORS: Record<string, string> = { ADMIN: 'bg-surface-accent text-content-accent', MANAGER: 'bg-surface-accent text-content-accent', EMPLOYEE: 'bg-background-secondary text-content-secondary' };
 function rupees(p: number) { return `₹${(p / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -62,14 +62,14 @@ export const CorporateDashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-ink">Corporate / B2B</h1>
-        <p className="text-sm text-mute">Manage corporate accounts, employees, policies, and billing</p>
+        <h1 className="text-xl font-bold text-content-primary">Corporate / B2B</h1>
+        <p className="text-sm text-content-tertiary">Manage corporate accounts, employees, policies, and billing</p>
       </div>
-      <div className="flex gap-1 border-b border-canvas-soft">
+      <div className="flex gap-1 border-b border-background-secondary">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key ? 'border-accent text-accent' : 'border-transparent text-body hover:text-ink'
+              tab === t.key ? 'border-accent text-accent' : 'border-transparent text-content-secondary hover:text-content-primary'
             }`}>{t.label}</button>
         ))}
       </div>
@@ -110,13 +110,13 @@ const AccountsTab: React.FC<{
       <div className="space-y-3">
         <div className="flex gap-2">
           <input type="text" placeholder="Search company…" value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+            className="flex-1 border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
           {isSuperAdmin && <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium">+ Add</button>}
         </div>
 
         {showCreate && (
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-            <div className="text-sm font-semibold text-ink">New Corporate Account</div>
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+            <div className="text-sm font-semibold text-content-primary">New Corporate Account</div>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Company Name', k: 'company_name', span: 2 },
@@ -124,62 +124,62 @@ const AccountsTab: React.FC<{
                 { label: 'Contact Name', k: 'primary_contact_name' }, { label: 'Contact Phone', k: 'primary_contact_phone' },
               ].map(f => (
                 <div key={f.k} className={f.span === 2 ? 'col-span-2' : ''}>
-                  <label className="text-xs text-mute">{f.label}</label>
+                  <label className="text-xs text-content-tertiary">{f.label}</label>
                   <input value={String((newAcc as any)[f.k] ?? '')} onChange={e => setNewAcc({ ...newAcc, [f.k]: e.target.value })}
-                    className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                    className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
                 </div>
               ))}
               <div>
-                <label className="text-xs text-mute">Plan</label>
+                <label className="text-xs text-content-tertiary">Plan</label>
                 <select value={newAcc.plan_type || 'STANDARD'} onChange={e => setNewAcc({ ...newAcc, plan_type: e.target.value })}
-                  className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                  className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                   {['STANDARD','PREMIUM','ENTERPRISE'].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-mute">Credit Limit (₹)</label>
+                <label className="text-xs text-content-tertiary">Credit Limit (₹)</label>
                 <input type="number" value={(newAcc.credit_limit_paise ?? 0) / 100} onChange={e => setNewAcc({ ...newAcc, credit_limit_paise: Number(e.target.value) * 100 })}
-                  className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" />
+                  className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2">
               <button onClick={createAcc} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Create</button>
-              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
             </div>
           </div>
         )}
 
-        <div className="divide-y divide-canvas-soft/50 bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
+        <div className="divide-y divide-background-secondary/50 bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
           {accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelect(acc)}
-              className={`w-full text-left px-4 py-3 hover:bg-canvas-soft/30 transition-colors ${selectedAccount?.id === acc.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}>
+              className={`w-full text-left px-4 py-3 hover:bg-background-secondary/30 transition-colors ${selectedAccount?.id === acc.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-ink">{acc.company_name}</div>
-                  <div className="text-xs text-mute">{acc.billing_email} · {acc.city_prefix}</div>
+                  <div className="text-sm font-medium text-content-primary">{acc.company_name}</div>
+                  <div className="text-xs text-content-tertiary">{acc.billing_email} · {acc.city_prefix}</div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${PLAN_COLORS[acc.plan_type] ?? 'bg-canvas-soft text-body'}`}>{acc.plan_type}</span>
-                  <span className="text-[10px] text-mute">{acc.employee_count} employees</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${PLAN_COLORS[acc.plan_type] ?? 'bg-background-secondary text-content-secondary'}`}>{acc.plan_type}</span>
+                  <span className="text-[10px] text-content-tertiary">{acc.employee_count} employees</span>
                 </div>
               </div>
             </button>
           ))}
-          {accounts.length === 0 && <div className="p-6 text-center text-sm text-mute">No corporate accounts found.</div>}
+          {accounts.length === 0 && <div className="p-6 text-center text-sm text-content-tertiary">No corporate accounts found.</div>}
         </div>
       </div>
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
+      <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
         {!selectedAccount ? (
-          <div className="flex flex-col items-center justify-center h-40 text-mute text-sm">
+          <div className="flex flex-col items-center justify-center h-40 text-content-tertiary text-sm">
             <span className="text-4xl mb-2">🏢</span>Select an account to see details
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-semibold text-ink">{selectedAccount.company_name}</div>
-                <div className="text-xs text-mute">{selectedAccount.gstin || 'No GSTIN'} · {selectedAccount.city_prefix}</div>
+                <div className="font-semibold text-content-primary">{selectedAccount.company_name}</div>
+                <div className="text-xs text-content-tertiary">{selectedAccount.gstin || 'No GSTIN'} · {selectedAccount.city_prefix}</div>
               </div>
               <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PLAN_COLORS[selectedAccount.plan_type]}`}>{selectedAccount.plan_type}</span>
             </div>
@@ -194,9 +194,9 @@ const AccountsTab: React.FC<{
                 ['SSO', selectedAccount.sso_provider || 'None'],
                 ['Employees', selectedAccount.employee_count.toString()],
               ].map(([k, v]) => (
-                <div key={k} className="bg-canvas-soft/50 rounded-lg p-3">
-                  <div className="text-xs text-mute">{k}</div>
-                  <div className="text-xs font-medium text-ink mt-0.5 truncate">{v}</div>
+                <div key={k} className="bg-background-secondary/50 rounded-lg p-3">
+                  <div className="text-xs text-content-tertiary">{k}</div>
+                  <div className="text-xs font-medium text-content-primary mt-0.5 truncate">{v}</div>
                 </div>
               ))}
             </div>
@@ -247,20 +247,20 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  if (!selectedAccount) return <div className="text-sm text-mute py-8 text-center">Select an account from the Accounts tab first.</div>;
+  if (!selectedAccount) return <div className="text-sm text-content-tertiary py-8 text-center">Select an account from the Accounts tab first.</div>;
 
   const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="text-sm font-medium text-ink">{selectedAccount.company_name} — {total} employees</div>
+        <div className="text-sm font-medium text-content-primary">{selectedAccount.company_name} — {total} employees</div>
         <div className="flex gap-2">
           <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-            className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-40 focus:outline-none" />
+            className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-40 focus:outline-none" />
           {isSuperAdmin && <>
             <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Add</button>
-            <label className="px-3 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft cursor-pointer">
+            <label className="px-3 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary cursor-pointer">
               ↑ CSV Bulk
               <input type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files?.[0] ?? null)} />
             </label>
@@ -270,53 +270,53 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
       </div>
 
       {bulkResult && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-3 text-sm">
-          Bulk upload: <span className="text-content-positive">{bulkResult.inserted} inserted</span> · <span className="text-mute">{bulkResult.skipped} skipped</span>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-3 text-sm">
+          Bulk upload: <span className="text-content-positive">{bulkResult.inserted} inserted</span> · <span className="text-content-tertiary">{bulkResult.skipped} skipped</span>
           {bulkResult.errors?.length > 0 && <div className="text-xs text-content-negative mt-1">{bulkResult.errors.join(', ')}</div>}
         </div>
       )}
 
       {showAdd && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">Add Employee</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Add Employee</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[{ label: 'Name', k: 'name' }, { label: 'Email', k: 'email' }, { label: 'Phone', k: 'phone' }, { label: 'Employee ID', k: 'employee_id' }, { label: 'Department', k: 'department' }, { label: 'Cost Center', k: 'cost_center' }].map(f => (
               <div key={f.k}>
-                <label className="text-xs text-mute">{f.label}</label>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
                 <input value={String((newEmp as any)[f.k] ?? '')} onChange={e => setNewEmp({ ...newEmp, [f.k]: e.target.value })}
-                  className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                  className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
               </div>
             ))}
             <div>
-              <label className="text-xs text-mute">Role</label>
+              <label className="text-xs text-content-tertiary">Role</label>
               <select value={newEmp.role || 'EMPLOYEE'} onChange={e => setNewEmp({ ...newEmp, role: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['EMPLOYEE','MANAGER','ADMIN'].map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-mute">Monthly Limit (₹)</label>
+              <label className="text-xs text-content-tertiary">Monthly Limit (₹)</label>
               <input type="number" value={(newEmp.monthly_limit_paise ?? 0) / 100} onChange={e => setNewEmp({ ...newEmp, monthly_limit_paise: Number(e.target.value) * 100 })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={addEmployee} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       {depts.length > 0 && (
         <div className="flex gap-1 flex-wrap text-xs">
-          <span className="text-mute">Departments:</span>
-          {depts.map(d => <span key={d} className="border border-canvas-soft rounded px-1.5 py-0.5 text-body">{d}</span>)}
+          <span className="text-content-tertiary">Departments:</span>
+          {depts.map(d => <span key={d} className="border border-background-secondary rounded px-1.5 py-0.5 text-content-secondary">{d}</span>)}
         </div>
       )}
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
+      <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-canvas-soft/50"><tr className="text-xs text-mute">
+          <thead className="bg-background-secondary/50"><tr className="text-xs text-content-tertiary">
             <th className="text-left px-4 py-2.5">Name</th>
             <th className="text-left px-4 py-2.5">Email</th>
             <th className="text-left px-4 py-2.5">Department</th>
@@ -327,13 +327,13 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
           </tr></thead>
           <tbody>
             {employees.map(emp => (
-              <tr key={emp.id} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
-                <td className="px-4 py-2.5 text-sm font-medium text-ink">{emp.name}</td>
-                <td className="px-4 py-2.5 text-xs text-mute">{emp.email}</td>
-                <td className="px-4 py-2.5 text-xs text-body">{emp.department || '—'}</td>
-                <td className="px-4 py-2.5 text-xs font-mono text-mute">{emp.cost_center || '—'}</td>
-                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_COLORS[emp.role] ?? 'bg-canvas-soft text-body'}`}>{emp.role}</span></td>
-                <td className="px-4 py-2.5 text-xs text-right text-mute">{emp.monthly_limit_paise > 0 ? rupees(emp.monthly_limit_paise) : '—'}</td>
+              <tr key={emp.id} className="border-t border-background-secondary/50 hover:bg-background-secondary/20">
+                <td className="px-4 py-2.5 text-sm font-medium text-content-primary">{emp.name}</td>
+                <td className="px-4 py-2.5 text-xs text-content-tertiary">{emp.email}</td>
+                <td className="px-4 py-2.5 text-xs text-content-secondary">{emp.department || '—'}</td>
+                <td className="px-4 py-2.5 text-xs font-mono text-content-tertiary">{emp.cost_center || '—'}</td>
+                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_COLORS[emp.role] ?? 'bg-background-secondary text-content-secondary'}`}>{emp.role}</span></td>
+                <td className="px-4 py-2.5 text-xs text-right text-content-tertiary">{emp.monthly_limit_paise > 0 ? rupees(emp.monthly_limit_paise) : '—'}</td>
                 <td className="px-4 py-2.5"><span className={`text-[10px] ${emp.is_active ? 'text-content-positive' : 'text-content-tertiary'}`}>{emp.is_active ? '● Active' : '● Inactive'}</span></td>
               </tr>
             ))}
@@ -368,34 +368,34 @@ const PoliciesTab: React.FC<{ base: string; headers: Record<string, string>; isS
   const TRIP_TYPES = ['IN_CITY', 'ROUND_TRIP', 'OUTSTATION', 'MINI_OUTSTATION'];
   const CAR_TYPES = ['HATCHBACK', 'SEDAN', 'SUV', 'PREMIUM'];
 
-  if (!selectedAccount) return <div className="text-sm text-mute py-8 text-center">Select an account from the Accounts tab first.</div>;
+  if (!selectedAccount) return <div className="text-sm text-content-tertiary py-8 text-center">Select an account from the Accounts tab first.</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-ink">{selectedAccount.company_name} — Trip Policies</div>
+        <div className="text-sm font-medium text-content-primary">{selectedAccount.company_name} — Trip Policies</div>
         {isSuperAdmin && <button onClick={() => setEditing({ max_fare_paise: 0, requires_approval: false, allowed_trip_types: ['IN_CITY'], allowed_car_types: ['SEDAN'], allowed_hours_start: 0, allowed_hours_end: 23, allowed_days: ['MON','TUE','WED','THU','FRI'], is_default: false, cost_center_required: false })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Policy</button>}
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">Trip Policy</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Trip Policy</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div className="col-span-2 md:col-span-3"><label className="text-xs text-mute">Policy Name</label><input value={editing.policy_name || ''} onChange={e => setEditing({ ...editing, policy_name: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
-            <div><label className="text-xs text-mute">Max Fare (₹) — 0 = unlimited</label><input type="number" value={(editing.max_fare_paise ?? 0) / 100} onChange={e => setEditing({ ...editing, max_fare_paise: Number(e.target.value) * 100 })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
-            <div><label className="text-xs text-mute">Approval Threshold (₹)</label><input type="number" value={(editing.approval_threshold_paise ?? 0) / 100} onChange={e => setEditing({ ...editing, approval_threshold_paise: Number(e.target.value) * 100 })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
-            <div><label className="text-xs text-mute">Hours (start – end)</label><div className="flex gap-1 mt-1"><input type="number" min={0} max={23} value={editing.allowed_hours_start ?? 0} onChange={e => setEditing({ ...editing, allowed_hours_start: Number(e.target.value) })} className="w-16 border border-canvas-soft rounded px-2 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /><span className="self-center text-mute">–</span><input type="number" min={0} max={23} value={editing.allowed_hours_end ?? 23} onChange={e => setEditing({ ...editing, allowed_hours_end: Number(e.target.value) })} className="w-16 border border-canvas-soft rounded px-2 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div></div>
+            <div className="col-span-2 md:col-span-3"><label className="text-xs text-content-tertiary">Policy Name</label><input value={editing.policy_name || ''} onChange={e => setEditing({ ...editing, policy_name: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Max Fare (₹) — 0 = unlimited</label><input type="number" value={(editing.max_fare_paise ?? 0) / 100} onChange={e => setEditing({ ...editing, max_fare_paise: Number(e.target.value) * 100 })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Approval Threshold (₹)</label><input type="number" value={(editing.approval_threshold_paise ?? 0) / 100} onChange={e => setEditing({ ...editing, approval_threshold_paise: Number(e.target.value) * 100 })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Hours (start – end)</label><div className="flex gap-1 mt-1"><input type="number" min={0} max={23} value={editing.allowed_hours_start ?? 0} onChange={e => setEditing({ ...editing, allowed_hours_start: Number(e.target.value) })} className="w-16 border border-background-secondary rounded px-2 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /><span className="self-center text-content-tertiary">–</span><input type="number" min={0} max={23} value={editing.allowed_hours_end ?? 23} onChange={e => setEditing({ ...editing, allowed_hours_end: Number(e.target.value) })} className="w-16 border border-background-secondary rounded px-2 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div></div>
           </div>
           <div>
-            <label className="text-xs text-mute">Allowed Trip Types</label>
+            <label className="text-xs text-content-tertiary">Allowed Trip Types</label>
             <div className="flex gap-1.5 mt-1 flex-wrap">
-              {TRIP_TYPES.map(t => <button key={t} onClick={() => { const cur = editing.allowed_trip_types || []; setEditing({ ...editing, allowed_trip_types: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); }} className={`px-2.5 py-1 rounded text-xs border ${(editing.allowed_trip_types || []).includes(t) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{t}</button>)}
+              {TRIP_TYPES.map(t => <button key={t} onClick={() => { const cur = editing.allowed_trip_types || []; setEditing({ ...editing, allowed_trip_types: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); }} className={`px-2.5 py-1 rounded text-xs border ${(editing.allowed_trip_types || []).includes(t) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{t}</button>)}
             </div>
           </div>
           <div>
-            <label className="text-xs text-mute">Allowed Car Types</label>
+            <label className="text-xs text-content-tertiary">Allowed Car Types</label>
             <div className="flex gap-1.5 mt-1 flex-wrap">
-              {CAR_TYPES.map(t => <button key={t} onClick={() => { const cur = editing.allowed_car_types || []; setEditing({ ...editing, allowed_car_types: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); }} className={`px-2.5 py-1 rounded text-xs border ${(editing.allowed_car_types || []).includes(t) ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{t}</button>)}
+              {CAR_TYPES.map(t => <button key={t} onClick={() => { const cur = editing.allowed_car_types || []; setEditing({ ...editing, allowed_car_types: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); }} className={`px-2.5 py-1 rounded text-xs border ${(editing.allowed_car_types || []).includes(t) ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{t}</button>)}
             </div>
           </div>
           <div className="flex gap-4 text-sm">
@@ -405,25 +405,25 @@ const PoliciesTab: React.FC<{ base: string; headers: Record<string, string>; isS
           </div>
           <div className="flex gap-2">
             <button onClick={save} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
         {policies.map(p => (
-          <div key={p.id} className={`bg-canvas rounded-xl border border-canvas-soft p-4 ${p.is_default ? 'border-accent/30' : ''}`}>
+          <div key={p.id} className={`bg-background-primary rounded-xl border border-background-secondary p-4 ${p.is_default ? 'border-accent/30' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-ink">{p.policy_name}</span>
+                  <span className="font-medium text-sm text-content-primary">{p.policy_name}</span>
                   {p.is_default && <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded font-medium">DEFAULT</span>}
                   {p.requires_approval && <span className="text-[10px] bg-surface-warning text-content-warning px-1.5 py-0.5 rounded">APPROVAL REQ.</span>}
                 </div>
-                <div className="text-xs text-mute mt-1">Max fare: {p.max_fare_paise > 0 ? rupees(p.max_fare_paise) : 'No limit'} · Hours: {p.allowed_hours_start}:00–{p.allowed_hours_end}:00</div>
+                <div className="text-xs text-content-tertiary mt-1">Max fare: {p.max_fare_paise > 0 ? rupees(p.max_fare_paise) : 'No limit'} · Hours: {p.allowed_hours_start}:00–{p.allowed_hours_end}:00</div>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {p.allowed_trip_types.map(t => <span key={t} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{t}</span>)}
-                  {p.allowed_car_types.map(t => <span key={t} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{t}</span>)}
+                  {p.allowed_trip_types.map(t => <span key={t} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 text-content-tertiary">{t}</span>)}
+                  {p.allowed_car_types.map(t => <span key={t} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 text-content-tertiary">{t}</span>)}
                 </div>
               </div>
               {isSuperAdmin && <button onClick={() => setEditing(p)} className="text-xs text-accent hover:underline shrink-0">Edit</button>}
@@ -463,12 +463,12 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  if (!selectedAccount) return <div className="text-sm text-mute py-8 text-center">Select an account from the Accounts tab first.</div>;
+  if (!selectedAccount) return <div className="text-sm text-content-tertiary py-8 text-center">Select an account from the Accounts tab first.</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-ink">{selectedAccount.company_name} — Invoices</div>
+        <div className="text-sm font-medium text-content-primary">{selectedAccount.company_name} — Invoices</div>
         {isSuperAdmin && <button onClick={() => setShowGen(!showGen)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Generate Invoice</button>}
       </div>
 
@@ -479,23 +479,23 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
       )}
 
       {showGen && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">Generate Monthly Invoice</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Generate Monthly Invoice</div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs text-mute">Period Start</label><input type="date" value={genReq.period_start} onChange={e => setGenReq({ ...genReq, period_start: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
-            <div><label className="text-xs text-mute">Period End</label><input type="date" value={genReq.period_end} onChange={e => setGenReq({ ...genReq, period_end: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none" /></div>
-            <div className="col-span-2"><label className="text-xs text-mute">Notes (optional)</label><input value={genReq.notes} onChange={e => setGenReq({ ...genReq, notes: e.target.value })} className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" /></div>
+            <div><label className="text-xs text-content-tertiary">Period Start</label><input type="date" value={genReq.period_start} onChange={e => setGenReq({ ...genReq, period_start: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
+            <div><label className="text-xs text-content-tertiary">Period End</label><input type="date" value={genReq.period_end} onChange={e => setGenReq({ ...genReq, period_end: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" /></div>
+            <div className="col-span-2"><label className="text-xs text-content-tertiary">Notes (optional)</label><input value={genReq.notes} onChange={e => setGenReq({ ...genReq, notes: e.target.value })} className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" /></div>
           </div>
           <div className="flex gap-2">
             <button onClick={generate} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Generate</button>
-            <button onClick={() => setShowGen(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowGen(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
+      <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-canvas-soft/50"><tr className="text-xs text-mute">
+          <thead className="bg-background-secondary/50"><tr className="text-xs text-content-tertiary">
             <th className="text-left px-4 py-2.5">Invoice</th>
             <th className="text-left px-4 py-2.5">Period</th>
             <th className="text-right px-4 py-2.5">Trips</th>
@@ -508,15 +508,15 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
           </tr></thead>
           <tbody>
             {invoices.map(inv => (
-              <tr key={inv.id} className="border-t border-canvas-soft/50 hover:bg-canvas-soft/20">
-                <td className="px-4 py-2.5 text-xs font-mono font-medium text-ink">{inv.invoice_number}</td>
-                <td className="px-4 py-2.5 text-xs text-mute">{inv.period_start} → {inv.period_end}</td>
-                <td className="px-4 py-2.5 text-xs text-right text-body">{inv.total_trips}</td>
-                <td className="px-4 py-2.5 text-xs text-right font-mono text-body">{rupees(inv.subtotal_paise)}</td>
-                <td className="px-4 py-2.5 text-xs text-right font-mono text-mute">{rupees(inv.gst_paise)}</td>
-                <td className="px-4 py-2.5 text-xs text-right font-mono font-semibold text-ink">{rupees(inv.total_paise)}</td>
-                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${INV_STATUS[inv.status] ?? 'bg-canvas-soft text-body'}`}>{inv.status}</span></td>
-                <td className="px-4 py-2.5 text-xs text-mute">{inv.due_date ?? '—'}</td>
+              <tr key={inv.id} className="border-t border-background-secondary/50 hover:bg-background-secondary/20">
+                <td className="px-4 py-2.5 text-xs font-mono font-medium text-content-primary">{inv.invoice_number}</td>
+                <td className="px-4 py-2.5 text-xs text-content-tertiary">{inv.period_start} → {inv.period_end}</td>
+                <td className="px-4 py-2.5 text-xs text-right text-content-secondary">{inv.total_trips}</td>
+                <td className="px-4 py-2.5 text-xs text-right font-mono text-content-secondary">{rupees(inv.subtotal_paise)}</td>
+                <td className="px-4 py-2.5 text-xs text-right font-mono text-content-tertiary">{rupees(inv.gst_paise)}</td>
+                <td className="px-4 py-2.5 text-xs text-right font-mono font-semibold text-content-primary">{rupees(inv.total_paise)}</td>
+                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${INV_STATUS[inv.status] ?? 'bg-background-secondary text-content-secondary'}`}>{inv.status}</span></td>
+                <td className="px-4 py-2.5 text-xs text-content-tertiary">{inv.due_date ?? '—'}</td>
                 <td className="px-4 py-2.5">
                   {isSuperAdmin && inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
                     <div className="flex gap-1">
@@ -527,7 +527,7 @@ const InvoicesTab: React.FC<{ base: string; headers: Record<string, string>; isS
                 </td>
               </tr>
             ))}
-            {invoices.length === 0 && <tr><td colSpan={9} className="text-center py-8 text-sm text-mute">No invoices yet.</td></tr>}
+            {invoices.length === 0 && <tr><td colSpan={9} className="text-center py-8 text-sm text-content-tertiary">No invoices yet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -551,15 +551,15 @@ const AnalyticsTab: React.FC<{ base: string; headers: Record<string, string>; se
     })();
   }, [selectedAccount, period]);
 
-  if (!selectedAccount) return <div className="text-sm text-mute py-8 text-center">Select an account from the Accounts tab first.</div>;
+  if (!selectedAccount) return <div className="text-sm text-content-tertiary py-8 text-center">Select an account from the Accounts tab first.</div>;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-ink">{selectedAccount.company_name} — Analytics</div>
+        <div className="text-sm font-medium text-content-primary">{selectedAccount.company_name} — Analytics</div>
         <div className="flex gap-1">
           {(['7d','30d','90d'] as const).map(p => (
-            <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-lg text-sm border ${period === p ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body'}`}>{p}</button>
+            <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-lg text-sm border ${period === p ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary'}`}>{p}</button>
           ))}
         </div>
       </div>
@@ -568,33 +568,33 @@ const AnalyticsTab: React.FC<{ base: string; headers: Record<string, string>; se
         <>
           <div className="grid grid-cols-3 gap-4">
             {[['Total Trips', data.total_trips.toLocaleString()], ['Revenue', rupees(data.total_revenue_paise)], ['Active Employees', data.total_employees.toLocaleString()]].map(([l, v]) => (
-              <div key={l} className="bg-canvas border border-canvas-soft rounded-xl p-4 text-center">
-                <div className="text-xs text-mute">{l}</div>
-                <div className="text-2xl font-bold text-ink mt-0.5">{v}</div>
+              <div key={l} className="bg-background-primary border border-background-secondary rounded-xl p-4 text-center">
+                <div className="text-xs text-content-tertiary">{l}</div>
+                <div className="text-2xl font-bold text-content-primary mt-0.5">{v}</div>
               </div>
             ))}
           </div>
 
           {data.daily_trips.length >= 2 && (
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-              <div className="text-sm font-semibold text-ink mb-3">Daily Trip Volume</div>
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+              <div className="text-sm font-semibold text-content-primary mb-3">Daily Trip Volume</div>
               <SvgAreaChart data={data.daily_trips.map(d => ({ label: d.day.slice(5), value: d.trips }))} height={120} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
             </div>
           )}
 
           {data.by_department.length > 0 && (
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-              <div className="text-sm font-semibold text-ink mb-3">Spending by Department</div>
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+              <div className="text-sm font-semibold text-content-primary mb-3">Spending by Department</div>
               <div className="space-y-2">
                 {data.by_department.map(d => {
                   const maxRev = Math.max(...data.by_department.map(x => x.revenue_paise), 1);
                   return (
                     <div key={d.department} className="flex items-center gap-3">
-                      <div className="w-32 text-xs text-body shrink-0 truncate">{d.department || 'Unknown'}</div>
-                      <div className="flex-1 h-4 bg-canvas-soft rounded-sm overflow-hidden">
+                      <div className="w-32 text-xs text-content-secondary shrink-0 truncate">{d.department || 'Unknown'}</div>
+                      <div className="flex-1 h-4 bg-background-secondary rounded-sm overflow-hidden">
                         <div className="h-full bg-accent/60 rounded-sm" style={{ width: `${(d.revenue_paise / maxRev) * 100}%` }} />
                       </div>
-                      <div className="w-28 text-right text-xs font-mono text-ink">{rupees(d.revenue_paise)} <span className="text-mute">({d.trips})</span></div>
+                      <div className="w-28 text-right text-xs font-mono text-content-primary">{rupees(d.revenue_paise)} <span className="text-content-tertiary">({d.trips})</span></div>
                     </div>
                   );
                 })}

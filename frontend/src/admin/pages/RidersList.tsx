@@ -17,10 +17,10 @@ const RIDER_COLUMNS: ColumnDef<RiderSummaryItem>[] = [
 								key={tag}
 								className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase font-mono ${
 									tag.toLowerCase() === 'vip'
-										? 'bg-ink text-on-dark'
+										? 'bg-content-primary text-gray-0'
 										: tag.toLowerCase() === 'blocked'
-										? 'bg-status-alert/10 text-status-alert'
-										: 'bg-status-warn/10 text-status-warn'
+										? 'bg-status-negative/10 text-status-negative'
+										: 'bg-status-pending/10 text-status-pending'
 								}`}
 							>
 								{tag}
@@ -58,12 +58,12 @@ const RIDER_COLUMNS: ColumnDef<RiderSummaryItem>[] = [
 			<span
 				className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider border ${
 					r.status === 'ACTIVE'
-						? 'bg-canvas text-ink border-canvas-soft'
+						? 'bg-background-primary text-content-primary border-background-secondary'
 						: r.status === 'SUSPENDED'
-						? 'bg-canvas-soft text-status-warn border-canvas-soft'
+						? 'bg-background-secondary text-status-pending border-background-secondary'
 						: r.status === 'BLOCKED'
-						? 'bg-canvas-soft text-status-alert border-canvas-soft'
-						: 'bg-canvas-soft text-mute border-canvas-soft'
+						? 'bg-background-secondary text-status-negative border-background-secondary'
+						: 'bg-background-secondary text-content-tertiary border-background-secondary'
 				}`}
 			>
 				<span
@@ -71,8 +71,8 @@ const RIDER_COLUMNS: ColumnDef<RiderSummaryItem>[] = [
 						r.status === 'ACTIVE'
 							? 'bg-status-online'
 							: r.status === 'SUSPENDED'
-							? 'bg-status-warn'
-							: 'bg-status-alert'
+							? 'bg-status-pending'
+							: 'bg-status-negative'
 					}`}
 				/>
 				{r.status.toLowerCase()}
@@ -208,28 +208,28 @@ export const RidersList: React.FC = () => {
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-ink">Riders Matrix</h1>
-					<p className="text-xs text-mute mt-1">Monitor passenger lifetime value, activity trends, risk scores, and account status</p>
+					<h1 className="text-2xl font-bold tracking-tight text-content-primary">Riders Matrix</h1>
+					<p className="text-xs text-content-tertiary mt-1">Monitor passenger lifetime value, activity trends, risk scores, and account status</p>
 				</div>
 				<button
 					onClick={exportCSV}
 					disabled={riders.length === 0}
-					className="h-9 px-4 rounded-pill bg-ink text-canvas text-xs font-semibold disabled:opacity-40"
+					className="h-9 px-4 rounded-pill bg-content-primary text-background-primary text-xs font-semibold disabled:opacity-40"
 				>
 					Export CSV
 				</button>
 			</div>
 
 			{/* ---- Filters Panel ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-4 shadow-sm">
+			<div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-4 shadow-sm">
 				<div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
 					{/* Text Search */}
 					<div className="col-span-1 md:col-span-2">
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Search</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Search</label>
 						<input
 							type="text"
 							placeholder="Search Name, Phone, Email, UUID..."
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink placeholder:text-mute focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
 						/>
@@ -237,9 +237,9 @@ export const RidersList: React.FC = () => {
 
 					{/* City selector */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">City</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 							value={city}
 							onChange={(e) => setCity(e.target.value)}
 						>
@@ -253,9 +253,9 @@ export const RidersList: React.FC = () => {
 
 					{/* Tag selector */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Tags</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Tags</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={tag}
 							onChange={(e) => setTag(e.target.value)}
 						>
@@ -268,9 +268,9 @@ export const RidersList: React.FC = () => {
 
 					{/* Referral Source */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Referral Source</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Referral Source</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
 							value={referral}
 							onChange={(e) => setReferral(e.target.value)}
 						>
@@ -285,9 +285,9 @@ export const RidersList: React.FC = () => {
 
 					{/* Rating Threshold */}
 					<div>
-						<label className="block text-[10px] uppercase tracking-wider text-mute mb-1 font-semibold">Min Rating (★)</label>
+						<label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Min Rating (★)</label>
 						<select
-							className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink font-mono"
+							className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
 							value={ratingMin}
 							onChange={(e) => setRatingMin(e.target.value)}
 						>
@@ -301,25 +301,25 @@ export const RidersList: React.FC = () => {
 				</div>
 
 				{/* Advanced numeric filters */}
-				<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-canvas-soft">
+				<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-background-secondary">
 					{/* Trips count */}
 					<div className="flex items-center space-x-2">
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Min Trips</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min Trips</label>
 							<input
 								type="number"
 								placeholder="0"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={tripsMin}
 								onChange={(e) => setTripsMin(e.target.value)}
 							/>
 						</div>
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Max Trips</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Max Trips</label>
 							<input
 								type="number"
 								placeholder="any"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={tripsMax}
 								onChange={(e) => setTripsMax(e.target.value)}
 							/>
@@ -329,21 +329,21 @@ export const RidersList: React.FC = () => {
 					{/* Wallet balance */}
 					<div className="flex items-center space-x-2">
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Min Wallet (₹)</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min Wallet (₹)</label>
 							<input
 								type="number"
 								placeholder="0"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={walletMin}
 								onChange={(e) => setWalletMin(e.target.value)}
 							/>
 						</div>
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Max Wallet (₹)</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Max Wallet (₹)</label>
 							<input
 								type="number"
 								placeholder="any"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={walletMax}
 								onChange={(e) => setWalletMax(e.target.value)}
 							/>
@@ -353,21 +353,21 @@ export const RidersList: React.FC = () => {
 					{/* LTV */}
 					<div className="flex items-center space-x-2">
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Min LTV (₹)</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min LTV (₹)</label>
 							<input
 								type="number"
 								placeholder="0"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={ltvMin}
 								onChange={(e) => setLtvMin(e.target.value)}
 							/>
 						</div>
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Max LTV (₹)</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Max LTV (₹)</label>
 							<input
 								type="number"
 								placeholder="any"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-2.5 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-mono"
 								value={ltvMax}
 								onChange={(e) => setLtvMax(e.target.value)}
 							/>
@@ -377,19 +377,19 @@ export const RidersList: React.FC = () => {
 					{/* Signup date range */}
 					<div className="flex items-center space-x-2 col-span-1 md:col-span-2">
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Signed Up From</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Signed Up From</label>
 							<input
 								type="date"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary font-mono"
 								value={signupStart}
 								onChange={(e) => setSignupStart(e.target.value)}
 							/>
 						</div>
 						<div className="w-1/2">
-							<label className="block text-[9px] uppercase text-mute font-semibold">Signed Up To</label>
+							<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Signed Up To</label>
 							<input
 								type="date"
-								className="w-full h-8 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink font-mono"
+								className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary font-mono"
 								value={signupEnd}
 								onChange={(e) => setSignupEnd(e.target.value)}
 							/>
@@ -400,7 +400,7 @@ export const RidersList: React.FC = () => {
 				<div className="flex justify-end pt-1">
 					<button
 						onClick={handleResetFilters}
-						className="text-[11px] text-mute hover:text-ink font-semibold transition-colors"
+						className="text-[11px] text-content-tertiary hover:text-content-primary font-semibold transition-colors"
 					>
 						Reset All Filters
 					</button>

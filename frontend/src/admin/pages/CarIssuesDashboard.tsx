@@ -100,21 +100,21 @@ export const CarIssuesDashboard: React.FC = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-ink">Car Issue Reports</h1>
-          <p className="text-xs text-mute mt-0.5">Driver-filed issues on rider vehicles after trips</p>
+          <h1 className="text-lg font-bold text-content-primary">Car Issue Reports</h1>
+          <p className="text-xs text-content-tertiary mt-0.5">Driver-filed issues on rider vehicles after trips</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex items-center gap-2 text-xs text-ink">
+        <label className="flex items-center gap-2 text-xs text-content-primary">
           <input type="checkbox" checked={unreviewedOnly} onChange={(e) => setUnreviewedOnly(e.target.checked)} />
           Unreviewed only
         </label>
         <select
           value={carType}
           onChange={(e) => setCarType(e.target.value)}
-          className="h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink"
+          className="h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
         >
           <option value="">All car types</option>
           <option value="HATCHBACK">Hatchback</option>
@@ -122,8 +122,8 @@ export const CarIssuesDashboard: React.FC = () => {
           <option value="SUV">SUV</option>
           <option value="PREMIUM">Premium</option>
         </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink focus:outline-none focus:border-ink" />
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary" />
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary" />
       </div>
 
       {/* Table (DataTable hero component) */}
@@ -177,10 +177,10 @@ const CarIssueDetailPanel: React.FC<{ report: CarIssueReport; onClose: () => voi
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div className="h-full w-full max-w-md bg-canvas shadow-2xl overflow-y-auto p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+      <div className="h-full w-full max-w-md bg-background-primary shadow-2xl overflow-y-auto p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-ink">Car Issue Detail</h2>
-          <button onClick={onClose} className="text-mute hover:text-ink text-sm">✕</button>
+          <h2 className="text-base font-bold text-content-primary">Car Issue Detail</h2>
+          <button onClick={onClose} className="text-content-tertiary hover:text-content-primary text-sm">✕</button>
         </div>
 
         <div className="space-y-2 text-xs">
@@ -193,17 +193,17 @@ const CarIssueDetailPanel: React.FC<{ report: CarIssueReport; onClose: () => voi
         </div>
 
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-mute mb-1">Driver description</div>
-          <p className="text-xs text-ink bg-canvas-soft rounded-lg p-3">{report.description || 'No description provided.'}</p>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary mb-1">Driver description</div>
+          <p className="text-xs text-content-primary bg-background-secondary rounded-lg p-3">{report.description || 'No description provided.'}</p>
         </div>
 
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-mute mb-1">Admin notes</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary mb-1">Admin notes</div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            className="w-full rounded-lg bg-canvas-soft border border-canvas-soft p-3 text-xs text-ink focus:outline-none focus:border-ink resize-none"
+            className="w-full rounded-lg bg-background-secondary border border-background-secondary p-3 text-xs text-content-primary focus:outline-none focus:border-content-primary resize-none"
             placeholder="Add review notes…"
           />
         </div>
@@ -212,14 +212,14 @@ const CarIssueDetailPanel: React.FC<{ report: CarIssueReport; onClose: () => voi
           <button
             onClick={() => submit(false)}
             disabled={saving}
-            className="flex-1 h-10 rounded-pill bg-ink text-canvas text-xs font-semibold disabled:opacity-50"
+            className="flex-1 h-10 rounded-pill bg-content-primary text-background-primary text-xs font-semibold disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Mark Reviewed'}
           </button>
           <button
             onClick={() => submit(true)}
             disabled={saving}
-            className="flex-1 h-10 rounded-pill border border-ink text-ink text-xs font-semibold disabled:opacity-50"
+            className="flex-1 h-10 rounded-pill border border-content-primary text-content-primary text-xs font-semibold disabled:opacity-50"
           >
             Notify Rider
           </button>
@@ -231,7 +231,7 @@ const CarIssueDetailPanel: React.FC<{ report: CarIssueReport; onClose: () => voi
 
 const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
   <div className="flex justify-between gap-3">
-    <span className="text-mute">{label}</span>
-    <span className={`text-ink text-right ${mono ? 'font-mono text-[11px]' : ''}`}>{value}</span>
+    <span className="text-content-tertiary">{label}</span>
+    <span className={`text-content-primary text-right ${mono ? 'font-mono text-[11px]' : ''}`}>{value}</span>
   </div>
 );

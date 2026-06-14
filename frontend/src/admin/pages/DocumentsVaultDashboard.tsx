@@ -63,8 +63,8 @@ const buildDocColumns = (
       <div className="flex items-center gap-2">
         <span className="text-lg">{MIME_ICONS[doc.mime_type] ?? '📁'}</span>
         <div>
-          <div className="text-xs font-medium text-ink truncate max-w-[180px]">{doc.display_name}</div>
-          <div className="text-[10px] text-mute font-mono text-mono-small">v{doc.version}</div>
+          <div className="text-xs font-medium text-content-primary truncate max-w-[180px]">{doc.display_name}</div>
+          <div className="text-[10px] text-content-tertiary font-mono text-mono-small">v{doc.version}</div>
         </div>
       </div>
     ),
@@ -73,21 +73,21 @@ const buildDocColumns = (
     key: 'entity_type', header: 'Entity',
     render: (_v, doc) => (
       <div>
-        <div className="text-xs text-body">{doc.entity_type}</div>
-        <div className="text-[10px] text-mute font-mono text-mono-small">{doc.entity_id.slice(0, 8)}…</div>
+        <div className="text-xs text-content-secondary">{doc.entity_type}</div>
+        <div className="text-[10px] text-content-tertiary font-mono text-mono-small">{doc.entity_id.slice(0, 8)}…</div>
       </div>
     ),
   },
   {
     key: 'doc_type', header: 'Type',
-    render: (_v, doc) => <span className="text-xs text-body">{doc.doc_type}</span>,
+    render: (_v, doc) => <span className="text-xs text-content-secondary">{doc.doc_type}</span>,
   },
   {
     key: 'tags', header: 'Tags',
     render: (_v, doc) => (
       <div className="flex gap-1 flex-wrap">
         {doc.tags.slice(0, 3).map(t => (
-          <span key={t} className="text-[10px] border border-canvas-soft rounded px-1.5 py-0.5 text-mute">{t}</span>
+          <span key={t} className="text-[10px] border border-background-secondary rounded px-1.5 py-0.5 text-content-tertiary">{t}</span>
         ))}
       </div>
     ),
@@ -98,20 +98,20 @@ const buildDocColumns = (
       const expDays = daysUntil(doc.expiry_date);
       return doc.expiry_date ? (
         <div>
-          <div className="text-xs text-body">{doc.expiry_date}</div>
+          <div className="text-xs text-content-secondary">{doc.expiry_date}</div>
           {expDays !== null && (
-            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-content-negative' : expDays <= 30 ? 'text-content-warning' : 'text-mute'}`}>
+            <div className={`text-[10px] font-medium ${expDays <= 0 ? 'text-content-negative' : expDays <= 30 ? 'text-content-warning' : 'text-content-tertiary'}`}>
               {expDays <= 0 ? 'EXPIRED' : `${expDays}d`}
             </div>
           )}
         </div>
-      ) : <span className="text-[10px] text-mute">—</span>;
+      ) : <span className="text-[10px] text-content-tertiary">—</span>;
     },
   },
   { key: 'status', header: 'Status', type: 'status' },
   {
     key: 'file_size_bytes', header: 'Size',
-    render: (_v, doc) => <span className="text-xs text-mute">{fileSize(doc.file_size_bytes)}</span>,
+    render: (_v, doc) => <span className="text-xs text-content-tertiary">{fileSize(doc.file_size_bytes)}</span>,
   },
 ];
 
@@ -205,41 +205,41 @@ export const DocumentsVaultDashboard: React.FC = () => {
       {/* Left: list */}
       <div className="flex-1 flex flex-col gap-4 min-w-0">
         <div>
-          <h1 className="text-xl font-bold text-ink">Documents Vault</h1>
-          <p className="text-sm text-mute">Centralized search, tagging, and access audit for all platform documents</p>
+          <h1 className="text-xl font-bold text-content-primary">Documents Vault</h1>
+          <p className="text-sm text-content-tertiary">Centralized search, tagging, and access audit for all platform documents</p>
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2">
           <input type="text" placeholder="Search by name or entity ID…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(0); }}
-            className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-52 focus:outline-none focus:ring-1 focus:ring-accent" />
+            className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-52 focus:outline-none focus:ring-1 focus:ring-accent" />
           <select value={entityType} onChange={e => { setEntityType(e.target.value); setPage(0); }}
-            className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
             <option value="">All entities</option>
             {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <select value={docType} onChange={e => { setDocType(e.target.value); setPage(0); }}
-            className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
             <option value="">All doc types</option>
             {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
-            className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+            className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
             <option value="ALL">All statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="EXPIRED">Expired</option>
             <option value="SUPERSEDED">Superseded</option>
           </select>
-          <span className="ml-auto text-xs text-mute self-center">{total.toLocaleString()} docs</span>
+          <span className="ml-auto text-xs text-content-tertiary self-center">{total.toLocaleString()} docs</span>
         </div>
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
           <div className="bg-accent/5 border border-accent/20 rounded-lg px-4 py-2.5 flex items-center gap-3 text-sm">
             <span className="font-medium text-accent">{selectedIds.size} selected</span>
-            <button onClick={() => setSelectedIds(new Set())} className="text-mute hover:text-body">Clear</button>
-            <button className="ml-auto text-body border border-canvas-soft rounded px-3 py-1 hover:bg-canvas-soft">
+            <button onClick={() => setSelectedIds(new Set())} className="text-content-tertiary hover:text-content-secondary">Clear</button>
+            <button className="ml-auto text-content-secondary border border-background-secondary rounded px-3 py-1 hover:bg-background-secondary">
               ↓ Bulk Download URLs
             </button>
           </div>
@@ -264,12 +264,12 @@ export const DocumentsVaultDashboard: React.FC = () => {
         {totalPages > 1 && (
           <div className="flex items-center justify-between text-sm">
             <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-canvas-soft text-body disabled:opacity-40 hover:bg-canvas-soft">
+              className="px-3 py-1.5 rounded-lg border border-background-secondary text-content-secondary disabled:opacity-40 hover:bg-background-secondary">
               Previous
             </button>
-            <span className="text-mute">Page {page + 1} / {totalPages}</span>
+            <span className="text-content-tertiary">Page {page + 1} / {totalPages}</span>
             <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-canvas-soft text-body disabled:opacity-40 hover:bg-canvas-soft">
+              className="px-3 py-1.5 rounded-lg border border-background-secondary text-content-secondary disabled:opacity-40 hover:bg-background-secondary">
               Next
             </button>
           </div>
@@ -278,9 +278,9 @@ export const DocumentsVaultDashboard: React.FC = () => {
 
       {/* Right: Detail panel */}
       <div className="w-80 shrink-0">
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5 sticky top-0 space-y-4">
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5 sticky top-0 space-y-4">
           {!selected ? (
-            <div className="flex flex-col items-center justify-center h-48 text-mute text-sm">
+            <div className="flex flex-col items-center justify-center h-48 text-content-tertiary text-sm">
               <span className="text-4xl mb-2">🗄</span>
               Select a document to inspect
             </div>
@@ -288,10 +288,10 @@ export const DocumentsVaultDashboard: React.FC = () => {
             <>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-sm text-ink">{selected.display_name}</div>
-                  <div className="text-xs text-mute mt-0.5">{selected.doc_type}</div>
+                  <div className="font-semibold text-sm text-content-primary">{selected.display_name}</div>
+                  <div className="text-xs text-content-tertiary mt-0.5">{selected.doc_type}</div>
                 </div>
-                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[selected.status] ?? 'bg-canvas-soft text-body'}`}>
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[selected.status] ?? 'bg-background-secondary text-content-secondary'}`}>
                   {selected.status}
                 </span>
               </div>
@@ -306,15 +306,15 @@ export const DocumentsVaultDashboard: React.FC = () => {
                   ...(selected.expiry_date ? [['Expires', selected.expiry_date]] : []),
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between">
-                    <span className="text-mute">{k}</span>
-                    <span className="text-body font-mono truncate ml-2 max-w-[160px]">{v}</span>
+                    <span className="text-content-tertiary">{k}</span>
+                    <span className="text-content-secondary font-mono truncate ml-2 max-w-[160px]">{v}</span>
                   </div>
                 ))}
               </div>
 
               <div>
                 <a href={selected.file_url} target="_blank" rel="noopener noreferrer"
-                  className="block w-full text-center border border-canvas-soft rounded-lg px-4 py-2 text-sm text-body hover:bg-canvas-soft">
+                  className="block w-full text-center border border-background-secondary rounded-lg px-4 py-2 text-sm text-content-secondary hover:bg-background-secondary">
                   ↗ Open Document
                 </a>
               </div>
@@ -322,7 +322,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
               {/* Tags */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-semibold text-mute uppercase tracking-wide">Tags</div>
+                  <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide">Tags</div>
                   <button onClick={() => { setEditingTags([...selected.tags]); setTagInput(''); }}
                     className="text-xs text-accent hover:underline">Edit</button>
                 </div>
@@ -330,7 +330,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-1">
                       {editingTags.map(t => (
-                        <span key={t} className="flex items-center gap-1 text-[11px] border border-canvas-soft rounded px-1.5 py-0.5 text-body">
+                        <span key={t} className="flex items-center gap-1 text-[11px] border border-background-secondary rounded px-1.5 py-0.5 text-content-secondary">
                           {t}
                           <button onClick={() => setEditingTags(editingTags.filter(x => x !== t))} className="text-content-negative hover:text-content-negative leading-none">×</button>
                         </span>
@@ -340,15 +340,15 @@ export const DocumentsVaultDashboard: React.FC = () => {
                       <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { setEditingTags([...editingTags, tagInput.trim()]); setTagInput(''); } }}
                         placeholder="Add tag…"
-                        className="flex-1 border border-canvas-soft rounded px-2 py-1 text-xs bg-canvas text-ink focus:outline-none" />
+                        className="flex-1 border border-background-secondary rounded px-2 py-1 text-xs bg-background-primary text-content-primary focus:outline-none" />
                       <button onClick={saveTags} className="text-xs bg-accent text-white px-2 py-1 rounded">Save</button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-1">
                     {selected.tags.length === 0
-                      ? <span className="text-xs text-mute italic">No tags</span>
-                      : selected.tags.map(t => <span key={t} className="text-[11px] border border-canvas-soft rounded px-1.5 py-0.5 text-body">{t}</span>)}
+                      ? <span className="text-xs text-content-tertiary italic">No tags</span>
+                      : selected.tags.map(t => <span key={t} className="text-[11px] border border-background-secondary rounded px-1.5 py-0.5 text-content-secondary">{t}</span>)}
                   </div>
                 )}
               </div>
@@ -356,15 +356,15 @@ export const DocumentsVaultDashboard: React.FC = () => {
               {/* Access log */}
               {!detailLoading && accessLog.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-mute uppercase tracking-wide mb-2">Access Log</div>
+                  <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-2">Access Log</div>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
                     {accessLog.map(e => (
                       <div key={e.id} className="flex items-center justify-between text-[11px]">
                         <div>
-                          <span className="text-body">{e.accessed_by_email.split('@')[0]}</span>
-                          <span className={`ml-1 font-mono ${e.access_type === 'DELETE' ? 'text-content-negative' : 'text-mute'}`}>{e.access_type}</span>
+                          <span className="text-content-secondary">{e.accessed_by_email.split('@')[0]}</span>
+                          <span className={`ml-1 font-mono ${e.access_type === 'DELETE' ? 'text-content-negative' : 'text-content-tertiary'}`}>{e.access_type}</span>
                         </div>
-                        <div className="text-mute">{new Date(e.created_at).toLocaleDateString('en-IN')}</div>
+                        <div className="text-content-tertiary">{new Date(e.created_at).toLocaleDateString('en-IN')}</div>
                       </div>
                     ))}
                   </div>

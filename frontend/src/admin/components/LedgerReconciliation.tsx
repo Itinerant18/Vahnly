@@ -114,20 +114,20 @@ export const LedgerReconciliation: React.FC = () => {
   };
 
   return (
-    <div className="bg-canvas-softer rounded-xl p-6 border border-canvas-soft space-y-6">
+    <div className="bg-background-tertiary rounded-xl p-6 border border-background-secondary space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-ink">Ledger reconciliation &amp; discrepancy explorer</h2>
-        <p className="text-xs text-body">Isolates sharded order sequences where double-entry balances diverge from zero</p>
+        <h2 className="text-lg font-bold text-content-primary">Ledger reconciliation &amp; discrepancy explorer</h2>
+        <p className="text-xs text-content-secondary">Isolates sharded order sequences where double-entry balances diverge from zero</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Feed panel */}
         <div className="lg:col-span-1 space-y-3 max-h-[380px] overflow-y-auto pr-2">
-          <div className="text-[10px] uppercase tracking-wider font-bold text-mute">Imbalance exceptions ({discrepancies.length})</div>
+          <div className="text-[10px] uppercase tracking-wider font-bold text-content-tertiary">Imbalance exceptions ({discrepancies.length})</div>
           {isLoading && discrepancies.length === 0 ? (
-            <div className="py-12 text-center text-xs font-mono text-mute">Executing cluster audit...</div>
+            <div className="py-12 text-center text-xs font-mono text-content-tertiary">Executing cluster audit...</div>
           ) : discrepancies.length === 0 ? (
-            <div className="p-4 bg-canvas border border-canvas-soft rounded-xl text-center text-xs text-body">
+            <div className="p-4 bg-background-primary border border-background-secondary rounded-xl text-center text-xs text-content-secondary">
               Absolute balance verified across all matching log pools. Zero leaks.
             </div>
           ) : (
@@ -137,16 +137,16 @@ export const LedgerReconciliation: React.FC = () => {
                 onClick={() => handleSelectRecord(rec)}
                 className={`p-4 rounded-xl border transition text-left cursor-pointer relative overflow-hidden ${
                   selectedRecord?.order_id === rec.order_id
-                    ? 'bg-ink border-ink text-on-dark'
-                    : 'bg-canvas border-canvas-soft hover:bg-canvas-softer text-ink'
+                    ? 'bg-content-primary border-content-primary text-gray-0'
+                    : 'bg-background-primary border-background-secondary hover:bg-background-tertiary text-content-primary'
                 }`}
               >
                 <div className="flex justify-between items-start">
                   <span className="text-xs font-mono font-bold">ID: {rec.order_id.slice(0, 13)}...</span>
                   <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
                     selectedRecord?.order_id === rec.order_id
-                      ? 'bg-on-dark text-ink'
-                      : 'bg-canvas-soft text-status-alert'
+                      ? 'bg-gray-0 text-content-primary'
+                      : 'bg-background-secondary text-status-negative'
                   }`}>
                     Δ ₹{(Math.abs(rec.discrepancy_paise) / 100).toFixed(2)}
                   </span>
@@ -161,30 +161,30 @@ export const LedgerReconciliation: React.FC = () => {
         </div>
 
         {/* Balancing interface */}
-        <div className="lg:col-span-2 bg-canvas border border-canvas-soft rounded-xl p-6 flex flex-col justify-between min-h-[380px]">
+        <div className="lg:col-span-2 bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-between min-h-[380px]">
           {selectedRecord ? (
             <form onSubmit={executeManualCorrectionEntry} className="space-y-4 text-left flex-grow flex flex-col justify-between">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 {/* Exception summary */}
                 <div className="space-y-3">
-                  <div className="border-b border-canvas-soft pb-2">
-                    <span className="text-[10px] uppercase font-bold text-mute tracking-wider">Audit investigation target</span>
-                    <div className="text-xs font-mono font-bold text-ink mt-1 select-all">{selectedRecord.order_id}</div>
+                  <div className="border-b border-background-secondary pb-2">
+                    <span className="text-[10px] uppercase font-bold text-content-tertiary tracking-wider">Audit investigation target</span>
+                    <div className="text-xs font-mono font-bold text-content-primary mt-1 select-all">{selectedRecord.order_id}</div>
                   </div>
-                  <div className="text-[11px] space-y-1.5 text-body">
+                  <div className="text-[11px] space-y-1.5 text-content-secondary">
                     <div><span className="font-bold">Variance direction:</span> {selectedRecord.discrepancy_paise > 0 ? 'Positive debit excess' : 'Negative credit excess'}</div>
-                    <div><span className="font-bold">Required balancing move:</span> <span className="font-mono text-ink font-bold">{selectedRecord.discrepancy_paise > 0 ? 'Post credit entry' : 'Post debit entry'}</span></div>
-                    <div><span className="font-bold">Precise absolute error:</span> <span className="font-mono text-ink bg-canvas-softer border border-canvas-soft px-1 rounded text-[10px]">{Math.abs(selectedRecord.discrepancy_paise)} Paise</span></div>
+                    <div><span className="font-bold">Required balancing move:</span> <span className="font-mono text-content-primary font-bold">{selectedRecord.discrepancy_paise > 0 ? 'Post credit entry' : 'Post debit entry'}</span></div>
+                    <div><span className="font-bold">Precise absolute error:</span> <span className="font-mono text-content-primary bg-background-tertiary border border-background-secondary px-1 rounded text-[10px]">{Math.abs(selectedRecord.discrepancy_paise)} Paise</span></div>
                   </div>
                 </div>
 
                 {/* Adjustment inputs */}
-                <div className="space-y-3 bg-canvas-softer p-4 rounded-xl border border-canvas-soft">
+                <div className="space-y-3 bg-background-tertiary p-4 rounded-xl border border-background-secondary">
                   <div>
-                    <label className="block text-[9px] uppercase tracking-wider font-bold text-mute mb-1">Target slice category</label>
+                    <label className="block text-[9px] uppercase tracking-wider font-bold text-content-tertiary mb-1">Target slice category</label>
                     <select
-                      className="w-full bg-canvas border border-canvas-soft rounded-md p-2 text-xs font-bold text-ink focus:outline-none focus:border-ink cursor-pointer"
+                      className="w-full bg-background-primary border border-background-secondary rounded-md p-2 text-xs font-bold text-content-primary focus:outline-none focus:border-content-primary cursor-pointer"
                       value={accountType}
                       onChange={(e) => setAccountType(e.target.value)}
                     >
@@ -197,9 +197,9 @@ export const LedgerReconciliation: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[9px] uppercase tracking-wider font-bold text-mute mb-1">Entry vector</label>
+                      <label className="block text-[9px] uppercase tracking-wider font-bold text-content-tertiary mb-1">Entry vector</label>
                       <select
-                        className="w-full bg-canvas border border-canvas-soft rounded-md p-2 text-xs font-bold text-ink focus:outline-none focus:border-ink cursor-pointer"
+                        className="w-full bg-background-primary border border-background-secondary rounded-md p-2 text-xs font-bold text-content-primary focus:outline-none focus:border-content-primary cursor-pointer"
                         value={entryType}
                         onChange={(e) => setEntryType(e.target.value as 'DEBIT' | 'CREDIT')}
                       >
@@ -208,10 +208,10 @@ export const LedgerReconciliation: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[9px] uppercase tracking-wider font-bold text-mute mb-1">Value (Paise)</label>
+                      <label className="block text-[9px] uppercase tracking-wider font-bold text-content-tertiary mb-1">Value (Paise)</label>
                       <input
                         type="number"
-                        className="w-full bg-canvas border border-canvas-soft rounded-md p-2 text-xs font-mono font-bold text-ink focus:outline-none focus:border-ink"
+                        className="w-full bg-background-primary border border-background-secondary rounded-md p-2 text-xs font-mono font-bold text-content-primary focus:outline-none focus:border-content-primary"
                         value={adjustmentPaise}
                         onChange={(e) => setAdjustmentPaise(parseInt(e.target.value, 10) || 0)}
                         required
@@ -223,10 +223,10 @@ export const LedgerReconciliation: React.FC = () => {
 
               {/* Justification */}
               <div className="pt-2">
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Adjustment audit narrative</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Adjustment audit narrative</label>
                 <input
                   type="text"
-                  className="w-full bg-canvas-softer border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none transition"
+                  className="w-full bg-background-tertiary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
                   placeholder="e.g. Offset manual credit adjustment for payment gateway webhook signature delay mismatch."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -241,30 +241,30 @@ export const LedgerReconciliation: React.FC = () => {
                 onAuditState={setOdoState}
               />
 
-              <div className="border-t border-canvas-soft pt-4 mt-2">
+              <div className="border-t border-background-secondary pt-4 mt-2">
                 <button
                   type="submit"
                   disabled={isLoading || adjustmentPaise <= 0 || odoBlocks}
-                  className="w-full bg-ink hover:bg-black-elevated disabled:opacity-40 text-on-dark font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider cursor-pointer active:scale-95 select-none"
+                  className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-40 text-gray-0 font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider cursor-pointer active:scale-95 select-none"
                 >
                   Commit balancing log entry
                 </button>
                 {odoBlocks && (
-                  <p className="mt-2 text-[10px] text-status-alert font-medium text-center">
+                  <p className="mt-2 text-[10px] text-status-negative font-medium text-center">
                     Mileage variance flagged — inspect the odometer photos and sign off above before committing.
                   </p>
                 )}
               </div>
             </form>
           ) : (
-            <div className="flex-grow flex flex-col items-center justify-center text-body text-xs text-center px-6">
+            <div className="flex-grow flex flex-col items-center justify-center text-content-secondary text-xs text-center px-6">
               Select an isolated variance entry from the feed to review transaction splits and execute balancing operations.
             </div>
           )}
 
           {auditLog && (
             <div className={`mt-4 p-3 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-              auditLog.startsWith('SUCCESS') ? 'bg-canvas-soft border border-surface-pressed text-status-online' : 'bg-canvas-soft border border-surface-pressed text-status-alert'
+              auditLog.startsWith('SUCCESS') ? 'bg-background-secondary border border-surface-pressed text-status-online' : 'bg-background-secondary border border-surface-pressed text-status-negative'
             }`}>
               {auditLog}
             </div>

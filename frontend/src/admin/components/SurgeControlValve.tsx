@@ -65,25 +65,25 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
   };
 
   return (
-    <div className="bg-canvas-softer rounded-lg p-4 border border-canvas-soft flex flex-col gap-3">
+    <div className="bg-background-tertiary rounded-lg p-4 border border-background-secondary flex flex-col gap-3">
       <div className="text-left">
-        <h2 className="text-sm font-bold text-ink">Price Control Valve</h2>
-        <p className="text-[11px] text-body mt-0.5">Cap surge during disruptions</p>
+        <h2 className="text-sm font-bold text-content-primary">Price Control Valve</h2>
+        <p className="text-[11px] text-content-secondary mt-0.5">Cap surge during disruptions</p>
       </div>
 
       {selectedCellToken ? (
         <form onSubmit={handleEnforceFreeze} className="space-y-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">
+            <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">
               Selected H3 Cell
             </label>
-            <div className="font-mono text-[11px] text-ink bg-canvas-soft border border-canvas-soft rounded-md p-2 select-all truncate">
+            <div className="font-mono text-[11px] text-content-primary bg-background-secondary border border-background-secondary rounded-md p-2 select-all truncate">
               {selectedCellToken}
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">
+            <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">
               Max Multiplier ({maxMultiplier}x)
             </label>
             <input
@@ -91,12 +91,12 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
               min="1.0"
               max="4.0"
               step="0.1"
-              className="w-full accent-black bg-canvas-soft h-1 rounded-lg appearance-none cursor-pointer"
+              className="w-full accent-black bg-background-secondary h-1 rounded-lg appearance-none cursor-pointer"
               value={maxMultiplier}
               onChange={(e) => setMaxMultiplier(parseFloat(e.target.value))}
               disabled={isProcessing}
             />
-            <div className="flex justify-between text-[9px] font-mono font-bold text-mute mt-1 uppercase">
+            <div className="flex justify-between text-[9px] font-mono font-bold text-content-tertiary mt-1 uppercase">
               <span>1.0x</span>
               <span>2.5x</span>
               <span>4.0x</span>
@@ -104,11 +104,11 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1">
+            <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1">
               Expiration TTL
             </label>
             <select
-              className="w-full bg-canvas-soft border border-canvas-soft rounded-md p-2 text-[11px] font-bold text-ink focus:outline-none focus:border-ink cursor-pointer"
+              className="w-full bg-background-secondary border border-background-secondary rounded-md p-2 text-[11px] font-bold text-content-primary focus:outline-none focus:border-content-primary cursor-pointer"
               value={durationMinutes}
               onChange={(e) => setDurationMinutes(parseInt(e.target.value, 10))}
               disabled={isProcessing}
@@ -123,20 +123,20 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full bg-ink hover:bg-black-elevated disabled:opacity-40 text-white font-bold py-2.5 px-4 rounded-md transition text-[11px] uppercase tracking-wider cursor-pointer active:scale-[0.98]"
+            className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-40 text-white font-bold py-2.5 px-4 rounded-md transition text-[11px] uppercase tracking-wider cursor-pointer active:scale-[0.98]"
           >
             {isProcessing ? 'Deploying...' : 'Enforce Price Cap'}
           </button>
         </form>
       ) : (
-        <div className="py-8 text-center text-[11px] text-mute bg-canvas-soft border border-dashed border-canvas-soft rounded-md flex items-center justify-center p-4">
+        <div className="py-8 text-center text-[11px] text-content-tertiary bg-background-secondary border border-dashed border-background-secondary rounded-md flex items-center justify-center p-4">
           Click a hex cell on the map to engage pricing control.
         </div>
       )}
 
       {statusMessage && (
         <div className={`p-2.5 rounded-md text-[10px] text-left font-mono font-bold uppercase tracking-wider ${
-          statusMessage.type === 'SUCCESS' ? 'bg-canvas-soft border border-surface-pressed text-status-online' : 'bg-canvas-soft border border-surface-pressed text-status-alert'
+          statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-status-online' : 'bg-background-secondary border border-surface-pressed text-status-negative'
         }`}>
           {statusMessage.text}
         </div>

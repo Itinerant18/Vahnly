@@ -62,7 +62,7 @@ function pct(n: number, d: number) {
 const CITY_COLUMNS: ColumnDef<CityRow>[] = [
   {
     key: 'city', header: 'City', sortable: true,
-    render: (v) => <span className="font-mono text-ink font-medium">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-content-primary font-medium">{String(v)}</span>,
   },
   { key: 'total', header: 'Trips', type: 'numeric', sortable: true },
   { key: 'revenue_paise', header: 'Revenue', type: 'currency', sortable: true },
@@ -77,10 +77,10 @@ const CITY_COLUMNS: ColumnDef<CityRow>[] = [
 ];
 
 const KPI: React.FC<{ label: string; value: string; sub?: string; accent?: boolean }> = ({ label, value, sub, accent }) => (
-  <div className={`rounded-xl border p-5 flex flex-col gap-1 ${accent ? 'border-accent/30 bg-accent/5' : 'border-canvas-soft bg-canvas'}`}>
-    <div className="text-xs text-mute uppercase tracking-wide">{label}</div>
-    <div className="text-2xl font-bold text-ink">{value}</div>
-    {sub && <div className="text-xs text-body">{sub}</div>}
+  <div className={`rounded-xl border p-5 flex flex-col gap-1 ${accent ? 'border-accent/30 bg-accent/5' : 'border-background-secondary bg-background-primary'}`}>
+    <div className="text-xs text-content-tertiary uppercase tracking-wide">{label}</div>
+    <div className="text-2xl font-bold text-content-primary">{value}</div>
+    {sub && <div className="text-xs text-content-secondary">{sub}</div>}
   </div>
 );
 
@@ -142,8 +142,8 @@ export const AnalyticsDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-ink">Analytics & Reports</h1>
-          <p className="text-sm text-mute">Platform-wide performance metrics</p>
+          <h1 className="text-xl font-bold text-content-primary">Analytics & Reports</h1>
+          <p className="text-sm text-content-tertiary">Platform-wide performance metrics</p>
         </div>
         <div className="flex gap-2">
           {(['7d', '30d', '90d'] as Period[]).map(p => (
@@ -153,7 +153,7 @@ export const AnalyticsDashboard: React.FC = () => {
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 period === p
                   ? 'bg-accent text-white'
-                  : 'bg-canvas border border-canvas-soft text-body hover:text-ink'
+                  : 'bg-background-primary border border-background-secondary text-content-secondary hover:text-content-primary'
               }`}
             >
               {PERIOD_LABELS[p]}
@@ -162,7 +162,7 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {loading && <div className="text-sm text-mute animate-pulse">Loading analytics…</div>}
+      {loading && <div className="text-sm text-content-tertiary animate-pulse">Loading analytics…</div>}
 
       {/* KPI Grid */}
       {summary && (
@@ -180,25 +180,25 @@ export const AnalyticsDashboard: React.FC = () => {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          <div className="text-sm font-semibold text-ink mb-3">Trips Over Time</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          <div className="text-sm font-semibold text-content-primary mb-3">Trips Over Time</div>
           {tripsChartData.length >= 2
             ? <SvgAreaChart data={tripsChartData} height={120} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
-            : <div className="text-xs text-mute">No data for period</div>}
+            : <div className="text-xs text-content-tertiary">No data for period</div>}
         </div>
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          <div className="text-sm font-semibold text-ink mb-3">Revenue (₹) Over Time</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          <div className="text-sm font-semibold text-content-primary mb-3">Revenue (₹) Over Time</div>
           {revenueChartData.length >= 2
             ? <SvgAreaChart data={revenueChartData} height={120} strokeColor="var(--positive-400)" fillColor="var(--positive-400)" />
-            : <div className="text-xs text-mute">No data for period</div>}
+            : <div className="text-xs text-content-tertiary">No data for period</div>}
         </div>
       </div>
 
       {/* Demand by Hour + Funnel */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Demand heatmap by hour */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          <div className="text-sm font-semibold text-ink mb-4">Demand by Hour of Day</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          <div className="text-sm font-semibold text-content-primary mb-4">Demand by Hour of Day</div>
           {hourChartPoints.some(p => p.value > 0) ? (
             <div className="flex items-end gap-0.5 h-24">
               {hourChartPoints.map((pt, i) => {
@@ -210,8 +210,8 @@ export const AnalyticsDashboard: React.FC = () => {
                       style={{ height: `${barH}%` }}
                       className="w-full bg-accent/60 hover:bg-accent rounded-sm transition-colors min-h-[2px]"
                     />
-                    <div className="text-[9px] text-mute leading-none">{i % 4 === 0 ? pt.label : ''}</div>
-                    <div className="absolute bottom-full mb-1 hidden group-hover:block bg-ink text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-10">
+                    <div className="text-[9px] text-content-tertiary leading-none">{i % 4 === 0 ? pt.label : ''}</div>
+                    <div className="absolute bottom-full mb-1 hidden group-hover:block bg-content-primary text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-10">
                       {pt.label}: {pt.value}
                     </div>
                   </div>
@@ -219,13 +219,13 @@ export const AnalyticsDashboard: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="text-xs text-mute">No data for period</div>
+            <div className="text-xs text-content-tertiary">No data for period</div>
           )}
         </div>
 
         {/* Funnel */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          <div className="text-sm font-semibold text-ink mb-4">Booking Funnel</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          <div className="text-sm font-semibold text-content-primary mb-4">Booking Funnel</div>
           {funnel ? (
             <div className="space-y-2">
               {[
@@ -238,27 +238,27 @@ export const AnalyticsDashboard: React.FC = () => {
                 const pctVal = funnel.created > 0 ? Math.round((step.value / funnel.created) * 100) : 0;
                 return (
                   <div key={step.label} className="flex items-center gap-3">
-                    <div className="w-24 text-xs text-body shrink-0">{step.label}</div>
-                    <div className="flex-1 h-5 bg-canvas-soft rounded-sm overflow-hidden">
+                    <div className="w-24 text-xs text-content-secondary shrink-0">{step.label}</div>
+                    <div className="flex-1 h-5 bg-background-secondary rounded-sm overflow-hidden">
                       <div className={`h-full ${step.color} rounded-sm transition-all`} style={{ width: `${pctVal}%` }} />
                     </div>
-                    <div className="w-20 text-right text-xs text-ink font-mono">
-                      {step.value.toLocaleString()} <span className="text-mute">({pctVal}%)</span>
+                    <div className="w-20 text-right text-xs text-content-primary font-mono">
+                      {step.value.toLocaleString()} <span className="text-content-tertiary">({pctVal}%)</span>
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="text-xs text-mute">No data for period</div>
+            <div className="text-xs text-content-tertiary">No data for period</div>
           )}
         </div>
       </div>
 
       {/* Top Cities Table */}
       {cities.length > 0 && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
-          <div className="text-sm font-semibold text-ink mb-4">Top Cities by Volume</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
+          <div className="text-sm font-semibold text-content-primary mb-4">Top Cities by Volume</div>
           <DataTable<CityRow>
             columns={CITY_COLUMNS}
             data={cities}

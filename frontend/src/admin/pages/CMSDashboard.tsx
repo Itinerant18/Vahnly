@@ -44,23 +44,23 @@ type I18NRow = Omit<I18NString, 'id'> & { id?: string };
 const I18N_COLUMNS: ColumnDef<I18NRow>[] = [
   {
     key: 'key_name', header: 'Key',
-    render: (v) => <span className="font-mono text-mono-small text-body">{String(v)}</span>,
+    render: (v) => <span className="font-mono text-mono-small text-content-secondary">{String(v)}</span>,
   },
   {
     key: 'namespace', header: 'Namespace',
-    render: (v) => <span className="text-xs text-mute">{String(v)}</span>,
+    render: (v) => <span className="text-xs text-content-tertiary">{String(v)}</span>,
   },
   {
     key: 'language_code', header: 'Lang',
     render: (v) => (
-      <span className="text-[10px] font-mono border border-canvas-soft rounded px-1.5 py-0.5 text-mute">
+      <span className="text-[10px] font-mono border border-background-secondary rounded px-1.5 py-0.5 text-content-tertiary">
         {String(v).toUpperCase()}
       </span>
     ),
   },
   {
     key: 'value', header: 'Value',
-    render: (v) => <span className="text-body max-w-xs truncate block">{String(v)}</span>,
+    render: (v) => <span className="text-content-secondary max-w-xs truncate block">{String(v)}</span>,
   },
 ];
 
@@ -77,14 +77,14 @@ export const CMSDashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-ink">Content Management (CMS)</h1>
-        <p className="text-sm text-mute">Manage app pages, localization strings, and visual assets</p>
+        <h1 className="text-xl font-bold text-content-primary">Content Management (CMS)</h1>
+        <p className="text-sm text-content-tertiary">Manage app pages, localization strings, and visual assets</p>
       </div>
-      <div className="flex gap-1 border-b border-canvas-soft">
+      <div className="flex gap-1 border-b border-background-secondary">
         {(['pages', 'i18n', 'assets'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-              tab === t ? 'border-accent text-accent' : 'border-transparent text-body hover:text-ink'
+              tab === t ? 'border-accent text-accent' : 'border-transparent text-content-secondary hover:text-content-primary'
             }`}>
             {t === 'pages' ? 'Content Pages' : t === 'i18n' ? 'i18n Strings' : 'Assets'}
           </button>
@@ -166,23 +166,23 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       {/* Page list */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <div className="px-4 py-3 border-b border-canvas-soft flex items-center gap-2">
+      <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+        <div className="px-4 py-3 border-b border-background-secondary flex items-center gap-2">
           <input type="text" placeholder="Filter pages…" value={filter} onChange={e => setFilter(e.target.value)}
-            className="flex-1 text-sm bg-transparent outline-none text-ink" />
+            className="flex-1 text-sm bg-transparent outline-none text-content-primary" />
         </div>
-        <div className="divide-y divide-canvas-soft/50">
+        <div className="divide-y divide-background-secondary/50">
           {filtered.map(p => (
             <button key={p.id} onClick={() => openPage(p)}
-              className={`w-full text-left px-4 py-3 hover:bg-canvas-soft/30 transition-colors ${selected?.id === p.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}>
+              className={`w-full text-left px-4 py-3 hover:bg-background-secondary/30 transition-colors ${selected?.id === p.id ? 'bg-accent/5 border-l-2 border-accent' : ''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-ink">
+                  <div className="text-sm font-medium text-content-primary">
                     {PAGE_TYPE_ICONS[p.page_type] ?? '📄'} {p.title}
                   </div>
-                  <div className="text-xs text-mute font-mono">{p.slug}</div>
+                  <div className="text-xs text-content-tertiary font-mono">{p.slug}</div>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_COLORS[p.status] ?? 'bg-canvas-soft text-body'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_COLORS[p.status] ?? 'bg-background-secondary text-content-secondary'}`}>
                   {p.status}
                 </span>
               </div>
@@ -194,19 +194,19 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
       {/* Editor */}
       <div className="lg:col-span-2 space-y-4">
         {!selected ? (
-          <div className="bg-canvas rounded-xl border border-canvas-soft p-10 text-center text-mute text-sm">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-10 text-center text-content-tertiary text-sm">
             Select a page to edit its content
           </div>
         ) : (
           <>
-            <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
+            <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <div className="font-semibold text-ink">{selected.title}</div>
-                  <div className="text-xs text-mute">{selected.page_type} · {selected.slug}</div>
+                  <div className="font-semibold text-content-primary">{selected.title}</div>
+                  <div className="text-xs text-content-tertiary">{selected.page_type} · {selected.slug}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={loadHistory} className="text-xs border border-canvas-soft rounded px-2 py-1 text-body hover:bg-canvas-soft">
+                  <button onClick={loadHistory} className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">
                     History
                   </button>
                   {selected.status !== 'PUBLISHED' && (
@@ -222,7 +222,7 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                 {LANGUAGES.map(lang => (
                   <button key={lang} onClick={() => setActiveLang(lang)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors uppercase ${
-                      activeLang === lang ? 'bg-accent text-white border-accent' : 'bg-canvas border-canvas-soft text-body hover:text-ink'
+                      activeLang === lang ? 'bg-accent text-white border-accent' : 'bg-background-primary border-background-secondary text-content-secondary hover:text-content-primary'
                     }`}>
                     {lang} {content.find(v => v.language_code === lang) ? '✓' : ''}
                   </button>
@@ -234,7 +234,7 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                 onChange={e => setEditBody(e.target.value)}
                 rows={16}
                 placeholder="Enter markdown content…"
-                className="w-full border border-canvas-soft rounded-lg px-3 py-2.5 text-sm font-mono bg-canvas text-ink resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+                className="w-full border border-background-secondary rounded-lg px-3 py-2.5 text-sm font-mono bg-background-primary text-content-primary resize-y focus:outline-none focus:ring-1 focus:ring-accent"
               />
 
               <div className="flex items-center gap-3">
@@ -248,17 +248,17 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
 
             {/* Version history */}
             {showHistory && (
-              <div className="bg-canvas rounded-xl border border-canvas-soft p-4">
-                <div className="text-sm font-semibold text-ink mb-3">Version History ({activeLang.toUpperCase()})</div>
+              <div className="bg-background-primary rounded-xl border border-background-secondary p-4">
+                <div className="text-sm font-semibold text-content-primary mb-3">Version History ({activeLang.toUpperCase()})</div>
                 <div className="space-y-2">
                   {history.map(v => (
-                    <div key={v.id} className="flex items-center justify-between text-sm border border-canvas-soft rounded-lg px-3 py-2">
+                    <div key={v.id} className="flex items-center justify-between text-sm border border-background-secondary rounded-lg px-3 py-2">
                       <div>
-                        <span className="font-mono text-body">v{v.version}</span>
+                        <span className="font-mono text-content-secondary">v{v.version}</span>
                         {v.is_current && <span className="ml-2 bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded">current</span>}
-                        <span className="ml-2 text-xs text-mute">{v.created_by_email}</span>
+                        <span className="ml-2 text-xs text-content-tertiary">{v.created_by_email}</span>
                       </div>
-                      <div className="text-xs text-mute">{new Date(v.created_at).toLocaleDateString('en-IN')}</div>
+                      <div className="text-xs text-content-tertiary">{new Date(v.created_at).toLocaleDateString('en-IN')}</div>
                     </div>
                   ))}
                 </div>
@@ -308,18 +308,18 @@ const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => 
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center">
         <select value={ns} onChange={e => setNs(e.target.value)}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent">
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent">
           <option value="">All namespaces</option>
           {namespaces.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
         <select value={lang} onChange={e => setLang(e.target.value)}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent">
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent">
           <option value="">All languages</option>
           {LANGUAGES.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
         </select>
         <input type="text" placeholder="Search key or value…" value={search} onChange={e => setSearch(e.target.value)}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink w-48 focus:outline-none focus:ring-1 focus:ring-accent" />
-        <span className="ml-auto text-xs text-mute">{total} strings</span>
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-48 focus:outline-none focus:ring-1 focus:ring-accent" />
+        <span className="ml-auto text-xs text-content-tertiary">{total} strings</span>
         <button onClick={() => setEditing({ namespace: 'common', language_code: 'en', key_name: '', value: '', description: '' })}
           className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">
           + Add String
@@ -327,44 +327,44 @@ const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => 
       </div>
 
       {editing && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">{editing.id ? 'Edit' : 'New'} i18n String</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">{editing.id ? 'Edit' : 'New'} i18n String</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-mute">Key</label>
+              <label className="text-xs text-content-tertiary">Key</label>
               <input value={editing.key_name || ''} onChange={e => setEditing({ ...editing, key_name: e.target.value })}
                 placeholder="e.g. book_a_ride"
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
             <div>
-              <label className="text-xs text-mute">Namespace</label>
+              <label className="text-xs text-content-tertiary">Namespace</label>
               <input value={editing.namespace || ''} onChange={e => setEditing({ ...editing, namespace: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
             <div>
-              <label className="text-xs text-mute">Language</label>
+              <label className="text-xs text-content-tertiary">Language</label>
               <select value={editing.language_code || 'en'} onChange={e => setEditing({ ...editing, language_code: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {LANGUAGES.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-mute">Value</label>
+              <label className="text-xs text-content-tertiary">Value</label>
               <input value={editing.value || ''} onChange={e => setEditing({ ...editing, value: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
           </div>
           <div>
-            <label className="text-xs text-mute">Description</label>
+            <label className="text-xs text-content-tertiary">Description</label>
             <input value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })}
-              className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+              className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
           <div className="flex gap-2">
             <button onClick={save} disabled={saving}
               className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">
+            <button onClick={() => setEditing(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">
               Cancel
             </button>
           </div>
@@ -429,7 +429,7 @@ const AssetsTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =
     <div className="space-y-4">
       <div className="flex gap-3 items-center flex-wrap">
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-          className="border border-canvas-soft rounded-lg px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+          className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
           <option value="">All types</option>
           {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
@@ -440,61 +440,61 @@ const AssetsTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =
       </div>
 
       {showAdd && (
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-4 space-y-3">
-          <div className="text-sm font-semibold text-ink">New Asset</div>
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">New Asset</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-mute">Type</label>
+              <label className="text-xs text-content-tertiary">Type</label>
               <select value={newAsset.asset_type} onChange={e => setNewAsset({ ...newAsset, asset_type: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-mute">Platform</label>
+              <label className="text-xs text-content-tertiary">Platform</label>
               <select value={newAsset.platform} onChange={e => setNewAsset({ ...newAsset, platform: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none">
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
                 {['ALL', 'iOS', 'ANDROID'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-mute">Title</label>
+              <label className="text-xs text-content-tertiary">Title</label>
               <input value={newAsset.title} onChange={e => setNewAsset({ ...newAsset, title: e.target.value })}
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
             <div>
-              <label className="text-xs text-mute">Min App Version (optional)</label>
+              <label className="text-xs text-content-tertiary">Min App Version (optional)</label>
               <input value={newAsset.min_app_version} onChange={e => setNewAsset({ ...newAsset, min_app_version: e.target.value })}
                 placeholder="e.g. 3.2.0"
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-mute">File URL</label>
+              <label className="text-xs text-content-tertiary">File URL</label>
               <input value={newAsset.file_url} onChange={e => setNewAsset({ ...newAsset, file_url: e.target.value })}
                 placeholder="https://cdn.driversfor-u.in/assets/..."
-                className="mt-1 w-full border border-canvas-soft rounded px-3 py-1.5 text-sm bg-canvas text-ink font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={addAsset} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-canvas-soft rounded-lg text-sm text-body hover:bg-canvas-soft">Cancel</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {assets.length === 0 && (
-          <div className="col-span-full text-center py-10 text-mute text-sm">No assets found. Add one above.</div>
+          <div className="col-span-full text-center py-10 text-content-tertiary text-sm">No assets found. Add one above.</div>
         )}
         {assets.map(a => (
-          <div key={a.id} className={`bg-canvas rounded-xl border overflow-hidden ${a.status === 'INACTIVE' ? 'border-canvas-soft opacity-60' : 'border-canvas-soft'}`}>
-            <div className="aspect-video bg-canvas-soft flex items-center justify-center text-4xl">
+          <div key={a.id} className={`bg-background-primary rounded-xl border overflow-hidden ${a.status === 'INACTIVE' ? 'border-background-secondary opacity-60' : 'border-background-secondary'}`}>
+            <div className="aspect-video bg-background-secondary flex items-center justify-center text-4xl">
               {a.thumbnail_url ? <img src={a.thumbnail_url} className="w-full h-full object-cover" alt={a.title} /> : '🖼️'}
             </div>
             <div className="p-3">
-              <div className="text-xs font-medium text-ink truncate">{a.title || a.asset_type}</div>
-              <div className="text-[10px] text-mute mt-0.5">{a.asset_type} · {a.platform}</div>
-              {a.min_app_version && <div className="text-[10px] text-mute">v{a.min_app_version}+</div>}
+              <div className="text-xs font-medium text-content-primary truncate">{a.title || a.asset_type}</div>
+              <div className="text-[10px] text-content-tertiary mt-0.5">{a.asset_type} · {a.platform}</div>
+              {a.min_app_version && <div className="text-[10px] text-content-tertiary">v{a.min_app_version}+</div>}
               <div className="flex items-center justify-between mt-2">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>
                   {a.status}

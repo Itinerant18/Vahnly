@@ -165,27 +165,27 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex items-center justify-center p-6 font-sans selection:bg-black selection:text-white">
-      <div className="w-full max-w-md bg-canvas rounded-xl p-8 border border-canvas-soft shadow-[rgba(0,0,0,0.12)_0px_4px_16px_0px] relative overflow-hidden">
+    <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center p-6 font-sans selection:bg-black selection:text-white">
+      <div className="w-full max-w-md bg-background-primary rounded-xl p-8 border border-background-secondary shadow-[rgba(0,0,0,0.12)_0px_4px_16px_0px] relative overflow-hidden">
 
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-ink font-move">drivers-for-u</h1>
-          <p className="text-body text-xs mt-1.5 font-medium">Operations control room terminal</p>
+          <h1 className="text-3xl font-bold tracking-tight text-content-primary font-move">drivers-for-u</h1>
+          <p className="text-content-secondary text-xs mt-1.5 font-medium">Operations control room terminal</p>
         </div>
 
         {/* Tab Selection Switches */}
         {activeTab !== 'FORGOT_PASSWORD' && !twoFactorRequired && (
-          <div className="flex border-b border-canvas-soft mb-6 text-xs font-bold uppercase tracking-wider">
+          <div className="flex border-b border-background-secondary mb-6 text-xs font-bold uppercase tracking-wider">
             <button
               onClick={() => { setActiveTab('LOGIN'); setStatusMessage(null); }}
-              className={`flex-1 pb-3 text-center transition cursor-pointer ${activeTab === 'LOGIN' ? 'border-b-2 border-ink text-ink' : 'text-mute hover:text-ink'}`}
+              className={`flex-1 pb-3 text-center transition cursor-pointer ${activeTab === 'LOGIN' ? 'border-b-2 border-content-primary text-content-primary' : 'text-content-tertiary hover:text-content-primary'}`}
             >
               Sign in
             </button>
             <button
               onClick={() => { setActiveTab('SIGNUP'); setStatusMessage(null); }}
-              className={`flex-1 pb-3 text-center transition cursor-pointer ${activeTab === 'SIGNUP' ? 'border-b-2 border-ink text-ink' : 'text-mute hover:text-ink'}`}
+              className={`flex-1 pb-3 text-center transition cursor-pointer ${activeTab === 'SIGNUP' ? 'border-b-2 border-content-primary text-content-primary' : 'text-content-tertiary hover:text-content-primary'}`}
             >
               Create account
             </button>
@@ -195,17 +195,17 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         {/* Render 2FA Passcode Screen */}
         {twoFactorRequired ? (
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
-            <div className="bg-canvas-soft border border-canvas-soft p-4 rounded-xl text-xs text-body leading-relaxed">
+            <div className="bg-background-secondary border border-background-secondary p-4 rounded-xl text-xs text-content-secondary leading-relaxed">
               <strong>Mandatory MFA Gate</strong>: {mfaMessage}. Enter the 6-digit code from your authenticator app.
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Two-Factor Passcode (6 Digits)</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Two-Factor Passcode (6 Digits)</label>
               <input
                 type="text"
                 maxLength={6}
                 placeholder="000 000"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-3 text-center text-lg font-mono font-bold tracking-widest text-ink focus:outline-none"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-3 text-center text-lg font-mono font-bold tracking-widest text-content-primary focus:outline-none"
                 value={twoFactorCode}
                 onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
                 required
@@ -218,14 +218,14 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="button"
                 onClick={() => { setTwoFactorRequired(false); setTwoFactorCode(''); setStatusMessage(null); }}
-                className="flex-1 bg-canvas border border-canvas-soft text-ink font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider hover:bg-canvas-soft cursor-pointer"
+                className="flex-1 bg-background-primary border border-background-secondary text-content-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider hover:bg-background-secondary cursor-pointer"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-ink hover:bg-black-elevated text-on-dark font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:bg-gray-800 text-gray-0 font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 {isLoading ? 'Verifying...' : 'Authenticate'}
               </button>
@@ -236,10 +236,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
           <div className="space-y-5">
             <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Corporate Email</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Corporate Email</label>
                 <input
                   type="email"
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-3 text-sm text-ink placeholder-mute focus:outline-none transition"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-3 text-sm text-content-primary placeholder-content-tertiary focus:outline-none transition"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   required
@@ -248,18 +248,18 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-body">Security Password</label>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary">Security Password</label>
                   <button 
                     type="button"
                     onClick={() => { setActiveTab('FORGOT_PASSWORD'); setStatusMessage(null); }}
-                    className="text-[10px] font-bold text-body hover:text-ink cursor-pointer"
+                    className="text-[10px] font-bold text-content-secondary hover:text-content-primary cursor-pointer"
                   >
                     Forgot Password?
                   </button>
                 </div>
                 <input
                   type="password"
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-3 text-sm text-ink placeholder-mute focus:outline-none transition"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-3 text-sm text-content-primary placeholder-content-tertiary focus:outline-none transition"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   required
@@ -269,21 +269,21 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-ink hover:bg-black-elevated disabled:opacity-50 text-on-dark font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
+                className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-50 text-gray-0 font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
               >
                 {isLoading ? 'Verifying Credentials...' : 'Unlock Dashboard'}
               </button>
             </form>
 
             {/* SSO Providers Panel */}
-            <div className="space-y-3 pt-3 border-t border-canvas-soft">
-              <div className="text-center text-[10px] text-mute uppercase tracking-wider font-bold">Or Federated Identity SSO</div>
+            <div className="space-y-3 pt-3 border-t border-background-secondary">
+              <div className="text-center text-[10px] text-content-tertiary uppercase tracking-wider font-bold">Or Federated Identity SSO</div>
               <div className="grid grid-cols-1 gap-2">
                 <button
                   type="button"
                   onClick={() => handleSSOLogin('GOOGLE')}
                   disabled={isLoading}
-                  className="w-full bg-canvas border border-canvas-soft hover:bg-canvas-soft text-ink font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-background-primary border border-background-secondary hover:bg-background-secondary text-content-primary font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span className="w-2.5 h-2.5 rounded-full bg-status-online" />
                   Sign in with Google Workspace
@@ -292,18 +292,18 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
                   type="button"
                   onClick={() => handleSSOLogin('MICROSOFT')}
                   disabled={isLoading}
-                  className="w-full bg-canvas border border-canvas-soft hover:bg-canvas-soft text-ink font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-background-primary border border-background-secondary hover:bg-background-secondary text-content-primary font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <span className="w-2.5 h-2.5 rounded-full bg-status-warn" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-status-pending" />
                   Sign in with Microsoft 365
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSSOLogin('SAML')}
                   disabled={isLoading}
-                  className="w-full bg-canvas border border-canvas-soft hover:bg-canvas-soft text-ink font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-background-primary border border-background-secondary hover:bg-background-secondary text-content-primary font-bold py-2.5 px-4 rounded-pill text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <span className="w-2.5 h-2.5 rounded-full bg-ink" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-content-primary" />
                   Enterprise SAML Portal
                 </button>
               </div>
@@ -313,10 +313,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
           // Register form
           <form onSubmit={handleSignupSubmit} className="space-y-3 text-left">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Full Name</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Full Name</label>
               <input
                 type="text"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none transition"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
                 required
@@ -324,10 +324,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Phone Number</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Phone Number</label>
               <input
                 type="text"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs font-mono text-ink focus:outline-none transition"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs font-mono text-content-primary focus:outline-none transition"
                 value={signupPhone}
                 onChange={(e) => setSignupPhone(e.target.value)}
                 required
@@ -335,10 +335,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Corporate Email</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Corporate Email</label>
               <input
                 type="email"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none transition"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
                 required
@@ -346,10 +346,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Password</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Password</label>
               <input
                 type="password"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none transition"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
                 required
@@ -358,9 +358,9 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Hub Region</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Hub Region</label>
                 <select
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs font-medium text-ink focus:outline-none cursor-pointer"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs font-medium text-content-primary focus:outline-none cursor-pointer"
                   value={signupRegion}
                   onChange={(e) => {
                     setSignupRegion(e.target.value);
@@ -374,9 +374,9 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               </div>
               
               <div>
-                <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Role Group</label>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Role Group</label>
                 <select
-                  className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs font-medium text-ink focus:outline-none cursor-pointer"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs font-medium text-content-primary focus:outline-none cursor-pointer"
                   value={signupRole}
                   onChange={(e) => setSignupRole(e.target.value)}
                   disabled={isLoading}
@@ -396,10 +396,10 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
             </div>
             
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-1.5">Scoped Cities (comma separated)</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Scoped Cities (comma separated)</label>
               <input
                 type="text"
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-2.5 text-xs text-ink focus:outline-none font-mono"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none font-mono"
                 value={signupCityScope}
                 onChange={(e) => setSignupCityScope(e.target.value)}
                 required
@@ -410,7 +410,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-ink hover:bg-black-elevated disabled:opacity-50 text-on-dark font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
+              className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-50 text-gray-0 font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
             >
               {isLoading ? 'Registering...' : 'Register Corporate Profile'}
             </button>
@@ -418,15 +418,15 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         ) : (
           // Forgot Password Form
           <form onSubmit={handleRecoverySubmit} className="space-y-4 text-left">
-            <div className="text-xs text-body leading-relaxed">
+            <div className="text-xs text-content-secondary leading-relaxed">
               Enter your registered corporate email to trigger credential lockout recovery loops.
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-body mb-2">Corporate Email</label>
+              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Corporate Email</label>
               <input
                 type="email"
                 required
-                className="w-full bg-canvas-soft border border-canvas-soft focus:border-ink rounded-md p-3 text-xs text-ink focus:outline-none"
+                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-3 text-xs text-content-primary focus:outline-none"
                 value={recoveryEmail}
                 onChange={(e) => setRecoveryEmail(e.target.value)}
               />
@@ -436,14 +436,14 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="button"
                 onClick={() => { setActiveTab('LOGIN'); setStatusMessage(null); }}
-                className="flex-1 bg-canvas border border-canvas-soft text-ink font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider hover:bg-canvas-soft cursor-pointer"
+                className="flex-1 bg-background-primary border border-background-secondary text-content-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider hover:bg-background-secondary cursor-pointer"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-ink hover:bg-black-elevated text-on-dark font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:bg-gray-800 text-gray-0 font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 {isLoading ? 'Processing...' : 'Recover Account'}
               </button>
@@ -454,15 +454,15 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         {/* System Message Log Banner */}
         {statusMessage && (
           <div className={`mt-4 p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-            statusMessage.type === 'SUCCESS' ? 'bg-canvas-soft border border-surface-pressed text-ink' : 'bg-ink text-on-dark'
+            statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-content-primary text-gray-0'
           }`}>
             {statusMessage.text}
           </div>
         )}
         
         {/* Device Fingerprint Audit Metadata Footer */}
-        <div className="mt-6 text-center border-t border-canvas-soft pt-4 select-none">
-          <span className="text-[9px] font-mono text-mute uppercase tracking-widest">
+        <div className="mt-6 text-center border-t border-background-secondary pt-4 select-none">
+          <span className="text-[9px] font-mono text-content-tertiary uppercase tracking-widest">
             FINGERPRINT: {deviceFingerprint}
           </span>
         </div>

@@ -12,10 +12,10 @@ export const SsoCallback: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex items-center justify-center font-sans">
+    <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center font-sans">
       <div className="text-center space-y-4">
-        <div className="w-8 h-8 rounded-full border-2 border-canvas-soft border-t-ink animate-spin mx-auto" />
-        <p className="text-xs text-mute uppercase font-bold tracking-wider">Completing sign-in…</p>
+        <div className="w-8 h-8 rounded-full border-2 border-background-secondary border-t-ink animate-spin mx-auto" />
+        <p className="text-xs text-content-tertiary uppercase font-bold tracking-wider">Completing sign-in…</p>
       </div>
     </div>
   );

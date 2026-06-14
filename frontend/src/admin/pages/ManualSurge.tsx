@@ -47,30 +47,30 @@ const centroid = (pts: LatLng[]): LatLng => {
 const buildColumns = (onDeactivate: (id: string) => void): ColumnDef<SurgeZone>[] => [
   {
     key: 'name', header: 'Zone',
-    render: (v) => <span className="font-semibold text-ink">{String(v)}</span>,
+    render: (v) => <span className="font-semibold text-content-primary">{String(v)}</span>,
   },
   {
     key: 'polygon', header: 'Shape',
-    render: (_v, r) => <span className="text-mute">{r.polygon && r.polygon.length >= 3 ? `polygon (${r.polygon.length}pt)` : 'circle'}</span>,
+    render: (_v, r) => <span className="text-content-tertiary">{r.polygon && r.polygon.length >= 3 ? `polygon (${r.polygon.length}pt)` : 'circle'}</span>,
   },
   {
     key: 'multiplier', header: 'Multiplier', type: 'numeric',
-    render: (v) => <span className="font-mono text-ink">{Number(v).toFixed(1)}×</span>,
+    render: (v) => <span className="font-mono text-content-primary">{Number(v).toFixed(1)}×</span>,
   },
   {
     key: 'expires_at', header: 'Expires',
-    render: (v) => <span className="font-mono text-body">{new Date(String(v)).toLocaleTimeString()}</span>,
+    render: (v) => <span className="font-mono text-content-secondary">{new Date(String(v)).toLocaleTimeString()}</span>,
   },
   {
     key: 'created_by', header: 'By',
-    render: (v) => <span className="text-mute">{String(v)}</span>,
+    render: (v) => <span className="text-content-tertiary">{String(v)}</span>,
   },
   {
     key: 'actions', header: '', type: 'actions',
     render: (_v, r) => (
       <button
         onClick={(e) => { e.stopPropagation(); onDeactivate(r.id); }}
-        className="text-status-alert text-[11px] font-semibold hover:underline"
+        className="text-status-negative text-[11px] font-semibold hover:underline"
       >
         Deactivate
       </button>
@@ -144,10 +144,10 @@ export const ManualSurge: React.FC = () => {
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Manual Surge Zones</h1>
-          <p className="text-xs text-mute mt-1">Click the map to draw a polygon zone (≥3 points), set the multiplier + duration, and activate.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-content-primary">Manual Surge Zones</h1>
+          <p className="text-xs text-content-tertiary mt-1">Click the map to draw a polygon zone (≥3 points), set the multiplier + duration, and activate.</p>
         </div>
-        <select value={city} onChange={(e) => setCity(e.target.value)} className="h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink">
+        <select value={city} onChange={(e) => setCity(e.target.value)} className="h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary">
           <option value="KOL">KOL</option>
           <option value="BLR">BLR</option>
         </select>
@@ -155,7 +155,7 @@ export const ManualSurge: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
-        <div className="lg:col-span-2 bg-canvas rounded-xl border border-canvas-soft overflow-hidden" style={{ height: 460 }}>
+        <div className="lg:col-span-2 bg-background-primary rounded-xl border border-background-secondary overflow-hidden" style={{ height: 460 }}>
           <MapContainer center={CITY_CENTERS[city]} zoom={12} style={{ height: '100%', width: '100%' }}>
             <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <PolygonDrawer onAddVertex={(p) => setDraftPolygon((prev) => [...prev, p])} />
@@ -173,56 +173,56 @@ export const ManualSurge: React.FC = () => {
         </div>
 
         {/* Form */}
-        <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
           <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">New Zone</h2>
-            <span className="text-[10px] font-mono text-mute">{draftPolygon.length} pts</span>
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">New Zone</h2>
+            <span className="text-[10px] font-mono text-content-tertiary">{draftPolygon.length} pts</span>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setDraftPolygon((p) => p.slice(0, -1))} disabled={!draftPolygon.length}
-              className="flex-1 text-[10px] font-semibold bg-canvas-soft rounded-pill h-7 disabled:opacity-40">Undo point</button>
+              className="flex-1 text-[10px] font-semibold bg-background-secondary rounded-pill h-7 disabled:opacity-40">Undo point</button>
             <button onClick={() => setDraftPolygon([])} disabled={!draftPolygon.length}
-              className="flex-1 text-[10px] font-semibold bg-canvas-soft rounded-pill h-7 disabled:opacity-40">Clear</button>
+              className="flex-1 text-[10px] font-semibold bg-background-secondary rounded-pill h-7 disabled:opacity-40">Clear</button>
           </div>
           <input placeholder="Zone name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink" />
+            className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary" />
           <div>
-            <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Multiplier (1.1× – 5.0×)</label>
+            <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Multiplier (1.1× – 5.0×)</label>
             <input type="number" min="1.1" max="5" step="0.1" value={form.multiplier} onChange={(e) => setForm({ ...form, multiplier: e.target.value })}
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink font-mono" />
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary font-mono" />
           </div>
           <div>
-            <label className="block text-[10px] uppercase text-mute font-semibold mb-1">Duration</label>
+            <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Duration</label>
             <select value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: Number(e.target.value) })}
-              className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink">
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary">
               <option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option><option value={180}>3 hours</option>
             </select>
           </div>
           <input placeholder="Reason (optional)" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}
-            className="w-full h-9 rounded-pill bg-canvas-soft border border-canvas-soft px-3 text-xs text-ink" />
+            className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary" />
           <button onClick={handleCreate} disabled={saving || draftPolygon.length < 3}
-            className="w-full bg-ink text-on-dark text-xs font-semibold rounded-pill h-9 hover:bg-black-elevated transition-colors disabled:opacity-40">
+            className="w-full bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 hover:bg-gray-800 transition-colors disabled:opacity-40">
             {saving ? 'Activating…' : 'Activate Surge Zone'}
           </button>
         </div>
       </div>
 
       {/* Active zones table */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <div className="p-4 border-b border-canvas-soft bg-canvas-softer"><span className="text-xs font-bold text-ink">Active Manual Zones</span></div>
+      <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
+        <div className="p-4 border-b border-background-secondary bg-background-tertiary"><span className="text-xs font-bold text-content-primary">Active Manual Zones</span></div>
         <DataTable<SurgeZone>
           columns={columns}
           data={zones}
           rowKey={(r) => String(r.id)}
-          emptyState={<div className="text-center text-xs text-mute">No active manual surge zones.</div>}
+          emptyState={<div className="text-center text-xs text-content-tertiary">No active manual surge zones.</div>}
         />
       </div>
 
       {/* Surge history sparkline */}
-      <div className="bg-canvas rounded-xl border border-canvas-soft p-5 space-y-3">
-        <h2 className="text-xs font-bold text-ink uppercase tracking-wider">Surge History — last 24h ({city})</h2>
+      <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
+        <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Surge History — last 24h ({city})</h2>
         {history.length === 0 ? (
-          <p className="text-xs text-mute">No trip surge data in the last 24 hours.</p>
+          <p className="text-xs text-content-tertiary">No trip surge data in the last 24 hours.</p>
         ) : (
           <div className="flex items-end gap-0.5 h-24">
             {history.map((h) => (
