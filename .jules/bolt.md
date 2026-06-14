@@ -1,0 +1,3 @@
+## 2026-06-13 - Remove Unnecessary Mutex Locks in Sequential Logic
+**Learning:** In the backend routing logic (`internal/routing/graph`), functions like `ComputeShortestPathETA` run sequentially. Using `sync.Mutex` inside tight algorithmic loops to protect local variables adds significant overhead without providing any thread-safety benefits because the state is entirely local to the function execution.
+**Action:** When implementing or reviewing tight algorithmic loops, verify if the execution context is actually concurrent. If state is local and execution is sequential, avoid synchronization primitives like `sync.Mutex`.

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"sync"
 )
 
 // CHNode represents a preprocessed vertex in the city's road graph
@@ -126,7 +125,6 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 	heap.Init(pqBackward)
 
 	bestEstimate := math.MaxFloat64
-	var mu sync.Mutex // Protects map reads if evaluating parallel threads
 
 	// Loop until both search trees are empty
 	for pqForward.Len() > 0 || pqBackward.Len() > 0 {
@@ -138,11 +136,10 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 
 		// 1. Forward Search Step (Moving upward from Source)
 		if pqForward.Len() > 0 {
-			mu.Lock()
+			// Removed unnecessary sync.Mutex locks to avoid overhead in this tight loop
 			curr := heap.Pop(pqForward).(*Item)
 			u := curr.nodeID
 			uDist := curr.priority
-			mu.Unlock()
 
 			if uDist <= forwardDist[u] {
 				for _, edge := range s.forwardGraph[u] {
@@ -151,9 +148,7 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 					
 					if d, ok := forwardDist[v]; !ok || alt < d {
 						forwardDist[v] = alt
-						mu.Lock()
 						heap.Push(pqForward, &Item{nodeID: v, priority: alt})
-						mu.Unlock()
 						
 						// Check meeting intersection point
 						if backD, evaluated := backwardDist[v]; evaluated {
@@ -168,11 +163,9 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 
 		// 2. Backward Search Step (Moving upward from Target)
 		if pqBackward.Len() > 0 {
-			mu.Lock()
 			curr := heap.Pop(pqBackward).(*Item)
 			u := curr.nodeID
 			uDist := curr.priority
-			mu.Unlock()
 
 			if uDist <= backwardDist[u] {
 				for _, edge := range s.backwardGraph[u] {
@@ -181,9 +174,7 @@ func (s *ContractionHierarchiesService) ComputeShortestPathETA(ctx context.Conte
 					
 					if d, ok := backwardDist[v]; !ok || alt < d {
 						backwardDist[v] = alt
-						mu.Lock()
 						heap.Push(pqBackward, &Item{nodeID: v, priority: alt})
-						mu.Unlock()
 						
 						// Check meeting intersection point
 						if forD, evaluated := forwardDist[v]; evaluated {
