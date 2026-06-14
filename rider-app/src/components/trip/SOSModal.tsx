@@ -24,7 +24,7 @@ export function SOSModal({ onClose }: SOSModalProps) {
 
   if (phase === "active") {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface-negative backdrop-blur-sm">
+      <div role="alert" aria-live="assertive" className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface-negative backdrop-blur-sm">
         <div className="mx-6 w-full max-w-sm rounded-2xl bg-background-secondary p-6 ring-2 ring-negative-400">
           <div className="mb-4 flex items-center justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-negative ring-2 ring-negative-400 animate-pulse">

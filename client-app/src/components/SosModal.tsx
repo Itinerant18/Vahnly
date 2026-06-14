@@ -28,7 +28,7 @@ export const SosModal: React.FC = () => {
   if (!isEmergencyActive) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-surface-negative/90 backdrop-blur-md p-6 text-white text-center font-mono">
+    <div role="alert" aria-live="assertive" className="fixed inset-0 z-[1000000] flex items-center justify-center bg-surface-negative/90 backdrop-blur-md p-6 text-white text-center font-mono">
       <div className="max-w-sm w-full bg-background-primary border border-negative-400 rounded-2xl p-6 shadow-2xl space-y-6">
         <div className="h-20 w-20 bg-surface-negative/40 border border-negative-400 rounded-full flex items-center justify-center text-4xl font-black mx-auto animate-pulse shadow-lg">
           🚨

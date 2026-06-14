@@ -9,7 +9,7 @@ interface Props {
   onPick: (lat: number, lng: number) => void;
 }
 
-const PIN_HTML = `<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:#FF6B35;transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`;
+const PIN_HTML = `<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:var(--accent-400);transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`;
 
 export default function PlacePickerMap({ lat, lng, onPick }: Props) {
   const elRef = useRef<HTMLDivElement>(null);
