@@ -118,21 +118,8 @@ export default {
           500: 'var(--negative-500)',
           600: 'var(--negative-600)',
         },
-        // ── Legacy aliases (retained for backward compat — do NOT use in new code) ──
-        primary:             'var(--interactive-primary)',
-        'on-primary':        'var(--interactive-primary-text)',
-        ink:                 'var(--content-primary)',
-        body:                'var(--content-secondary)',
-        mute:                'var(--content-tertiary)',
-        canvas:              'var(--background-primary)',
-        'canvas-soft':       'var(--background-secondary)',
-        'canvas-softer':     'var(--background-tertiary)',
-        'surface-pressed':   'var(--border-opaque)',
-        'on-dark':           'var(--gray-0)',
-        'black-elevated':    'var(--gray-800)',
-        'status-online':     'var(--status-online)',
-        'status-warn':       'var(--status-pending)',
-        'status-alert':      'var(--status-negative)',
+        // Legacy ink/canvas/mute/status-* aliases removed (Phase 2) — use the DS
+        // semantic tokens directly (content-*, background-*, border-*, status.*, gray-*).
       },
 
       // ── Spacing (8px base grid, extends Tailwind defaults) ──────────────────

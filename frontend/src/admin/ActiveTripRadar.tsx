@@ -376,7 +376,7 @@ export const ActiveTripRadar: React.FC = () => {
                     )}
                   </td>
                   <td className="p-4">
-                    <span className="bg-background-secondary border border-surface-pressed text-content-primary px-2 py-0.5 rounded text-[10px] font-bold select-none">
+                    <span className="bg-background-secondary border border-border-opaque text-content-primary px-2 py-0.5 rounded text-[10px] font-bold select-none">
                       {order.city_prefix}
                     </span>
                   </td>
@@ -446,7 +446,7 @@ export const ActiveTripRadar: React.FC = () => {
 
       {message && (
         <div className={`p-3 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-          message.status === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-black text-white'
+          message.status === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-black text-white'
         }`}>
           {message.text}
         </div>

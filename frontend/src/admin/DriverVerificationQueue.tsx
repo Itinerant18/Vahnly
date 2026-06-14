@@ -299,7 +299,7 @@ export const DriverVerificationQueue: React.FC = () => {
 
           {message && (
             <div className={`mt-4 p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider ${
-              message.status === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-black text-white'
+              message.status === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-black text-white'
             }`}>
               {message.text}
             </div>

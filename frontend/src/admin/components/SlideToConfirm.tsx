@@ -95,14 +95,14 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
         confirmed
           ? tone === 'destructive'
             ? 'bg-content-primary border-content-primary'
-            : 'bg-background-secondary border-surface-pressed'
+            : 'bg-background-secondary border-border-opaque'
           : 'bg-background-secondary border-background-secondary'
       } ${disabled ? 'opacity-40' : ''}`}
     >
       {/* Fill trail that grows behind the thumb */}
       {!confirmed && (
         <div
-          className="absolute inset-y-0 left-0 bg-surface-pressed/60"
+          className="absolute inset-y-0 left-0 bg-border-opaque/60"
           style={{ width: offset + THUMB / 2 }}
         />
       )}

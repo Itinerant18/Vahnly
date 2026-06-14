@@ -136,7 +136,7 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
 
       {statusMessage && (
         <div className={`p-2.5 rounded-md text-[10px] text-left font-mono font-bold uppercase tracking-wider ${
-          statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-status-online' : 'bg-background-secondary border border-surface-pressed text-status-negative'
+          statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-status-online' : 'bg-background-secondary border border-border-opaque text-status-negative'
         }`}>
           {statusMessage.text}
         </div>

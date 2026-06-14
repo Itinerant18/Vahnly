@@ -454,7 +454,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         {/* System Message Log Banner */}
         {statusMessage && (
           <div className={`mt-4 p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-            statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-content-primary text-gray-0'
+            statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-content-primary text-gray-0'
           }`}>
             {statusMessage.text}
           </div>

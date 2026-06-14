@@ -731,7 +731,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
 
       {logResponse && (
         <div className={`p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-          logResponse.startsWith('SUCCESS') || logResponse.startsWith('COMPLIANCE') ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-black text-white'
+          logResponse.startsWith('SUCCESS') || logResponse.startsWith('COMPLIANCE') ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-black text-white'
         }`}>
           {logResponse}
         </div>

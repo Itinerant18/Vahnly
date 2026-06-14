@@ -264,7 +264,7 @@ export const LedgerReconciliation: React.FC = () => {
 
           {auditLog && (
             <div className={`mt-4 p-3 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-              auditLog.startsWith('SUCCESS') ? 'bg-background-secondary border border-surface-pressed text-status-online' : 'bg-background-secondary border border-surface-pressed text-status-negative'
+              auditLog.startsWith('SUCCESS') ? 'bg-background-secondary border border-border-opaque text-status-online' : 'bg-background-secondary border border-border-opaque text-status-negative'
             }`}>
               {auditLog}
             </div>

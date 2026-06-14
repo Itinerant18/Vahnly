@@ -141,7 +141,7 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
                 className={`rounded-xl p-4 space-y-3 transition ${
                   flagged
                     ? 'bg-background-secondary border border-status-pending'
-                    : 'bg-background-tertiary border border-background-secondary hover:border-surface-pressed'
+                    : 'bg-background-tertiary border border-background-secondary hover:border-border-opaque'
                 }`}
               >
                 {/* Driver Profile Title Metrics */}
@@ -153,7 +153,7 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
                   <span
                     className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                       driver.current_state === 'ONLINE_AVAILABLE'
-                        ? 'bg-background-secondary border border-surface-pressed text-content-primary'
+                        ? 'bg-background-secondary border border-border-opaque text-content-primary'
                         : driver.current_state === 'OFFLINE'
                         ? 'bg-content-tertiary/20 text-content-tertiary'
                         : 'bg-black text-white'

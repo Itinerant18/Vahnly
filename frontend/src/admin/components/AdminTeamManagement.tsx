@@ -245,7 +245,7 @@ export const AdminTeamManagement: React.FC = () => {
 
       {statusMsg && (
         <div className={`p-3.5 rounded-xl text-xs font-mono font-bold tracking-wide uppercase text-center ${
-          statusMsg.type === 'SUCCESS' ? 'bg-background-secondary border border-surface-pressed text-content-primary' : 'bg-content-primary text-gray-0'
+          statusMsg.type === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-content-primary text-gray-0'
         }`}>
           {statusMsg.text}
         </div>
