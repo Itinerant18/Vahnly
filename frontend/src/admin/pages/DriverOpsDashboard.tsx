@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -50,6 +51,7 @@ interface Inspection {
   due_date: string;
   overall_score?: number;
   notes: string;
+  [key: string]: unknown;
 }
 
 interface TelSummary {
@@ -59,6 +61,7 @@ interface TelSummary {
   harsh_braking_count: number;
   speeding_count: number;
   safety_score: number;
+  [key: string]: unknown;
 }
 
 const SEV_CLS: Record<string, string> = {
@@ -75,6 +78,60 @@ const INSP_CLS: Record<string, string> = {
   SUBMITTED: 'bg-surface-accent text-content-accent',
   OVERDUE: 'bg-surface-negative text-content-negative',
 };
+
+const INSPECTION_COLUMNS = (
+  reviewInspection: (id: string, status: string) => void,
+): ColumnDef<Inspection>[] => [
+  {
+    key: 'driver_id', header: 'Driver',
+    render: (v) => <span className="font-mono text-mono-small text-content-primary">{String(v)}</span>,
+  },
+  {
+    key: 'vehicle_plate', header: 'Plate',
+    render: (v) => <span className="font-semibold text-content-primary">{String(v)}</span>,
+  },
+  {
+    key: 'status', header: 'Status',
+    render: (v) => <span className={`text-xs px-2 py-0.5 rounded ${INSP_CLS[String(v)] ?? 'bg-background-secondary'}`}>{String(v)}</span>,
+  },
+  { key: 'due_date', header: 'Due Date', type: 'date' },
+  {
+    key: 'overall_score', header: 'Score', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small text-content-primary tabular-nums">{v != null ? String(v) : '-'}</span>,
+  },
+  {
+    key: 'actions', header: 'Actions', type: 'actions',
+    render: (_v, ins) => (
+      ins.status === 'SUBMITTED' ? (
+        <span className="space-x-2">
+          <button onClick={(e) => { e.stopPropagation(); reviewInspection(ins.id, 'APPROVED'); }} className="text-xs text-content-positive hover:underline">Approve</button>
+          <button onClick={(e) => { e.stopPropagation(); reviewInspection(ins.id, 'REJECTED'); }} className="text-xs text-content-negative hover:underline">Reject</button>
+        </span>
+      ) : null
+    ),
+  },
+];
+
+const TELEMATICS_COLUMNS: ColumnDef<TelSummary>[] = [
+  {
+    key: 'driver_id', header: 'Driver',
+    render: (v) => <span className="font-mono text-mono-small text-content-primary">{String(v)}</span>,
+  },
+  { key: 'period_date', header: 'Date', type: 'date' },
+  {
+    key: 'total_distance_km', header: 'Distance', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small text-content-primary tabular-nums">{Number(v).toFixed(1)} km</span>,
+  },
+  { key: 'harsh_braking_count', header: 'Harsh Braking', type: 'numeric' },
+  { key: 'speeding_count', header: 'Speeding', type: 'numeric' },
+  {
+    key: 'safety_score', header: 'Safety Score', type: 'numeric',
+    render: (v) => {
+      const score = Number(v);
+      return <span className={`font-mono text-mono-small tabular-nums font-bold ${score < 60 ? 'text-content-negative' : score < 80 ? 'text-content-warning' : 'text-content-positive'}`}>{score}</span>;
+    },
+  },
+];
 
 export function DriverOpsDashboard() {
   const [tab, setTab] = useState<'incentives' | 'coaching' | 'inspection' | 'telematics'>('incentives');
@@ -260,55 +317,20 @@ export function DriverOpsDashboard() {
               {['PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED', 'OVERDUE'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-background-secondary">
-                <tr>{['Driver', 'Plate', 'Status', 'Due Date', 'Score', 'Actions'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-border-opaque">
-                {inspections.map(ins => (
-                  <tr key={ins.id} className="hover:bg-background-secondary">
-                    <td className="p-3 font-mono text-xs">{ins.driver_id}</td>
-                    <td className="p-3 font-semibold">{ins.vehicle_plate}</td>
-                    <td className="p-3"><span className={`text-xs px-2 py-0.5 rounded ${INSP_CLS[ins.status] ?? 'bg-background-secondary'}`}>{ins.status}</span></td>
-                    <td className="p-3 text-content-secondary text-xs">{ins.due_date}</td>
-                    <td className="p-3">{ins.overall_score ?? '-'}</td>
-                    <td className="p-3 space-x-2">
-                      {ins.status === 'SUBMITTED' && (
-                        <>
-                          <button onClick={() => reviewInspection(ins.id, 'APPROVED')} className="text-xs text-content-positive hover:underline">Approve</button>
-                          <button onClick={() => reviewInspection(ins.id, 'REJECTED')} className="text-xs text-content-negative hover:underline">Reject</button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Inspection>
+            columns={INSPECTION_COLUMNS(reviewInspection)}
+            data={inspections}
+            rowKey={(r) => r.id}
+          />
         </div>
       )}
 
       {tab === 'telematics' && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-background-secondary">
-              <tr>{['Driver', 'Date', 'Distance', 'Harsh Braking', 'Speeding', 'Safety Score'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-border-opaque">
-              {summaries.map(s => (
-                <tr key={`${s.driver_id}-${s.period_date}`} className={`hover:bg-background-secondary ${s.safety_score < 60 ? 'bg-surface-negative' : ''}`}>
-                  <td className="p-3 font-mono text-xs">{s.driver_id}</td>
-                  <td className="p-3 text-content-secondary text-xs">{s.period_date}</td>
-                  <td className="p-3">{s.total_distance_km.toFixed(1)} km</td>
-                  <td className="p-3">{s.harsh_braking_count}</td>
-                  <td className="p-3">{s.speeding_count}</td>
-                  <td className={`p-3 font-bold ${s.safety_score < 60 ? 'text-content-negative' : s.safety_score < 80 ? 'text-content-warning' : 'text-content-positive'}`}>{s.safety_score}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<TelSummary>
+          columns={TELEMATICS_COLUMNS}
+          data={summaries}
+          rowKey={(r) => `${r.driver_id}-${r.period_date}`}
+        />
       )}
     </div>
   );

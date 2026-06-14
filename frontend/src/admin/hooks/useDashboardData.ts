@@ -46,6 +46,7 @@ export interface RecentTrip {
   amount: number;
   durationMin: number;
   city: string;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
 
 interface ChartsData {

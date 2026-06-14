@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { SvgAreaChart } from '../components/SvgAreaChart';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 interface Summary {
   total_trips: number;
@@ -31,7 +32,12 @@ interface Funnel {
   cancelled: number;
 }
 
-interface CityRow { city: string; total: number; revenue_paise: number; }
+interface CityRow {
+  city: string;
+  total: number;
+  revenue_paise: number;
+  [key: string]: unknown;
+}
 
 type Period = '7d' | '30d' | '90d';
 
@@ -52,6 +58,23 @@ function pct(n: number, d: number) {
   if (!d) return '—';
   return `${((n / d) * 100).toFixed(1)}%`;
 }
+
+const CITY_COLUMNS: ColumnDef<CityRow>[] = [
+  {
+    key: 'city', header: 'City', sortable: true,
+    render: (v) => <span className="font-mono text-ink font-medium">{String(v)}</span>,
+  },
+  { key: 'total', header: 'Trips', type: 'numeric', sortable: true },
+  { key: 'revenue_paise', header: 'Revenue', type: 'currency', sortable: true },
+  {
+    key: 'avg', header: 'Avg/Trip', type: 'numeric',
+    render: (_v, r) => (
+      <span className="font-mono text-mono-small text-content-secondary tabular-nums">
+        {r.total ? rupees(Math.round(r.revenue_paise / r.total)) : '—'}
+      </span>
+    ),
+  },
+];
 
 const KPI: React.FC<{ label: string; value: string; sub?: string; accent?: boolean }> = ({ label, value, sub, accent }) => (
   <div className={`rounded-xl border p-5 flex flex-col gap-1 ${accent ? 'border-accent/30 bg-accent/5' : 'border-canvas-soft bg-canvas'}`}>
@@ -236,26 +259,11 @@ export const AnalyticsDashboard: React.FC = () => {
       {cities.length > 0 && (
         <div className="bg-canvas rounded-xl border border-canvas-soft p-5">
           <div className="text-sm font-semibold text-ink mb-4">Top Cities by Volume</div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-mute border-b border-canvas-soft">
-                <th className="text-left py-2">City</th>
-                <th className="text-right py-2">Trips</th>
-                <th className="text-right py-2">Revenue</th>
-                <th className="text-right py-2">Avg/Trip</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cities.map(c => (
-                <tr key={c.city} className="border-b border-canvas-soft/50 hover:bg-canvas-soft/30">
-                  <td className="py-2 font-mono text-ink font-medium">{c.city}</td>
-                  <td className="py-2 text-right text-body">{c.total.toLocaleString()}</td>
-                  <td className="py-2 text-right text-body">{rupees(c.revenue_paise)}</td>
-                  <td className="py-2 text-right text-mute">{c.total ? rupees(Math.round(c.revenue_paise / c.total)) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable<CityRow>
+            columns={CITY_COLUMNS}
+            data={cities}
+            rowKey={(r) => r.city}
+          />
         </div>
       )}
     </div>

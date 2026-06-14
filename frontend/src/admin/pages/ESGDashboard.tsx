@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -22,6 +23,7 @@ interface CarbonRecord {
   emission_kg: number;
   offset_kg: number;
   recorded_date: string;
+  [key: string]: unknown;
 }
 
 interface ESGReport {
@@ -51,6 +53,33 @@ const VT_CLS: Record<string, string> = {
   DIESEL: 'bg-surface-negative text-content-negative',
   HYBRID: 'bg-surface-accent text-content-accent',
 };
+
+const ESG_COLUMNS: ColumnDef<CarbonRecord>[] = [
+  { key: 'recorded_date', header: 'Date', type: 'date' },
+  {
+    key: 'vehicle_type', header: 'Vehicle Type',
+    render: (v) => <span className={`text-xs px-2 py-0.5 rounded ${VT_CLS[String(v)] ?? 'bg-background-secondary'}`}>{String(v)}</span>,
+  },
+  {
+    key: 'distance_km', header: 'Distance', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{Number(v).toFixed(1)} km</span>,
+  },
+  {
+    key: 'emission_kg', header: 'Emission', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-warning">{Number(v).toFixed(3)} kg</span>,
+  },
+  {
+    key: 'offset_kg', header: 'Offset', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-positive">{Number(v).toFixed(3)} kg</span>,
+  },
+  {
+    key: 'net', header: 'Net', type: 'numeric',
+    render: (_v, r) => {
+      const net = r.emission_kg - r.offset_kg;
+      return <span className={`font-mono text-mono-small tabular-nums font-semibold ${net > 0 ? 'text-content-negative' : 'text-content-positive'}`}>{net.toFixed(3)} kg</span>;
+    },
+  },
+];
 
 export function ESGDashboard() {
   const [tab, setTab] = useState<'overview' | 'records' | 'reports'>('overview');
@@ -135,28 +164,11 @@ export function ESGDashboard() {
       )}
 
       {tab === 'records' && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-background-secondary">
-              <tr>{['Date', 'Vehicle Type', 'Distance', 'Emission', 'Offset', 'Net'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-border-opaque">
-              {records.map(r => {
-                const net = r.emission_kg - r.offset_kg;
-                return (
-                  <tr key={r.id} className="hover:bg-background-secondary">
-                    <td className="p-3 text-content-secondary text-xs">{r.recorded_date}</td>
-                    <td className="p-3"><span className={`text-xs px-2 py-0.5 rounded ${VT_CLS[r.vehicle_type] ?? 'bg-background-secondary'}`}>{r.vehicle_type}</span></td>
-                    <td className="p-3">{r.distance_km.toFixed(1)} km</td>
-                    <td className="p-3 text-content-warning">{r.emission_kg.toFixed(3)} kg</td>
-                    <td className="p-3 text-content-positive">{r.offset_kg.toFixed(3)} kg</td>
-                    <td className={`p-3 font-semibold ${net > 0 ? 'text-content-negative' : 'text-content-positive'}`}>{net.toFixed(3)} kg</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<CarbonRecord>
+          columns={ESG_COLUMNS}
+          data={records}
+          rowKey={(r) => r.id}
+        />
       )}
 
       {tab === 'reports' && (

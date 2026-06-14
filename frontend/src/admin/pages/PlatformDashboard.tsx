@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -52,6 +53,7 @@ interface ExpResult {
   avg_metric_value: number;
   p_value?: number;
   is_winner: boolean;
+  [key: string]: unknown;
 }
 
 interface ChatbotIntent {
@@ -83,6 +85,33 @@ const EXP_CLS: Record<string, string> = {
   PAUSED: 'bg-background-secondary text-content-secondary',
   CONCLUDED: 'bg-surface-positive text-content-positive',
 };
+
+const RESULT_COLUMNS: ColumnDef<ExpResult>[] = [
+  {
+    key: 'variant_name', header: 'Variant',
+    render: (v) => <span className="font-mono text-mono-small font-medium text-content-primary">{String(v)}</span>,
+  },
+  {
+    key: 'sample_size', header: 'Sample', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{Number(v).toLocaleString()}</span>,
+  },
+  {
+    key: 'conversion_rate', header: 'Conversion', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{(Number(v) * 100).toFixed(1)}%</span>,
+  },
+  {
+    key: 'avg_metric_value', header: 'Avg Metric', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{Number(v).toFixed(2)}</span>,
+  },
+  {
+    key: 'p_value', header: 'p-value', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{v != null ? Number(v).toFixed(3) : '—'}</span>,
+  },
+  {
+    key: 'is_winner', header: '',
+    render: (_v, r) => r.is_winner ? <span className="text-content-positive font-semibold">Winner</span> : null,
+  },
+];
 
 export function PlatformDashboard() {
   const [tab, setTab] = useState<'health' | 'experiments' | 'chatbot'>('health');
@@ -309,24 +338,12 @@ export function PlatformDashboard() {
                   </div>
                 </div>
                 {expResults.length > 0 && (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-background-secondary">
-                        <tr>{['Variant', 'Sample', 'Conversion', 'Avg Metric', 'p-value', ''].map(h => <th key={h} className="text-left p-2 font-medium text-content-secondary">{h}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-opaque">
-                        {expResults.map(res => (
-                          <tr key={res.variant_name} className={res.is_winner ? 'bg-surface-positive' : ''}>
-                            <td className="p-2 font-medium">{res.variant_name}</td>
-                            <td className="p-2">{res.sample_size.toLocaleString()}</td>
-                            <td className="p-2">{(res.conversion_rate * 100).toFixed(1)}%</td>
-                            <td className="p-2">{res.avg_metric_value.toFixed(2)}</td>
-                            <td className="p-2">{res.p_value != null ? res.p_value.toFixed(3) : '—'}</td>
-                            <td className="p-2">{res.is_winner && <span className="text-content-positive font-semibold">Winner</span>}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="mt-3">
+                    <DataTable<ExpResult>
+                      columns={RESULT_COLUMNS}
+                      data={expResults}
+                      rowKey={(r) => r.variant_name}
+                    />
                   </div>
                 )}
               </div>

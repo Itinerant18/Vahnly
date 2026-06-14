@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface PlatformSetting { key: string; value: string; data_type: string; category: string; description: string; }
@@ -30,7 +31,12 @@ interface CancelRule {
   minutes_elapsed_min: number; minutes_elapsed_max: number;
   cancellation_fee_pct: number; cancellation_fee_fixed_paise: number;
   refund_pct: number; party_at_fault: string; is_active: boolean; priority: number;
+  [key: string]: unknown; // satisfies DataTable's row constraint
 }
+// DataTable's generic requires id?: string, but CancelRule.id is numeric. Columns
+// and handlers are authored against CancelRule; only the DataTable boundary is cast
+// to this constraint-satisfying row shape.
+type CancelRuleRow = { id?: string; [key: string]: unknown };
 interface RatingRule {
   id: number; applies_to: string; threshold_type: string;
   min_trips_required: number; rating_below: number;
@@ -547,6 +553,31 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
 };
 
 // ── 20.6 Cancellation Rules ───────────────────────────────────────────────────
+// Read-only display columns for the cancellation-rules DataTable. The per-row
+// action buttons (Edit / Disable / Enable, gated by isSuperAdmin) are appended
+// inside the component since they depend on component state/handlers.
+const CANCEL_RULE_COLUMNS: ColumnDef<CancelRule>[] = [
+  { key: 'rule_name', header: 'Rule', render: (v) => <span className="text-xs font-medium text-ink">{String(v)}</span> },
+  { key: 'applies_to', header: 'Applies To', render: (v) => <span className="text-xs text-body">{String(v)}</span> },
+  {
+    key: 'is_active', header: 'Status',
+    render: (_v, r) => <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${r.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{r.is_active ? 'ON' : 'OFF'}</span>,
+  },
+  {
+    key: 'minutes_elapsed_min', header: 'Time Window', type: 'numeric',
+    render: (_v, r) => <span className="text-xs text-mute font-mono">{r.minutes_elapsed_min}–{r.minutes_elapsed_max === 999999 ? '∞' : r.minutes_elapsed_max}m</span>,
+  },
+  {
+    key: 'cancellation_fee_pct', header: 'Fee', type: 'numeric',
+    render: (_v, r) => <span className="text-xs font-mono">{r.cancellation_fee_pct > 0 ? `${r.cancellation_fee_pct}%` : r.cancellation_fee_fixed_paise > 0 ? `₹${r.cancellation_fee_fixed_paise / 100}` : '—'}</span>,
+  },
+  {
+    key: 'refund_pct', header: 'Refund', type: 'numeric',
+    render: (v) => <span className="text-xs font-mono">{Number(v)}%</span>,
+  },
+  { key: 'party_at_fault', header: 'Fault', render: (v) => <span className="text-xs text-mute">{String(v)}</span> },
+];
+
 const CancelRulesSection: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
   const [rules, setRules] = useState<CancelRule[]>([]);
   const [editing, setEditing] = useState<Partial<CancelRule> | null>(null);
@@ -570,6 +601,21 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
   };
 
   useEffect(() => { fetchRules(); }, [fetchRules]);
+
+  const columns: ColumnDef<CancelRule>[] = [
+    ...CANCEL_RULE_COLUMNS,
+    {
+      key: 'actions', header: '', type: 'actions',
+      render: (_v, row) => (
+        isSuperAdmin ? (
+          <div className="flex gap-2 justify-end">
+            <button onClick={(e) => { e.stopPropagation(); setEditing(row); }} className="text-xs text-accent hover:underline">Edit</button>
+            <button onClick={(e) => { e.stopPropagation(); toggle(row); }} className="text-xs text-mute hover:text-body">{row.is_active ? 'Disable' : 'Enable'}</button>
+          </div>
+        ) : null
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -611,39 +657,11 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
         </div>
       )}
 
-      <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-canvas-soft/50"><tr className="text-xs text-mute">
-            <th className="text-left px-4 py-2.5">Rule</th>
-            <th className="text-left px-4 py-2.5">Applies To</th>
-            <th className="text-left px-4 py-2.5">Status</th>
-            <th className="text-right px-4 py-2.5">Time Window</th>
-            <th className="text-right px-4 py-2.5">Fee</th>
-            <th className="text-right px-4 py-2.5">Refund</th>
-            <th className="text-left px-4 py-2.5">Fault</th>
-            <th className="px-4 py-2.5"></th>
-          </tr></thead>
-          <tbody>
-            {rules.map(rule => (
-              <tr key={rule.id} className={`border-t border-canvas-soft/50 hover:bg-canvas-soft/20 ${!rule.is_active ? 'opacity-50' : ''}`}>
-                <td className="px-4 py-2.5 text-xs font-medium text-ink">{rule.rule_name}</td>
-                <td className="px-4 py-2.5 text-xs text-body">{rule.applies_to}</td>
-                <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${rule.is_active ? 'bg-surface-positive text-content-positive' : 'bg-background-secondary text-content-secondary'}`}>{rule.is_active ? 'ON' : 'OFF'}</span></td>
-                <td className="px-4 py-2.5 text-xs text-right text-mute font-mono">{rule.minutes_elapsed_min}–{rule.minutes_elapsed_max === 999999 ? '∞' : rule.minutes_elapsed_max}m</td>
-                <td className="px-4 py-2.5 text-xs text-right font-mono">{rule.cancellation_fee_pct > 0 ? `${rule.cancellation_fee_pct}%` : rule.cancellation_fee_fixed_paise > 0 ? `₹${rule.cancellation_fee_fixed_paise / 100}` : '—'}</td>
-                <td className="px-4 py-2.5 text-xs text-right font-mono">{rule.refund_pct}%</td>
-                <td className="px-4 py-2.5 text-xs text-mute">{rule.party_at_fault}</td>
-                <td className="px-4 py-2.5">
-                  {isSuperAdmin && <div className="flex gap-2">
-                    <button onClick={() => setEditing(rule)} className="text-xs text-accent hover:underline">Edit</button>
-                    <button onClick={() => toggle(rule)} className="text-xs text-mute hover:text-body">{rule.is_active ? 'Disable' : 'Enable'}</button>
-                  </div>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns as unknown as ColumnDef<CancelRuleRow>[]}
+        data={rules as unknown as CancelRuleRow[]}
+        rowKey={(r) => String(r.id)}
+      />
     </div>
   );
 };

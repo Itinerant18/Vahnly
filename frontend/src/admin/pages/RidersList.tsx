@@ -1,6 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+
+// Column definitions for the DataTable hero component (built-in sort / loading / empty).
+const RIDER_COLUMNS: ColumnDef<RiderSummaryItem>[] = [
+	{
+		key: 'name', header: 'Name', type: 'avatar', sortable: true,
+		render: (_v, r) => (
+			<div>
+				<span className="block font-semibold text-content-primary text-paragraph-medium">{r.name}</span>
+				{r.tags && r.tags.length > 0 && (
+					<div className="flex flex-wrap gap-1 mt-1">
+						{r.tags.map((tag) => (
+							<span
+								key={tag}
+								className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase font-mono ${
+									tag.toLowerCase() === 'vip'
+										? 'bg-ink text-on-dark'
+										: tag.toLowerCase() === 'blocked'
+										? 'bg-status-alert/10 text-status-alert'
+										: 'bg-status-warn/10 text-status-warn'
+								}`}
+							>
+								{tag}
+							</span>
+						))}
+					</div>
+				)}
+			</div>
+		),
+	},
+	{
+		key: 'phone', header: 'Phone',
+		render: (v) => <span className="font-mono text-mono-small text-content-secondary">{String(v)}</span>,
+	},
+	{ key: 'email', header: 'Email', sortable: true },
+	{ key: 'total_trips', header: 'Trips', type: 'numeric', sortable: true },
+	{
+		key: 'average_rating', header: 'Rating', sortable: true,
+		render: (v) => Number(v) > 0
+			? <span className="font-mono text-mono-small text-content-primary">{Number(v).toFixed(1)} <span className="text-content-tertiary">★</span></span>
+			: <span className="text-content-tertiary">—</span>,
+	},
+	{
+		key: 'wallet_balance', header: 'Wallet', type: 'numeric', sortable: true,
+		render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-secondary font-semibold">₹{(Number(v) / 100).toFixed(2)}</span>,
+	},
+	{
+		key: 'lifetime_value', header: 'LTV', type: 'numeric', sortable: true,
+		render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary font-bold">₹{(Number(v) / 100).toFixed(2)}</span>,
+	},
+	{ key: 'last_trip_date', header: 'Last Trip', type: 'date', sortable: true },
+	{
+		key: 'status', header: 'Status', sortable: true,
+		render: (_v, r) => (
+			<span
+				className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider border ${
+					r.status === 'ACTIVE'
+						? 'bg-canvas text-ink border-canvas-soft'
+						: r.status === 'SUSPENDED'
+						? 'bg-canvas-soft text-status-warn border-canvas-soft'
+						: r.status === 'BLOCKED'
+						? 'bg-canvas-soft text-status-alert border-canvas-soft'
+						: 'bg-canvas-soft text-mute border-canvas-soft'
+				}`}
+			>
+				<span
+					className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+						r.status === 'ACTIVE'
+							? 'bg-status-online'
+							: r.status === 'SUSPENDED'
+							? 'bg-status-warn'
+							: 'bg-status-alert'
+					}`}
+				/>
+				{r.status.toLowerCase()}
+			</span>
+		),
+	},
+];
 
 export interface RiderSummaryItem {
 	customer_id: string;
@@ -17,6 +96,7 @@ export interface RiderSummaryItem {
 	status: string;
 	tags: string[];
 	referral_source: string;
+	[key: string]: unknown; // satisfies DataTable's row constraint
 }
 
 export const RidersList: React.FC = () => {
@@ -327,119 +407,20 @@ export const RidersList: React.FC = () => {
 				</div>
 			</div>
 
-			{/* ---- Riders Data Table ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-				{loading ? (
-					<div className="p-12 text-center text-xs text-mute animate-pulse">Loading riders directory...</div>
-				) : riders.length === 0 ? (
-					<div className="p-12 text-center">
-						<div className="text-sm font-semibold text-ink">No riders match selection criteria</div>
-						<p className="text-xs text-mute mt-1">Try resetting filter parameters or adjusting terms</p>
+			{/* ---- Riders Table (DataTable hero component) ---- */}
+			<DataTable<RiderSummaryItem>
+				columns={RIDER_COLUMNS}
+				data={riders}
+				loading={loading}
+				rowKey={(r) => r.customer_id}
+				onRowClick={(r) => navigate(`/riders/${r.customer_id}`)}
+				emptyState={
+					<div className="flex flex-col items-center gap-1 text-center">
+						<span className="text-heading-medium text-content-secondary">No riders match selection criteria</span>
+						<span className="text-paragraph-small text-content-tertiary">Try resetting filter parameters or adjusting terms</span>
 					</div>
-				) : (
-					<table className="w-full text-left border-collapse">
-						<thead>
-							<tr className="border-b border-canvas-soft bg-canvas-soft">
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Name</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Phone</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Email</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center">Trips</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Rating</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Wallet</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">LTV</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Last Trip</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Status</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-canvas-soft">
-							{riders.map((rider) => (
-								<tr
-									key={rider.customer_id}
-									onClick={() => navigate(`/riders/${rider.customer_id}`)}
-									className="hover:bg-canvas-softer cursor-pointer transition-colors"
-								>
-									<td className="p-4 font-semibold text-ink text-xs">
-										{rider.name}
-										{rider.tags && rider.tags.length > 0 && (
-											<div className="flex flex-wrap gap-1 mt-1">
-												{rider.tags.map((tag) => (
-													<span
-														key={tag}
-														className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase font-mono ${
-															tag.toLowerCase() === 'vip'
-																? 'bg-ink text-on-dark'
-																: tag.toLowerCase() === 'blocked'
-																? 'bg-status-alert/10 text-status-alert'
-																: 'bg-status-warn/10 text-status-warn'
-														}`}
-													>
-														{tag}
-													</span>
-												))}
-											</div>
-										)}
-									</td>
-									<td className="p-4 font-mono text-xs text-body">
-										{rider.phone}
-									</td>
-									<td className="p-4 text-xs text-body">
-										{rider.email}
-									</td>
-									<td className="p-4 font-mono text-xs text-ink font-semibold text-center">
-										{rider.total_trips}
-									</td>
-									<td className="p-4 text-xs font-mono">
-										{rider.average_rating > 0 ? (
-											<span className="text-ink font-semibold">
-												{rider.average_rating.toFixed(1)} <span className="text-mute font-sans text-[10px]">★</span>
-											</span>
-										) : (
-											<span className="text-mute">—</span>
-										)}
-									</td>
-									<td className="p-4 font-mono text-xs text-body font-semibold">
-										₹{(rider.wallet_balance / 100).toFixed(2)}
-									</td>
-									<td className="p-4 font-mono text-xs text-ink font-bold">
-										₹{(rider.lifetime_value / 100).toFixed(2)}
-									</td>
-									<td className="p-4 font-mono text-xs text-body">
-										{new Date(rider.last_trip_date).toLocaleDateString([], {
-											month: 'short',
-											day: 'numeric',
-											year: 'numeric'
-										})}
-									</td>
-									<td className="p-4">
-										<span
-											className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider border ${
-												rider.status === 'ACTIVE'
-													? 'bg-canvas text-ink border-canvas-soft'
-													: rider.status === 'SUSPENDED'
-													? 'bg-canvas-soft text-status-warn border-canvas-soft'
-													: rider.status === 'BLOCKED'
-													? 'bg-canvas-soft text-status-alert border-canvas-soft'
-													: 'bg-canvas-soft text-mute border-canvas-soft'
-											}`}
-										>
-											<span
-												className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-													rider.status === 'ACTIVE'
-														? 'bg-status-online'
-														: rider.status === 'SUSPENDED'
-														? 'bg-status-warn'
-														: 'bg-status-alert'
-												}`}
-											/>
-											{rider.status.toLowerCase()}
-										</span>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)}
-			</div>
+				}
+			/>
 		</div>
 	);
 };

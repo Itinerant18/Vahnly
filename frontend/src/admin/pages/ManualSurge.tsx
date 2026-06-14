@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Polygon, Circle, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 type LatLng = [number, number];
 
@@ -17,6 +18,7 @@ interface SurgeZone {
   reason: string;
   created_by: string;
   expires_at: string;
+  [key: string]: unknown;
 }
 
 interface HistoryBucket { hour: string; avg_surge: number; samples: number; }
@@ -41,6 +43,40 @@ const centroid = (pts: LatLng[]): LatLng => {
   const n = pts.length || 1;
   return [pts.reduce((s, p) => s + p[0], 0) / n, pts.reduce((s, p) => s + p[1], 0) / n];
 };
+
+const buildColumns = (onDeactivate: (id: string) => void): ColumnDef<SurgeZone>[] => [
+  {
+    key: 'name', header: 'Zone',
+    render: (v) => <span className="font-semibold text-ink">{String(v)}</span>,
+  },
+  {
+    key: 'polygon', header: 'Shape',
+    render: (_v, r) => <span className="text-mute">{r.polygon && r.polygon.length >= 3 ? `polygon (${r.polygon.length}pt)` : 'circle'}</span>,
+  },
+  {
+    key: 'multiplier', header: 'Multiplier', type: 'numeric',
+    render: (v) => <span className="font-mono text-ink">{Number(v).toFixed(1)}×</span>,
+  },
+  {
+    key: 'expires_at', header: 'Expires',
+    render: (v) => <span className="font-mono text-body">{new Date(String(v)).toLocaleTimeString()}</span>,
+  },
+  {
+    key: 'created_by', header: 'By',
+    render: (v) => <span className="text-mute">{String(v)}</span>,
+  },
+  {
+    key: 'actions', header: '', type: 'actions',
+    render: (_v, r) => (
+      <button
+        onClick={(e) => { e.stopPropagation(); onDeactivate(r.id); }}
+        className="text-status-alert text-[11px] font-semibold hover:underline"
+      >
+        Deactivate
+      </button>
+    ),
+  },
+];
 
 export const ManualSurge: React.FC = () => {
   const [city, setCity] = useState<string>('KOL');
@@ -102,6 +138,7 @@ export const ManualSurge: React.FC = () => {
   };
 
   const maxSurge = Math.max(1.5, ...history.map((h) => h.avg_surge));
+  const columns = buildColumns(handleDeactivate);
 
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
@@ -173,29 +210,12 @@ export const ManualSurge: React.FC = () => {
       {/* Active zones table */}
       <div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
         <div className="p-4 border-b border-canvas-soft bg-canvas-softer"><span className="text-xs font-bold text-ink">Active Manual Zones</span></div>
-        {zones.length === 0 ? (
-          <div className="p-8 text-center text-xs text-mute">No active manual surge zones.</div>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead><tr className="border-b border-canvas-soft text-[10px] uppercase text-mute">
-              <th className="p-3">Zone</th><th className="p-3">Shape</th><th className="p-3">Multiplier</th><th className="p-3">Expires</th><th className="p-3">By</th><th className="p-3"></th>
-            </tr></thead>
-            <tbody className="divide-y divide-canvas-soft">
-              {zones.map((z) => (
-                <tr key={z.id}>
-                  <td className="p-3 font-semibold text-ink">{z.name}</td>
-                  <td className="p-3 text-mute">{z.polygon && z.polygon.length >= 3 ? `polygon (${z.polygon.length}pt)` : 'circle'}</td>
-                  <td className="p-3 font-mono text-ink">{z.multiplier.toFixed(1)}×</td>
-                  <td className="p-3 font-mono text-body">{new Date(z.expires_at).toLocaleTimeString()}</td>
-                  <td className="p-3 text-mute">{z.created_by}</td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleDeactivate(z.id)} className="text-status-alert text-[11px] font-semibold hover:underline">Deactivate</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable<SurgeZone>
+          columns={columns}
+          data={zones}
+          rowKey={(r) => String(r.id)}
+          emptyState={<div className="text-center text-xs text-mute">No active manual surge zones.</div>}
+        />
       </div>
 
       {/* Surge history sparkline */}

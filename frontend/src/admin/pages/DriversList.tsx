@@ -1,7 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
-import { useSort, exportToCsv } from '../lib/tableTools';
+import { exportToCsv } from '../lib/tableTools';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+
+// Column definitions for the DataTable hero component (built-in sort / loading / empty).
+const DRIVER_COLUMNS: ColumnDef<DriverSummaryItem>[] = [
+  { key: 'name', header: 'Photo / Name', type: 'avatar', sortable: true },
+  {
+    key: 'phone', header: 'Phone',
+    render: (v) => <span className="font-mono text-mono-small text-content-secondary">{String(v)}</span>,
+  },
+  {
+    key: 'city_prefix', header: 'City & Exp', sortable: true,
+    render: (_v, r) => (
+      <div>
+        <span className="block font-mono text-mono-small font-semibold text-content-primary">{r.city_prefix}</span>
+        <span className="text-label-small text-content-tertiary uppercase">{r.transmission_capability}</span>
+      </div>
+    ),
+  },
+  { key: 'total_trips', header: 'Trips', type: 'numeric', sortable: true },
+  {
+    key: 'acceptance_rate', header: 'Acceptance', type: 'numeric', sortable: true,
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{(Number(v) * 100).toFixed(0)}%</span>,
+  },
+  {
+    key: 'cancellation_rate', header: 'Cancellation', type: 'numeric', sortable: true,
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{(Number(v) * 100).toFixed(0)}%</span>,
+  },
+  {
+    key: 'rating', header: 'Rating', sortable: true,
+    render: (v) => Number(v) > 0
+      ? <span className="font-mono text-mono-small text-content-primary">{Number(v).toFixed(1)} <span className="text-content-tertiary">★</span></span>
+      : <span className="text-content-tertiary">—</span>,
+  },
+  { key: 'last_online', header: 'Last Active', type: 'date', sortable: true },
+  { key: 'status', header: 'Status', type: 'status', sortable: true },
+];
 
 export interface DriverSummaryItem {
 	driver_id: string;
@@ -15,6 +51,7 @@ export interface DriverSummaryItem {
 	cancellation_rate: number;
 	last_online: string;
 	transmission_capability: string; // MANUAL, AUTOMATIC, BOTH
+	[key: string]: unknown; // satisfies DataTable's row constraint
 }
 
 export const DriversList: React.FC = () => {
@@ -68,8 +105,6 @@ export const DriversList: React.FC = () => {
 		fetchDrivers();
 	}, [search, status, city, transmission, ratingMin, acceptanceMin, cancellationMax, tripsMin]);
 
-	const { sorted, toggleSort, indicator } = useSort<DriverSummaryItem>(drivers, null);
-
 	const handleExportCsv = () => {
 		exportToCsv<DriverSummaryItem>('drivers.csv', [
 			{ key: 'driver_id', label: 'Driver ID' },
@@ -83,7 +118,7 @@ export const DriversList: React.FC = () => {
 			{ key: 'rating', label: 'Rating' },
 			{ key: 'status', label: 'Status' },
 			{ key: 'last_online', label: 'Last Online' },
-		], sorted);
+		], drivers);
 	};
 
 	const handleResetFilters = () => {
@@ -249,104 +284,20 @@ export const DriversList: React.FC = () => {
 				</div>
 			</div>
 
-			{/* ---- Drivers Table ---- */}
-			<div className="bg-canvas rounded-xl border border-canvas-soft overflow-hidden">
-				{loading ? (
-					<div className="p-12 text-center text-xs text-mute animate-pulse">Loading drivers directory...</div>
-				) : drivers.length === 0 ? (
-					<div className="p-12 text-center">
-						<div className="text-sm font-semibold text-ink">No drivers match criteria</div>
-						<p className="text-xs text-mute mt-1">Try modifying filter parameters or text search</p>
+			{/* ---- Drivers Table (DataTable hero component) ---- */}
+			<DataTable<DriverSummaryItem>
+				columns={DRIVER_COLUMNS}
+				data={drivers}
+				loading={loading}
+				rowKey={(r) => r.driver_id}
+				onRowClick={(r) => navigate(`/drivers/${r.driver_id}`)}
+				emptyState={
+					<div className="flex flex-col items-center gap-1 text-center">
+						<span className="text-heading-medium text-content-secondary">No drivers match criteria</span>
+						<span className="text-paragraph-small text-content-tertiary">Try modifying filter parameters or text search</span>
 					</div>
-				) : (
-					<table className="w-full text-left border-collapse">
-						<thead>
-							<tr className="border-b border-canvas-soft bg-canvas-soft select-none">
-								<th onClick={() => toggleSort('name')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Photo / Name{indicator('name')}</th>
-								<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute">Phone</th>
-								<th onClick={() => toggleSort('city_prefix')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">City & Exp{indicator('city_prefix')}</th>
-								<th onClick={() => toggleSort('total_trips')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Trips{indicator('total_trips')}</th>
-								<th onClick={() => toggleSort('acceptance_rate')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Acceptance{indicator('acceptance_rate')}</th>
-								<th onClick={() => toggleSort('cancellation_rate')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute text-center cursor-pointer hover:text-ink">Cancellation{indicator('cancellation_rate')}</th>
-								<th onClick={() => toggleSort('rating')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Rating{indicator('rating')}</th>
-								<th onClick={() => toggleSort('last_online')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Last Active{indicator('last_online')}</th>
-								<th onClick={() => toggleSort('status')} className="p-4 text-[10px] font-semibold uppercase tracking-wider text-mute cursor-pointer hover:text-ink">Status{indicator('status')}</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-canvas-soft">
-							{sorted.map((driver) => (
-								<tr
-									key={driver.driver_id}
-									onClick={() => navigate(`/drivers/${driver.driver_id}`)}
-									className="hover:bg-canvas-softer cursor-pointer transition-colors text-xs"
-								>
-									<td className="p-4 flex items-center space-x-3">
-										<div className="w-8 h-8 rounded-full bg-canvas-soft border border-canvas-soft flex items-center justify-center font-bold text-ink">
-											{driver.name.split(' ').map((n) => n[0]).join('')}
-										</div>
-										<span className="font-semibold text-ink">{driver.name}</span>
-									</td>
-									<td className="p-4 font-mono text-body">
-										{driver.phone}
-									</td>
-									<td className="p-4">
-										<span className="block font-mono font-semibold text-ink text-[10px]">{driver.city_prefix}</span>
-										<span className="text-[10px] text-mute font-semibold uppercase">{driver.transmission_capability}</span>
-									</td>
-									<td className="p-4 font-mono font-semibold text-ink text-center">
-										{driver.total_trips}
-									</td>
-									<td className="p-4 font-mono text-center text-body">
-										{(driver.acceptance_rate * 100).toFixed(0)}%
-									</td>
-									<td className="p-4 font-mono text-center text-body">
-										{(driver.cancellation_rate * 100).toFixed(0)}%
-									</td>
-									<td className="p-4 font-mono font-semibold text-ink">
-										{driver.rating > 0 ? (
-											<span>{driver.rating.toFixed(1)} <span className="text-mute font-sans text-[10px]">★</span></span>
-										) : (
-											<span className="text-mute">—</span>
-										)}
-									</td>
-									<td className="p-4 font-mono text-body">
-										{new Date(driver.last_online).toLocaleDateString([], {
-											month: 'short',
-											day: 'numeric',
-											hour: '2-digit',
-											minute: '2-digit',
-										})}
-									</td>
-									<td className="p-4">
-										<span
-											className={`inline-flex items-center text-[9px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider border ${
-												driver.status === 'ACTIVE'
-													? 'bg-canvas text-ink border-canvas-soft'
-													: driver.status === 'SUSPENDED'
-													? 'bg-canvas-soft text-status-warn border-canvas-soft'
-													: driver.status === 'BLOCKED'
-													? 'bg-canvas-soft text-status-alert border-canvas-soft'
-													: 'bg-canvas-soft text-mute border-canvas-soft'
-											}`}
-										>
-											<span
-												className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-													driver.status === 'ACTIVE'
-														? 'bg-status-online'
-														: driver.status === 'SUSPENDED'
-														? 'bg-status-warn'
-														: 'bg-status-alert'
-												}`}
-											/>
-											{driver.status.toLowerCase()}
-										</span>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)}
-			</div>
+				}
+			/>
 		</div>
 	);
 };
