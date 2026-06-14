@@ -365,12 +365,14 @@ export default function MapInterpolated({
       <div className="absolute bottom-4 right-4 flex flex-col gap-2 p-1.5 rounded-xl border border-border-opaque/80 bg-background-secondary/60 backdrop-blur-md shadow-xl">
         <button
           onClick={() => setZoomLevel((z) => Math.min(18, z + 1))}
+          aria-label="Zoom in"
           className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           +
         </button>
         <button
           onClick={() => setZoomLevel((z) => Math.max(13, z - 1))}
+          aria-label="Zoom out"
           className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           −

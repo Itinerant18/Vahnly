@@ -112,6 +112,7 @@ function TripRateContent() {
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(null)}
+                  aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
                   className={`text-3xl transition-transform active:scale-95 duration-100 cursor-pointer ${
                     isActive ? 'text-content-warning scale-110' : 'text-content-tertiary'
                   }`}

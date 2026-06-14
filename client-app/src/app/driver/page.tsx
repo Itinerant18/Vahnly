@@ -1078,6 +1078,7 @@ export default function DriverTerminalPage() {
 
         <div className="flex items-center gap-3">
           {dutyState !== 'OFFLINE' && (
+            <span role="status" aria-live="polite">{
             connectionStatus === 'OFFLINE' ? (
               <button
                 type="button"
@@ -1099,7 +1100,7 @@ export default function DriverTerminalPage() {
                 <span className="ml-1">Reconnecting</span>
               </span>
             )
-          )}
+          }</span>)}
 
           {/* SOS — 2-second hold */}
           <button

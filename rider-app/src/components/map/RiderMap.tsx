@@ -153,6 +153,7 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
       {/* Recenter FAB */}
       <button
         onClick={onRecenter}
+        aria-label="Recenter map"
         className="absolute bottom-[136px] right-4 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary shadow-lg ring-1 ring-border-opaque"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

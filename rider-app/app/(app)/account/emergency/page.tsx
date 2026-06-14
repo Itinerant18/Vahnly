@@ -43,7 +43,7 @@ export default function EmergencyPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-content-primary">Auto-share trip</span>
-            <button onClick={() => setShowTip((v) => !v)} className="text-xs text-content-secondary">
+            <button onClick={() => setShowTip((v) => !v)} aria-label="Auto-share info" className="text-xs text-content-secondary">
               ⓘ
             </button>
           </div>

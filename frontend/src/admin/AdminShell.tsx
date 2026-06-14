@@ -284,6 +284,7 @@ export const AdminShell: React.FC = () => {
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
+              aria-label="Notifications"
               className="relative p-2 rounded-pill hover:bg-background-secondary transition-base cursor-pointer"
             >
               <IconBell size={18} className="text-content-primary" />
@@ -321,6 +322,7 @@ export const AdminShell: React.FC = () => {
           <div className="relative" ref={quickRef}>
             <button
               onClick={() => setShowQuickActions(!showQuickActions)}
+              aria-label="Quick actions"
               className="p-2 rounded-pill bg-interactive-primary hover:opacity-90 text-interactive-primary-text transition-base active:scale-[0.96] cursor-pointer"
             >
               <IconPlus size={16} />
@@ -430,6 +432,7 @@ export const AdminShell: React.FC = () => {
           {/* Collapse toggle */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className="flex items-center justify-center gap-2 py-4 border-t border-border-opaque text-content-secondary hover:text-content-primary transition-base text-label-medium cursor-pointer"
           >
             <IconChevron size={16} direction={sidebarCollapsed ? 'right' : 'left'} />

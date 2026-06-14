@@ -952,12 +952,14 @@ export default function RiderDashboardPage() {
         <div className="absolute bottom-[20vh] right-4 z-20 flex flex-col gap-1.5 font-mono font-bold text-xs select-none">
           <button
             onClick={handleZoomIn}
+            aria-label="Zoom in"
             className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
           >
             +
           </button>
           <button
             onClick={handleZoomOut}
+            aria-label="Zoom out"
             className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
           >
             -
@@ -1103,6 +1105,7 @@ export default function RiderDashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveStop(i)}
+                      aria-label="Remove stop"
                       className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                     >
                       ✕
@@ -1322,6 +1325,7 @@ export default function RiderDashboardPage() {
                   <div className="flex gap-3 items-center font-mono font-bold">
                     <button
                       onClick={() => setPassengersCount(c => Math.max(1, c - 1))}
+                      aria-label="Decrease passengers"
                       className="h-6 w-6 bg-background-primary border border-border-opaque rounded flex items-center justify-center"
                     >
                       -
@@ -1329,6 +1333,7 @@ export default function RiderDashboardPage() {
                     <span>{passengersCount}</span>
                     <button
                       onClick={() => setPassengersCount(c => Math.min(8, c + 1))}
+                      aria-label="Increase passengers"
                       className="h-6 w-6 bg-background-primary border border-border-opaque rounded flex items-center justify-center"
                     >
                       +
@@ -1344,6 +1349,7 @@ export default function RiderDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setD4mCareEnabled(!d4mCareEnabled)}
+                    aria-label="Toggle D4M Care"
                     className={`h-5 w-10 rounded-full transition relative p-0.5 ${d4mCareEnabled ? 'bg-white' : 'bg-background-tertiary'}`}
                   >
                     <div className={`h-4 w-4 rounded-full shadow transition-transform ${d4mCareEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />

@@ -105,6 +105,7 @@ export const FleetDrillDownDrawer: React.FC<FleetDrillDownDrawerProps> = ({ cell
         <button
           onClick={onClose}
           type="button"
+          aria-label="Close"
           className="h-8 w-8 rounded-full border border-background-secondary bg-white hover:bg-background-tertiary text-content-primary font-bold text-xs flex items-center justify-center transition active:scale-95 cursor-pointer"
         >
           ✕

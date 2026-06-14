@@ -844,7 +844,7 @@ export const FinanceDashboard: React.FC = () => {
 									<h2 className="text-heading-medium text-content-primary">Transaction Details</h2>
 									<span className="text-paragraph-small font-mono text-content-secondary block mt-0.5">{selectedTx.id}</span>
 								</div>
-								<button onClick={() => setSelectedTx(null)} className="p-1 rounded-full hover:bg-background-secondary text-content-secondary hover:text-content-primary transition-base">
+								<button onClick={() => setSelectedTx(null)} aria-label="Close" className="p-1 rounded-full hover:bg-background-secondary text-content-secondary hover:text-content-primary transition-base">
 									<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
 									</svg>

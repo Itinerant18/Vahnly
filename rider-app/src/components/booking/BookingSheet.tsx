@@ -399,6 +399,7 @@ export function BookingSheet() {
                   type="button"
                   onClick={() => setPersonsCount(personsCount - 1)}
                   disabled={personsCount <= 1}
+                  aria-label="Decrease persons"
                   className="flex h-9 w-9 items-center justify-center rounded-sm
                     bg-background-secondary border border-border-opaque
                     text-label-large text-content-primary
@@ -415,6 +416,7 @@ export function BookingSheet() {
                   type="button"
                   onClick={() => setPersonsCount(personsCount + 1)}
                   disabled={personsCount >= 8}
+                  aria-label="Increase persons"
                   className="flex h-9 w-9 items-center justify-center rounded-sm
                     bg-background-secondary border border-border-opaque
                     text-label-large text-content-primary

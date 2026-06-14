@@ -133,7 +133,7 @@ export default function DriverVehiclesPage() {
       </div>
 
       {/* Add Vehicle FAB */}
-      <button onClick={() => setShowAdd(true)}
+      <button onClick={() => setShowAdd(true)} aria-label="Add vehicle"
         className="fixed bottom-24 right-6 h-14 w-14 rounded-full bg-white text-black text-2xl font-bold shadow-lg flex items-center justify-center z-20">+</button>
 
       {showAdd && (

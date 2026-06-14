@@ -180,7 +180,7 @@ const CarIssueDetailPanel: React.FC<{ report: CarIssueReport; onClose: () => voi
       <div className="h-full w-full max-w-md bg-background-primary shadow-2xl overflow-y-auto p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-content-primary">Car Issue Detail</h2>
-          <button onClick={onClose} className="text-content-tertiary hover:text-content-primary text-sm">✕</button>
+          <button onClick={onClose} aria-label="Close" className="text-content-tertiary hover:text-content-primary text-sm">✕</button>
         </div>
 
         <div className="space-y-2 text-xs">

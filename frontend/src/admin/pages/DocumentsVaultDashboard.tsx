@@ -332,7 +332,7 @@ export const DocumentsVaultDashboard: React.FC = () => {
                       {editingTags.map(t => (
                         <span key={t} className="flex items-center gap-1 text-[11px] border border-background-secondary rounded px-1.5 py-0.5 text-content-secondary">
                           {t}
-                          <button onClick={() => setEditingTags(editingTags.filter(x => x !== t))} className="text-content-negative hover:text-content-negative leading-none">×</button>
+                          <button onClick={() => setEditingTags(editingTags.filter(x => x !== t))} aria-label="Remove tag" className="text-content-negative hover:text-content-negative leading-none">×</button>
                         </span>
                       ))}
                     </div>

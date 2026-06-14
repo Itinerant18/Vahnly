@@ -222,6 +222,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
               <div className="flex gap-2">
                 <button
                   onClick={() => alert(`Dialing ${activeTrip.customer_phone || 'Protected'}`)}
+                  aria-label="Call rider"
                   className="h-9 px-3 rounded-sm bg-background-secondary border border-border-opaque
                     text-label-small text-content-primary cursor-pointer
                     hover:bg-background-tertiary transition-base min-w-[44px]
@@ -231,6 +232,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                 </button>
                 <button
                   onClick={() => alert('Opening chat')}
+                  aria-label="Chat with rider"
                   className="h-9 px-3 rounded-sm bg-background-secondary border border-border-opaque
                     text-label-small text-content-primary cursor-pointer
                     hover:bg-background-tertiary transition-base min-w-[44px]

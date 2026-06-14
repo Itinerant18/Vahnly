@@ -85,6 +85,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Open menu"
               className="h-8 w-8 bg-background-secondary rounded-lg border border-border-opaque flex items-center justify-center text-sm cursor-pointer"
             >
               ☰

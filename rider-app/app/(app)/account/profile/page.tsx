@@ -101,6 +101,7 @@ export default function ProfilePage() {
       <div className="flex flex-col items-center">
         <button
           onClick={() => fileRef.current?.click()}
+          aria-label="Change profile photo"
           className="relative h-24 w-24 overflow-hidden rounded-full bg-surface-accent"
         >
           {photo ? (

@@ -233,6 +233,7 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
         {flags.map(flag => (
           <div key={flag.flag_key} className={`bg-background-primary rounded-xl border p-4 flex items-center gap-4 ${flag.is_kill_switch ? 'border-negative-400' : 'border-background-secondary'}`}>
             <button onClick={() => isSuperAdmin && toggle(flag)}
+              aria-label={`Toggle ${flag.name}`}
               className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${flag.is_enabled ? (flag.is_kill_switch ? 'bg-surface-negative0' : 'bg-accent') : 'bg-background-secondary'} ${!isSuperAdmin ? 'cursor-default' : 'cursor-pointer'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${flag.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>

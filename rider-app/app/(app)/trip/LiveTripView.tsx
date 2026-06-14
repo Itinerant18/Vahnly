@@ -286,6 +286,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             />
             <button
               type="button"
+              aria-label="Close"
               onClick={() => setAddStopInput(false)}
               className="px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
             >

@@ -687,6 +687,7 @@ function LiveTripContent() {
       <div className="absolute top-24 right-4 z-20">
         <button
           onClick={handleSOS}
+          aria-label="Emergency SOS"
           className="h-10 w-10 bg-negative-400 hover:bg-negative-400 text-white font-bold rounded-xl flex items-center justify-center shadow-lg border border-negative-400 animate-pulse transition cursor-pointer active:scale-95 text-xs"
         >
           🚨
@@ -707,12 +708,14 @@ function LiveTripContent() {
       <div className="absolute bottom-[22vh] right-4 z-20 flex flex-col gap-1 font-mono font-bold text-xs select-none">
         <button
           onClick={() => setMapZoom(z => Math.min(18, z + 1))}
+          aria-label="Zoom in"
           className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
         >
           +
         </button>
         <button
           onClick={() => setMapZoom(z => Math.max(10, z - 1))}
+          aria-label="Zoom out"
           className="h-8 w-8 bg-background-primary/80 border border-border-opaque rounded-lg flex items-center justify-center text-white hover:bg-background-secondary transition backdrop-blur-sm cursor-pointer"
         >
           -
@@ -827,6 +830,7 @@ function LiveTripContent() {
                         <button
                           type="button"
                           onClick={() => handleRemoveStop(i)}
+                          aria-label="Remove stop"
                           className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                         >
                           ✕

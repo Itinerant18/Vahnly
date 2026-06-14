@@ -259,6 +259,7 @@ export default function RiderSupportPage() {
                     <button
                       type="button"
                       onClick={() => setUploadedImage(null)}
+                      aria-label="Remove photo"
                       className="absolute -top-1.5 -right-1.5 bg-negative-400 rounded-full h-4 w-4 text-[8px] font-bold flex items-center justify-center text-white"
                     >
                       ×

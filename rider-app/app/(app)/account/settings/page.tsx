@@ -318,6 +318,7 @@ export default function SettingsPage() {
                 <div key={ch} className="flex w-12 justify-center">
                   <button
                     onClick={() => togglePref(row.key, ch)}
+                    aria-label={`${row.label} via ${ch}`}
                     className={`flex h-5 w-5 items-center justify-center rounded-md ${
                       prefs[row.key]?.[ch] ? "bg-accent-400" : "bg-background-tertiary"
                     }`}

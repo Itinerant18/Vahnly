@@ -17,6 +17,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
       {[1, 2, 3, 4, 5].map((s) => (
         <button
           key={s}
+          aria-label={`Rate ${s} star${s === 1 ? "" : "s"}`}
           className="h-12 w-12 text-4xl transition-transform active:scale-90"
           onMouseEnter={() => setHover(s)}
           onMouseLeave={() => setHover(0)}

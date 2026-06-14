@@ -377,6 +377,7 @@ export const CompletedPane: React.FC<CompletedPaneProps> = ({
                 key={star}
                 type="button"
                 onClick={() => setRiderRating(star)}
+                aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
                 className={`text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer transition-base ${
                   star <= riderRating ? 'text-content-warning' : 'text-border-opaque'
                 }`}

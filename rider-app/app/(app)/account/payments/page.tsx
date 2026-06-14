@@ -457,6 +457,7 @@ function Toggle({
       </div>
       <button
         onClick={onChange}
+        aria-label={label}
         className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${on ? "bg-accent-400" : "bg-background-tertiary"}`}
       >
         <span
