@@ -18,11 +18,10 @@ import (
 	"github.com/platform/driver-delivery/internal/intelligence/client"
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
 	"github.com/platform/driver-delivery/internal/observability"
-	"github.com/platform/driver-delivery/internal/routing/graph"
 	googleRouting "github.com/platform/driver-delivery/internal/routing/google"
+	"github.com/platform/driver-delivery/internal/routing/graph"
 	"github.com/platform/driver-delivery/internal/storage/migration"
 )
-
 
 func main() {
 	// 1. Core System Context & Configuration Setup
@@ -88,6 +87,7 @@ func main() {
 
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:          nodeList,
+		Password:       os.Getenv("REDIS_PASSWORD"),
 		ReadOnly:       false,
 		RouteByLatency: true,
 		DialTimeout:    2 * time.Second,

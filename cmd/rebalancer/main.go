@@ -35,7 +35,8 @@ func main() {
 	}
 
 	rdb := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs: addrs,
+		Addrs:    addrs,
+		Password: os.Getenv("REDIS_PASSWORD"),
 	})
 	defer rdb.Close()
 

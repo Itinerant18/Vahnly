@@ -32,7 +32,7 @@ func main() {
 	postgresURL := getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/delivery_platform?sslmode=disable")
 	redisNodes := getEnv("REDIS_CLUSTER_NODES", "127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003")
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "127.0.0.1:9092")
-	
+
 	log.Printf("Starting Location Ingestion Service. Target Scale: 100K active drivers.")
 
 	// 2. Initialize PostgreSQL Connection Pool via pgxpool
@@ -40,7 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to parse PostgreSQL connection string: %v", err)
 	}
-	
+
 	// Tune connection pools for low-latency concurrent operations
 	pgxConfig.MaxConns = 50
 	pgxConfig.MinConns = 10
@@ -75,12 +75,13 @@ func main() {
 	}
 
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs:        nodeList,
-		ReadOnly:     false,
+		Addrs:          nodeList,
+		Password:       os.Getenv("REDIS_PASSWORD"),
+		ReadOnly:       false,
 		RouteByLatency: true,
-		DialTimeout:  2 * time.Second,
-		ReadTimeout:  500 * time.Millisecond, // Strict sub-500ms lifecycle enforcement
-		WriteTimeout: 500 * time.Millisecond,
+		DialTimeout:    2 * time.Second,
+		ReadTimeout:    500 * time.Millisecond, // Strict sub-500ms lifecycle enforcement
+		WriteTimeout:   500 * time.Millisecond,
 		Dialer: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if localAddr, ok := ipMap[addr]; ok {
 				addr = localAddr
@@ -127,7 +128,9 @@ func main() {
 	defer handoffWriter.Close()
 
 	regionRouter := usecase.NewRegionRouter(redisClusterClient, handoffWriter, "kolkata")
-	if setter, ok := telemetryUseCase.(interface{ SetRegionRouter(router *usecase.RegionRouter) }); ok {
+	if setter, ok := telemetryUseCase.(interface {
+		SetRegionRouter(router *usecase.RegionRouter)
+	}); ok {
 		setter.SetRegionRouter(regionRouter)
 	}
 
@@ -196,5 +199,3 @@ func getEnv(key, defaultValue string) string {
 	}
 	return defaultValue
 }
-
-

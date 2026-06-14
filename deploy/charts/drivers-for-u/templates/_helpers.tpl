@@ -48,3 +48,18 @@ plaintext for local/dev. Every producer & consumer reads these via kafkacfg.From
       key: kafka-sasl-password
 {{- end }}
 {{- end -}}
+
+{{/*
+Redis client auth env. Include inside any Redis-talking container's `env:` list.
+No-op when redis.authEnabled is false, so passwordless local/dev clusters keep
+working. Every Redis client reads REDIS_PASSWORD via redis.ClusterOptions.Password.
+*/}}
+{{- define "drivers-for-u.redisAuthEnv" -}}
+{{- if .Values.redis.authEnabled }}
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "drivers-for-u.name" . }}-app-secrets
+      key: redis-password
+{{- end }}
+{{- end -}}

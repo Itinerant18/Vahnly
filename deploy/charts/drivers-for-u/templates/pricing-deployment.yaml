@@ -26,6 +26,7 @@ spec:
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_ADDRS
               value: {{ .Values.global.env.redisClusterNodes | quote }}
+            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
             - name: PRICING_GROUP_ID
               value: {{ .Values.pricing.groupID | quote }}
             {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}

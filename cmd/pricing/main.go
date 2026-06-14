@@ -22,7 +22,8 @@ func main() {
 	redisAddrs := getEnv("REDIS_CLUSTER_ADDRS", "localhost:6379")
 
 	clusterClient := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs: parseCSV(redisAddrs),
+		Addrs:    parseCSV(redisAddrs),
+		Password: os.Getenv("REDIS_PASSWORD"),
 	})
 	defer clusterClient.Close()
 
