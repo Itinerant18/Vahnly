@@ -225,12 +225,32 @@ function encodeQuery(params: Record<string, string | number>): string {
   return query.toString();
 }
 
+// The gateway returns a flat DriverAuthResponse (token + driver_id/role/name/...),
+// not a nested { token, user }. Map it here so callers get DriverLoginResponse.
+interface DriverLoginRaw {
+  token: string;
+  role: 'DRIVER';
+  driver_id: string;
+  name: string;
+  verification_status?: string;
+  onboarding_step?: number;
+}
+
 export async function driverLogin(phone: string, password: string): Promise<DriverLoginResponse> {
   // This is the REAL authentication endpoint, not the mock one at /auth/driver/login
-  return request<DriverLoginResponse>('/api/v1/driver/login', {
+  const raw = await request<DriverLoginRaw>('/api/v1/driver/login', {
     method: 'POST',
     body: { phone, password },
   });
+  return {
+    token: raw.token,
+    user: {
+      id: raw.driver_id,
+      role: raw.role ?? 'DRIVER',
+      name: raw.name,
+      current_state: '',
+    },
+  };
 }
 
 export async function getDriverProfile(token: string): Promise<DriverProfile> {
