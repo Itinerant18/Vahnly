@@ -1,0 +1,44 @@
+{{- if .Values.migrations.hookEnabled }}
+# Schema migration gate. Runs the multi-target image with TARGET_SERVICE=migrate as a
+# pre-install/pre-upgrade Helm hook, so migrations complete BEFORE app pods roll.
+# This replaces sole reliance on dispatch's app-boot AutoRunDatabaseMigrations (which
+# gave no ordering guarantee and raced across dispatch replicas). dispatch still
+# auto-migrates on boot as a redundant safety net — it no-ops once the schema is current.
+#
+# DATABASE_URL is taken directly from global.env (not the db-credentials Secret):
+# Helm runs hooks before normal resources, so on a first install the Secret does not
+# yet exist when this Job runs. The value is identical to what secrets.yaml stores.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "drivers-for-u.name" . }}-migrate
+  labels:
+    app: migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit | default 3 }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds | default 300 }}
+  template:
+    metadata:
+      labels:
+        app: migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
+          command: ["/entrypoint"]
+          env:
+            - name: TARGET_SERVICE
+              value: "migrate"
+            - name: DATABASE_URL
+              value: {{ .Values.global.env.databaseUrl | quote }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+{{- end }}

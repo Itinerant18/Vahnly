@@ -73,6 +73,17 @@ kafka:
 redis:
   authEnabled: false
 
+# Database migrations run as a pre-install/pre-upgrade hook Job that gates the rollout
+# (schema is current before app pods start). Mirrors the docker-compose db-migrator.
+# Disable only if a separate process owns the schema.
+migrations:
+  hookEnabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+
 # Public HTTPS ingress for the gateway. Disabled by default so local/dev installs
 # stay ClusterIP-only. In production set ingress.enabled=true with a real host, an
 # nginx ingress controller, and a cert-manager ClusterIssuer for auto-renewed TLS.
