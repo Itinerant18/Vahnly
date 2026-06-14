@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -18,6 +19,7 @@ interface FraudEvent {
   status: string;
   reviewed_at?: string;
   created_at: string;
+  [key: string]: unknown;
 }
 
 interface FraudRule {
@@ -42,6 +44,7 @@ interface Forecast {
   surge_predicted: number;
   confidence_pct: number;
   gap: number;
+  [key: string]: unknown;
 }
 
 interface VoCTopic {
@@ -74,6 +77,61 @@ const SENT_CLS: Record<string, string> = {
   NEGATIVE: 'bg-surface-negative text-content-negative',
   NEUTRAL: 'bg-background-secondary text-content-primary',
 };
+
+// Column definitions for the DataTable hero component.
+// Fraud events carry row actions, so columns are produced from a factory that
+// closes over the update handler.
+const fraudColumns = (updateFraud: (id: string, status: string) => void): ColumnDef<FraudEvent>[] => [
+  {
+    key: 'entity_type', header: 'Entity',
+    render: (_v, e) => <span className="font-mono text-mono-small text-content-primary">{e.entity_type}/{e.entity_id}</span>,
+  },
+  { key: 'fraud_type', header: 'Type' },
+  {
+    key: 'score', header: 'Score', type: 'numeric',
+    render: (v) => <span className={`font-mono text-mono-small tabular-nums ${SCORE_CLS(Number(v))}`}>{Number(v).toFixed(1)}</span>,
+  },
+  {
+    key: 'status', header: 'Status', type: 'status',
+    render: (v) => <span className="px-2 py-0.5 rounded text-xs bg-background-secondary">{String(v)}</span>,
+  },
+  { key: 'created_at', header: 'Created', type: 'date' },
+  {
+    key: 'actions', header: 'Actions', type: 'actions',
+    render: (_v, e) => e.status === 'OPEN' ? (
+      <span className="space-x-2">
+        <button onClick={(ev) => { ev.stopPropagation(); updateFraud(e.id, 'CONFIRMED'); }} className="text-xs text-content-negative hover:underline">Confirm</button>
+        <button onClick={(ev) => { ev.stopPropagation(); updateFraud(e.id, 'DISMISSED'); }} className="text-xs text-content-secondary hover:underline">Dismiss</button>
+      </span>
+    ) : null,
+  },
+];
+
+const FORECAST_COLUMNS: ColumnDef<Forecast>[] = [
+  { key: 'city', header: 'City', render: (v) => <span className="font-medium text-content-primary">{String(v)}</span> },
+  { key: 'zone_name', header: 'Zone' },
+  {
+    key: 'forecast_hour', header: 'Hour',
+    render: (v) => <span className="text-xs text-content-secondary">{new Date(String(v)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>,
+  },
+  { key: 'predicted_demand', header: 'Demand', type: 'numeric' },
+  { key: 'current_supply', header: 'Supply', type: 'numeric' },
+  {
+    key: 'gap', header: 'Gap', type: 'numeric',
+    render: (v) => {
+      const g = Number(v);
+      return <span className={`font-mono text-mono-small tabular-nums font-semibold ${g > 0 ? 'text-content-negative' : 'text-content-positive'}`}>{g > 0 ? `+${g}` : g}</span>;
+    },
+  },
+  {
+    key: 'surge_predicted', header: 'Surge', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{Number(v).toFixed(1)}x</span>,
+  },
+  {
+    key: 'confidence_pct', header: 'Confidence', type: 'numeric',
+    render: (v) => <span className="font-mono text-mono-small tabular-nums text-content-primary">{Number(v)}%</span>,
+  },
+];
 
 export function AIIntelligenceDashboard() {
   const [tab, setTab] = useState<'fraud' | 'demand' | 'voc'>('fraud');
@@ -176,32 +234,11 @@ export function AIIntelligenceDashboard() {
           </div>
 
           {fraudTab === 'events' && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-background-secondary">
-                  <tr>{['Entity', 'Type', 'Score', 'Status', 'Created', 'Actions'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-border-opaque">
-                  {events.map(e => (
-                    <tr key={e.id} className="hover:bg-background-secondary">
-                      <td className="p-3 font-mono text-xs">{e.entity_type}/{e.entity_id}</td>
-                      <td className="p-3">{e.fraud_type}</td>
-                      <td className={`p-3 ${SCORE_CLS(e.score)}`}>{e.score.toFixed(1)}</td>
-                      <td className="p-3"><span className="px-2 py-0.5 rounded text-xs bg-background-secondary">{e.status}</span></td>
-                      <td className="p-3 text-content-secondary text-xs">{new Date(e.created_at).toLocaleDateString()}</td>
-                      <td className="p-3 space-x-2">
-                        {e.status === 'OPEN' && (
-                          <>
-                            <button onClick={() => updateFraud(e.id, 'CONFIRMED')} className="text-xs text-content-negative hover:underline">Confirm</button>
-                            <button onClick={() => updateFraud(e.id, 'DISMISSED')} className="text-xs text-content-secondary hover:underline">Dismiss</button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<FraudEvent>
+              columns={fraudColumns(updateFraud)}
+              data={events}
+              rowKey={(e) => e.id}
+            />
           )}
 
           {fraudTab === 'rules' && (
@@ -230,27 +267,11 @@ export function AIIntelligenceDashboard() {
             <input value={cityFilter} onChange={e => setCityFilter(e.target.value)} placeholder="Filter by city (e.g. KOL)" className="border rounded px-3 py-1.5 text-sm w-48" />
             <button onClick={loadForecasts} className="px-4 py-1.5 bg-accent-400 text-white text-sm rounded hover:bg-accent-400">Apply</button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-background-secondary">
-                <tr>{['City', 'Zone', 'Hour', 'Demand', 'Supply', 'Gap', 'Surge', 'Confidence'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-border-opaque">
-                {forecasts.map(f => (
-                  <tr key={f.id} className={`hover:bg-background-secondary ${f.gap > 10 ? 'bg-surface-negative' : ''}`}>
-                    <td className="p-3 font-medium">{f.city}</td>
-                    <td className="p-3">{f.zone_name}</td>
-                    <td className="p-3 text-xs text-content-secondary">{new Date(f.forecast_hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className="p-3">{f.predicted_demand}</td>
-                    <td className="p-3">{f.current_supply}</td>
-                    <td className={`p-3 font-semibold ${f.gap > 0 ? 'text-content-negative' : 'text-content-positive'}`}>{f.gap > 0 ? `+${f.gap}` : f.gap}</td>
-                    <td className="p-3">{f.surge_predicted.toFixed(1)}x</td>
-                    <td className="p-3">{f.confidence_pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Forecast>
+            columns={FORECAST_COLUMNS}
+            data={forecasts}
+            rowKey={(f) => f.id}
+          />
         </div>
       )}
 

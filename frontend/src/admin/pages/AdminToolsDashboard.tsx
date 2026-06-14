@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
 const API = '/api/v1/admin';
 
@@ -56,6 +57,7 @@ interface CronRun {
   status: string;
   rows_processed: number;
   error: string;
+  [key: string]: unknown;
 }
 
 interface ExportQuery {
@@ -79,6 +81,7 @@ interface ExportJob {
   created_by: string;
   created_at: string;
   completed_at?: string;
+  [key: string]: unknown;
 }
 
 const CRON_CLS: Record<string, string> = {
@@ -101,6 +104,38 @@ const BULK_CLS: Record<string, string> = {
   APPROVED: 'bg-surface-accent text-content-accent',
   FAILED: 'bg-surface-negative text-content-negative',
 };
+
+const CRON_RUN_COLUMNS: ColumnDef<CronRun>[] = [
+  { key: 'job_name', header: 'Job', render: (v) => <span className="font-mono text-mono-small">{String(v)}</span> },
+  { key: 'started_at', header: 'Started', type: 'date' },
+  {
+    key: 'status', header: 'Status',
+    render: (v) => <span className={`px-1.5 py-0.5 rounded ${CRON_CLS[String(v)] ?? 'bg-background-secondary'}`}>{String(v)}</span>,
+  },
+  { key: 'rows_processed', header: 'Rows', type: 'numeric', render: (v) => Number(v).toLocaleString() },
+  {
+    key: 'error', header: 'Error',
+    render: (v) => <span className="text-content-negative truncate max-w-xs block">{String(v) || '—'}</span>,
+  },
+];
+
+const EXPORT_JOB_COLUMNS: ColumnDef<ExportJob>[] = [
+  { key: 'query_name', header: 'Query', render: (v) => <span className="font-medium">{String(v)}</span> },
+  {
+    key: 'status', header: 'Status',
+    render: (v) => <span className={`text-xs px-2 py-0.5 rounded ${JOB_STATUS_CLS[String(v)] ?? 'bg-background-secondary'}`}>{String(v)}</span>,
+  },
+  { key: 'row_count', header: 'Rows', type: 'numeric', render: (v) => Number(v).toLocaleString() },
+  {
+    key: 'file_size_bytes', header: 'Size',
+    render: (v) => <span className="text-xs text-content-secondary">{Number(v) > 0 ? `${(Number(v) / 1024 / 1024).toFixed(1)} MB` : '—'}</span>,
+  },
+  { key: 'created_at', header: 'Created', type: 'date' },
+  {
+    key: 'file_url', header: 'Download',
+    render: (v) => v ? <a href={String(v)} className="text-xs text-content-accent hover:underline">Download</a> : <>—</>,
+  },
+];
 
 export function AdminToolsDashboard() {
   const [tab, setTab] = useState<'impersonation' | 'bulk' | 'cron' | 'exports'>('cron');
@@ -205,24 +240,11 @@ export function AdminToolsDashboard() {
           {cronRuns.length > 0 && (
             <div>
               <h3 className="font-semibold text-content-primary mb-2 text-sm">Recent Runs</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-background-secondary">
-                    <tr>{['Job', 'Started', 'Status', 'Rows', 'Error'].map(h => <th key={h} className="text-left p-2 font-medium text-content-secondary">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-opaque">
-                    {cronRuns.map(run => (
-                      <tr key={run.id} className="hover:bg-background-secondary">
-                        <td className="p-2 font-mono">{run.job_name}</td>
-                        <td className="p-2 text-content-secondary">{new Date(run.started_at).toLocaleString()}</td>
-                        <td className="p-2"><span className={`px-1.5 py-0.5 rounded ${CRON_CLS[run.status] ?? 'bg-background-secondary'}`}>{run.status}</span></td>
-                        <td className="p-2">{run.rows_processed.toLocaleString()}</td>
-                        <td className="p-2 text-content-negative truncate max-w-xs">{run.error || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<CronRun>
+                columns={CRON_RUN_COLUMNS}
+                data={cronRuns}
+                rowKey={(r) => r.id}
+              />
             </div>
           )}
         </div>
@@ -253,25 +275,11 @@ export function AdminToolsDashboard() {
           {exportJobs.length > 0 && (
             <div>
               <h3 className="font-semibold text-content-primary mb-3">Recent Jobs</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-background-secondary">
-                    <tr>{['Query', 'Status', 'Rows', 'Size', 'Created', 'Download'].map(h => <th key={h} className="text-left p-3 font-medium text-content-secondary">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-opaque">
-                    {exportJobs.map(j => (
-                      <tr key={j.id} className="hover:bg-background-secondary">
-                        <td className="p-3 font-medium">{j.query_name}</td>
-                        <td className="p-3"><span className={`text-xs px-2 py-0.5 rounded ${JOB_STATUS_CLS[j.status] ?? 'bg-background-secondary'}`}>{j.status}</span></td>
-                        <td className="p-3">{j.row_count.toLocaleString()}</td>
-                        <td className="p-3 text-xs text-content-secondary">{j.file_size_bytes > 0 ? `${(j.file_size_bytes / 1024 / 1024).toFixed(1)} MB` : '—'}</td>
-                        <td className="p-3 text-xs text-content-secondary">{new Date(j.created_at).toLocaleString()}</td>
-                        <td className="p-3">{j.file_url ? <a href={j.file_url} className="text-xs text-content-accent hover:underline">Download</a> : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<ExportJob>
+                columns={EXPORT_JOB_COLUMNS}
+                data={exportJobs}
+                rowKey={(j) => j.id}
+              />
             </div>
           )}
         </div>
