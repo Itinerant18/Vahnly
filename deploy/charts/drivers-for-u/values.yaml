@@ -11,20 +11,10 @@ global:
   logLevel: warn
   metricsEnabled: true
 
-# Toggle baseline NetworkPolicies (default-deny ingress + scoped egress). Requires
-# a NetworkPolicy-enforcing CNI (Calico/Cilium).
-networkPolicy:
-  enabled: true
-
-# Monitoring integration. namespace is where kube-prometheus-stack runs; the
-# gateway metrics NetworkPolicy allows scrapes only from this namespace (which
-# must carry the label name=<namespace>).
-monitoring:
-  namespace: monitoring
-
-  # In-cluster connection strings. Every data-tier service is assumed to live in
-  # the same namespace (dispatch). Keep kafkaBrokers consistent with the KEDA
-  # ScaledObject bootstrapServers under dispatch.autoscaling.kafka below.
+  # In-cluster connection strings consumed by every service via .Values.global.env.
+  # Every data-tier service is assumed to live in the same namespace (dispatch).
+  # Keep kafkaBrokers consistent with the KEDA ScaledObject bootstrapServers under
+  # dispatch.autoscaling.kafka below.
   env:
     # sslmode=require encrypts without CA verification. Use verify-full only once
     # a CA bundle is mounted into the pods, otherwise the TLS handshake fails.
@@ -37,6 +27,17 @@ monitoring:
     kafkaBrokers: "kafka-cluster-kafka-bootstrap.dispatch.svc.cluster.local:9092"
     redisClusterNodes: "redis-cluster.dispatch.svc.cluster.local:6379"
     tritonServerUrl: "triton-inference-service.dispatch.svc.cluster.local:8001"
+
+# Toggle baseline NetworkPolicies (default-deny ingress + scoped egress). Requires
+# a NetworkPolicy-enforcing CNI (Calico/Cilium).
+networkPolicy:
+  enabled: true
+
+# Monitoring integration. namespace is where kube-prometheus-stack runs; the
+# gateway metrics NetworkPolicy allows scrapes only from this namespace (which
+# must carry the label name=<namespace>).
+monitoring:
+  namespace: monitoring
 
 # Single multi-target image. The compiled binary is service-specific (built with
 # --build-arg TARGET_SERVICE=<svc>); publish one tag per service or override
