@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -11,8 +12,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/pruner"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func main() {
 
 	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs:          nodeList,
+		Password:       os.Getenv("REDIS_PASSWORD"),
 		ReadOnly:       false,
 		RouteByLatency: true,
 		DialTimeout:    2 * time.Second,
@@ -75,9 +77,11 @@ func main() {
 	trackedZones := []string{"88754cb247fffff", "88283473fffffff"}
 
 	prunerDaemon := pruner.NewStaleTelemetryPruner(redisClusterClient, dbPool)
-	
+
 	// Boot the sweeping loop worker thread
 	go prunerDaemon.StartPrunerLoop(ctx, "KOL", trackedZones)
+
+	go startHealthServer("PRUNER", getEnv("HEALTH_PORT", "8080"))
 
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -90,4 +94,23 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// startHealthServer exposes /health (liveness) and /ready (readiness) so this
+// otherwise-portless background worker can be probed by Kubernetes. The scratch
+// runtime image has no shell, so an exec probe is not an option.
+func startHealthServer(tag, port string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready"))
+	})
+	log.Printf("[%s] health server listening on :%s", tag, port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil && err != http.ErrServerClosed {
+		log.Printf("[%s] health server error: %v", tag, err)
+	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -36,7 +37,7 @@ func main() {
 	defer dbPool.Close()
 
 	nodeList := strings.Split(redisNodes, ",")
-	redisClient := redis.NewClusterClient(&redis.ClusterOptions{Addrs: nodeList})
+	redisClient := redis.NewClusterClient(&redis.ClusterOptions{Addrs: nodeList, Password: os.Getenv("REDIS_PASSWORD")})
 	defer redisClient.Close()
 
 	brokersList := strings.Split(kafkaBrokers, ",")
@@ -54,9 +55,11 @@ func main() {
 	gatewayHandler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClient)
 
 	janitorWorker := expiry.NewOfferTimeoutJanitor(dbPool, redisClient, gatewayHandler)
-	
+
 	// Launch the background janitor loop
 	go janitorWorker.StartJanitorLoop(ctx, cityPrefix)
+
+	go startHealthServer("EXPIRY", getEnv("HEALTH_PORT", "8080"))
 
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -69,4 +72,23 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// startHealthServer exposes /health (liveness) and /ready (readiness) so this
+// otherwise-portless background worker can be probed by Kubernetes. The scratch
+// runtime image has no shell, so an exec probe is not an option.
+func startHealthServer(tag, port string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready"))
+	})
+	log.Printf("[%s] health server listening on :%s", tag, port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil && err != http.ErrServerClosed {
+		log.Printf("[%s] health server error: %v", tag, err)
+	}
 }

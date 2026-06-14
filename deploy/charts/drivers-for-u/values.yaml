@@ -56,6 +56,7 @@ secrets:
   awsSecretAccessKey: "REPLACE_ME_VIA_SEALED_SECRET"
   kafkaSaslUsername: "REPLACE_ME_VIA_SEALED_SECRET"
   kafkaSaslPassword: "REPLACE_ME_VIA_SEALED_SECRET"
+  redisPassword: "REPLACE_ME_VIA_SEALED_SECRET"
 
 # Kafka client security. Enable both for production SASL_SSL (PLAIN over TLS).
 # All producers/consumers read KAFKA_TLS_ENABLED + KAFKA_SASL_* via kafkacfg.
@@ -64,6 +65,28 @@ secrets:
 kafka:
   tlsEnabled: false
   saslEnabled: false
+
+# Redis client auth. Enable in production once the Redis cluster requires AUTH and
+# secrets.redisPassword is injected via SealedSecret. No-op (no REDIS_PASSWORD env)
+# when off, so passwordless local/dev clusters keep working.
+redis:
+  authEnabled: false
+
+# Public HTTPS ingress for the gateway. Disabled by default so local/dev installs
+# stay ClusterIP-only. In production set ingress.enabled=true with a real host, an
+# nginx ingress controller, and a cert-manager ClusterIssuer for auto-renewed TLS.
+# adminAllowlist.sourceRanges restricts /api/v1/admin to office/VPN CIDRs — LEAVE IT
+# SET in prod; an empty list leaves the admin API open via the main ingress.
+ingress:
+  enabled: false
+  className: nginx
+  host: api.example.com
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    clusterIssuer: letsencrypt-prod
+  adminAllowlist:
+    sourceRanges: []
 
 # Durable object storage for driver KYC documents. Leave bucket empty to fall back
 # to ephemeral local disk (NOT for production). endpoint is for S3-compatible
@@ -123,6 +146,10 @@ pricing:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "250m", memory: "128Mi" }
 
+# pruner/expiry/notification stay at 1: their work loops are NOT yet safe to run
+# concurrently (unconditional DB scans / unlocked outbox reads would double-process
+# — duplicate Kafka re-queues and duplicate push sends). Add SELECT ... FOR UPDATE
+# SKIP LOCKED (or leader election) before raising these to >=2. See INF-1.
 pruner:
   replicaCount: 1
   resources:
@@ -130,7 +157,7 @@ pruner:
     requests: { cpu: "100m", memory: "128Mi" }
 
 reconciler:
-  replicaCount: 1
+  replicaCount: 2 # idempotent (events tagged reconciled:true) + has /health, /ready
   resources:
     limits: { cpu: "500m", memory: "256Mi" }
     requests: { cpu: "100m", memory: "128Mi" }
@@ -162,7 +189,7 @@ analytics:
     requests: { cpu: "250m", memory: "128Mi" }
 
 rebalancer:
-  replicaCount: 1
+  replicaCount: 2 # idempotent recompute (overwrites Redis keys / re-publishes nudges)
   httpAddr: ":8090"
   resources:
     limits: { cpu: "500m", memory: "256Mi" }

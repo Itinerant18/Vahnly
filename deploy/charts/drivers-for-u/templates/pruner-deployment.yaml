@@ -29,5 +29,21 @@ spec:
                   key: database-url
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
+            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
+          ports:
+            - containerPort: 8080
+              name: health
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
             {{- toYaml .Values.pruner.resources | nindent 12 }}
