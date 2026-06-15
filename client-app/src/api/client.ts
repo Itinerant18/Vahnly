@@ -6,39 +6,24 @@ export type DevicePlatform = 'ANDROID_FCM' | 'IOS_APNS';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
-function readEnv(key: string): string | undefined {
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return process.env[key];
-  }
-  return undefined;
-}
-
 export const BASE_URL =
-  readEnv('VITE_API_BASE_URL') ||
-  readEnv('NEXT_PUBLIC_API_GATEWAY') ||
-  readEnv('API_GATEWAY_URL') ||
+  process.env.NEXT_PUBLIC_API_GATEWAY ||
   'http://localhost:8085';
 
 export const GRPC_URL =
-  readEnv('VITE_GRPC_URL') ||
-  readEnv('NEXT_PUBLIC_GRPC_URL') ||
+  process.env.NEXT_PUBLIC_GRPC_URL ||
   'http://localhost:50051';
 
 export const GRPC_WEB_URL =
-  readEnv('VITE_GRPC_WEB_URL') ||
-  readEnv('NEXT_PUBLIC_GRPC_WEB_URL') ||
+  process.env.NEXT_PUBLIC_GRPC_WEB_URL ||
   'http://localhost:8085';
 
 export const SSE_URL =
-  readEnv('VITE_ANALYTICS_URL') ||
-  readEnv('NEXT_PUBLIC_ANALYTICS_URL') ||
-  readEnv('ANALYTICS_SSE_URL') ||
+  process.env.NEXT_PUBLIC_ANALYTICS_URL ||
   'http://localhost:8089';
 
 export const WS_BASE_URL =
-  readEnv('VITE_WS_BASE_URL') ||
-  readEnv('NEXT_PUBLIC_WS_GATEWAY') ||
-  readEnv('WS_GATEWAY_URL') ||
+  process.env.NEXT_PUBLIC_WS_GATEWAY ||
   BASE_URL.replace(/^http/i, 'ws');
 
 const REGION_PREFIX = 'KOL';
@@ -248,6 +233,65 @@ export async function driverLogin(phone: string, password: string): Promise<Driv
       id: raw.driver_id,
       role: raw.role ?? 'DRIVER',
       name: raw.name,
+      current_state: '',
+    },
+  };
+}
+
+export interface DriverGoogleLoginResponse {
+  token?: string;
+  user?: DriverAuthUser;
+  registered?: boolean;
+  email?: string;
+  name?: string;
+}
+
+interface DriverGoogleLoginRaw {
+  token?: string;
+  role?: 'DRIVER';
+  driver_id?: string;
+  name?: string;
+  verification_status?: string;
+  onboarding_step?: number;
+  registered?: boolean;
+  email?: string;
+}
+
+export async function driverGoogleLogin(
+  idToken: string,
+  regData?: { phone: string; cityPrefix: string; name?: string }
+): Promise<DriverGoogleLoginResponse> {
+  const payload = {
+    id_token: idToken,
+    // Backend expects snake_case keys (city_prefix). Spreading regData as-is sent the
+    // camelCase `cityPrefix`, so the server saw an empty city and refused to create the
+    // driver (returned registered:false -> "no token received").
+    ...(regData && {
+      phone: regData.phone,
+      city_prefix: regData.cityPrefix,
+      name: regData.name,
+    }),
+  };
+  const raw = await request<DriverGoogleLoginRaw>('/api/v1/driver/login/google', {
+    method: 'POST',
+    body: payload,
+  });
+
+  if (raw.registered === false) {
+    return {
+      registered: false,
+      email: raw.email,
+      name: raw.name,
+    };
+  }
+
+  return {
+    registered: true,
+    token: raw.token,
+    user: {
+      id: raw.driver_id || '',
+      role: raw.role ?? 'DRIVER',
+      name: raw.name || '',
       current_state: '',
     },
   };
