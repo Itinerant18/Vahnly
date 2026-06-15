@@ -170,9 +170,10 @@ func (h *RiderHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type RiderGoogleLoginRequest struct {
-	IDToken        string `json:"id_token"`
-	Phone          string `json:"phone,omitempty"`
-	OTP            string `json:"otp,omitempty"`
+	IDToken string `json:"id_token"`
+	// PhoneToken is a Firebase Phone Auth ID token proving the rider controls the number.
+	// The verified phone is read from this token, not from a client-supplied field.
+	PhoneToken     string `json:"phone_token,omitempty"`
 	Name           string `json:"name,omitempty"`
 	ReferredByCode string `json:"referred_by_code,omitempty"`
 }
@@ -266,8 +267,10 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// User is not registered by email yet. Check if we have a phone number to register.
-	if req.Phone == "" {
+	// User is not registered by email yet. We need a phone number to register them, and the
+	// number is safety-critical here (the rider owns the car the driver will operate), so it
+	// must be proven via Firebase Phone Auth. Without that proof we ask the client to verify.
+	if req.PhoneToken == "" {
 		writeData(w, http.StatusOK, map[string]any{
 			"registered": false,
 			"email":      googleClaims.Email,
@@ -276,17 +279,18 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// The phone number is safety-critical here (the rider owns the car the driver will
-	// operate), so it must be proven via OTP before it is attached to a Google account —
-	// both when creating a new rider and when linking the email onto an existing phone-only
-	// record (which would otherwise allow taking over someone else's number).
-	if err := h.auth.VerifyPhoneOTP(ctx, req.Phone, req.OTP); err != nil {
-		h.writeServiceError(w, err)
+	// Verify the Firebase Phone Auth token and take the phone number from the SIGNED token,
+	// not from any client field — this both proves ownership and prevents linking the email
+	// onto someone else's number.
+	phoneClaims, perr := verifyFirebaseIDToken(ctx, req.PhoneToken, firebaseProjectID())
+	if perr != nil || phoneClaims.PhoneNumber == "" {
+		writeError(w, http.StatusUnauthorized, "Phone verification failed", "ERR_UNAUTHENTICATED")
 		return
 	}
+	verifiedPhone := phoneClaims.PhoneNumber
 
-	// Check if a rider already exists with this phone number.
-	existingRider, err := h.repo.GetRiderByPhone(ctx, req.Phone)
+	// Check if a rider already exists with this (verified) phone number.
+	existingRider, err := h.repo.GetRiderByPhone(ctx, verifiedPhone)
 	if err == nil {
 		// Rider exists by phone. Check if they already have an email.
 		if existingRider.Email != nil && *existingRider.Email != "" {
@@ -323,7 +327,7 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 			regName = "Google Rider"
 		}
 
-		newRider, err := h.repo.CreateRiderWithEmail(ctx, req.Phone, googleClaims.Email, regName)
+		newRider, err := h.repo.CreateRiderWithEmail(ctx, verifiedPhone, googleClaims.Email, regName)
 		if err != nil {
 			h.writeServiceError(w, err)
 			return

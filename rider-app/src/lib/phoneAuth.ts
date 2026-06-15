@@ -1,4 +1,3 @@
-import { Capacitor } from "@capacitor/core";
 import { auth } from "./firebase";
 import {
   RecaptchaVerifier,
@@ -6,54 +5,38 @@ import {
   type ConfirmationResult,
 } from "firebase/auth";
 
-let recaptchaVerifier: RecaptchaVerifier | null = null;
+// Firebase Phone Auth (web). The page must render <div id="recaptcha-container" /> for the
+// invisible reCAPTCHA challenge. confirmationResult.confirm(code) yields the verified phone
+// user, whose Firebase ID token carries the phone_number claim the backend trusts.
+const RECAPTCHA_CONTAINER_ID = "recaptcha-container";
 
-// Lazily create a single invisible reCAPTCHA bound to a DOM container. Firebase requires
-// reCAPTCHA for web phone auth to deter SMS abuse.
-function getRecaptcha(containerId: string): RecaptchaVerifier {
+let verifier: RecaptchaVerifier | null = null;
+
+function getRecaptcha(): RecaptchaVerifier {
   if (!auth) throw new Error("Authentication module is not initialized.");
-  if (!recaptchaVerifier) {
-    recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+  if (!verifier) {
+    verifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
       size: "invisible",
     });
   }
-  return recaptchaVerifier;
+  return verifier;
 }
 
-/**
- * Start Firebase Phone Auth: sends an SMS OTP to the E.164 number and returns a confirmation
- * handle. Web-only for now (native Capacitor needs the platform plugin).
- */
+// Sends an SMS OTP to the E.164 phone and returns a ConfirmationResult.
 export async function startPhoneVerification(
-  phoneE164: string,
-  recaptchaContainerId: string,
+  e164Phone: string,
 ): Promise<ConfirmationResult> {
-  if (Capacitor.isNativePlatform()) {
-    throw new Error("Phone verification on native is not configured yet.");
-  }
   if (!auth) throw new Error("Authentication module is not initialized.");
-  const verifier = getRecaptcha(recaptchaContainerId);
-  return signInWithPhoneNumber(auth, phoneE164, verifier);
-}
-
-/**
- * Confirm the SMS OTP and return the Firebase ID token. The token carries a verified
- * phone_number claim that the backend trusts when creating the rider.
- */
-export async function confirmPhoneCode(
-  confirmation: ConfirmationResult,
-  code: string,
-): Promise<string> {
-  const cred = await confirmation.confirm(code);
-  return cred.user.getIdToken();
-}
-
-/** Tear down the verifier (after an error) so a fresh challenge can be issued. */
-export function resetRecaptcha(): void {
   try {
-    recaptchaVerifier?.clear();
-  } catch {
-    // ignore
+    return await signInWithPhoneNumber(auth, e164Phone, getRecaptcha());
+  } catch (err) {
+    // Reset the verifier so a retry starts a fresh challenge instead of reusing a spent one.
+    try {
+      verifier?.clear();
+    } catch {
+      /* ignore */
+    }
+    verifier = null;
+    throw err;
   }
-  recaptchaVerifier = null;
 }

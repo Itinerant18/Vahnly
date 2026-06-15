@@ -477,6 +477,9 @@ services:
       # SPA→API deployment (Firebase Hosting frontend + separate API origin); None requires
       # Secure, so keep the gateway on HTTPS.
       - ADMIN_COOKIE_SAMESITE=${ADMIN_COOKIE_SAMESITE:-}
+      # Firebase project id — used to verify Firebase Phone Auth ID tokens (rider Google
+      # sign-up phone verification). Audience/issuer of the token must match this project.
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
       # S3-compatible object storage (MinIO in local dev).
       - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
       - S3_BUCKET=${S3_BUCKET_DOCUMENTS:-documents}

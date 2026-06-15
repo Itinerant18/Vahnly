@@ -32,13 +32,12 @@ export const authApi = {
 
   googleLogin: (
     idToken: string,
-    regData?: { phone: string; otp: string; name?: string; referred_by_code?: string },
+    regData?: { phone_token: string; name?: string; referred_by_code?: string },
   ) =>
     apiClient.post<GoogleLoginResponse>("/api/v1/rider/auth/login/google", {
       id_token: idToken,
       ...(regData && {
-        phone: regData.phone,
-        otp: regData.otp,
+        phone_token: regData.phone_token,
         name: regData.name,
         referred_by_code: regData.referred_by_code,
       }),

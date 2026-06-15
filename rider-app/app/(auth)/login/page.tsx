@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { getGoogleIdToken } from "@/lib/googleAuth";
+import { startPhoneVerification } from "@/lib/phoneAuth";
+import type { ConfirmationResult } from "firebase/auth";
 
 // ── 6-box OTP input with auto-advance + paste ────────────────────────────────
 function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
@@ -125,6 +127,7 @@ export default function LoginPage() {
   const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string } | null>(null);
   const [googleOtpSent, setGoogleOtpSent] = useState(false);
   const [googleOtp, setGoogleOtp] = useState("");
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
 
   const onSendOTP = async () => {
     setError("");
@@ -169,7 +172,9 @@ export default function LoginPage() {
   const sendGoogleOtp = async () => {
     setError("");
     try {
-      await sendOTP(`+91${phone.replace(/\D/g, "")}`);
+      // Firebase Phone Auth sends the real SMS (invisible reCAPTCHA).
+      const conf = await startPhoneVerification(`+91${phone.replace(/\D/g, "")}`);
+      setConfirmation(conf);
       setGoogleOtpSent(true);
     } catch {
       setError("Could not send OTP. Check the number and try again.");
@@ -177,12 +182,15 @@ export default function LoginPage() {
   };
 
   const onCompleteGoogleRegistration = async () => {
-    if (!googleRegInfo) return;
+    if (!googleRegInfo || !confirmation) return;
     setError("");
     try {
+      // Confirm the SMS code → the verified phone user's Firebase ID token carries the
+      // phone_number claim that the backend trusts to register the rider.
+      const cred = await confirmation.confirm(googleOtp);
+      const phoneToken = await cred.user.getIdToken();
       const res = await googleLogin(googleRegInfo.idToken, {
-        phone: `+91${phone.replace(/\D/g, "")}`,
-        otp: googleOtp,
+        phone_token: phoneToken,
         name: googleRegInfo.name,
         referred_by_code: referral || undefined,
       });
@@ -192,7 +200,7 @@ export default function LoginPage() {
         setError("Registration incomplete. Please verify your details.");
       }
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+      setError(err.message || "Incorrect or expired OTP. Please try again.");
     }
   };
 
@@ -511,6 +519,9 @@ export default function LoginPage() {
             </button>
           </div>
         )}
+
+        {/* Invisible reCAPTCHA mount point for Firebase Phone Auth */}
+        <div id="recaptcha-container" />
 
         {/* Error banner */}
         {error && (
