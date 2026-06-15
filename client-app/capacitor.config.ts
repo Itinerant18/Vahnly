@@ -5,6 +5,12 @@ const config: CapacitorConfig = {
   appName: 'DFU Driver',
   webDir: 'out',
   plugins: {
+    // Native Google Sign-In. The provider must also be enabled in the Firebase console, and
+    // each platform needs its OAuth client config (google-services.json / GoogleService-Info.plist).
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
+    },
     BackgroundRunner: {
       label: 'com.driversforu.background.worker',
       src: 'background.js',

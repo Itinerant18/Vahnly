@@ -2,10 +2,11 @@
 
 import React, { useState, useRef, Suspense } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { driverLogin, driverRegister } from '@/api/client';
+import { driverLogin, driverRegister, driverGoogleLogin } from '@/api/client';
 import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter } from 'next/navigation';
 import { Input, Button } from '@/components/ds';
+import { getGoogleIdToken } from '@/lib/googleAuth';
 
 function UnifiedLoginContent() {
   const router = useRouter();
@@ -22,6 +23,14 @@ function UnifiedLoginContent() {
   const [driverName, setDriverName] = useState<string>('');
   const [driverEmail, setDriverEmail] = useState<string>('');
   const [driverCityPrefix, setDriverCityPrefix] = useState<string>('KOL');
+  
+  // Google registration states
+  const [isGoogleRegister, setIsGoogleRegister] = useState<boolean>(false);
+  const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string }>({
+    idToken: '',
+    email: '',
+    name: '',
+  });
   
   // Logs state
   const [logs, setLogs] = useState<string[]>([]);
@@ -163,6 +172,91 @@ function UnifiedLoginContent() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setAuthError(null);
+    addAuditLog('GOOGLE_SIGN_IN_START', { timestamp: new Date().toISOString() });
+    try {
+      // Native (Capacitor) uses the platform Google SDK; web uses the Firebase popup.
+      const idToken = await getGoogleIdToken();
+
+      // Try to log in with Google ID token
+      const res = await driverGoogleLogin(idToken);
+      if (res.registered === false) {
+        setGoogleRegInfo({
+          idToken,
+          email: res.email || '',
+          name: res.name || '',
+        });
+        setIsGoogleRegister(true);
+        addAuditLog('GOOGLE_SIGN_IN_PENDING_REGISTRATION', { email: res.email });
+      } else if (res.token && res.user) {
+        login(res.token, {
+          id: res.user.id,
+          role: res.user.role,
+          name: res.user.name,
+          phone: '',
+        });
+        void registerDriverPushNotifications(res.token).catch((pushErr) => {
+          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+        });
+        addAuditLog('LOGIN_SUCCESS_GOOGLE', { userId: res.user.id, role: 'DRIVER' });
+        router.push('/driver');
+      }
+    } catch (err: any) {
+      console.error('[Google Sign-in] Failed:', err);
+      setAuthError(err.message || 'Google Sign-in failed. Please try again.');
+      addAuditLog('GOOGLE_SIGN_IN_FAILED', { error: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setAuthError(null);
+
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (!phone || cleanPhone.length < 10) {
+      setAuthError('Please enter a valid 10-digit mobile number.');
+      setLoading(false);
+      return;
+    }
+
+    addAuditLog('GOOGLE_REGISTER_ATTEMPT', { email: googleRegInfo.email, phone: cleanPhone });
+
+    try {
+      const res = await driverGoogleLogin(googleRegInfo.idToken, {
+        phone: cleanPhone,
+        cityPrefix: driverCityPrefix,
+        name: googleRegInfo.name.trim() || undefined,
+      });
+
+      if (res.token && res.user) {
+        login(res.token, {
+          id: res.user.id,
+          role: res.user.role,
+          name: res.user.name,
+          phone: cleanPhone,
+        });
+        void registerDriverPushNotifications(res.token).catch((pushErr) => {
+          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+        });
+        addAuditLog('REGISTER_SUCCESS_GOOGLE', { userId: res.user.id });
+        router.push('/driver-onboarding');
+      } else {
+        throw new Error('Registration failed, no token received.');
+      }
+    } catch (err: any) {
+      console.warn('[UnifiedAuth] Google registration failed.', err);
+      setAuthError(err.message || 'Registration failed. The phone number may already be registered.');
+      addAuditLog('GOOGLE_REGISTER_FAILED', { error: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen relative flex flex-col justify-center items-center p-4 sm:p-6 bg-background-primary text-content-primary font-sans overflow-hidden">
       {/* Grid line matrix background */}
@@ -188,7 +282,73 @@ function UnifiedLoginContent() {
           </div>
         )}
 
-        {isDriverRegister ? (
+        {isGoogleRegister ? (
+          /* GOOGLE ADDITIONAL DETAILS FORM */
+          <form onSubmit={handleGoogleRegisterSubmit} className="space-y-4 text-left">
+            <div className="mb-2">
+              <p className="text-paragraph-small text-content-secondary">
+                Complete registration for <strong>{googleRegInfo.email}</strong> to continue as a Driver Partner.
+              </p>
+            </div>
+
+            <Input
+              label="Full Legal Name"
+              type="text"
+              value={googleRegInfo.name}
+              onChange={(e) => setGoogleRegInfo({ ...googleRegInfo, name: e.target.value })}
+              placeholder="John Doe"
+              disabled={loading}
+            />
+
+            <Input
+              label="Driver Phone Number"
+              type="tel"
+              value={phone}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              placeholder="99999 88888"
+              leftIcon={<span className="text-content-secondary font-mono text-paragraph-medium">+91</span>}
+              disabled={loading}
+            />
+
+            <div className="w-full">
+              <label className="block text-label-small text-content-secondary mb-1">
+                Hub Region City Prefix
+              </label>
+              <select
+                value={driverCityPrefix}
+                onChange={(e) => setDriverCityPrefix(e.target.value)}
+                className="w-full h-12 rounded-sm px-500 font-body text-paragraph-large text-content-primary bg-background-secondary border border-border-opaque focus:border-border-accent focus:ring-2 focus:ring-accent-400 outline-none transition-base cursor-pointer"
+              >
+                <option value="KOL">KOL (Kolkata)</option>
+                <option value="BLR">BLR (Bengaluru)</option>
+              </select>
+            </div>
+
+            <div className="pt-2 space-y-3">
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                loading={loading}
+              >
+                Complete Registration
+              </Button>
+
+              <Button
+                type="button"
+                variant="tertiary"
+                fullWidth
+                onClick={() => {
+                  setAuthError(null);
+                  setIsGoogleRegister(false);
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : isDriverRegister ? (
           /* DRIVER REGISTRATION FLOW */
           <form onSubmit={handleDriverRegisterSubmit} className="space-y-4 text-left">
             <Input
@@ -319,10 +479,7 @@ function UnifiedLoginContent() {
         <div className="pt-6 border-t border-border-opaque mt-6 grid grid-cols-2 gap-3">
           <Button
             variant="secondary"
-            onClick={() => {
-              addAuditLog('OAUTH_GOOGLE_CLICKED', { timestamp: new Date().toISOString() });
-              alert('Google Single Sign-On simulation complete.');
-            }}
+            onClick={handleGoogleSignIn}
             disabled={loading}
           >
             Google Sign-In
@@ -340,19 +497,7 @@ function UnifiedLoginContent() {
           </Button>
         </div>
 
-        {/* Live compliance logging terminal view */}
-        {logs.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-border-opaque text-left">
-            <span className="text-label-small font-bold text-content-secondary uppercase tracking-widest block mb-2">
-              Live Compliance Logging:
-            </span>
-            <div className="bg-background-tertiary border border-border-opaque rounded-sm p-3 max-h-24 overflow-y-auto font-mono text-mono-small text-content-secondary space-y-1 scrollbar-thin">
-              {logs.map((lg, i) => (
-                <div key={i} className="truncate select-all">{lg}</div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
       </div>
 
