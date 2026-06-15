@@ -143,13 +143,27 @@ func (h *SafetyHandler) HandleGetSOSAlerts(w http.ResponseWriter, r *http.Reques
 			&notes, &item.CreatedAt, &item.UpdatedAt, &resAt,
 		)
 		if err == nil {
-			if agentID.Valid { item.AssignedAgentID = &agentID.String }
-			if agentName.Valid { item.AssignedAgentName = &agentName.String }
-			if audio.Valid { item.AudioStreamURL = &audio.String }
-			if notes.Valid { item.Notes = &notes.String }
-			if lat.Valid { item.Latitude = &lat.Float64 }
-			if lng.Valid { item.Longitude = &lng.Float64 }
-			if resAt.Valid { item.ResolvedAt = &resAt.Time }
+			if agentID.Valid {
+				item.AssignedAgentID = &agentID.String
+			}
+			if agentName.Valid {
+				item.AssignedAgentName = &agentName.String
+			}
+			if audio.Valid {
+				item.AudioStreamURL = &audio.String
+			}
+			if notes.Valid {
+				item.Notes = &notes.String
+			}
+			if lat.Valid {
+				item.Latitude = &lat.Float64
+			}
+			if lng.Valid {
+				item.Longitude = &lng.Float64
+			}
+			if resAt.Valid {
+				item.ResolvedAt = &resAt.Time
+			}
 			alerts = append(alerts, item)
 		} else {
 			h.logger.Printf("[SAFETY_ERROR] SOS row scan failed: %v", err)
@@ -227,7 +241,7 @@ func (h *SafetyHandler) HandleAcknowledgeSOSAlert(w http.ResponseWriter, r *http
 	}
 	if agentID == "" {
 		// Default system/super admin fallback
-		agentID = "255e9024-d123-4063-9c6f-1662b7f2e8a5" 
+		agentID = "255e9024-d123-4063-9c6f-1662b7f2e8a5"
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -408,13 +422,27 @@ func (h *SafetyHandler) HandleGetIncidents(w http.ResponseWriter, r *http.Reques
 			&agentID, &agentName, &item.CreatedAt, &item.UpdatedAt, &resTime,
 		)
 		if err == nil {
-			if sosAlert.Valid { item.SOSAlertID = &sosAlert.String }
-			if outcome.Valid { item.OutcomeType = &outcome.String }
-			if details.Valid { item.OutcomeDetails = &details.String }
-			if claim.Valid { item.D4MCareClaimID = &claim.String }
-			if agentID.Valid { item.AssignedAgentID = &agentID.String }
-			if agentName.Valid { item.AssignedAgentName = &agentName.String }
-			if resTime.Valid { item.ResolvedAt = &resTime.Time }
+			if sosAlert.Valid {
+				item.SOSAlertID = &sosAlert.String
+			}
+			if outcome.Valid {
+				item.OutcomeType = &outcome.String
+			}
+			if details.Valid {
+				item.OutcomeDetails = &details.String
+			}
+			if claim.Valid {
+				item.D4MCareClaimID = &claim.String
+			}
+			if agentID.Valid {
+				item.AssignedAgentID = &agentID.String
+			}
+			if agentName.Valid {
+				item.AssignedAgentName = &agentName.String
+			}
+			if resTime.Valid {
+				item.ResolvedAt = &resTime.Time
+			}
 			incidents = append(incidents, item)
 		} else {
 			h.logger.Printf("[SAFETY_ERROR] Incident row scan failed: %v", err)
@@ -517,13 +545,27 @@ func (h *SafetyHandler) HandleGetIncidentDetail(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if sosAlert.Valid { item.SOSAlertID = &sosAlert.String }
-	if outcome.Valid { item.OutcomeType = &outcome.String }
-	if details.Valid { item.OutcomeDetails = &details.String }
-	if claim.Valid { item.D4MCareClaimID = &claim.String }
-	if agentID.Valid { item.AssignedAgentID = &agentID.String }
-	if agentName.Valid { item.AssignedAgentName = &agentName.String }
-	if resTime.Valid { item.ResolvedAt = &resTime.Time }
+	if sosAlert.Valid {
+		item.SOSAlertID = &sosAlert.String
+	}
+	if outcome.Valid {
+		item.OutcomeType = &outcome.String
+	}
+	if details.Valid {
+		item.OutcomeDetails = &details.String
+	}
+	if claim.Valid {
+		item.D4MCareClaimID = &claim.String
+	}
+	if agentID.Valid {
+		item.AssignedAgentID = &agentID.String
+	}
+	if agentName.Valid {
+		item.AssignedAgentName = &agentName.String
+	}
+	if resTime.Valid {
+		item.ResolvedAt = &resTime.Time
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(item)
@@ -726,8 +768,12 @@ func (h *SafetyHandler) HandleGetAnomalies(w http.ResponseWriter, r *http.Reques
 			&lat, &lng, &item.Status, &item.CreatedAt,
 		)
 		if err == nil {
-			if lat.Valid { item.Latitude = &lat.Float64 }
-			if lng.Valid { item.Longitude = &lng.Float64 }
+			if lat.Valid {
+				item.Latitude = &lat.Float64
+			}
+			if lng.Valid {
+				item.Longitude = &lng.Float64
+			}
 			anomalies = append(anomalies, item)
 		}
 	}
@@ -785,8 +831,12 @@ func (h *SafetyHandler) HandleResolveAnomaly(w http.ResponseWriter, r *http.Requ
 		sosID := fmt.Sprintf("SOS-%d", (time.Now().UnixNano()/1000)%100000)
 		audio := "https://platform-safety-recordings.s3.amazonaws.com/sos/" + sosID + ".mp3"
 		var lat, lng float64
-		if latVal.Valid { lat = latVal.Float64 }
-		if lngVal.Valid { lng = lngVal.Float64 }
+		if latVal.Valid {
+			lat = latVal.Float64
+		}
+		if lngVal.Valid {
+			lng = lngVal.Float64
+		}
 		notes := fmt.Sprintf("Automatically escalated from Ride Check Anomaly %s (%s): %s", anomalyType, id, description)
 
 		sosQuery := `
@@ -853,10 +903,18 @@ func (h *SafetyHandler) HandleGetBlacklist(w http.ResponseWriter, r *http.Reques
 			&item.Reason, &item.CreatedAt, &createdBy, &creatorName,
 		)
 		if err == nil {
-			if targetID.Valid { item.TargetUserID = &targetID.String }
-			if targetType.Valid { item.TargetUserType = &targetType.String }
-			if createdBy.Valid { item.CreatedBy = &createdBy.String }
-			if creatorName.Valid { item.CreatedByName = &creatorName.String }
+			if targetID.Valid {
+				item.TargetUserID = &targetID.String
+			}
+			if targetType.Valid {
+				item.TargetUserType = &targetType.String
+			}
+			if createdBy.Valid {
+				item.CreatedBy = &createdBy.String
+			}
+			if creatorName.Valid {
+				item.CreatedByName = &creatorName.String
+			}
 			entries = append(entries, item)
 		} else {
 			h.logger.Printf("[SAFETY_ERROR] Blacklist row scan failed: %v", err)
@@ -876,7 +934,7 @@ func (h *SafetyHandler) HandleAddBlacklistBlock(w http.ResponseWriter, r *http.R
 
 	var req struct {
 		UserID         string  `json:"user_id"`
-		UserType       string  `json:"user_type"` // RIDER, DRIVER
+		UserType       string  `json:"user_type"`  // RIDER, DRIVER
 		BlockType      string  `json:"block_type"` // GLOBAL, MUTUAL
 		TargetUserID   *string `json:"target_user_id"`
 		TargetUserType *string `json:"target_user_type"`

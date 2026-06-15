@@ -35,8 +35,8 @@ func NewSurgeCalculatorEngine(brokers []string, redisClient *redis.ClusterClient
 	w := &kafka.Writer{
 		Addr:         kafka.TCP(brokers...),
 		Topic:        "surge.zone.updated", // Defined in Section 06 topic topology
-		Balancer:     &kafka.Hash{},         // Partitioned by city prefix hash
-		RequiredAcks: kafka.RequireOne,       // Ensures low latency while preserving delivery durability
+		Balancer:     &kafka.Hash{},        // Partitioned by city prefix hash
+		RequiredAcks: kafka.RequireOne,     // Ensures low latency while preserving delivery durability
 	}
 	kafkacfg.FromEnv().ApplyToWriter(w)
 	return &SurgeCalculatorEngine{
@@ -110,7 +110,7 @@ func (e *SurgeCalculatorEngine) evaluateCitySurgeGrid(ctx context.Context, cityP
 
 				// Formula calculation: max(1.0, demand_rate / (supply_count * 0.7))
 				computedMultiplier := float64(demandRate) / (effectiveSupply * 0.7)
-				
+
 				// Enforce lower bound (1.0) and our maximum safety multiplier cap
 				multiplier = math.Max(1.0, computedMultiplier)
 				if multiplier > e.maxSurgeCap {

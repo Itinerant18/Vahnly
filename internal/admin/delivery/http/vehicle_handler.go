@@ -16,19 +16,18 @@ import (
 )
 
 type CustomerVehicleProfile struct {
-	ID                     string    `json:"id"`
-	OwnerName              string    `json:"owner_name"`
-	OwnerPhone             string    `json:"owner_phone"`
-	VehicleMakeModel       string    `json:"vehicle_make_model"`
-	LicensePlate           string    `json:"license_plate"`
+	ID                      string    `json:"id"`
+	OwnerName               string    `json:"owner_name"`
+	OwnerPhone              string    `json:"owner_phone"`
+	VehicleMakeModel        string    `json:"vehicle_make_model"`
+	LicensePlate            string    `json:"license_plate"`
 	TransmissionRequirement string    `json:"transmission_requirement"` // MANUAL, AUTOMATIC
-	AssetTier              string    `json:"asset_tier"`               // HATCHBACK, PREMIUM_SUV, ULTRA_LUXURY
-	VerificationStatus     string    `json:"verification_status"`      // VERIFIED, PENDING_INSURANCE, FLAGGED
-	EscrowBalancePaise     int64     `json:"escrow_balance_paise"`
-	CityPrefix             string    `json:"city_prefix"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	AssetTier               string    `json:"asset_tier"`               // HATCHBACK, PREMIUM_SUV, ULTRA_LUXURY
+	VerificationStatus      string    `json:"verification_status"`      // VERIFIED, PENDING_INSURANCE, FLAGGED
+	EscrowBalancePaise      int64     `json:"escrow_balance_paise"`
+	CityPrefix              string    `json:"city_prefix"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
-
 
 type VehicleHandler struct {
 	dbPool      *pgxpool.Pool
@@ -47,9 +46,9 @@ func NewVehicleHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient, l
 type Vehicle struct {
 	Plate               string    `json:"plate"`
 	Model               string    `json:"model"`
-	Type                string    `json:"type"` // Hatchback, Sedan, SUV, Premium
+	Type                string    `json:"type"`         // Hatchback, Sedan, SUV, Premium
 	Transmission        string    `json:"transmission"` // Manual, Automatic
-	Fuel                string    `json:"fuel"` // Petrol, Diesel, EV, CNG
+	Fuel                string    `json:"fuel"`         // Petrol, Diesel, EV, CNG
 	Year                int       `json:"year"`
 	OwnerID             string    `json:"owner_id"`
 	OwnerName           string    `json:"owner_name"`
@@ -132,7 +131,7 @@ func projectVehicleProperties(plate string, v *Vehicle) {
 	if h%10 == 0 {
 		insExpiry = time.Now().AddDate(0, 0, -int(h%15+1)) // expired 1 to 15 days ago
 	} else if h%10 == 1 {
-		insExpiry = time.Now().AddDate(0, 0, int(h%15+1))  // expiring in 1 to 15 days
+		insExpiry = time.Now().AddDate(0, 0, int(h%15+1)) // expiring in 1 to 15 days
 	} else {
 		insExpiry = time.Now().AddDate(0, 0, int(h%300+30)) // expiring in 30 to 330 days
 	}
@@ -483,7 +482,7 @@ func (h *VehicleHandler) HandleSendDocReminders(w http.ResponseWriter, r *http.R
 		if v.RCStatus == "EXPIRED" || v.RCStatus == "EXPIRING_SOON" ||
 			v.InsuranceStatus == "EXPIRED" || v.InsuranceStatus == "EXPIRING_SOON" ||
 			v.PUCStatus == "EXPIRED" || v.PUCStatus == "EXPIRING_SOON" {
-			
+
 			reminderKey := "vehicle:reminder:" + plate
 			err := h.redisClient.Set(ctx, reminderKey, nowStr, 0).Err()
 			if err != nil {
@@ -626,17 +625,17 @@ func (h *VehicleHandler) HandleGetCustomerVehicleProfiles(w http.ResponseWriter,
 		pv := predefinedVehicles[hHash%uint32(len(predefinedVehicles))]
 
 		profile := CustomerVehicleProfile{
-			ID:                     customerID,
-			OwnerName:              projectRiderName(customerID),
-			OwnerPhone:             fmt.Sprintf("+91 9831%d %04d", val%10, val%10000),
-			VehicleMakeModel:       pv.Model,
-			LicensePlate:           plate,
+			ID:                      customerID,
+			OwnerName:               projectRiderName(customerID),
+			OwnerPhone:              fmt.Sprintf("+91 9831%d %04d", val%10, val%10000),
+			VehicleMakeModel:        pv.Model,
+			LicensePlate:            plate,
 			TransmissionRequirement: transmission,
-			AssetTier:              tier,
-			VerificationStatus:     status,
-			EscrowBalancePaise:     int64((val % 10000) * 100),
-			CityPrefix:             city,
-			UpdatedAt:              time.Now().Add(-time.Duration(val%100) * time.Hour),
+			AssetTier:               tier,
+			VerificationStatus:      status,
+			EscrowBalancePaise:      int64((val % 10000) * 100),
+			CityPrefix:              city,
+			UpdatedAt:               time.Now().Add(-time.Duration(val%100) * time.Hour),
 		}
 
 		// Merge Redis override
@@ -645,8 +644,8 @@ func (h *VehicleHandler) HandleGetCustomerVehicleProfiles(w http.ResponseWriter,
 		if err == nil {
 			var ov struct {
 				TransmissionRequirement string `json:"transmission_requirement"`
-				AssetTier              string `json:"asset_tier"`
-				VerificationStatus     string `json:"verification_status"`
+				AssetTier               string `json:"asset_tier"`
+				VerificationStatus      string `json:"verification_status"`
 			}
 			if json.Unmarshal(ovBytes, &ov) == nil {
 				if ov.TransmissionRequirement != "" {
@@ -679,8 +678,8 @@ func (h *VehicleHandler) HandlePostCustomerVehicleProfileUpdate(w http.ResponseW
 	var req struct {
 		ProfileID               string `json:"profile_id"`
 		TransmissionRequirement string `json:"transmission_requirement"`
-		AssetTier              string `json:"asset_tier"`
-		VerificationStatus     string `json:"verification_status"`
+		AssetTier               string `json:"asset_tier"`
+		VerificationStatus      string `json:"verification_status"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProfileID == "" {

@@ -23,21 +23,21 @@ func NewDocumentsHandler(dbPool *pgxpool.Pool, logger *log.Logger) *DocumentsHan
 }
 
 type VaultDocument struct {
-	ID               string     `json:"id"`
-	EntityType       string     `json:"entity_type"`
-	EntityID         string     `json:"entity_id"`
-	DocType          string     `json:"doc_type"`
-	DisplayName      string     `json:"display_name"`
-	FileURL          string     `json:"file_url"`
-	FileSizeBytes    int        `json:"file_size_bytes"`
-	MimeType         string     `json:"mime_type"`
-	Version          int        `json:"version"`
-	Tags             []string   `json:"tags"`
-	ExpiryDate       *string    `json:"expiry_date"`
-	UploadedByEmail  string     `json:"uploaded_by_email"`
-	Status           string     `json:"status"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID              string    `json:"id"`
+	EntityType      string    `json:"entity_type"`
+	EntityID        string    `json:"entity_id"`
+	DocType         string    `json:"doc_type"`
+	DisplayName     string    `json:"display_name"`
+	FileURL         string    `json:"file_url"`
+	FileSizeBytes   int       `json:"file_size_bytes"`
+	MimeType        string    `json:"mime_type"`
+	Version         int       `json:"version"`
+	Tags            []string  `json:"tags"`
+	ExpiryDate      *string   `json:"expiry_date"`
+	UploadedByEmail string    `json:"uploaded_by_email"`
+	Status          string    `json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type DocAccessEntry struct {
@@ -67,26 +67,39 @@ func (h *DocumentsHandler) HandleGetDocuments(w http.ResponseWriter, r *http.Req
 	idx := 1
 
 	if v := q.Get("entity_type"); v != "" {
-		base += fmt.Sprintf(" AND entity_type = $%d", idx); args = append(args, strings.ToUpper(v)); idx++
+		base += fmt.Sprintf(" AND entity_type = $%d", idx)
+		args = append(args, strings.ToUpper(v))
+		idx++
 	}
 	if v := q.Get("entity_id"); v != "" {
-		base += fmt.Sprintf(" AND entity_id = $%d", idx); args = append(args, v); idx++
+		base += fmt.Sprintf(" AND entity_id = $%d", idx)
+		args = append(args, v)
+		idx++
 	}
 	if v := q.Get("doc_type"); v != "" {
-		base += fmt.Sprintf(" AND doc_type = $%d", idx); args = append(args, strings.ToUpper(v)); idx++
+		base += fmt.Sprintf(" AND doc_type = $%d", idx)
+		args = append(args, strings.ToUpper(v))
+		idx++
 	}
 	if v := q.Get("status"); v != "" {
-		base += fmt.Sprintf(" AND status = $%d", idx); args = append(args, strings.ToUpper(v)); idx++
+		base += fmt.Sprintf(" AND status = $%d", idx)
+		args = append(args, strings.ToUpper(v))
+		idx++
 	}
 	if v := q.Get("search"); v != "" {
 		base += fmt.Sprintf(" AND (display_name ILIKE $%d OR entity_id ILIKE $%d)", idx, idx)
-		args = append(args, "%"+v+"%"); idx++
+		args = append(args, "%"+v+"%")
+		idx++
 	}
 	if v := q.Get("expiry_before"); v != "" {
-		base += fmt.Sprintf(" AND expiry_date <= $%d", idx); args = append(args, v); idx++
+		base += fmt.Sprintf(" AND expiry_date <= $%d", idx)
+		args = append(args, v)
+		idx++
 	}
 	if v := q.Get("tag"); v != "" {
-		base += fmt.Sprintf(" AND $%d = ANY(tags)", idx); args = append(args, v); idx++
+		base += fmt.Sprintf(" AND $%d = ANY(tags)", idx)
+		args = append(args, v)
+		idx++
 	}
 
 	var total int64
@@ -312,7 +325,9 @@ func (h *DocumentsHandler) HandleGetPrivacyRequests(w http.ResponseWriter, r *ht
 	var args []interface{}
 	idx := 1
 	if status != "" {
-		base += fmt.Sprintf(" AND status = $%d", idx); args = append(args, strings.ToUpper(status)); idx++
+		base += fmt.Sprintf(" AND status = $%d", idx)
+		args = append(args, strings.ToUpper(status))
+		idx++
 	}
 
 	var total int64

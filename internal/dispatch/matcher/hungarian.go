@@ -90,12 +90,12 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 			supplyDensity,
 			float32(driver.IdleSeconds),
 		}
-		
+
 		// Query the secondary classification tree model on Triton
 		riskProb, riskErr := etaCorrector.ComputeCancellationRisk(routingCtx, riskFeatures)
 		if riskErr == nil {
 			cancellationRiskScore = riskProb
-			
+
 			// FENCE VALUE EXCLUSION: Prune high-risk drivers from matching eligibility entirely
 			if cancellationRiskScore >= 0.75 {
 				return 1e7, estimatedEtaSeconds

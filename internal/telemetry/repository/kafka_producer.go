@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
+	"github.com/segmentio/kafka-go"
 )
 
 type kafkaProducer struct {
@@ -21,8 +21,8 @@ func NewKafkaProducer(brokers []string) domain.KafkaProducer {
 		Topic:        "driver.location.updated", // Defined in core topology [cite: 76]
 		Balancer:     &kafka.Hash{},             // Explicitly uses hashing for partition routing [cite: 76]
 		MaxAttempts:  3,
-		RequiredAcks: kafka.RequireOne,          // Fast sub-500ms acknowledgment path [cite: 2]
-		Async:        true,                      // Non-blocking asynchronous ingestion path [cite: 34]
+		RequiredAcks: kafka.RequireOne, // Fast sub-500ms acknowledgment path [cite: 2]
+		Async:        true,             // Non-blocking asynchronous ingestion path [cite: 34]
 	}
 	kafkacfg.FromEnv().ApplyToWriter(w)
 	return &kafkaProducer{writer: w}
@@ -37,7 +37,7 @@ func (p *kafkaProducer) PublishLocationUpdate(ctx context.Context, loc *domain.D
 
 	// Route event dynamically based on city prefix partition key [cite: 74, 76]
 	msg := kafka.Message{
-		Key:   []byte(loc.CityPrefix), 
+		Key:   []byte(loc.CityPrefix),
 		Value: payload,
 	}
 

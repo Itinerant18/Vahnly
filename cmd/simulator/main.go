@@ -30,7 +30,7 @@ const (
 
 // ChaosController manages real-time fault injection properties.
 type ChaosController struct {
-	mu               sync.RWMutex
+	mu                sync.RWMutex
 	injectTritonFault bool
 	injectHighLoad    bool // slows message send rate to simulate backpressure
 }

@@ -41,13 +41,13 @@ type StalledTripIncident struct {
 	LastKnownStatus      string  `json:"last_known_status"` // "EN_ROUTE" or "ON_TRIP"
 	SecondsSinceLastPing int     `json:"seconds_since_last_ping"`
 	CityPrefix           string  `json:"city_prefix"`
-	IncidentType         string  `json:"incident_type"`          // "SOS" | "FRAUD" | "SILENCE"
-	IncidentStatus       string  `json:"incident_status"`        // "UNASSIGNED" | "INVESTIGATING" | "RESOLVED"
-	AssignedAgentID      string  `json:"assigned_agent_id"`      // string identifier
-	BearingDelta         float64 `json:"bearing_delta"`          // degrees
-	CalculatedSpeed      float64 `json:"calculated_speed"`       // km/h
-	IsMockProvider       bool    `json:"is_mock_provider"`       // Boolean check flag
-	BatteryLevel         float64 `json:"battery_level"`          // percentage
+	IncidentType         string  `json:"incident_type"`     // "SOS" | "FRAUD" | "SILENCE"
+	IncidentStatus       string  `json:"incident_status"`   // "UNASSIGNED" | "INVESTIGATING" | "RESOLVED"
+	AssignedAgentID      string  `json:"assigned_agent_id"` // string identifier
+	BearingDelta         float64 `json:"bearing_delta"`     // degrees
+	CalculatedSpeed      float64 `json:"calculated_speed"`  // km/h
+	IsMockProvider       bool    `json:"is_mock_provider"`  // Boolean check flag
+	BatteryLevel         float64 `json:"battery_level"`     // percentage
 	Latitude             float64 `json:"latitude"`
 	Longitude            float64 `json:"longitude"`
 }
@@ -270,7 +270,7 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 			"city_prefix": "KOL",
 			"status":      "CREATED",
 		})
-		
+
 		err = h.kafkaWriter.WriteMessages(ctx, kafka.Message{
 			Key:   []byte(req.OrderID),
 			Value: kafkaPayload,
@@ -286,13 +286,13 @@ func (h *IncidentAdminHandler) HandleExecuteTripRecovery(w http.ResponseWriter, 
 			http.Error(w, "database_order_abort_mutation_failure", http.StatusInternalServerError)
 			return
 		}
-		
+
 		_, err = tx.Exec(ctx, "UPDATE drivers SET current_state = 'OFFLINE'::driver_state_enum, updated_at = NOW() WHERE id = $1::uuid", req.DriverID)
 		if err != nil {
 			http.Error(w, "database_driver_abort_mutation_failure", http.StatusInternalServerError)
 			return
 		}
-		
+
 		if err := tx.Commit(ctx); err != nil {
 			http.Error(w, "transaction_abort_commit_failure", http.StatusInternalServerError)
 			return
@@ -322,4 +322,3 @@ func (h *IncidentAdminHandler) GetIncidents() []StalledTripIncident {
 	}
 	return incidents
 }
-

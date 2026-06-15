@@ -9,7 +9,7 @@ import (
 func TestDriverAccountEndpoints(t *testing.T) {
 	// Initialize target test runtime server
 	handler := &http.ServeMux{}
-	
+
 	// Mock target context execution
 	handler.HandleFunc("/api/v1/driver-account/earnings", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

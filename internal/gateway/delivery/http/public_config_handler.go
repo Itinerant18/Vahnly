@@ -14,8 +14,8 @@ import (
 //   - /api/v1/config/app-version  → min/latest app version (cache TTL 5m)
 
 type publicFlag struct {
-	Enabled       bool `json:"enabled"`
-	RolloutPercent int `json:"rollout_percent"`
+	Enabled        bool `json:"enabled"`
+	RolloutPercent int  `json:"rollout_percent"`
 }
 
 // HandlePublicFlags returns the active feature flags applicable to the caller's

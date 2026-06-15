@@ -63,19 +63,19 @@ type TicketMessage struct {
 }
 
 type LostFoundItem struct {
-	ID                 int        `json:"id"`
-	TicketID           *string    `json:"ticket_id"`
-	TripID             *string    `json:"trip_id"`
-	ReporterID         string     `json:"reporter_id"`
-	ReporterType       string     `json:"reporter_type"`
-	ItemDescription    string     `json:"item_description"`
-	Status             string     `json:"status"`
-	DriverContacted    bool       `json:"driver_contacted"`
-	ReturnTrackingCode *string    `json:"return_tracking_code"`
-	ReturnMethod       *string    `json:"return_method"`
-	Notes              *string    `json:"notes"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 int       `json:"id"`
+	TicketID           *string   `json:"ticket_id"`
+	TripID             *string   `json:"trip_id"`
+	ReporterID         string    `json:"reporter_id"`
+	ReporterType       string    `json:"reporter_type"`
+	ItemDescription    string    `json:"item_description"`
+	Status             string    `json:"status"`
+	DriverContacted    bool      `json:"driver_contacted"`
+	ReturnTrackingCode *string   `json:"return_tracking_code"`
+	ReturnMethod       *string   `json:"return_method"`
+	Notes              *string   `json:"notes"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type SupportMacro struct {
@@ -206,13 +206,27 @@ func (h *SupportHandler) HandleGetTickets(w http.ResponseWriter, r *http.Request
 			&item.CreatedAt, &item.UpdatedAt, &closedAtVal,
 		)
 		if err == nil {
-			if agentIDStr.Valid { item.AssignedAgentID = &agentIDStr.String }
-			if agentName.Valid { item.AssignedAgentName = &agentName.String }
-			if escalated.Valid { item.EscalatedTo = &escalated.String }
-			if tripID.Valid { item.LinkedTripID = &tripID.String }
-			if resType.Valid { item.ResolutionType = &resType.String }
-			if resReason.Valid { item.ResolutionReason = &resReason.String }
-			if closedAtVal.Valid { item.ClosedAt = &closedAtVal.Time }
+			if agentIDStr.Valid {
+				item.AssignedAgentID = &agentIDStr.String
+			}
+			if agentName.Valid {
+				item.AssignedAgentName = &agentName.String
+			}
+			if escalated.Valid {
+				item.EscalatedTo = &escalated.String
+			}
+			if tripID.Valid {
+				item.LinkedTripID = &tripID.String
+			}
+			if resType.Valid {
+				item.ResolutionType = &resType.String
+			}
+			if resReason.Valid {
+				item.ResolutionReason = &resReason.String
+			}
+			if closedAtVal.Valid {
+				item.ClosedAt = &closedAtVal.Time
+			}
 
 			item.SLABreach = item.SLADeadline.Before(time.Now()) && (item.Status == "OPEN" || item.Status == "PENDING")
 			tickets = append(tickets, item)
@@ -274,13 +288,27 @@ func (h *SupportHandler) HandleGetTicketDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if agentIDStr.Valid { item.AssignedAgentID = &agentIDStr.String }
-	if agentName.Valid { item.AssignedAgentName = &agentName.String }
-	if escalated.Valid { item.EscalatedTo = &escalated.String }
-	if tripID.Valid { item.LinkedTripID = &tripID.String }
-	if resType.Valid { item.ResolutionType = &resType.String }
-	if resReason.Valid { item.ResolutionReason = &resReason.String }
-	if closedAtVal.Valid { item.ClosedAt = &closedAtVal.Time }
+	if agentIDStr.Valid {
+		item.AssignedAgentID = &agentIDStr.String
+	}
+	if agentName.Valid {
+		item.AssignedAgentName = &agentName.String
+	}
+	if escalated.Valid {
+		item.EscalatedTo = &escalated.String
+	}
+	if tripID.Valid {
+		item.LinkedTripID = &tripID.String
+	}
+	if resType.Valid {
+		item.ResolutionType = &resType.String
+	}
+	if resReason.Valid {
+		item.ResolutionReason = &resReason.String
+	}
+	if closedAtVal.Valid {
+		item.ClosedAt = &closedAtVal.Time
+	}
 	item.SLABreach = item.SLADeadline.Before(time.Now()) && (item.Status == "OPEN" || item.Status == "PENDING")
 
 	// Fetch Messages
@@ -314,7 +342,9 @@ func (h *SupportHandler) HandleGetTicketDetail(w http.ResponseWriter, r *http.Re
 	var csatPtr *TicketCSAT
 	err = h.dbPool.QueryRow(ctx, csatQuery, id).Scan(&csat.TicketID, &csat.Rating, &csatComment, &csat.SubmittedAt)
 	if err == nil {
-		if csatComment.Valid { csat.Comment = &csatComment.String }
+		if csatComment.Valid {
+			csat.Comment = &csatComment.String
+		}
 		csatPtr = &csat
 	}
 
@@ -944,11 +974,21 @@ func (h *SupportHandler) HandleGetLostFoundItems(w http.ResponseWriter, r *http.
 			&item.ID, &tktID, &tripID, &item.ReporterID, &item.ReporterType, &item.ItemDescription, &item.Status, &item.DriverContacted, &tracking, &method, &notes, &item.CreatedAt, &item.UpdatedAt,
 		)
 		if err == nil {
-			if tktID.Valid { item.TicketID = &tktID.String }
-			if tripID.Valid { item.TripID = &tripID.String }
-			if tracking.Valid { item.ReturnTrackingCode = &tracking.String }
-			if method.Valid { item.ReturnMethod = &method.String }
-			if notes.Valid { item.Notes = &notes.String }
+			if tktID.Valid {
+				item.TicketID = &tktID.String
+			}
+			if tripID.Valid {
+				item.TripID = &tripID.String
+			}
+			if tracking.Valid {
+				item.ReturnTrackingCode = &tracking.String
+			}
+			if method.Valid {
+				item.ReturnMethod = &method.String
+			}
+			if notes.Valid {
+				item.Notes = &notes.String
+			}
 			items = append(items, item)
 		}
 	}

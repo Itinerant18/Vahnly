@@ -18,7 +18,7 @@ func TestSafetySOSIngress(t *testing.T) {
 	body := []byte(`{"latitude":22.5726,"longitude":88.3639}`)
 	req, _ := http.NewRequest("POST", "/api/v1/driver/safety/sos", bytes.NewBuffer(body))
 	req.Header.Set("X-Driver-ID", "00000000-0000-0000-0000-000000000001")
-	
+
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 

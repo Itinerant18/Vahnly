@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestRateLimiterMiddleware_LimitRouteConcurrency_MissingContext(t *testing.T) {
@@ -37,7 +37,7 @@ func TestRateLimiterMiddleware_LimitRouteConcurrency_FailOpenGracefully(t *testi
 	rateLimiter := middleware.NewRateLimiterMiddleware(nilClient, 5, time.Minute)
 
 	req := httptest.NewRequest("POST", "/api/v1/orders", nil)
-	
+
 	// Inject authenticated user ID into context
 	ctx := context.WithValue(req.Context(), middleware.UserIDContextKey, "user-abc")
 	req = req.WithContext(ctx)

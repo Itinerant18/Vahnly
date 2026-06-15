@@ -7,11 +7,11 @@ import "testing"
 // by the Redis-gated tests; this locks the money math itself.
 func TestComputeFarePaise(t *testing.T) {
 	cases := []struct {
-		name             string
-		base, perMeter   int64
-		distanceMeters   float64
-		multiplier       float64
-		want             int64
+		name           string
+		base, perMeter int64
+		distanceMeters float64
+		multiplier     float64
+		want           int64
 	}{
 		{"base only, no surge", 4000, 15, 0, 1.0, 4000},
 		{"base + 1km, no surge", 4000, 15, 1000, 1.0, 19000},   // 4000 + 15*1000

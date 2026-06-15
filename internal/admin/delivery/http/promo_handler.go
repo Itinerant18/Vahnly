@@ -31,24 +31,24 @@ func NewPromoHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient, log
 }
 
 type PromoCode struct {
-	Code              string    `json:"code"`
-	PromoType         string    `json:"promo_type"` // PERCENT, FLAT, FREE_RIDE, CASHBACK, FIRST_RIDE
-	Value             float64   `json:"value"`      // discount % or flat rupees
-	MaxDiscountPaise  int64     `json:"max_discount_paise"`
-	MinFarePaise      int64     `json:"min_fare_paise"`
-	TripTypes         []string  `json:"trip_types"`
-	CarTypes          []string  `json:"car_types"`
-	Cities            []string  `json:"cities"`
-	PaymentMethods    []string  `json:"payment_methods"`
-	UserSegment       string    `json:"user_segment"` // ALL, NEW, VIP
-	UsageCapTotal     int       `json:"usage_cap_total"`
-	UsageCapPerUser   int       `json:"usage_cap_per_user"`
-	ValidFrom         time.Time `json:"valid_from"`
-	ValidTo           time.Time `json:"valid_to"`
-	Stackable         bool      `json:"stackable"`
-	Status            string    `json:"status"` // DRAFT, SCHEDULED, ACTIVE, PAUSED, EXPIRED
-	RedemptionsCount  int       `json:"redemptions_count"`
-	CreatedAt         time.Time `json:"created_at"`
+	Code             string    `json:"code"`
+	PromoType        string    `json:"promo_type"` // PERCENT, FLAT, FREE_RIDE, CASHBACK, FIRST_RIDE
+	Value            float64   `json:"value"`      // discount % or flat rupees
+	MaxDiscountPaise int64     `json:"max_discount_paise"`
+	MinFarePaise     int64     `json:"min_fare_paise"`
+	TripTypes        []string  `json:"trip_types"`
+	CarTypes         []string  `json:"car_types"`
+	Cities           []string  `json:"cities"`
+	PaymentMethods   []string  `json:"payment_methods"`
+	UserSegment      string    `json:"user_segment"` // ALL, NEW, VIP
+	UsageCapTotal    int       `json:"usage_cap_total"`
+	UsageCapPerUser  int       `json:"usage_cap_per_user"`
+	ValidFrom        time.Time `json:"valid_from"`
+	ValidTo          time.Time `json:"valid_to"`
+	Stackable        bool      `json:"stackable"`
+	Status           string    `json:"status"` // DRAFT, SCHEDULED, ACTIVE, PAUSED, EXPIRED
+	RedemptionsCount int       `json:"redemptions_count"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type BannerOffer struct {
@@ -70,7 +70,7 @@ type ReferralRule struct {
 }
 
 type ReferralSettings struct {
-	Rules          []ReferralRule `json:"rules"`
+	Rules           []ReferralRule `json:"rules"`
 	BlockSameDevice bool           `json:"block_same_device"`
 	BlockIPCluster  bool           `json:"block_ip_cluster"`
 }
@@ -258,7 +258,7 @@ func (h *PromoHandler) HandlePostPromo(w http.ResponseWriter, r *http.Request) {
 	// Initialize usage redemptions count tracker
 	_ = h.redisClient.SetNX(ctx, "promo:redemptions:"+req.Code, req.RedemptionsCount, 0).Err()
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODE_CREATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODE_CREATED",
 		fmt.Sprintf("Created promo code %s type %s value %f status %s", req.Code, req.PromoType, req.Value, req.Status), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -352,7 +352,7 @@ func (h *PromoHandler) HandlePostPromosBulk(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODES_BULK_UPLOAD", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODES_BULK_UPLOAD",
 		fmt.Sprintf("Bulk parsed and uploaded %d promo codes via CSV import stream", successCount), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -522,7 +522,7 @@ func (h *PromoHandler) HandlePostBanners(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "BANNERS_CONFIG_UPDATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "BANNERS_CONFIG_UPDATED",
 		"Updated auto-applied app promotional banners", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -604,7 +604,7 @@ func (h *PromoHandler) HandlePostReferralSettings(w http.ResponseWriter, r *http
 		return
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "REFERRAL_RULES_UPDATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "REFERRAL_RULES_UPDATED",
 		"Updated referral reward triggers and fraud parameters", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -671,7 +671,7 @@ func (h *PromoHandler) HandlePostLoyaltySettings(w http.ResponseWriter, r *http.
 		return
 	}
 
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "LOYALTY_TIERS_UPDATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "LOYALTY_TIERS_UPDATED",
 		"Updated loyalty tier trip thresholds and perks matrices", getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")

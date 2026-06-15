@@ -36,9 +36,9 @@ type DutyStateRequest struct {
 	DutyState string  `json:"duty_state"` // ONLINE or OFFLINE
 	State     string  `json:"state"`      // Alternative: ONLINE or OFFLINE
 	Latitude  float64 `json:"latitude"`
-	Lat       float64 `json:"lat"`        // Alternative
+	Lat       float64 `json:"lat"` // Alternative
 	Longitude float64 `json:"longitude"`
-	Lng       float64 `json:"lng"`        // Alternative
+	Lng       float64 `json:"lng"` // Alternative
 }
 
 // HandleDutyStateToggle handles Online/Offline toggle for drivers
@@ -185,8 +185,8 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 24*time.Hour)
 				// Pre-warm the profile hash for Hungarian matcher
 				pipe.HSet(ctx, profileKey,
-					"osm_node_id",              "1001",
-					"acceptance_rate",          "0.95",
+					"osm_node_id", "1001",
+					"acceptance_rate", "0.95",
 					"cancellation_probability", "0.05",
 				)
 				pipe.Expire(ctx, profileKey, 24*time.Hour)
@@ -275,7 +275,7 @@ func (h *DutyHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request) {
 	var lastLat, lastLng *float64
 	var driverName string
 	_ = h.dbPool.QueryRow(ctx, "SELECT name, last_lat, last_lng FROM drivers WHERE id = $1", driverID).Scan(&driverName, &lastLat, &lastLng)
-	
+
 	lat := 22.5726
 	lng := 88.3639
 	if lastLat != nil {
@@ -288,7 +288,7 @@ func (h *DutyHandler) HandleTriggerSOS(w http.ResponseWriter, r *http.Request) {
 	// 4. Insert into safety_sos_alerts
 	sosID := fmt.Sprintf("SOS-%d", (time.Now().UnixNano()/1000)%100000)
 	audio := "https://platform-safety-recordings.s3.amazonaws.com/sos/" + sosID + ".mp3"
-	
+
 	var tripIDArg interface{}
 	if tripID != "" {
 		tripIDArg = tripID
@@ -373,11 +373,11 @@ func (h *DutyHandler) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"trips_count":       tripsToday,
-		"earnings_rupees":   float64(earningsTodayPaise) / 100.0,
-		"online_hours":      math.Round(onlineHours*10) / 10,
-		"acceptance_rate":   96.0, // mock base
-		"rating":            rating,
+		"trips_count":     tripsToday,
+		"earnings_rupees": float64(earningsTodayPaise) / 100.0,
+		"online_hours":    math.Round(onlineHours*10) / 10,
+		"acceptance_rate": 96.0, // mock base
+		"rating":          rating,
 	})
 }
 
@@ -476,7 +476,7 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 	// Compare hashed OTP
 	sum := sha256.Sum256([]byte(req.OTP))
 	inputHash := hex.EncodeToString(sum[:])
-	
+
 	targetHash := ""
 	if otpHash != nil {
 		targetHash = *otpHash
@@ -491,7 +491,7 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 		// Increment otp_attempts
 		_, _ = tx.Exec(ctx, "UPDATE orders SET otp_attempts = otp_attempts + 1 WHERE id = $1::uuid", orderID)
 		_ = tx.Commit(ctx) // Commit the increment to DB
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{

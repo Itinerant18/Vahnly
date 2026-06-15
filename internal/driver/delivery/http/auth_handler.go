@@ -18,19 +18,19 @@ import (
 )
 
 type DriverLoginRequest struct {
-	Phone             string `json:"phone"`
-	Password          string `json:"password"`
-	DeviceID          string `json:"device_id"`
-	AppVersion        string `json:"app_version"`
-	GeoLocation       string `json:"geo_location"`
+	Phone       string `json:"phone"`
+	Password    string `json:"password"`
+	DeviceID    string `json:"device_id"`
+	AppVersion  string `json:"app_version"`
+	GeoLocation string `json:"geo_location"`
 }
 
 type DriverRegisterRequest struct {
-	Name         string `json:"name"`
-	Phone        string `json:"phone"`
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	CityPrefix   string `json:"city_prefix"`
+	Name       string `json:"name"`
+	Phone      string `json:"phone"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	CityPrefix string `json:"city_prefix"`
 }
 
 type DriverAuthResponse struct {

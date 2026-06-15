@@ -63,10 +63,10 @@ func (h *DriverAccountHandler) GetEarningsSummary(w http.ResponseWriter, r *http
 
 	summary := map[string]interface{}{
 		"gross_earnings": grossEarnings,
-		"trips_count":     tripsCount,
+		"trips_count":    tripsCount,
 		"incentives":     incentives,
 		"deductions":     deductions,
-		"net_payout":      netPayout,
+		"net_payout":     netPayout,
 		"time_series": []map[string]interface{}{
 			{"label": "Mon", "amount": 150000},
 			{"label": "Tue", "amount": 220000},
@@ -100,7 +100,7 @@ func (h *DriverAccountHandler) TriggerInstantPayout(w http.ResponseWriter, r *ht
 		if err == nil && balance > 0 {
 			// Deduct balance
 			_, _ = tx.Exec(ctx, "UPDATE driver_wallets SET available_balance = 0, updated_at = NOW() WHERE driver_id = $1::uuid", driverID)
-			
+
 			// Insert payout request
 			payoutID := uuid.New().String()
 			_, _ = tx.Exec(ctx, `
@@ -158,7 +158,7 @@ func (h *DriverAccountHandler) GetNotifications(w http.ResponseWriter, r *http.R
 					"category":  category,
 					"title":     title,
 					"body":      body,
-					"is_read":    isRead,
+					"is_read":   isRead,
 					"timestamp": timestamp,
 				})
 			}
@@ -172,7 +172,7 @@ func (h *DriverAccountHandler) GetNotifications(w http.ResponseWriter, r *http.R
 				"category":  "EARNINGS",
 				"title":     "Bonus Achieved!",
 				"body":      "Completed 10 trips milestone! ₹500 added to your balance.",
-				"is_read":    false,
+				"is_read":   false,
 				"timestamp": time.Now().Add(-1 * time.Hour),
 			},
 			{
@@ -180,7 +180,7 @@ func (h *DriverAccountHandler) GetNotifications(w http.ResponseWriter, r *http.R
 				"category":  "TRIPS",
 				"title":     "Trip Adjustment Cleared",
 				"body":      "Odometer variance audit finalized by admin. Fare recalculated successfully.",
-				"is_read":    true,
+				"is_read":   true,
 				"timestamp": time.Now().Add(-24 * time.Hour),
 			},
 		}

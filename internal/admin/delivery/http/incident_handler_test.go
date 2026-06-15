@@ -40,7 +40,7 @@ func TestHandleClaimIncident_RBAC(t *testing.T) {
 
 func TestHandleClaimIncident_Validation(t *testing.T) {
 	handler := NewIncidentAdminHandler(nil, nil, []string{"localhost:9092"}, nil)
-	
+
 	// Test missing fields
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/trips/claim", strings.NewReader(`{
 		"order_id": "",
@@ -69,7 +69,7 @@ func TestHandleClaimIncident_Validation(t *testing.T) {
 
 func TestHandleClaimIncident_NotFound(t *testing.T) {
 	handler := NewIncidentAdminHandler(nil, nil, []string{"localhost:9092"}, nil)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/trips/claim", strings.NewReader(`{
 		"order_id": "non-existent-order",
 		"agent_id": "agent-777"

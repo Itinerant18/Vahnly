@@ -11,14 +11,14 @@ import (
 )
 
 type ForensicAuditTrail struct {
-	OrderID         string                   `json:"order_id"`
-	DriverID        string                   `json:"driver_id"`
-	OfferTimestamps map[string]interface{}  `json:"offer_timestamps"`
-	OdometerInputs  map[string]interface{}  `json:"odometer_inputs"`
-	RouteMetrics    map[string]interface{}  `json:"route_metrics"`
-	HardwareState   map[string]interface{}  `json:"hardware_state"`
-	FinalInvoice    map[string]interface{}  `json:"final_invoice"`
-	CapturedAt      time.Time                `json:"captured_at"`
+	OrderID         string                 `json:"order_id"`
+	DriverID        string                 `json:"driver_id"`
+	OfferTimestamps map[string]interface{} `json:"offer_timestamps"`
+	OdometerInputs  map[string]interface{} `json:"odometer_inputs"`
+	RouteMetrics    map[string]interface{} `json:"route_metrics"`
+	HardwareState   map[string]interface{} `json:"hardware_state"`
+	FinalInvoice    map[string]interface{} `json:"final_invoice"`
+	CapturedAt      time.Time              `json:"captured_at"`
 }
 
 type TripAuditHandler struct {
@@ -73,11 +73,11 @@ func (h *TripAuditHandler) CompileTripAuditTrail(w http.ResponseWriter, r *http.
 			OrderID:  orderID.String(),
 			DriverID: driverID.String(),
 			OfferTimestamps: map[string]interface{}{
-				"received_ts":       offerReceived,
-				"responded_ts":      offerResponded,
-				"action":            offerResolution,
-				"decline_reason":    declineReason,
-				"response_latency":  responseLatencyMs,
+				"received_ts":      offerReceived,
+				"responded_ts":     offerResponded,
+				"action":           offerResolution,
+				"decline_reason":   declineReason,
+				"response_latency": responseLatencyMs,
 			},
 			OdometerInputs: map[string]interface{}{
 				"start_km":                 startOdo,
@@ -118,10 +118,10 @@ func (h *TripAuditHandler) CompileTripAuditTrail(w http.ResponseWriter, r *http.
 			OrderID:  orderID.String(),
 			DriverID: "00000000-0000-0000-0000-000000000001",
 			OfferTimestamps: map[string]interface{}{
-				"received_ts":       time.Now().Add(-1 * time.Hour),
-				"responded_ts":      time.Now().Add(-59 * time.Minute),
-				"action":            "ACCEPTED",
-				"response_latency":  850,
+				"received_ts":      time.Now().Add(-1 * time.Hour),
+				"responded_ts":     time.Now().Add(-59 * time.Minute),
+				"action":           "ACCEPTED",
+				"response_latency": 850,
 			},
 			OdometerInputs: map[string]interface{}{
 				"start_km":                 14500,

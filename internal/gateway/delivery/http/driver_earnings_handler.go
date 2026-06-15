@@ -36,8 +36,8 @@ func NewDriverEarningsHandler(dbPool *pgxpool.Pool, rc *redis.ClusterClient, pay
 }
 
 const (
-	payoutMinPaise       = 10000 // ₹100 minimum withdrawal
-	payoutCooldown       = time.Hour
+	payoutMinPaise      = 10000 // ₹100 minimum withdrawal
+	payoutCooldown      = time.Hour
 	driverEarningsAcct  = "DRIVER_EARNINGS"
 	payoutEstimatedTime = "~2 business hours"
 )
@@ -76,15 +76,15 @@ func resolvePeriod(r *http.Request) (string, time.Time, time.Time) {
 // ─── Task 1: Earnings ─────────────────────────────────────────────────────────
 
 type earningsSummary struct {
-	GrossEarningsPaise     int64   `json:"gross_earnings_paise"`
-	TipsPaise              int64   `json:"tips_paise"`
-	BonusesPaise           int64   `json:"bonuses_paise"`
-	IncentivesPaise        int64   `json:"incentives_paise"`
-	PlatformDeductionsPaise int64  `json:"platform_deductions_paise"`
-	NetEarningsPaise       int64   `json:"net_earnings_paise"`
-	TripCount              int64   `json:"trip_count"`
-	OnlineHours            float64 `json:"online_hours"`
-	AcceptanceRate         float64 `json:"acceptance_rate"`
+	GrossEarningsPaise      int64   `json:"gross_earnings_paise"`
+	TipsPaise               int64   `json:"tips_paise"`
+	BonusesPaise            int64   `json:"bonuses_paise"`
+	IncentivesPaise         int64   `json:"incentives_paise"`
+	PlatformDeductionsPaise int64   `json:"platform_deductions_paise"`
+	NetEarningsPaise        int64   `json:"net_earnings_paise"`
+	TripCount               int64   `json:"trip_count"`
+	OnlineHours             float64 `json:"online_hours"`
+	AcceptanceRate          float64 `json:"acceptance_rate"`
 }
 
 type dailyBreakdownItem struct {

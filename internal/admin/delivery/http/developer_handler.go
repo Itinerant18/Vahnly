@@ -126,10 +126,18 @@ func (h *DeveloperHandler) HandleCreateKey(w http.ResponseWriter, r *http.Reques
 	keyHash := hex.EncodeToString(hashBytes[:])
 	displayPrefix := plaintextKey[:min(12, len(plaintextKey))]
 
-	if req.RateLimitPerMin == 0 { req.RateLimitPerMin = 60 }
-	if req.RateLimitPerDay == 0 { req.RateLimitPerDay = 10000 }
-	if req.QuotaMonthly == 0    { req.QuotaMonthly = 100000 }
-	if req.OwnerType == ""      { req.OwnerType = "PARTNER" }
+	if req.RateLimitPerMin == 0 {
+		req.RateLimitPerMin = 60
+	}
+	if req.RateLimitPerDay == 0 {
+		req.RateLimitPerDay = 10000
+	}
+	if req.QuotaMonthly == 0 {
+		req.QuotaMonthly = 100000
+	}
+	if req.OwnerType == "" {
+		req.OwnerType = "PARTNER"
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -161,10 +169,10 @@ func (h *DeveloperHandler) HandleCreateKey(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusCreated)
 	// Return plaintext key ONCE — it cannot be retrieved again
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"id":           id,
-		"key":          plaintextKey,
-		"key_prefix":   displayPrefix,
-		"warning":      "Store this key securely. It will NOT be shown again.",
+		"id":         id,
+		"key":        plaintextKey,
+		"key_prefix": displayPrefix,
+		"warning":    "Store this key securely. It will NOT be shown again.",
 	})
 }
 
@@ -191,11 +199,31 @@ func (h *DeveloperHandler) HandleUpdateKey(w http.ResponseWriter, r *http.Reques
 	query := `UPDATE api_keys SET updated_at = NOW()`
 	args := []interface{}{}
 	idx := 1
-	if req.IsActive != nil        { query += fmt.Sprintf(", is_active = $%d", idx);          args = append(args, *req.IsActive);        idx++ }
-	if req.RateLimitPerMin != nil { query += fmt.Sprintf(", rate_limit_per_min = $%d", idx); args = append(args, *req.RateLimitPerMin); idx++ }
-	if req.RateLimitPerDay != nil { query += fmt.Sprintf(", rate_limit_per_day = $%d", idx); args = append(args, *req.RateLimitPerDay); idx++ }
-	if req.QuotaMonthly != nil    { query += fmt.Sprintf(", quota_monthly = $%d", idx);      args = append(args, *req.QuotaMonthly);    idx++ }
-	if req.Scopes != nil          { query += fmt.Sprintf(", scopes = $%d", idx);             args = append(args, req.Scopes);           idx++ }
+	if req.IsActive != nil {
+		query += fmt.Sprintf(", is_active = $%d", idx)
+		args = append(args, *req.IsActive)
+		idx++
+	}
+	if req.RateLimitPerMin != nil {
+		query += fmt.Sprintf(", rate_limit_per_min = $%d", idx)
+		args = append(args, *req.RateLimitPerMin)
+		idx++
+	}
+	if req.RateLimitPerDay != nil {
+		query += fmt.Sprintf(", rate_limit_per_day = $%d", idx)
+		args = append(args, *req.RateLimitPerDay)
+		idx++
+	}
+	if req.QuotaMonthly != nil {
+		query += fmt.Sprintf(", quota_monthly = $%d", idx)
+		args = append(args, *req.QuotaMonthly)
+		idx++
+	}
+	if req.Scopes != nil {
+		query += fmt.Sprintf(", scopes = $%d", idx)
+		args = append(args, req.Scopes)
+		idx++
+	}
 	query += fmt.Sprintf(" WHERE id = $%d::uuid", idx)
 	args = append(args, id)
 
@@ -298,9 +326,15 @@ func (h *DeveloperHandler) HandleCreateWebhook(w http.ResponseWriter, r *http.Re
 		http.Error(w, "invalid_payload", http.StatusBadRequest)
 		return
 	}
-	if req.RetryCount == 0 { req.RetryCount = 3 }
-	if req.TimeoutMs == 0  { req.TimeoutMs = 5000 }
-	if req.OwnerType == "" { req.OwnerType = "PARTNER" }
+	if req.RetryCount == 0 {
+		req.RetryCount = 3
+	}
+	if req.TimeoutMs == 0 {
+		req.TimeoutMs = 5000
+	}
+	if req.OwnerType == "" {
+		req.OwnerType = "PARTNER"
+	}
 
 	// Generate signing secret
 	secretBytes := make([]byte, 16)
@@ -348,9 +382,21 @@ func (h *DeveloperHandler) HandleUpdateWebhook(w http.ResponseWriter, r *http.Re
 	query := `UPDATE webhooks SET updated_at = NOW()`
 	args := []interface{}{}
 	idx := 1
-	if req.IsActive != nil          { query += fmt.Sprintf(", is_active = $%d", idx);           args = append(args, *req.IsActive);         idx++ }
-	if len(req.SubscribedEvents) > 0 { query += fmt.Sprintf(", subscribed_events = $%d", idx);  args = append(args, req.SubscribedEvents);   idx++ }
-	if req.EndpointURL != ""         { query += fmt.Sprintf(", endpoint_url = $%d", idx);        args = append(args, req.EndpointURL);        idx++ }
+	if req.IsActive != nil {
+		query += fmt.Sprintf(", is_active = $%d", idx)
+		args = append(args, *req.IsActive)
+		idx++
+	}
+	if len(req.SubscribedEvents) > 0 {
+		query += fmt.Sprintf(", subscribed_events = $%d", idx)
+		args = append(args, req.SubscribedEvents)
+		idx++
+	}
+	if req.EndpointURL != "" {
+		query += fmt.Sprintf(", endpoint_url = $%d", idx)
+		args = append(args, req.EndpointURL)
+		idx++
+	}
 	query += fmt.Sprintf(" WHERE id = $%d::uuid", idx)
 	args = append(args, id)
 	_, _ = h.dbPool.Exec(ctx, query, args...)
@@ -388,16 +434,16 @@ func (h *DeveloperHandler) HandleTestWebhook(w http.ResponseWriter, r *http.Requ
 // ── API Logs ──────────────────────────────────────────────────────────────────
 
 type APILogEntry struct {
-	ID                 int64      `json:"id"`
-	KeyPrefix          string     `json:"key_prefix"`
-	Method             string     `json:"method"`
-	Path               string     `json:"path"`
-	StatusCode         int        `json:"status_code"`
-	ResponseTimeMs     int        `json:"response_time_ms"`
-	IPAddress          string     `json:"ip_address"`
-	IsSandbox          bool       `json:"is_sandbox"`
-	ErrorMessage       *string    `json:"error_message"`
-	CreatedAt          time.Time  `json:"created_at"`
+	ID             int64     `json:"id"`
+	KeyPrefix      string    `json:"key_prefix"`
+	Method         string    `json:"method"`
+	Path           string    `json:"path"`
+	StatusCode     int       `json:"status_code"`
+	ResponseTimeMs int       `json:"response_time_ms"`
+	IPAddress      string    `json:"ip_address"`
+	IsSandbox      bool      `json:"is_sandbox"`
+	ErrorMessage   *string   `json:"error_message"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func (h *DeveloperHandler) HandleGetAPILogs(w http.ResponseWriter, r *http.Request) {
@@ -418,10 +464,14 @@ func (h *DeveloperHandler) HandleGetAPILogs(w http.ResponseWriter, r *http.Reque
 	args := []interface{}{}
 	idx := 1
 	if keyPrefix != "" {
-		base += fmt.Sprintf(" AND key_prefix = $%d", idx); args = append(args, keyPrefix); idx++
+		base += fmt.Sprintf(" AND key_prefix = $%d", idx)
+		args = append(args, keyPrefix)
+		idx++
 	}
 	if statusCode != "" {
-		base += fmt.Sprintf(" AND status_code = $%d", idx); args = append(args, statusCode); idx++
+		base += fmt.Sprintf(" AND status_code = $%d", idx)
+		args = append(args, statusCode)
+		idx++
 	}
 
 	var total int64
@@ -465,9 +515,9 @@ func (h *DeveloperHandler) HandleGetAPILogs(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"logs":   entries,
-		"total":  total,
-		"stats":  stats,
+		"logs":  entries,
+		"total": total,
+		"stats": stats,
 	})
 }
 
@@ -561,4 +611,3 @@ func (h *DeveloperHandler) HandleUpsertIncident(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"id": req.ID})
 }
-

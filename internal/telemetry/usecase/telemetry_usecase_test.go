@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uber/h3-go/v3"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
 	"github.com/platform/driver-delivery/internal/telemetry/usecase"
+	"github.com/uber/h3-go/v3"
 )
 
 type mockRedisRepo struct {

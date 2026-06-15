@@ -77,14 +77,14 @@ type TripRecord struct {
 	CreatedAt       time.Time  `json:"created_at"`
 	AssignedAt      *time.Time `json:"assigned_at"`
 	// Projected fields based on UUID hashing
-	TripType      string  `json:"trip_type"`
-	CarType       string  `json:"car_type"`
-	Transmission  string  `json:"transmission"`
-	PaymentMethod string  `json:"payment_method"`
-	PromoApplied  string  `json:"promo_applied"`
-	D4MCare       bool    `json:"d4m_care"`
-	Rating        int     `json:"rating"`
-	Plate         string  `json:"plate"`
+	TripType      string `json:"trip_type"`
+	CarType       string `json:"car_type"`
+	Transmission  string `json:"transmission"`
+	PaymentMethod string `json:"payment_method"`
+	PromoApplied  string `json:"promo_applied"`
+	D4MCare       bool   `json:"d4m_care"`
+	Rating        int    `json:"rating"`
+	Plate         string `json:"plate"`
 }
 
 func (h *AdminTripHandler) HandleAdminGetOrders(w http.ResponseWriter, r *http.Request) {
@@ -617,11 +617,11 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	}
 
 	type PaymentAttempt struct {
-		Timestamp  time.Time `json:"timestamp"`
-		Status     string    `json:"status"`
-		Amount     float64   `json:"amount"`
-		TxnID      string    `json:"txn_id"`
-		Provider   string    `json:"provider"`
+		Timestamp time.Time `json:"timestamp"`
+		Status    string    `json:"status"`
+		Amount    float64   `json:"amount"`
+		TxnID     string    `json:"txn_id"`
+		Provider  string    `json:"provider"`
 	}
 	var paymentAttempts []PaymentAttempt = []PaymentAttempt{}
 	rowsLedger, err := h.dbPool.Query(ctx, "SELECT id, amount_paise, payment_status, provider_type, created_at FROM payment_intents WHERE order_id = $1::uuid", id)
@@ -633,22 +633,22 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 			var piCreated time.Time
 			if err := rowsLedger.Scan(&piID, &piAmt, &piStatus, &piProvider, &piCreated); err == nil {
 				paymentAttempts = append(paymentAttempts, PaymentAttempt{
-					Timestamp:  piCreated,
-					Status:     piStatus,
-					Amount:     float64(piAmt) / 100.0,
-					TxnID:      piID,
-					Provider:   piProvider,
+					Timestamp: piCreated,
+					Status:    piStatus,
+					Amount:    float64(piAmt) / 100.0,
+					TxnID:     piID,
+					Provider:  piProvider,
 				})
 			}
 		}
 	}
 	if len(paymentAttempts) == 0 {
 		paymentAttempts = append(paymentAttempts, PaymentAttempt{
-			Timestamp:  rec.CreatedAt.Add(10 * time.Minute),
-			Status:     "SUCCEEDED",
-			Amount:     total,
-			TxnID:      "pi_simulated_" + id[0:6],
-			Provider:   rec.PaymentMethod,
+			Timestamp: rec.CreatedAt.Add(10 * time.Minute),
+			Status:    "SUCCEEDED",
+			Amount:    total,
+			TxnID:     "pi_simulated_" + id[0:6],
+			Provider:  rec.PaymentMethod,
 		})
 	}
 

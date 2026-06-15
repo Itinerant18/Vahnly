@@ -168,7 +168,7 @@ func TestHandleDriverGetEarnings_MissingFromTo(t *testing.T) {
 
 func TestHandleTriggerSOS_ValidRequest(t *testing.T) {
 	handler := &GatewayHandler{}
-	
+
 	callbackCalled := false
 	SOSCallback = func(tripID string, lat, lng float64) {
 		if tripID == "trp-123" && lat == 22.5 && lng == 88.5 {
@@ -210,4 +210,3 @@ func TestHandleTriggerSOS_MissingTripID(t *testing.T) {
 		t.Fatalf("expected 400 Bad Request, got %d", rec.Code)
 	}
 }
-

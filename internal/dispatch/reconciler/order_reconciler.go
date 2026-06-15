@@ -14,10 +14,10 @@ import (
 )
 
 type OrderReconcilerSyncWorker struct {
-	dbPool          *pgxpool.Pool
-	kafkaWriter     *kafka.Writer
-	syncInterval    time.Duration
-	stuckThreshold  time.Duration
+	dbPool         *pgxpool.Pool
+	kafkaWriter    *kafka.Writer
+	syncInterval   time.Duration
+	stuckThreshold time.Duration
 }
 
 type ReconcileTarget struct {
@@ -101,7 +101,7 @@ func (w *OrderReconcilerSyncWorker) ExecuteStateReconciliation(ctx context.Conte
 	// 2. Stream missing events back onto the event backbone sequentially to prevent lock thrashing
 	for _, target := range targets {
 		emitCtx, emitCancel := context.WithTimeout(ctx, 2*time.Second)
-		
+
 		payload := map[string]interface{}{
 			"order_id":    target.OrderID,
 			"driver_id":   target.DriverID,

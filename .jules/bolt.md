@@ -1,0 +1,3 @@
+## 2025-02-23 - Remove redundant sync.Mutex from sequential inner loop
+**Learning:** In backend routing algorithms (`ComputeShortestPathETA` in Contraction Hierarchies Graph), `sync.Mutex` was unnecessarily protecting purely local variables (`pqForward`, `pqBackward`, etc.). Go doesn't automatically optimize away uncontended locks, so placing one inside an algorithmic tight loop causes massive overhead.
+**Action:** When inspecting tight loops doing local algorithmic processing (like Dijkstra or graph searches), always ensure no synchronization primitives are present if the data structures are local to the function invocation.

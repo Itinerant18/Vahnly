@@ -305,9 +305,9 @@ func (h *OnboardingHandler) HandleUploadDocument(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"document_id":  docID,
-		"storage_url":  storageURL,
-		"status":       "PENDING",
+		"document_id":   docID,
+		"storage_url":   storageURL,
+		"status":        "PENDING",
 		"document_type": docType,
 	})
 }

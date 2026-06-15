@@ -21,7 +21,7 @@ type TritonClient struct {
 
 func NewTritonClient(addr string) (*TritonClient, error) {
 	// Configure aggressive keepalive settings to keep persistent sockets warm across container boundaries
-	conn, err := grpc.NewClient(addr, 
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                60 * time.Second,
@@ -43,7 +43,7 @@ func NewTritonClient(addr string) (*TritonClient, error) {
 func (c *TritonClient) PredictETAMultiplier(ctx context.Context, modelName, modelVersion string, features []float32) (float32, error) {
 	// XGBoost models inside Triton typically look for a 2D tensor shaped [1, NumberOfFeatures]
 	numFeatures := int64(len(features))
-	
+
 	// Pack float32 slice directly into a sequence of raw little-endian bytes
 	byteBuffer := make([]byte, numFeatures*4)
 	for i, f := range features {
@@ -79,7 +79,7 @@ func (c *TritonClient) PredictETAMultiplier(ctx context.Context, modelName, mode
 	if len(outputBytes) < 4 {
 		return 1.0, fmt.Errorf("output_bytes_truncated")
 	}
-	
+
 	bits := binary.LittleEndian.Uint32(outputBytes[0:4])
 	multiplier := math.Float32frombits(bits)
 

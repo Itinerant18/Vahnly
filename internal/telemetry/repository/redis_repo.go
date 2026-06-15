@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/telemetry/domain"
+	"github.com/redis/go-redis/v9"
 )
 
 type redisRepo struct {
@@ -20,9 +20,9 @@ func NewRedisRepository(client *redis.ClusterClient) domain.RedisRepository {
 
 func (r *redisRepo) SetDriverLocation(ctx context.Context, loc *domain.DriverLocation, ttl time.Duration) error {
 	// Group driver-specific keys by DriverID to distribute load across all shards
-	statusKey  := fmt.Sprintf("driver:{%s:%s}:status",       loc.CityPrefix, loc.DriverID)
+	statusKey := fmt.Sprintf("driver:{%s:%s}:status", loc.CityPrefix, loc.DriverID)
 	trackerKey := fmt.Sprintf("driver:{%s:%s}:current_cell", loc.CityPrefix, loc.DriverID)
-	profileKey := fmt.Sprintf("driver:{%s:%s}:profile",      loc.CityPrefix, loc.DriverID)
+	profileKey := fmt.Sprintf("driver:{%s:%s}:profile", loc.CityPrefix, loc.DriverID)
 
 	// Spatial index ZSET keys are single-key structures that don't need driver-level hashtagging
 	spatialZSetKey := fmt.Sprintf("drivers:zset:%s:%s", loc.CityPrefix, loc.H3Cell)
@@ -45,12 +45,12 @@ func (r *redisRepo) SetDriverLocation(ctx context.Context, loc *domain.DriverLoc
 			pipe.Set(ctx, trackerKey, loc.H3Cell, 24*time.Hour)
 			// Write driver-owned profile fields (set unconditionally on every location update).
 			pipe.HSet(ctx, profileKey,
-				"osm_node_id",              strconv.FormatInt(loc.OSMNodeID, 10),
-				"acceptance_rate",          strconv.FormatFloat(float64(loc.AcceptanceRate), 'f', 6, 32),
+				"osm_node_id", strconv.FormatInt(loc.OSMNodeID, 10),
+				"acceptance_rate", strconv.FormatFloat(float64(loc.AcceptanceRate), 'f', 6, 32),
 				"cancellation_probability", strconv.FormatFloat(float64(loc.CancellationProbability), 'f', 6, 32),
-				"speed_kms",                strconv.FormatFloat(float64(loc.SpeedKMS), 'f', 2, 32),
-				"bearing",                  strconv.FormatFloat(float64(loc.Bearing), 'f', 2, 32),
-				"last_ping_utc",            time.Now().Format(time.RFC3339),
+				"speed_kms", strconv.FormatFloat(float64(loc.SpeedKMS), 'f', 2, 32),
+				"bearing", strconv.FormatFloat(float64(loc.Bearing), 'f', 2, 32),
+				"last_ping_utc", time.Now().Format(time.RFC3339),
 			)
 			// is_inside_surge_zone and idle_seconds are owned by the surge aggregator.
 			// Use HSetNX so we write a safe default only on first creation, never overwriting

@@ -23,11 +23,11 @@ type RebalancePrompt struct {
 // demandProjectionHorizon ticks forward so the fleet is steered toward where
 // demand WILL be — not where it currently is.
 const (
-	demandSampleWindow       = 12 // recent demand samples retained per cell
-	demandProjectionHorizon  = 3  // ticks to project forward (~ next few cycles)
-	defaultNudgeFanout       = 6  // drivers nudged per incentive when unspecified
-	defaultNudgeBonusVector  = 1.2
-	defaultNudgeMessage      = "High demand nearby! Reposition for priority dispatch matching."
+	demandSampleWindow      = 12 // recent demand samples retained per cell
+	demandProjectionHorizon = 3  // ticks to project forward (~ next few cycles)
+	defaultNudgeFanout      = 6  // drivers nudged per incentive when unspecified
+	defaultNudgeBonusVector = 1.2
+	defaultNudgeMessage     = "High demand nearby! Reposition for priority dispatch matching."
 )
 
 type FleetRebalancer struct {
@@ -63,10 +63,10 @@ func (r *FleetRebalancer) evaluateGridDeficits(ctx context.Context) {
 	// 1. Scan active supply and demand cells
 	// In a full production ML setup, this would query Triton for time-series projections.
 	// Here we evaluate a heuristic ratio based on current live metrics.
-	
+
 	// Example targeted evaluation for a known high-density commercial zone
-	commercialZoneH3 := "88283082b9fffff" 
-	
+	commercialZoneH3 := "88283082b9fffff"
+
 	supplyKey := fmt.Sprintf("surge:supply:%s:%s", r.cityPrefix, commercialZoneH3)
 	demandKey := fmt.Sprintf("surge:demand:%s:%s", r.cityPrefix, commercialZoneH3)
 

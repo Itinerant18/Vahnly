@@ -32,24 +32,24 @@ func NewDashboardHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient,
 }
 
 type KPIResponse struct {
-	TotalTrips          int64   `json:"total_trips"`
-	ActiveTrips         int64   `json:"active_trips"`
-	NewRiderSignups     int64   `json:"new_rider_signups"`
-	NewDriverSignups    int64   `json:"new_driver_signups"`
-	OnlineDrivers       int64   `json:"online_drivers"`
-	TotalDrivers        int64   `json:"total_drivers"`
-	CancellationRate    float64 `json:"cancellation_rate"`
-	AvgEtaMinutes       float64 `json:"avg_eta_minutes"`
-	AvgRating           float64 `json:"avg_rating"`
-	GrossRevenue        int64   `json:"gross_revenue"`
-	NetRevenue          int64   `json:"net_revenue"`
-	PromoCost           int64   `json:"promo_cost"`
-	TotalTripsDelta     float64 `json:"total_trips_delta"`
-	ActiveTripsChange   int64   `json:"active_trips_change"`
-	NewSignupsDelta     float64 `json:"new_signups_delta"`
-	OnlineDriversDelta  float64 `json:"online_drivers_delta"`
-	CancellationDelta   float64 `json:"cancellation_delta"`
-	RevenueDelta        float64 `json:"revenue_delta"`
+	TotalTrips         int64   `json:"total_trips"`
+	ActiveTrips        int64   `json:"active_trips"`
+	NewRiderSignups    int64   `json:"new_rider_signups"`
+	NewDriverSignups   int64   `json:"new_driver_signups"`
+	OnlineDrivers      int64   `json:"online_drivers"`
+	TotalDrivers       int64   `json:"total_drivers"`
+	CancellationRate   float64 `json:"cancellation_rate"`
+	AvgEtaMinutes      float64 `json:"avg_eta_minutes"`
+	AvgRating          float64 `json:"avg_rating"`
+	GrossRevenue       int64   `json:"gross_revenue"`
+	NetRevenue         int64   `json:"net_revenue"`
+	PromoCost          int64   `json:"promo_cost"`
+	TotalTripsDelta    float64 `json:"total_trips_delta"`
+	ActiveTripsChange  int64   `json:"active_trips_change"`
+	NewSignupsDelta    float64 `json:"new_signups_delta"`
+	OnlineDriversDelta float64 `json:"online_drivers_delta"`
+	CancellationDelta  float64 `json:"cancellation_delta"`
+	RevenueDelta       float64 `json:"revenue_delta"`
 }
 
 type ChartPoint struct {
@@ -294,24 +294,24 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 	revenueDelta := percentageDelta(grossRevenue, prevGrossRevenue)
 
 	kpis := KPIResponse{
-		TotalTrips:          totalTrips,
-		ActiveTrips:         activeTrips,
-		NewRiderSignups:     newRiders,
-		NewDriverSignups:    newDrivers,
-		OnlineDrivers:       onlineDrivers,
-		TotalDrivers:        totalDrivers,
-		CancellationRate:    cancellationRate,
-		AvgEtaMinutes:       avgEtaMinutes,
-		AvgRating:           4.72,
-		GrossRevenue:        grossRevenue,
-		NetRevenue:          netRevenue,
-		PromoCost:           promoCost,
-		TotalTripsDelta:     totalTripsDelta,
-		ActiveTripsChange:   activeTripsChange,
-		NewSignupsDelta:     newSignupsDelta,
-		OnlineDriversDelta:  onlineDriversDelta,
-		CancellationDelta:   cancellationDelta,
-		RevenueDelta:        revenueDelta,
+		TotalTrips:         totalTrips,
+		ActiveTrips:        activeTrips,
+		NewRiderSignups:    newRiders,
+		NewDriverSignups:   newDrivers,
+		OnlineDrivers:      onlineDrivers,
+		TotalDrivers:       totalDrivers,
+		CancellationRate:   cancellationRate,
+		AvgEtaMinutes:      avgEtaMinutes,
+		AvgRating:          4.72,
+		GrossRevenue:       grossRevenue,
+		NetRevenue:         netRevenue,
+		PromoCost:          promoCost,
+		TotalTripsDelta:    totalTripsDelta,
+		ActiveTripsChange:  activeTripsChange,
+		NewSignupsDelta:    newSignupsDelta,
+		OnlineDriversDelta: onlineDriversDelta,
+		CancellationDelta:  cancellationDelta,
+		RevenueDelta:       revenueDelta,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -842,4 +842,3 @@ func percentageDelta(current, previous int64) float64 {
 	}
 	return (float64(current-previous) / float64(previous)) * 100.0
 }
-

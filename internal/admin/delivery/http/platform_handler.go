@@ -36,14 +36,14 @@ func (h *PlatformHandler) HandleGetServiceHealth(w http.ResponseWriter, r *http.
 	defer cancel()
 
 	type Snapshot struct {
-		ServiceName     string    `json:"service_name"`
-		UptimePct       float64   `json:"uptime_pct"`
-		ErrorRatePct    float64   `json:"error_rate_pct"`
-		P50LatencyMs    int       `json:"p50_latency_ms"`
-		P95LatencyMs    int       `json:"p95_latency_ms"`
-		P99LatencyMs    int       `json:"p99_latency_ms"`
-		RequestsPerMin  int       `json:"requests_per_min"`
-		RecordedAt      time.Time `json:"recorded_at"`
+		ServiceName    string    `json:"service_name"`
+		UptimePct      float64   `json:"uptime_pct"`
+		ErrorRatePct   float64   `json:"error_rate_pct"`
+		P50LatencyMs   int       `json:"p50_latency_ms"`
+		P95LatencyMs   int       `json:"p95_latency_ms"`
+		P99LatencyMs   int       `json:"p99_latency_ms"`
+		RequestsPerMin int       `json:"requests_per_min"`
+		RecordedAt     time.Time `json:"recorded_at"`
 	}
 
 	rows, err := h.db.Query(ctx, `SELECT DISTINCT ON (service_name) service_name, uptime_pct, error_rate_pct, p50_latency_ms, p95_latency_ms, p99_latency_ms, requests_per_min, recorded_at FROM service_health_snapshots ORDER BY service_name, recorded_at DESC`)
@@ -160,13 +160,13 @@ func (h *PlatformHandler) HandleGetExperiments(w http.ResponseWriter, r *http.Re
 	}
 
 	type Result struct {
-		ExperimentID    string   `json:"experiment_id"`
-		VariantName     string   `json:"variant_name"`
-		SampleSize      int      `json:"sample_size"`
-		ConversionRate  float64  `json:"conversion_rate"`
-		AvgMetricValue  float64  `json:"avg_metric_value"`
-		PValue          *float64 `json:"p_value,omitempty"`
-		IsWinner        bool     `json:"is_winner"`
+		ExperimentID   string   `json:"experiment_id"`
+		VariantName    string   `json:"variant_name"`
+		SampleSize     int      `json:"sample_size"`
+		ConversionRate float64  `json:"conversion_rate"`
+		AvgMetricValue float64  `json:"avg_metric_value"`
+		PValue         *float64 `json:"p_value,omitempty"`
+		IsWinner       bool     `json:"is_winner"`
 	}
 
 	// Enforce city scope: scoped admins see experiments targeting their cities plus
@@ -271,13 +271,13 @@ func (h *PlatformHandler) HandleGetChatbotStats(w http.ResponseWriter, r *http.R
 		Scan(&totalSessions, &deflected, &escalated, &active)
 
 	type Intent struct {
-		ID                  string   `json:"id"`
-		IntentName          string   `json:"intent_name"`
-		ResponseTemplate    string   `json:"response_template"`
-		ConfidenceThreshold float64  `json:"confidence_threshold"`
-		FallbackToHuman     bool     `json:"fallback_to_human"`
-		TriggerCount        int      `json:"trigger_count"`
-		IsActive            bool     `json:"is_active"`
+		ID                  string  `json:"id"`
+		IntentName          string  `json:"intent_name"`
+		ResponseTemplate    string  `json:"response_template"`
+		ConfidenceThreshold float64 `json:"confidence_threshold"`
+		FallbackToHuman     bool    `json:"fallback_to_human"`
+		TriggerCount        int     `json:"trigger_count"`
+		IsActive            bool    `json:"is_active"`
 	}
 
 	rows, err := h.db.Query(ctx, `SELECT id, intent_name, response_template, confidence_threshold, fallback_to_human, trigger_count, is_active FROM chatbot_intents ORDER BY trigger_count DESC`)

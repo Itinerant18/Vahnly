@@ -27,7 +27,7 @@ func TestOfflineSyncPayloadIngress(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/driver/sync/offline-payload", bytes.NewBuffer(syncJSON))
 	req.Header.Set("X-Driver-ID", "00000000-0000-0000-0000-000000000001")
-	
+
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 

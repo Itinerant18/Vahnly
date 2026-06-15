@@ -21,7 +21,7 @@ func TestOrderCreatedConsumer_DynamicBatchingWindow(t *testing.T) {
 
 	// 1. Off-peak: 5 orders in 1 second = 5 orders/sec (rolling rate < 10)
 	batch := make([]domain.OrderCreatedPayload, 5)
-	
+
 	// Simulate computation phase in processBatchLoop:
 	now := time.Now()
 	elapsedSeconds := 1.0 // simulate 1 second elapsed

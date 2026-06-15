@@ -13,7 +13,7 @@ func TestMarketplaceOrchestratorHandler_CompileCheck(t *testing.T) {
 
 func TestHandleUpsertGeofenceZone_InvalidInput(t *testing.T) {
 	handler := NewMarketplaceOrchestratorHandler(nil, nil, nil)
-	
+
 	// Test too few coordinates
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/marketplace/geofence", strings.NewReader(`{
 		"zone_name": "Test Zone",

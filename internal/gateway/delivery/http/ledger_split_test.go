@@ -26,9 +26,9 @@ func TestTakeRatePctForCompletedTrips(t *testing.T) {
 // rider debit (total fare). If this ever fails, the double-entry ledger is unbalanced.
 func TestDriverLedgerSplit_BalancesDoubleEntry(t *testing.T) {
 	cases := []struct {
-		name                      string
-		nonToll, tolls, parking   int64
-		rate                      int64
+		name                    string
+		nonToll, tolls, parking int64
+		rate                    int64
 	}{
 		{"fare only, 20%", 100000, 0, 0, 20},
 		{"fare + tolls + parking, 15%", 100000, 5000, 3000, 15},

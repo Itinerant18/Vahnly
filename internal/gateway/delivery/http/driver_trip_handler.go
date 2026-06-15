@@ -195,10 +195,10 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"success":         true,
-		"message":         "Event recorded and ledger updated",
+		"success":            true,
+		"message":            "Event recorded and ledger updated",
 		"new_estimate_paise": fareEstimate,
-		"added_component": addedComponent,
+		"added_component":    addedComponent,
 	})
 }
 

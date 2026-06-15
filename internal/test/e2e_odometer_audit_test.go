@@ -26,9 +26,9 @@ import (
 // correct data from trip_odometer_checkpoints.
 //
 // The test exercises three regression scenarios:
-//   1. Low variance  → AUTO_RECONCILED (CLEARED)
-//   2. High variance → FINANCIAL_REVIEW_REQUIRED
-//   3. Missing END   → PENDING_CHECKPOINT (has_both = false)
+//  1. Low variance  → AUTO_RECONCILED (CLEARED)
+//  2. High variance → FINANCIAL_REVIEW_REQUIRED
+//  3. Missing END   → PENDING_CHECKPOINT (has_both = false)
 func TestOdometerAuditReconciliation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

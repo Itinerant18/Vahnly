@@ -478,16 +478,16 @@ func (h *AdminAuthHandler) HandleListAdmins(w http.ResponseWriter, r *http.Reque
 	defer rows.Close()
 
 	type AdminItem struct {
-		ID                 string     `json:"id"`
-		FullName           string     `json:"full_name"`
-		Phone              string     `json:"phone"`
-		Email              string     `json:"email"`
-		Role               string     `json:"role"`
-		RegionPrefix       string     `json:"region_prefix"`
-		IsActive           bool       `json:"is_active"`
-		TwoFactorEnabled   bool       `json:"two_factor_enabled"`
-		LastActiveAt       *time.Time `json:"last_active_at"`
-		CityScope          string     `json:"city_scope"`
+		ID               string     `json:"id"`
+		FullName         string     `json:"full_name"`
+		Phone            string     `json:"phone"`
+		Email            string     `json:"email"`
+		Role             string     `json:"role"`
+		RegionPrefix     string     `json:"region_prefix"`
+		IsActive         bool       `json:"is_active"`
+		TwoFactorEnabled bool       `json:"two_factor_enabled"`
+		LastActiveAt     *time.Time `json:"last_active_at"`
+		CityScope        string     `json:"city_scope"`
 	}
 
 	var list []AdminItem
@@ -625,8 +625,8 @@ func (h *AdminAuthHandler) HandleSuspendAdmin(w http.ResponseWriter, r *http.Req
 	}
 
 	var req struct {
-		AdminID  string `json:"admin_id"`
-		Suspend  bool   `json:"suspend"`
+		AdminID string `json:"admin_id"`
+		Suspend bool   `json:"suspend"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

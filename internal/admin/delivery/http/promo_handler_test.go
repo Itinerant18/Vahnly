@@ -154,5 +154,3 @@ func TestHandlePostLoyaltySettings_MethodValidation(t *testing.T) {
 		t.Fatalf("expected 405 method not allowed, got %d", rec.Code)
 	}
 }
-
-

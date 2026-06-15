@@ -65,7 +65,7 @@ type DispatchRules struct {
 	MinDriverRating                float64            `json:"min_driver_rating"`
 	MinDriverAcceptanceRate        float64            `json:"min_driver_acceptance_rate"`
 	TransmissionCapability         string             `json:"transmission_capability"` // "ALL", "MATCH"
-	PriorityOrder                  string             `json:"priority_order"` // "NEAREST", "HIGHEST_RATED", "ROUND_ROBIN"
+	PriorityOrder                  string             `json:"priority_order"`          // "NEAREST", "HIGHEST_RATED", "ROUND_ROBIN"
 	OutstationPreAssignmentMinutes int                `json:"outstation_pre_assignment_minutes"`
 	OutstationAdvancePaymentPct    int                `json:"outstation_advance_payment_pct"`
 }

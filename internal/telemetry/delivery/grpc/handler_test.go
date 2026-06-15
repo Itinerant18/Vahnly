@@ -33,7 +33,7 @@ func TestClientStreamPositions_Success(t *testing.T) {
 	// 1. Setup in-memory gRPC listener
 	const bufSize = 1024 * 1024
 	lis := bufconn.Listen(bufSize)
-	
+
 	mockUC := &mockTelemetryUseCase{
 		processed: make(chan *domain.DriverLocation, 5),
 	}
@@ -50,10 +50,10 @@ func TestClientStreamPositions_Success(t *testing.T) {
 
 	// 2. Setup Client connection
 	ctx := context.Background()
-	conn, err := grpc.NewClient("passthrough:///bufnet", 
+	conn, err := grpc.NewClient("passthrough:///bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
-		}), 
+		}),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

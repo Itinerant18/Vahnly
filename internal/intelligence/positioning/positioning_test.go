@@ -16,9 +16,9 @@ func TestProjectDemand(t *testing.T) {
 	}{
 		{"empty series projects zero", nil, 3, 0},
 		{"single sample returns itself", []float64{5}, 3, 5},
-		{"linear rise extrapolates up", []float64{2, 4, 6}, 2, 10},   // slope 2, last 6, +2*2
-		{"linear fall floors at zero", []float64{10, 6, 2}, 3, 0},    // slope -4, last 2, +(-4*3)=-10 -> 0
-		{"flat series stays flat", []float64{7, 7, 7, 7}, 5, 7},      // slope 0
+		{"linear rise extrapolates up", []float64{2, 4, 6}, 2, 10}, // slope 2, last 6, +2*2
+		{"linear fall floors at zero", []float64{10, 6, 2}, 3, 0},  // slope -4, last 2, +(-4*3)=-10 -> 0
+		{"flat series stays flat", []float64{7, 7, 7, 7}, 5, 7},    // slope 0
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

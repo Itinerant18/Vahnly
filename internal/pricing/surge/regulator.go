@@ -23,7 +23,7 @@ type SurgeRegulator struct {
 	consecutiveSuccess int64
 	totalRequests      int64
 	lastStateChange    time.Time
-	
+
 	maxTimeout       time.Duration
 	failureThreshold float64 // Percentage e.g. 0.20
 	coolDownPeriod   time.Duration
@@ -97,7 +97,7 @@ func (r *SurgeRegulator) CalculateO1HeuristicFallback(demand, supply int64) floa
 	if demand <= supply {
 		return 1.0
 	}
-	
+
 	// Multiplier = 1.0 + alpha * ln((Demand+1)/(Supply+1))
 	ratio := float64(demand+1) / float64(supply+1)
 	multiplier := 1.0 + r.alphaCoefficient*math.Log(ratio)

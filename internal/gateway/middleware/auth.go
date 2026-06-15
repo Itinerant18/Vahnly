@@ -49,6 +49,7 @@ func ClearSessionCookie(w http.ResponseWriter) {
 }
 
 type ContextKey string
+
 const UserIDContextKey ContextKey = "userID"
 
 // DriverSessionTTL bounds a driver login session; matches the driver JWT expiry.
