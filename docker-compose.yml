@@ -473,6 +473,10 @@ services:
       - ALLOW_LOCAL_OBJECT_STORE=${ALLOW_LOCAL_OBJECT_STORE:-false}
       # CORS allow-list (comma-separated). No wildcard in production.
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      # Admin session cookie SameSite. Default Lax (same-origin). Set =none for a cross-site
+      # SPA→API deployment (Firebase Hosting frontend + separate API origin); None requires
+      # Secure, so keep the gateway on HTTPS.
+      - ADMIN_COOKIE_SAMESITE=${ADMIN_COOKIE_SAMESITE:-}
       # S3-compatible object storage (MinIO in local dev).
       - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
       - S3_BUCKET=${S3_BUCKET_DOCUMENTS:-documents}
