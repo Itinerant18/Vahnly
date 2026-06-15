@@ -20,7 +20,8 @@ func (c *CORSMiddleware) Handler(next http.Handler) http.Handler {
 	//   - CORS_ALLOWED_ORIGINS (comma-separated; production frontend origins)
 	//   - sensible localhost dev defaults (admin :5173, driver :3000, rider :3050)
 	allowed := map[string]bool{
-		"http://localhost:5173": true, // admin dev
+		"http://localhost:5000": true, // admin dev (Vite server.port)
+		"http://localhost:5173": true, // admin dev (Vite default)
 		"http://localhost:3000": true, // driver app dev
 		"http://localhost:3050": true, // rider app dev
 		"capacitor://localhost": true, // native Capacitor (iOS) WebView origin

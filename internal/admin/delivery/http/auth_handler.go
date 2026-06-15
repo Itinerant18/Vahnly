@@ -26,12 +26,13 @@ type AuthRequest struct {
 }
 
 type AuthResponse struct {
-	Token       string    `json:"token,omitempty"`
-	ExpiresAt   time.Time `json:"expires_at,omitempty"`
-	Role        string    `json:"role,omitempty"`
-	MFARequired bool      `json:"mfa_required,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	Email       string    `json:"email,omitempty"`
+	Token              string    `json:"token,omitempty"`
+	ExpiresAt          time.Time `json:"expires_at,omitempty"`
+	Role               string    `json:"role,omitempty"`
+	MFARequired        bool      `json:"mfa_required,omitempty"`
+	MustChangePassword bool      `json:"must_change_password,omitempty"`
+	Message            string    `json:"message,omitempty"`
+	Email              string    `json:"email,omitempty"`
 }
 
 type RegisterRequest struct {
@@ -133,18 +134,21 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	var dbLockedUntil *time.Time
 	var dbIPAllowList string
 	var dbCityScope string
+	var dbMustChangePassword bool
 
 	query := `
-		SELECT id, full_name, password_hash, role, is_active, 
+		SELECT id, full_name, password_hash, role, is_active,
 		       two_factor_secret, two_factor_enabled, sso_provider, sso_id,
-		       login_attempts, locked_until, ip_allow_list, city_scope
-		FROM system_admins 
+		       login_attempts, locked_until, ip_allow_list, city_scope,
+		       must_change_password
+		FROM system_admins
 		WHERE email = $1
 	`
 	err := h.dbPool.QueryRow(ctx, query, req.Email).Scan(
 		&dbUserID, &dbFullName, &dbPasswordHash, &dbRole, &dbIsActive,
 		&dbTwoFactorSecret, &dbTwoFactorEnabled, &dbSSOProvider, &dbSSOID,
 		&dbLoginAttempts, &dbLockedUntil, &dbIPAllowList, &dbCityScope,
+		&dbMustChangePassword,
 	)
 
 	if err != nil {
@@ -299,10 +303,11 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 	// 5. Generate signed JWT token
 	expirationTime := time.Now().Add(12 * time.Hour)
 	claims := &middleware.CustomClaims{
-		UserID:    dbUserID,
-		Role:      dbRole,
-		Email:     req.Email,
-		CityScope: dbCityScope,
+		UserID:             dbUserID,
+		Role:               dbRole,
+		Email:              req.Email,
+		CityScope:          dbCityScope,
+		MustChangePassword: dbMustChangePassword,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -326,9 +331,10 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AuthResponse{
-		Token:     tokenString,
-		ExpiresAt: expirationTime,
-		Role:      dbRole,
+		Token:              tokenString,
+		ExpiresAt:          expirationTime,
+		Role:               dbRole,
+		MustChangePassword: dbMustChangePassword,
 	})
 }
 
@@ -345,15 +351,18 @@ func (h *AdminAuthHandler) HandleAuthSession(w http.ResponseWriter, r *http.Requ
 	role, _ := middleware.GetUserRoleFromContext(ctx)
 	scope, _ := middleware.GetCityScopeFromContext(ctx)
 	pending := middleware.GetTwoFactorPendingFromContext(ctx)
+	mustChange := middleware.GetMustChangePasswordFromContext(ctx)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		// 2FA-enrolment sessions are not "authenticated" for the dashboard — the SPA must
-		// route them to the enrolment screen, not the control room.
-		"authenticated":      !pending,
-		"two_factor_pending": pending,
-		"user_id":            userID,
-		"role":               role,
-		"city_scope":         scope,
+		// route them to the enrolment screen, not the control room. A must-change session is
+		// authenticated but the SPA routes it to the password-rotation screen first.
+		"authenticated":        !pending,
+		"two_factor_pending":   pending,
+		"must_change_password": mustChange,
+		"user_id":              userID,
+		"role":                 role,
+		"city_scope":           scope,
 	})
 }
 
@@ -362,6 +371,102 @@ func (h *AdminAuthHandler) HandleAuthLogout(w http.ResponseWriter, r *http.Reque
 	middleware.ClearSessionCookie(w)
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"logged_out"}`))
+}
+
+// HandleChangePassword rotates the authenticated admin's password. It is required on first
+// login for invited admins (whose token carries must_change_password until they rotate the
+// temporary password) and is also usable for voluntary rotation. It verifies the current
+// password, stores a fresh bcrypt hash, clears the must_change_password flag, and re-issues a
+// full-access session cookie/token so the holder can proceed straight into the dashboard.
+func (h *AdminAuthHandler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	adminID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || adminID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid_request_payload", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		http.Error(w, "weak_password_min_8_chars", http.StatusBadRequest)
+		return
+	}
+	if req.NewPassword == req.CurrentPassword {
+		http.Error(w, "new_password_must_differ", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var dbPasswordHash, dbRole, dbEmail, dbCityScope string
+	err := h.dbPool.QueryRow(ctx,
+		"SELECT password_hash, role, email, city_scope FROM system_admins WHERE id = $1",
+		adminID).Scan(&dbPasswordHash, &dbRole, &dbEmail, &dbCityScope)
+	if err != nil {
+		http.Error(w, "admin_not_found", http.StatusNotFound)
+		return
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(dbPasswordHash), []byte(req.CurrentPassword)) != nil {
+		h.recordAuditLog(ctx, adminID, dbEmail, "PASSWORD_CHANGE_FAILED", "Current password incorrect", getClientIP(r))
+		http.Error(w, "invalid_current_password", http.StatusUnauthorized)
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
+	if err != nil {
+		http.Error(w, "internal_server_error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := h.dbPool.Exec(ctx,
+		"UPDATE system_admins SET password_hash = $1, must_change_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+		string(newHash), adminID); err != nil {
+		http.Error(w, "password_update_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Re-issue a full-access token now the temporary-password gate is cleared.
+	expirationTime := time.Now().Add(12 * time.Hour)
+	claims := &middleware.CustomClaims{
+		UserID:    adminID,
+		Role:      dbRole,
+		Email:     dbEmail,
+		CityScope: dbCityScope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   adminID,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "drivers-for-u-auth",
+		},
+	}
+	tokenString, signErr := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
+	if signErr != nil {
+		http.Error(w, "internal_server_error", http.StatusInternalServerError)
+		return
+	}
+
+	h.recordAuditLog(ctx, adminID, dbEmail, "PASSWORD_CHANGED", "Admin rotated password", getClientIP(r))
+
+	middleware.SetSessionCookie(w, tokenString)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(AuthResponse{
+		Token:     tokenString,
+		ExpiresAt: expirationTime,
+		Role:      dbRole,
+	})
 }
 
 // HandleEnroll2FA provisions a fresh TOTP secret for the authenticated admin and
@@ -558,8 +663,8 @@ func (h *AdminAuthHandler) HandleInviteAdmin(w http.ResponseWriter, r *http.Requ
 	}
 
 	query := `
-		INSERT INTO system_admins (full_name, phone, email, password_hash, role, region_prefix, city_scope, two_factor_enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+		INSERT INTO system_admins (full_name, phone, email, password_hash, role, region_prefix, city_scope, two_factor_enabled, must_change_password)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, true, true)
 	`
 	_, err := h.dbPool.Exec(ctx, query, req.FullName, req.Phone, req.Email, string(hashedBytes), requestedRole, regPrefix, cityScope)
 	if err != nil {

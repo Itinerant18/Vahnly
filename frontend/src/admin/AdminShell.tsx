@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { adminRoutes, navItems, navGroups } from './adminRoutes';
 import { API_GATEWAY_BASE_URL } from '../config';
 import { AdminAuthGateway } from './components/AdminAuthGateway';
+import { AdminChangePassword } from './components/AdminChangePassword';
 import { SsoCallback } from './components/SsoCallback';
 import { themeStore } from './lib/useThemeStore';
 import {
@@ -91,6 +92,7 @@ function ThemeToggle() {
 
 export const AdminShell: React.FC = () => {
   const [sessionState, setSessionState] = useState<'LOADING' | 'AUTHED' | 'ANON'>('LOADING');
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(false);
   const [adminRole, setAdminRole] = useState<string>(localStorage.getItem('admin_role') ?? 'ADMIN');
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -136,6 +138,7 @@ export const AdminShell: React.FC = () => {
           const role = data.role || 'ADMIN';
           setAdminRole(role);
           localStorage.setItem('admin_role', role);
+          setMustChangePassword(Boolean(data.must_change_password));
           setSessionState('AUTHED');
         } else {
           setSessionState('ANON');
@@ -194,6 +197,16 @@ export const AdminShell: React.FC = () => {
 
   if (sessionState === 'ANON') {
     return <AdminAuthGateway onAuthSuccess={handleLoginSuccess} />;
+  }
+
+  // Authenticated but still on a temporary (invited) password — force rotation first.
+  if (mustChangePassword) {
+    return (
+      <AdminChangePassword
+        onChanged={() => { setMustChangePassword(false); checkSession(); }}
+        onCancel={handleLogout}
+      />
+    );
   }
 
   // Filter nav items by role

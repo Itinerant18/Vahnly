@@ -97,6 +97,10 @@ type CustomClaims struct {
 	// enabled but no TOTP secret on file. The RBAC guards reject it for everything
 	// except the /2fa/enroll endpoint, so it cannot reach protected admin data.
 	TwoFactorPending bool `json:"two_factor_pending,omitempty"`
+	// MustChangePassword marks a token for an admin still on a temporary (invited) password.
+	// The RBAC guards reject it for everything except /auth/change-password, forcing a
+	// first-login password rotation before any protected admin data is reachable.
+	MustChangePassword bool `json:"must_change_password,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -151,6 +155,7 @@ func InjectClaims(ctx context.Context, c *CustomClaims) context.Context {
 	ctx = context.WithValue(ctx, UserRoleContextKey, c.Role)
 	ctx = context.WithValue(ctx, CityScopeContextKey, c.CityScope)
 	ctx = context.WithValue(ctx, TwoFactorPendingContextKey, c.TwoFactorPending)
+	ctx = context.WithValue(ctx, MustChangePasswordContextKey, c.MustChangePassword)
 	return ctx
 }
 
@@ -188,6 +193,7 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 		ctx = context.WithValue(ctx, UserRoleContextKey, claims.Role)
 		ctx = context.WithValue(ctx, CityScopeContextKey, claims.CityScope)
 		ctx = context.WithValue(ctx, TwoFactorPendingContextKey, claims.TwoFactorPending)
+		ctx = context.WithValue(ctx, MustChangePasswordContextKey, claims.MustChangePassword)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
@@ -216,6 +222,15 @@ func GetTwoFactorPendingFromContext(ctx context.Context) bool {
 	return v
 }
 
+const MustChangePasswordContextKey ContextKey = "mustChangePassword"
+
+// GetMustChangePasswordFromContext reports whether the session is for an admin still on a
+// temporary password. Such a session may only reach /auth/change-password.
+func GetMustChangePasswordFromContext(ctx context.Context) bool {
+	v, _ := ctx.Value(MustChangePasswordContextKey).(bool)
+	return v
+}
+
 // GetCityScopeFromContext returns the raw city_scope claim (e.g. "KOL" or "KOL,BLR").
 func GetCityScopeFromContext(ctx context.Context) (string, bool) {
 	scope, ok := ctx.Value(CityScopeContextKey).(string)
@@ -241,6 +256,11 @@ func (m *AuthMiddleware) RequireRole(targetRole string, next http.HandlerFunc) h
 
 			if claims.TwoFactorPending {
 				http.Error(w, "two_factor_enrolment_incomplete", http.StatusForbidden)
+				return
+			}
+
+			if claims.MustChangePassword {
+				http.Error(w, "password_change_required", http.StatusForbidden)
 				return
 			}
 
@@ -285,6 +305,11 @@ func (m *AuthMiddleware) RequireAnyRole(allowedRoles []string, next http.Handler
 
 			if claims.TwoFactorPending {
 				http.Error(w, "two_factor_enrolment_incomplete", http.StatusForbidden)
+				return
+			}
+
+			if claims.MustChangePassword {
+				http.Error(w, "password_change_required", http.StatusForbidden)
 				return
 			}
 

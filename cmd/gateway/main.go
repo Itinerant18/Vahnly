@@ -518,6 +518,10 @@ func main() {
 	// let anyone self-register an account with an arbitrary role (incl. SUPER_ADMIN),
 	// a full authentication bypass. New admins are provisioned via /admin/team/invite.
 	mux.HandleFunc("POST /api/v1/admin/auth/register", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleAdminRegister))
+	// First-login / voluntary password rotation. Behind plain AuthenticateJWT (not a role
+	// guard) so a must_change_password token — which the role guards reject — can still reach
+	// it to clear the temporary password.
+	mux.HandleFunc("POST /api/v1/admin/auth/change-password", authGuard.AuthenticateJWT(adminAuthHandler.HandleChangePassword))
 	// TOTP self-enrolment (JWT-protected) + Google Workspace SSO (public entry points).
 	mux.HandleFunc("POST /api/v1/admin/auth/2fa/enroll", authGuard.AuthenticateJWT(adminAuthHandler.HandleEnroll2FA))
 	mux.HandleFunc("GET /api/v1/admin/auth/sso/google/start", adminAuthHandler.HandleSSOGoogleStart)
