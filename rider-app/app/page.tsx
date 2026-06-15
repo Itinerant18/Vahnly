@@ -149,8 +149,8 @@ export default function IndexPage() {
           </div>
           <div>
             <span>Drivers-for-u © 2026. Admin Contact: </span>
-            <a href="mailto:support@aniket.site" className="hover:text-slate-950 underline font-mono">
-              support@aniket.site
+            <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-slate-950 underline font-mono">
+              karmakaraniket018@gmail.com
             </a>
           </div>
         </div>

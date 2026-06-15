@@ -193,7 +193,7 @@ export default function PrivacyPolicy() {
                   please reach out to our administration team at:
                 </p>
                 <p className="mt-2 font-mono text-xs text-slate-700 bg-slate-100 p-3 rounded border border-slate-200">
-                  Email: support@aniket.site<br />
+                  Email: karmakaraniket018@gmail.com<br />
                   Operational Hub: Asia-South1 (India)
                 </p>
               </div>

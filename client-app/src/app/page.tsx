@@ -160,8 +160,8 @@ export default function Home() {
           </div>
           <div>
             <span>Drivers-For-U © 2026. Support Contact: </span>
-            <a href="mailto:support@aniket.site" className="hover:text-white underline">
-              support@aniket.site
+            <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-white underline">
+              karmakaraniket018@gmail.com
             </a>
           </div>
         </div>
