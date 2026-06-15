@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -285,3 +286,192 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 		Name:               dbName,
 	})
 }
+
+type DriverGoogleLoginRequest struct {
+	IDToken     string `json:"id_token"`
+	DeviceID    string `json:"device_id"`
+	AppVersion  string `json:"app_version"`
+	GeoLocation string `json:"geo_location"`
+	Phone       string `json:"phone,omitempty"`
+	CityPrefix  string `json:"city_prefix,omitempty"`
+	Name        string `json:"name,omitempty"`
+}
+
+func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req DriverGoogleLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.IDToken == "" {
+		http.Error(w, "Missing ID token", http.StatusBadRequest)
+		return
+	}
+
+	// Verify ID token via Google TokenInfo API
+	tokenInfoUrl := "https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(req.IDToken)
+	resp, err := http.Get(tokenInfoUrl)
+	if err != nil {
+		http.Error(w, "Failed to verify ID token with Google", http.StatusUnauthorized)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "Invalid Google ID token", http.StatusUnauthorized)
+		return
+	}
+
+	var googleClaims struct {
+		Email         string      `json:"email"`
+		EmailVerified interface{} `json:"email_verified"`
+		Name          string      `json:"name"`
+		Sub           string      `json:"sub"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&googleClaims); err != nil {
+		http.Error(w, "Failed to decode Google token response", http.StatusInternalServerError)
+		return
+	}
+
+	if googleClaims.Email == "" {
+		http.Error(w, "Google account does not provide email", http.StatusBadRequest)
+		return
+	}
+
+	// Parse email_verified robustly since it can be string or bool from Google TokenInfo
+	emailVerified := false
+	if googleClaims.EmailVerified != nil {
+		switch v := googleClaims.EmailVerified.(type) {
+		case bool:
+			emailVerified = v
+		case string:
+			emailVerified = (v == "true")
+		}
+	}
+
+	if !emailVerified {
+		http.Error(w, "Google email not verified", http.StatusUnauthorized)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var dbDriverID string
+	var dbName string
+	var dbCityPrefix string
+	var dbVerificationStatus string
+	var dbOnboardingStep int
+
+	query := `
+		SELECT id, name, city_prefix, verification_status, onboarding_step
+		FROM drivers
+		WHERE email = $1
+	`
+	err = h.dbPool.QueryRow(ctx, query, googleClaims.Email).Scan(
+		&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep,
+	)
+
+	ip := getClientIP(r)
+	deviceID := req.DeviceID
+	appVersion := req.AppVersion
+	geoLocation := req.GeoLocation
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// User is not registered as a driver yet
+			// Check if we have registration info to create the account now
+			if req.Phone == "" || req.CityPrefix == "" {
+				// Return status indicating registration is required
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"registered": false,
+					"email":      googleClaims.Email,
+					"name":       googleClaims.Name,
+				})
+				return
+			}
+
+			// Perform registration
+			// Generate dummy password hash for Google login user
+			dummyPwd := "oauth-google-" + googleClaims.Sub
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(dummyPwd), bcrypt.DefaultCost)
+			if err != nil {
+				http.Error(w, "Server error", http.StatusInternalServerError)
+				return
+			}
+
+			regName := req.Name
+			if regName == "" {
+				regName = googleClaims.Name
+			}
+			if regName == "" {
+				regName = "Google Driver"
+			}
+
+			insertQuery := `
+				INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, onboarding_step, verification_status)
+				VALUES ($1, $2, $3, $4, $5, 'OFFLINE', false, 1, 'ONBOARDING')
+				RETURNING id, name, city_prefix, verification_status, onboarding_step
+			`
+			err = h.dbPool.QueryRow(ctx, insertQuery, regName, req.Phone, googleClaims.Email, string(hashedPassword), req.CityPrefix).Scan(
+				&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep,
+			)
+			if err != nil {
+				http.Error(w, "Driver Google registration failed, phone might be already registered", http.StatusConflict)
+				return
+			}
+
+			h.recordAuditLog(ctx, dbDriverID, "REGISTER_SUCCESS_GOOGLE", deviceID, ip, appVersion, geoLocation)
+		} else {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Update last login timestamp
+	_, _ = h.dbPool.Exec(ctx, "UPDATE drivers SET last_login_at = NOW() WHERE id = $1", dbDriverID)
+
+	// Record audit trail
+	h.recordAuditLog(ctx, dbDriverID, "LOGIN_SUCCESS_GOOGLE", deviceID, ip, appVersion, geoLocation)
+
+	// Generate signed JWT token
+	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
+	claims := &middleware.CustomClaims{
+		UserID:    dbDriverID,
+		Role:      "DRIVER",
+		CityScope: dbCityPrefix,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   dbDriverID,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "drivers-for-u-driver-auth",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.jwtSecret)
+	if err != nil {
+		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
+		Token:              tokenString,
+		ExpiresAt:          expirationTime,
+		Role:               "DRIVER",
+		DriverID:           dbDriverID,
+		VerificationStatus: dbVerificationStatus,
+		OnboardingStep:     dbOnboardingStep,
+		Name:               dbName,
+	})
+}
+

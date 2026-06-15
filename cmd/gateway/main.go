@@ -535,6 +535,7 @@ func main() {
 
 	// Driver App & Onboarding routes
 	mux.HandleFunc("POST /api/v1/driver/login", driverAuthHandler.HandleDriverLogin)
+	mux.HandleFunc("POST /api/v1/driver/login/google", driverAuthHandler.HandleDriverGoogleLogin)
 	mux.HandleFunc("POST /api/v1/driver/register", driverAuthHandler.HandleDriverRegister)
 	mux.HandleFunc("POST /api/v1/driver/onboarding/step/{step_id}", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleSaveStep))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/upload", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleUploadDocument))
@@ -640,6 +641,7 @@ func main() {
 	// protected endpoints guarded by the standalone rider auth middleware.
 	mux.HandleFunc("POST /api/v1/rider/auth/send-otp", riderAppHandler.HandleSendOTP)
 	mux.HandleFunc("POST /api/v1/rider/auth/verify-otp", riderAppHandler.HandleVerifyOTP)
+	mux.HandleFunc("POST /api/v1/rider/auth/login/google", riderAppHandler.HandleRiderGoogleLogin)
 
 	mux.HandleFunc("GET /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleGetMe))
 	mux.HandleFunc("PUT /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleUpdateMe))

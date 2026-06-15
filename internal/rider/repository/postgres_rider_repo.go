@@ -40,6 +40,8 @@ type RiderRepository interface {
 	GetRiderByID(ctx context.Context, id string) (*domain.Rider, error)
 	UpdateRider(ctx context.Context, rider *domain.Rider) (*domain.Rider, error)
 	TouchLastLogin(ctx context.Context, riderID string) error
+	GetRiderByEmail(ctx context.Context, email string) (*domain.Rider, error)
+	CreateRiderWithEmail(ctx context.Context, phone, email, name string) (*domain.Rider, error)
 
 	// ExportRiderData returns the rider's personal data across the rider domain as a
 	// portable JSON-serializable map (DPDP data-portability right).
@@ -229,6 +231,25 @@ func (p *postgresRiderRepo) CreateRider(ctx context.Context, phone string) (*dom
 	return nil, lastErr
 }
 
+func (p *postgresRiderRepo) CreateRiderWithEmail(ctx context.Context, phone, email, name string) (*domain.Rider, error) {
+	// For Google login users, phone and email are verified automatically.
+	q := `INSERT INTO riders (phone, phone_verified, email, email_verified, name, referral_code) VALUES ($1, true, $2, true, $3, $4) RETURNING ` + riderColumns
+	var lastErr error
+	for i := 0; i < 5; i++ {
+		r, err := scanRider(p.dbPool.QueryRow(ctx, q, phone, email, name, generateReferralCode()))
+		if err == nil {
+			return r, nil
+		}
+		lastErr = err
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.Contains(pgErr.ConstraintName, "referral_code") {
+			continue // referral-code collision only — retry with a fresh code
+		}
+		return nil, err // phone/email duplicate / other error: do not retry
+	}
+	return nil, lastErr
+}
+
 // GetRiderIDByReferralCode resolves a referrer by their referral code.
 func (p *postgresRiderRepo) GetRiderIDByReferralCode(ctx context.Context, code string) (string, error) {
 	var id string
@@ -317,6 +338,11 @@ func creditWalletTx(ctx context.Context, tx pgx.Tx, riderID string, amount int64
 func (p *postgresRiderRepo) GetRiderByPhone(ctx context.Context, phone string) (*domain.Rider, error) {
 	q := `SELECT ` + riderColumns + ` FROM riders WHERE phone = $1`
 	return scanRider(p.dbPool.QueryRow(ctx, q, phone))
+}
+
+func (p *postgresRiderRepo) GetRiderByEmail(ctx context.Context, email string) (*domain.Rider, error) {
+	q := `SELECT ` + riderColumns + ` FROM riders WHERE email = $1`
+	return scanRider(p.dbPool.QueryRow(ctx, q, email))
 }
 
 func (p *postgresRiderRepo) GetRiderByID(ctx context.Context, id string) (*domain.Rider, error) {
