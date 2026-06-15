@@ -12,8 +12,10 @@ import (
 )
 
 // adminSessionCookie holds the admin JWT as an HttpOnly cookie so it is never readable by
-// JavaScript — this closes the localStorage XSS exposure (CRIT-004). The admin SPA is
-// served same-origin, so the cookie is sent automatically on every API/WS request.
+// JavaScript — this closes the localStorage XSS exposure (CRIT-004). When the SPA is served
+// same-origin the default SameSite=Lax cookie is attached automatically; for a cross-site
+// deployment (Firebase Hosting frontend + a separate API origin) set ADMIN_COOKIE_SAMESITE=none
+// so the browser sends the cookie on cross-site fetch/XHR.
 const adminSessionCookie = "admin_session"
 
 // adminCookieSecure controls the Secure flag. Default true (production HTTPS); set
@@ -22,7 +24,18 @@ func adminCookieSecure() bool {
 	return os.Getenv("ADMIN_COOKIE_SECURE") != "false"
 }
 
-// SetSessionCookie writes the admin session JWT as an HttpOnly, SameSite=Lax cookie.
+// adminCookieSameSite selects the SameSite policy. Default Lax (same-origin / local dev).
+// Set ADMIN_COOKIE_SAMESITE=none when the admin SPA and API are on different sites — browsers
+// require SameSite=None for cross-site cookies, and None mandates Secure (keep HTTPS / do not
+// set ADMIN_COOKIE_SECURE=false alongside it, or the browser drops the cookie).
+func adminCookieSameSite() http.SameSite {
+	if strings.EqualFold(os.Getenv("ADMIN_COOKIE_SAMESITE"), "none") {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
+// SetSessionCookie writes the admin session JWT as an HttpOnly session cookie.
 func SetSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     adminSessionCookie,
@@ -30,7 +43,7 @@ func SetSessionCookie(w http.ResponseWriter, token string) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   adminCookieSecure(),
-		SameSite: http.SameSiteLaxMode,
+		SameSite: adminCookieSameSite(),
 		MaxAge:   12 * 60 * 60, // 12h, matches the admin token TTL
 	})
 }
@@ -43,7 +56,7 @@ func ClearSessionCookie(w http.ResponseWriter) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   adminCookieSecure(),
-		SameSite: http.SameSiteLaxMode,
+		SameSite: adminCookieSameSite(),
 		MaxAge:   -1,
 	})
 }

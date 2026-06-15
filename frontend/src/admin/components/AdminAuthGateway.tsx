@@ -58,6 +58,9 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
     try {
       const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/login`, {
         method: 'POST',
+        // Cross-origin (Firebase Hosting -> api.aniket.site) must opt in so the gateway's
+        // Set-Cookie session cookie (CRIT-004) is stored; checkSession()/logout already do.
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: loginEmail.trim(),
@@ -225,7 +228,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-content-primary hover:bg-gray-800 text-gray-0 font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:bg-gray-800 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 {isLoading ? 'Verifying...' : 'Authenticate'}
               </button>
@@ -269,7 +272,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-50 text-gray-0 font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
+                className="w-full bg-content-primary hover:bg-gray-200 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
               >
                 {isLoading ? 'Verifying Credentials...' : 'Unlock Dashboard'}
               </button>
@@ -410,7 +413,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-content-primary hover:bg-gray-800 disabled:opacity-50 text-gray-0 font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
+              className="w-full bg-content-primary hover:bg-gray-200 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
             >
               {isLoading ? 'Registering...' : 'Register Corporate Profile'}
             </button>
@@ -443,7 +446,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-content-primary hover:bg-gray-800 text-gray-0 font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:bg-gray-200 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 {isLoading ? 'Processing...' : 'Recover Account'}
               </button>
@@ -454,7 +457,9 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
         {/* System Message Log Banner */}
         {statusMessage && (
           <div className={`mt-4 p-3.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-center ${
-            statusMessage.type === 'SUCCESS' ? 'bg-background-secondary border border-border-opaque text-content-primary' : 'bg-content-primary text-gray-0'
+            statusMessage.type === 'SUCCESS'
+              ? 'bg-background-secondary border border-border-opaque text-content-primary'
+              : 'bg-negative-100 border border-negative-300 text-content-negative'
           }`}>
             {statusMessage.text}
           </div>
