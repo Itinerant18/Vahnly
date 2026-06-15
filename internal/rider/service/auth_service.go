@@ -205,6 +205,31 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, otp string) (*domain
 	return rider, token, nil
 }
 
+// VerifyPhoneOTP validates an OTP against the active session for a phone WITHOUT resolving or
+// creating a rider. It proves the caller controls the number, for flows that must verify a
+// phone before attaching it to an account (e.g. Google sign-up, where the phone number is
+// safety-critical for this "your car, our driver" service). Consumes the session on success.
+func (s *AuthService) VerifyPhoneOTP(ctx context.Context, phone, otp string) error {
+	phone = normalizePhone(phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		return ErrInvalidPhone
+	}
+
+	session, err := s.repo.GetActiveOTPSession(ctx, phone, otpPurposeLogin)
+	if err != nil {
+		return ErrOTPNotFound
+	}
+	if session.Attempts >= session.MaxAttempts {
+		return ErrOTPMaxAttempts
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(session.OTPHash), []byte(otp)); err != nil {
+		_ = s.repo.IncrementOTPAttempts(ctx, session.ID)
+		return ErrOTPInvalid
+	}
+	_ = s.repo.MarkOTPUsed(ctx, session.ID)
+	return nil
+}
+
 // IssueSession mints an HS256 rider JWT and records its jti in Redis so the
 // session can be validated (and revoked) server-side. Exported so the handler
 // can issue a token for a freshly-onboarded new rider too.

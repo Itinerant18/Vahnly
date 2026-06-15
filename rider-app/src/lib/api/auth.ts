@@ -32,19 +32,15 @@ export const authApi = {
 
   googleLogin: (
     idToken: string,
-    regData?: {
-      name?: string;
-      referred_by_code?: string;
-      // Firebase ID token from a completed Phone Auth (SMS OTP) flow; proves phone ownership.
-      firebase_phone_token?: string;
-    },
+    regData?: { phone: string; otp: string; name?: string; referred_by_code?: string },
   ) =>
     apiClient.post<GoogleLoginResponse>("/api/v1/rider/auth/login/google", {
       id_token: idToken,
       ...(regData && {
+        phone: regData.phone,
+        otp: regData.otp,
         name: regData.name,
         referred_by_code: regData.referred_by_code,
-        firebase_phone_token: regData.firebase_phone_token,
       }),
     }),
 

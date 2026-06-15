@@ -47,11 +47,7 @@ export interface AuthState {
   ) => Promise<{ isNew: boolean }>;
   googleLogin: (
     idToken: string,
-    regData?: {
-      name?: string;
-      referred_by_code?: string;
-      firebase_phone_token?: string;
-    },
+    regData?: { phone: string; otp: string; name?: string; referred_by_code?: string },
   ) => Promise<{
     registered: boolean;
     isNew?: boolean;
@@ -94,11 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   googleLogin: async (
     idToken: string,
-    regData?: {
-      name?: string;
-      referred_by_code?: string;
-      firebase_phone_token?: string;
-    },
+    regData?: { phone: string; otp: string; name?: string; referred_by_code?: string },
   ) => {
     set({ isLoading: true });
     try {
