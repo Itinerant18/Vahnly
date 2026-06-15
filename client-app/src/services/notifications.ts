@@ -2,19 +2,11 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { registerDeviceToken } from '@/api/client';
 
-function readEnv(key: string): string | undefined {
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return process.env[key];
-  }
-  return undefined;
-}
-
 function readConfig() {
-  const apiKey = readEnv('VITE_FIREBASE_API_KEY') || readEnv('NEXT_PUBLIC_FIREBASE_API_KEY');
-  const projectId = readEnv('VITE_FIREBASE_PROJECT_ID') || readEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID');
-  const messagingSenderId =
-    readEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') || readEnv('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
-  const appId = readEnv('VITE_FIREBASE_APP_ID') || readEnv('NEXT_PUBLIC_FIREBASE_APP_ID');
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 
   if (!apiKey || !projectId || !messagingSenderId || !appId) {
     return null;
@@ -29,7 +21,7 @@ export async function registerDriverPushNotifications(authToken: string): Promis
   }
 
   const firebaseConfig = readConfig();
-  const vapidKey = readEnv('VITE_FCM_VAPID_KEY') || readEnv('NEXT_PUBLIC_FCM_VAPID_KEY');
+  const vapidKey = process.env.NEXT_PUBLIC_FCM_VAPID_KEY;
   if (!firebaseConfig || !vapidKey || !(await isSupported())) {
     return;
   }

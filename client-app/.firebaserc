@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "drivers-for-u-app"
+  },
+  "targets": {
+    "drivers-for-u-app": {
+      "hosting": {
+        "driver": ["dfu-driver-app"]
+      }
+    }
+  }
+}

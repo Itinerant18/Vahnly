@@ -26,6 +26,9 @@ export const metadata: Metadata = {
   title: "Drivers-For-U | Unified Dispatch Platform",
   description:
     "High-performance, secure dynamic ride dispatch matching ecosystem client application.",
+  verification: {
+    google: "dg6nUxvK7dY9xv1e0v2abZSJ8P0TnQBL59avWsb65q4",
+  },
 };
 
 export default function RootLayout({

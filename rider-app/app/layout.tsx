@@ -25,6 +25,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Drivers-for-u",
   description: "Hire a professional driver for your own car.",
+  verification: {
+    google: "dg6nUxvK7dY9xv1e0v2abZSJ8P0TnQBL59avWsb65q4",
+  },
 };
 
 export const viewport: Viewport = {
