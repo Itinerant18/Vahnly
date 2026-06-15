@@ -38,14 +38,21 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   // Password recovery input
   const [recoveryEmail, setRecoveryEmail] = useState<string>('');
 
-  // Registration form inputs
+  // New-administrator details. The new admin's password is NOT set here — creation goes
+  // through the SUPER_ADMIN invite flow, which issues a temporary password.
   const [signupName, setSignupName] = useState<string>('');
   const [signupPhone, setSignupPhone] = useState<string>('');
   const [signupEmail, setSignupEmail] = useState<string>('');
-  const [signupPassword, setSignupPassword] = useState<string>('');
-  const [signupRegion, setSignupRegion] = useState<string>('KOL'); 
-  const [signupRole, setSignupRole] = useState<string>('FLEET_MANAGER'); 
-  const [signupCityScope, setSignupCityScope] = useState<string>('KOL'); 
+  const [signupRegion, setSignupRegion] = useState<string>('KOL');
+  const [signupRole, setSignupRole] = useState<string>('FLEET_MANAGER');
+  const [signupCityScope, setSignupCityScope] = useState<string>('KOL');
+
+  // Authorizing SUPER_ADMIN credentials. Creating an account is a privileged, audited action,
+  // so the signup form posts through /team/invite under a real SUPER_ADMIN session instead of
+  // the disabled public /auth/register.
+  const [authorizerEmail, setAuthorizerEmail] = useState<string>('');
+  const [authorizerPassword, setAuthorizerPassword] = useState<string>('');
+  const [authorizerTwoFactor, setAuthorizerTwoFactor] = useState<string>('');
 
   // Client device fingerprint audit parameters
   const deviceFingerprint = getDeviceFingerprint();
@@ -121,34 +128,76 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
     setStatusMessage(null);
 
     try {
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/register`, {
+      // 1. Authenticate the authorizing SUPER_ADMIN. Public self-registration is disabled
+      //    server-side (/auth/register requires SUPER_ADMIN), so we open a real session for
+      //    the authorizer and provision the new admin through the audited invite endpoint.
+      const authRes = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/login`, {
         method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: authorizerEmail.trim(),
+          password: authorizerPassword,
+          two_factor_code: authorizerTwoFactor,
+        }),
+      });
+      const authData = await authRes.json().catch(() => ({}));
+      if (!authRes.ok) {
+        setStatusMessage({ type: 'ERROR', text: 'Authorizing sign-in failed — check the SUPER_ADMIN email and password.' });
+        return;
+      }
+      if (authData.mfa_required) {
+        setStatusMessage({ type: 'ERROR', text: 'Authorizing admin needs a 2FA code — enter the SUPER_ADMIN 6-digit code and retry.' });
+        return;
+      }
+
+      // 2. Provision the new admin via the SUPER_ADMIN-gated invite (temp password + mandatory
+      //    2FA enrolment). Never /auth/register.
+      const inviteRes = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/invite`, {
+        method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: signupName.trim(),
           phone: signupPhone.trim(),
           email: signupEmail.trim(),
-          password: signupPassword,
-          region_prefix: signupRegion,
           role: signupRole,
-          city_scope: signupCityScope
+          region_prefix: signupRegion,
+          city_scope: signupCityScope,
         }),
       });
 
-      if (response.ok) {
-        setStatusMessage({ 
-          type: 'SUCCESS', 
-          text: 'Account created successfully! Switching to login layer...' 
-        });
-        setLoginEmail(signupEmail);
-        // Do not prefill the password — keeping the plaintext in component state extends its
-        // lifetime in memory / React DevTools. The user re-enters it on the login screen.
-        setTimeout(() => setActiveTab('LOGIN'), 1500);
-      } else {
-        setStatusMessage({ type: 'ERROR', text: 'Registration rejected. Profile credentials may already exist.' });
+      // 3. Drop the authorizer session so the public signup screen never leaves a SUPER_ADMIN
+      //    logged in on a shared browser.
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      }).catch(() => {});
+
+      if (inviteRes.status === 401 || inviteRes.status === 403) {
+        setStatusMessage({ type: 'ERROR', text: 'Authorizing account is not a SUPER_ADMIN — only SUPER_ADMIN can create accounts.' });
+        return;
       }
+      if (inviteRes.status === 409) {
+        setStatusMessage({ type: 'ERROR', text: 'An account with this email already exists.' });
+        return;
+      }
+      if (!inviteRes.ok) {
+        setStatusMessage({ type: 'ERROR', text: 'Account creation failed — check the details and try again.' });
+        return;
+      }
+
+      setStatusMessage({
+        type: 'SUCCESS',
+        text: `Invited ${signupEmail.trim()} as ${signupRole}. Temporary password: TempPassword123 — sign in with it plus the 2FA code, then rotate it.`,
+      });
+      setLoginEmail(signupEmail.trim());
+      // Clear the authorizer secret from memory once consumed.
+      setAuthorizerPassword('');
+      setAuthorizerTwoFactor('');
+      setTimeout(() => setActiveTab('LOGIN'), 3000);
     } catch {
-      setStatusMessage({ type: 'ERROR', text: 'Network error occurred during profile registration.' });
+      setStatusMessage({ type: 'ERROR', text: 'Network error during account provisioning.' });
     } finally {
       setIsLoading(false);
     }
@@ -348,17 +397,6 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
                 disabled={isLoading}
               />
             </div>
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Password</label>
-              <input
-                type="password"
-                className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
-                value={signupPassword}
-                onChange={(e) => setSignupPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Hub Region</label>
@@ -410,12 +448,57 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               />
             </div>
 
+            {/* Authorization — account creation runs under a SUPER_ADMIN session via the
+                audited invite endpoint, not public self-registration. */}
+            <div className="space-y-3 pt-3 mt-1 border-t border-background-secondary">
+              <div className="text-[10px] uppercase tracking-wider font-bold text-content-tertiary">
+                Authorize as SUPER_ADMIN
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">SUPER_ADMIN Email</label>
+                <input
+                  type="email"
+                  className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
+                  value={authorizerEmail}
+                  onChange={(e) => setAuthorizerEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">Password</label>
+                  <input
+                    type="password"
+                    className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs text-content-primary focus:outline-none transition"
+                    value={authorizerPassword}
+                    onChange={(e) => setAuthorizerPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-1.5">2FA Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    className="w-full bg-background-secondary border border-background-secondary focus:border-content-primary rounded-md p-2.5 text-xs font-mono text-content-primary focus:outline-none transition"
+                    value={authorizerTwoFactor}
+                    onChange={(e) => setAuthorizerTwoFactor(e.target.value.replace(/\D/g, ''))}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-content-primary hover:bg-gray-200 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
             >
-              {isLoading ? 'Registering...' : 'Register Corporate Profile'}
+              {isLoading ? 'Provisioning…' : 'Create Account (SUPER_ADMIN)'}
             </button>
           </form>
         ) : (
