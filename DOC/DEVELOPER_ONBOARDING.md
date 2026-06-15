@@ -17,15 +17,15 @@ Two ways to read this:
 
 ## 0. Install prerequisites (once)
 
-| Tool | Version | Needed for | Install |
-| --- | --- | --- | --- |
-| **Go** | 1.25.x | backend services + tests | https://go.dev/dl/ |
-| **Node.js** | 20.x LTS (or newer) | all 3 frontends + e2e | https://nodejs.org/ |
-| **Docker Desktop** | 4.x (Compose v2) | local backend infra | https://www.docker.com/ |
-| **PowerShell** | 7.4+ (`pwsh`) | bootstrap scripts (Windows) | `winget install Microsoft.PowerShell` |
-| **Git** | 2.40+ | clone | preinstalled |
-| **kubectl + helm** | 1.29+ / 3.x | *optional* — monitoring stack, k8s path | Docker Desktop / https://helm.sh |
-| **Android Studio / Xcode** | latest | *optional* — mobile builds | — |
+| Tool                       | Version             | Needed for                              | Install                               |
+| -------------------------- | ------------------- | --------------------------------------- | ------------------------------------- |
+| **Go**                     | 1.25.x              | backend services + tests                | https://go.dev/dl/                    |
+| **Node.js**                | 20.x LTS (or newer) | all 3 frontends + e2e                   | https://nodejs.org/                   |
+| **Docker Desktop**         | 4.x (Compose v2)    | local backend infra                     | https://www.docker.com/               |
+| **PowerShell**             | 7.4+ (`pwsh`)       | bootstrap scripts (Windows)             | `winget install Microsoft.PowerShell` |
+| **Git**                    | 2.40+               | clone                                   | preinstalled                          |
+| **kubectl + helm**         | 1.29+ / 3.x         | _optional_ — monitoring stack, k8s path | Docker Desktop / https://helm.sh      |
+| **Android Studio / Xcode** | latest              | _optional_ — mobile builds              | —                                     |
 
 Verify:
 
@@ -291,13 +291,13 @@ For codebase questions, query the graph before grepping:
 
 ## 13. Where to read next
 
-| Topic | Doc |
-| --- | --- |
-| Deep backend setup + k8s path | `SETUP.md` |
-| Architecture & data flow | `DOC/ARCHITECTURE_BREAKDOWN_FOR_TEAM.md` |
-| WebSocket / state model | `DOC/STATE_ARCHITECTURE_AND_WEBSOCKET_INTEGRATION.md` |
-| Backend test strategy | `DOC/TEST_COVERAGE.md` |
-| Frontend test strategy | `DOC/TEST_FRONTEND.md` |
-| Monitoring stack | `deploy/monitoring/README.md` |
-| Required secrets | `.github/SECRETS.md` |
-| Design system | `DOC/UBER_LIKE_UI_UX_DESIGN_GUIDE.md` |
+| Topic                         | Doc                                                   |
+| ----------------------------- | ----------------------------------------------------- |
+| Deep backend setup + k8s path | `SETUP.md`                                            |
+| Architecture & data flow      | `DOC/ARCHITECTURE_BREAKDOWN_FOR_TEAM.md`              |
+| WebSocket / state model       | `DOC/STATE_ARCHITECTURE_AND_WEBSOCKET_INTEGRATION.md` |
+| Backend test strategy         | `DOC/TEST_COVERAGE.md`                                |
+| Frontend test strategy        | `DOC/TEST_FRONTEND.md`                                |
+| Monitoring stack              | `deploy/monitoring/README.md`                         |
+| Required secrets              | `.github/SECRETS.md`                                  |
+| Design system                 | `DOC/UBER_LIKE_UI_UX_DESIGN_GUIDE.md`                 |
