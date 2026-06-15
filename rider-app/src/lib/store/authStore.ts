@@ -40,7 +40,24 @@ export interface AuthState {
   isLoading: boolean;
 
   sendOTP: (phone: string) => Promise<void>;
-  verifyOTP: (phone: string, otp: string, referredByCode?: string) => Promise<{ isNew: boolean }>;
+  verifyOTP: (
+    phone: string,
+    otp: string,
+    referredByCode?: string,
+  ) => Promise<{ isNew: boolean }>;
+  googleLogin: (
+    idToken: string,
+    regData?: {
+      name?: string;
+      referred_by_code?: string;
+      firebase_phone_token?: string;
+    },
+  ) => Promise<{
+    registered: boolean;
+    isNew?: boolean;
+    email?: string;
+    name?: string;
+  }>;
   fetchMe: () => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
@@ -70,6 +87,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       persistRider(res.rider);
       set({ token: res.token, rider: res.rider, isNewRider: res.is_new_rider });
       return { isNew: res.is_new_rider };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  googleLogin: async (
+    idToken: string,
+    regData?: {
+      name?: string;
+      referred_by_code?: string;
+      firebase_phone_token?: string;
+    },
+  ) => {
+    set({ isLoading: true });
+    try {
+      const res = await authApi.googleLogin(idToken, regData);
+      if (res.registered === false) {
+        return {
+          registered: false,
+          email: res.email,
+          name: res.name,
+        };
+      }
+      persistToken(res.token ?? null);
+      persistRider(res.rider ?? null);
+      set({
+        token: res.token ?? null,
+        rider: res.rider ?? null,
+        isNewRider: res.is_new_rider ?? false,
+      });
+      return { registered: true, isNew: res.is_new_rider };
     } finally {
       set({ isLoading: false });
     }

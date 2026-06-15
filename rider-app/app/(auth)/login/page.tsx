@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
+import { getGoogleIdToken } from "@/lib/googleAuth";
+import { startPhoneVerification, confirmPhoneCode, resetRecaptcha } from "@/lib/phoneAuth";
+import type { ConfirmationResult } from "firebase/auth";
 
 // ── 6-box OTP input with auto-advance + paste ────────────────────────────────
 function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
@@ -116,11 +119,24 @@ function Logo() {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const router = useRouter();
-  const { sendOTP, verifyOTP, isLoading } = useAuthStore();
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const { sendOTP, verifyOTP, googleLogin, isLoading } = useAuthStore();
+  const [step, setStep] = useState<"phone" | "otp" | "google-register">("phone");
   const [phone, setPhone] = useState("");
   const [referral, setReferral] = useState("");
   const [error, setError] = useState("");
+  const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string } | null>(null);
+  // Google sign-up sub-flow: collect phone, then verify it via Firebase Phone Auth (SMS OTP).
+  const [googlePhase, setGooglePhase] = useState<"phone" | "otp">("phone");
+  const [googleConfirmation, setGoogleConfirmation] = useState<ConfirmationResult | null>(null);
+  const [phoneBusy, setPhoneBusy] = useState(false);
+
+  const resetGoogleFlow = () => {
+    setStep("phone");
+    setGoogleRegInfo(null);
+    setGooglePhase("phone");
+    setGoogleConfirmation(null);
+    resetRecaptcha();
+  };
 
   const onSendOTP = async () => {
     setError("");
@@ -141,6 +157,71 @@ export default function LoginPage() {
       setError("Incorrect or expired OTP. Please try again.");
     }
   }, [phone, referral, verifyOTP, router]);
+
+  const handleGoogleSignIn = async () => {
+    setError("");
+    try {
+      const idToken = await getGoogleIdToken();
+      const res = await googleLogin(idToken);
+      if (!res.registered) {
+        setGoogleRegInfo({
+          idToken,
+          email: res.email || "",
+          name: res.name || "",
+        });
+        setStep("google-register");
+      } else {
+        router.replace(res.isNew ? "/onboarding" : "/home");
+      }
+    } catch (err: any) {
+      setError(err.message || "Google sign-in failed. Please try again.");
+    }
+  };
+
+  // Step 1: send the Firebase Phone Auth SMS to the typed number.
+  const onGoogleSendCode = async () => {
+    setError("");
+    if (phone.length !== 10) {
+      setError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    setPhoneBusy(true);
+    try {
+      const confirmation = await startPhoneVerification(`+91${phone}`, "recaptcha-container");
+      setGoogleConfirmation(confirmation);
+      setGooglePhase("otp");
+    } catch (err: any) {
+      resetRecaptcha();
+      setError(err?.message || "Could not send the verification code. Please try again.");
+    } finally {
+      setPhoneBusy(false);
+    }
+  };
+
+  // Step 2: confirm the SMS code -> Firebase phone token -> create the rider with the
+  // verified phone + Google email.
+  const onGoogleConfirmCode = useCallback(async (code: string) => {
+    if (!googleRegInfo || !googleConfirmation) return;
+    setError("");
+    setPhoneBusy(true);
+    try {
+      const firebasePhoneToken = await confirmPhoneCode(googleConfirmation, code);
+      const res = await googleLogin(googleRegInfo.idToken, {
+        name: googleRegInfo.name,
+        referred_by_code: referral || undefined,
+        firebase_phone_token: firebasePhoneToken,
+      });
+      if (res.registered) {
+        router.replace(res.isNew ? "/onboarding" : "/home");
+      } else {
+        setError("Registration incomplete. Please try again.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Phone verification failed. Check the code and try again.");
+    } finally {
+      setPhoneBusy(false);
+    }
+  }, [googleRegInfo, googleConfirmation, referral, googleLogin, router]);
 
   return (
     <main className="flex min-h-screen flex-col bg-background-primary">
@@ -232,15 +313,17 @@ export default function LoginPage() {
               <div className="flex-1 border-t border-border-opaque" />
             </div>
 
-            {/* Social stubs */}
-            <div className="grid grid-cols-2 gap-3 opacity-50">
+            {/* Social buttons */}
+            <div className="grid grid-cols-2 gap-3">
               <button
+                type="button"
+                onClick={handleGoogleSignIn}
                 className="flex h-12 items-center justify-center gap-2 rounded-sm
                   bg-background-primary border border-border-opaque
                   text-label-medium text-content-primary
-                  relative cursor-not-allowed"
-                disabled
-                title="Coming soon"
+                  cursor-pointer hover:bg-background-secondary active:scale-[0.98] transition-base
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                disabled={isLoading}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -249,15 +332,13 @@ export default function LoginPage() {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
                 Google
-                <span className="absolute -top-1.5 -right-1.5 rounded-pill bg-background-tertiary px-1.5 py-0.5 text-label-small text-content-tertiary text-[9px]">
-                  Soon
-                </span>
               </button>
               <button
+                type="button"
                 className="flex h-12 items-center justify-center gap-2 rounded-sm
                   bg-background-primary border border-border-opaque
                   text-label-medium text-content-primary
-                  relative cursor-not-allowed"
+                  opacity-50 cursor-not-allowed relative"
                 disabled
                 title="Coming soon"
               >
@@ -271,8 +352,7 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-
-        ) : (
+        ) : step === "otp" ? (
           /* ── OTP step ── */
           <div className="space-y-5">
             <div>
@@ -303,6 +383,115 @@ export default function LoginPage() {
             >
               Change number
             </button>
+          </div>
+        ) : (
+          /* ── Google Registration: verify phone via Firebase Phone Auth ── */
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-heading-medium text-content-primary mb-1">
+                {googlePhase === "phone" ? "Verify your mobile number" : "Enter the 6-digit code"}
+              </h2>
+              <p className="text-paragraph-small text-content-secondary">
+                {googlePhase === "phone"
+                  ? "Your number is essential for ride coordination — we'll text you a verification code."
+                  : `Sent to +91 ${phone}`}
+              </p>
+            </div>
+
+            {googlePhase === "phone" ? (
+              <>
+                {/* Email (readonly) */}
+                <div>
+                  <label className="text-label-small text-content-secondary block mb-1">Email</label>
+                  <input
+                    className="h-12 w-full rounded-sm border border-border-opaque bg-background-tertiary px-4 text-content-secondary cursor-not-allowed outline-none"
+                    value={googleRegInfo?.email || ""}
+                    disabled
+                    readOnly
+                  />
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="text-label-small text-content-secondary block mb-1">Full Name</label>
+                  <input
+                    className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 font-sans text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                    placeholder="Full Name"
+                    type="text"
+                    value={googleRegInfo?.name || ""}
+                    onChange={(e) =>
+                      setGoogleRegInfo((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                    }
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-label-small text-content-secondary block mb-1">Mobile Number</label>
+                  <div className="flex gap-2">
+                    <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
+                      <span className="text-lg">🇮🇳</span>
+                      <span className="text-label-medium text-content-primary">+91</span>
+                    </div>
+                    <input
+                      className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                      placeholder="98765 43210"
+                      inputMode="numeric"
+                      type="tel"
+                      value={phone}
+                      maxLength={10}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    />
+                  </div>
+                </div>
+
+                {/* Referral */}
+                <div>
+                  <label className="text-label-small text-content-secondary block mb-1">Referral Code (optional)</label>
+                  <input
+                    className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-small text-content-primary uppercase placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                    placeholder="e.g. DFU1A2B3"
+                    value={referral}
+                    onChange={(e) => setReferral(e.target.value.toUpperCase())}
+                  />
+                </div>
+
+                <button
+                  className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
+                  style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.18)", WebkitTapHighlightColor: "transparent" }}
+                  disabled={phoneBusy || phone.length !== 10}
+                  onClick={onGoogleSendCode}
+                >
+                  {phoneBusy ? <Spinner /> : "Send verification code"}
+                </button>
+              </>
+            ) : (
+              <>
+                <OtpInput onComplete={onGoogleConfirmCode} />
+                {phoneBusy && (
+                  <div className="flex items-center justify-center gap-2 text-content-secondary">
+                    <Spinner size={16} />
+                    <span className="text-paragraph-small">Verifying…</span>
+                  </div>
+                )}
+                <button
+                  className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base"
+                  onClick={() => { setGooglePhase("phone"); setGoogleConfirmation(null); resetRecaptcha(); }}
+                >
+                  Change number
+                </button>
+              </>
+            )}
+
+            <button
+              className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+              onClick={resetGoogleFlow}
+            >
+              Cancel
+            </button>
+
+            {/* Invisible reCAPTCHA target for Firebase Phone Auth */}
+            <div id="recaptcha-container" />
           </div>
         )}
 

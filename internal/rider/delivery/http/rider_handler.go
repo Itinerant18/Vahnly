@@ -6,7 +6,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -163,6 +166,191 @@ func (h *RiderHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 		"token":        token,
 		"rider":        rider,
 		"is_new_rider": false,
+	})
+}
+
+type RiderGoogleLoginRequest struct {
+	IDToken string `json:"id_token"`
+	// FirebasePhoneToken is a Firebase ID token from a completed Firebase Phone Auth (SMS OTP)
+	// flow. It carries a verified phone_number claim — the ONLY phone we trust when creating a
+	// rider from Google sign-in. A typed phone is never used for account creation.
+	FirebasePhoneToken string `json:"firebase_phone_token,omitempty"`
+	Name               string `json:"name,omitempty"`
+	ReferredByCode     string `json:"referred_by_code,omitempty"`
+}
+
+func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req RiderGoogleLoginRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+
+	if req.IDToken == "" {
+		writeError(w, http.StatusBadRequest, "Missing Google ID token", "ERR_VALIDATION")
+		return
+	}
+
+	// Verify ID token via Google TokenInfo API
+	tokenInfoUrl := "https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(req.IDToken)
+	resp, err := http.Get(tokenInfoUrl)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Failed to verify ID token with Google", "ERR_UNAUTHENTICATED")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		writeError(w, http.StatusUnauthorized, "Invalid Google ID token", "ERR_UNAUTHENTICATED")
+		return
+	}
+
+	var googleClaims struct {
+		Email         string      `json:"email"`
+		EmailVerified interface{} `json:"email_verified"`
+		Name          string      `json:"name"`
+		Sub           string      `json:"sub"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&googleClaims); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to decode Google token response", "ERR_INTERNAL")
+		return
+	}
+
+	if googleClaims.Email == "" {
+		writeError(w, http.StatusBadRequest, "Google account does not provide email", "ERR_VALIDATION")
+		return
+	}
+
+	emailVerified := false
+	if googleClaims.EmailVerified != nil {
+		switch v := googleClaims.EmailVerified.(type) {
+		case bool:
+			emailVerified = v
+		case string:
+			emailVerified = (v == "true")
+		}
+	}
+
+	if !emailVerified {
+		writeError(w, http.StatusUnauthorized, "Google email not verified", "ERR_UNAUTHENTICATED")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	rider, err := h.repo.GetRiderByEmail(ctx, googleClaims.Email)
+	if err == nil {
+		// Rider is already registered by email. Touch last login.
+		_ = h.repo.TouchLastLogin(ctx, rider.ID)
+
+		token, err := h.auth.IssueSession(r.Context(), rider)
+		if err != nil {
+			h.writeServiceError(w, err)
+			return
+		}
+
+		writeData(w, http.StatusOK, map[string]any{
+			"token":        token,
+			"rider":        rider,
+			"is_new_rider": false,
+		})
+		return
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	// User is not registered by email yet. Account creation requires a Firebase-verified phone
+	// (the number is critical to this service) — a typed phone is never trusted. Without the
+	// phone token, tell the client to run Firebase Phone Auth and retry.
+	if req.FirebasePhoneToken == "" {
+		writeData(w, http.StatusOK, map[string]any{
+			"registered": false,
+			"email":      googleClaims.Email,
+			"name":       googleClaims.Name,
+		})
+		return
+	}
+
+	fbClaims, ferr := verifyFirebaseToken(ctx, req.FirebasePhoneToken)
+	if ferr != nil || fbClaims.PhoneNumber == "" {
+		writeError(w, http.StatusUnauthorized, "Phone verification failed", "ERR_PHONE_UNVERIFIED")
+		return
+	}
+	verifiedPhone := fbClaims.PhoneNumber
+
+	// Check if a rider already exists with this verified phone number.
+	existingRider, err := h.repo.GetRiderByPhone(ctx, verifiedPhone)
+	if err == nil {
+		// Rider exists by phone. Check if they already have an email.
+		if existingRider.Email != nil && *existingRider.Email != "" {
+			if strings.ToLower(*existingRider.Email) != strings.ToLower(googleClaims.Email) {
+				writeError(w, http.StatusConflict, "Phone number already registered with another email", "ERR_CONFLICT")
+				return
+			}
+		}
+
+		// Link Google email to the existing phone-only record.
+		existingRider.Email = &googleClaims.Email
+		existingRider.EmailVerified = true
+		regName := req.Name
+		if regName == "" {
+			regName = googleClaims.Name
+		}
+		if regName != "" {
+			existingRider.Name = &regName
+		}
+
+		updatedRider, err := h.repo.UpdateRider(ctx, existingRider)
+		if err != nil {
+			h.writeServiceError(w, err)
+			return
+		}
+		rider = updatedRider
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		// Completely new rider, register them.
+		regName := req.Name
+		if regName == "" {
+			regName = googleClaims.Name
+		}
+		if regName == "" {
+			regName = "Google Rider"
+		}
+
+		newRider, err := h.repo.CreateRiderWithEmail(ctx, verifiedPhone, googleClaims.Email, regName)
+		if err != nil {
+			h.writeServiceError(w, err)
+			return
+		}
+		rider = newRider
+
+		// Attach referral (best-effort, background)
+		if h.referral != nil && req.ReferredByCode != "" {
+			go h.referral.AttachReferral(context.Background(), rider.ID, req.ReferredByCode)
+		}
+	} else {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	token, err := h.auth.IssueSession(r.Context(), rider)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	writeData(w, http.StatusOK, map[string]any{
+		"token":        token,
+		"rider":        rider,
+		"is_new_rider": true,
 	})
 }
 
