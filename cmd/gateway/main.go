@@ -161,7 +161,7 @@ func main() {
 	go handler.StartGPSWriteBehindWorker(mainCtx)
 
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
-	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, jwtSecret)
+	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, redisClusterClient, jwtSecret)
 	driverOnboardingHandler := driverHttp.NewOnboardingHandler(dbPool)
 	if fieldCipher, err := crypto.NewFieldCipher(fieldEncKey); err != nil {
 		log.Fatalf("Field encryption cipher setup failed: %v", err)

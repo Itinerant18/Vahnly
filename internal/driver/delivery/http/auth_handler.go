@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -46,12 +48,14 @@ type DriverAuthResponse struct {
 
 type DriverAuthHandler struct {
 	dbPool    *pgxpool.Pool
+	redis     *redis.ClusterClient
 	jwtSecret []byte
 }
 
-func NewDriverAuthHandler(dbPool *pgxpool.Pool, jwtSecret string) *DriverAuthHandler {
+func NewDriverAuthHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient, jwtSecret string) *DriverAuthHandler {
 	return &DriverAuthHandler{
 		dbPool:    dbPool,
+		redis:     redisClient,
 		jwtSecret: []byte(jwtSecret),
 	}
 }
@@ -256,11 +260,13 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 
 	// Generate signed JWT token
 	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
+	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
 		UserID:    dbDriverID,
 		Role:      "DRIVER",
 		CityScope: dbCityPrefix,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Subject:   dbDriverID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -273,6 +279,14 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Record the session jti so the gateway's DRIVER session validator accepts this token.
+	// Without it, the validator returns session_revoked_or_expired on every authed request.
+	if h.redis != nil {
+		if sErr := h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err(); sErr != nil {
+			log.Printf("[AUTH_WARN] failed to record driver session for %s: %v", dbDriverID, sErr)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -444,11 +458,13 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 
 	// Generate signed JWT token
 	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
+	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
 		UserID:    dbDriverID,
 		Role:      "DRIVER",
 		CityScope: dbCityPrefix,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Subject:   dbDriverID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -461,6 +477,14 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 	if err != nil {
 		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Record the session jti so the gateway's DRIVER session validator accepts this token.
+	// Without it, the validator returns session_revoked_or_expired on every authed request.
+	if h.redis != nil {
+		if sErr := h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err(); sErr != nil {
+			log.Printf("[AUTH_WARN] failed to record driver session for %s: %v", dbDriverID, sErr)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
