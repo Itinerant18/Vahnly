@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { getDriverNotifications, DriverNotification } from "@/api/client";
+import { getDriverNotifications, markNotificationRead, DriverNotification } from "@/api/client";
 
 export default function NotificationsClient() {
   const { token } = useAuthStore();
@@ -64,13 +64,32 @@ export default function NotificationsClient() {
   );
 
   const toggleReadStatus = (id: string) => {
+    const target = notifications.find(n => n.id === id);
+    if (!target || target.is_read) return; // already read — nothing to sync
+
+    // Optimistically mark read, then persist; revert on failure.
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
     );
+
+    if (!token) return;
+    markNotificationRead(token, id).catch((err) => {
+      console.warn("Failed to mark notification read:", err);
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, is_read: false } : n))
+      );
+    });
   };
 
   const handleMarkAllRead = () => {
+    const unread = notifications.filter(n => !n.is_read);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    if (!token) return;
+    unread.forEach(n => {
+      markNotificationRead(token, n.id).catch((err) =>
+        console.warn("Failed to mark notification read:", err)
+      );
+    });
   };
 
   return (

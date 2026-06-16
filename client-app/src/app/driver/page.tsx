@@ -30,6 +30,8 @@ import {
   driverConfirmPayment,
   FinalBill,
   getDriverOrder,
+  getFatigueCheck,
+  FatigueCheckResponse,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -144,6 +146,9 @@ export default function DriverTerminalPage() {
     acceptance_rate: 100,
     rating: 5.0,
   });
+
+  // Fatigue / mandatory-break monitor (polled every 5 min while ONLINE)
+  const [fatigue, setFatigue] = useState<FatigueCheckResponse | null>(null);
 
   // SOS hold to confirm trigger states
   const sosHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -325,6 +330,28 @@ export default function DriverTerminalPage() {
 
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, [token, dutyState]);
+
+  // Fatigue monitor: poll every 5 minutes while ONLINE. Surface a mandatory-break
+  // banner when the server says the driver must rest (or has no hours remaining).
+  useEffect(() => {
+    if (!token || dutyState !== 'ONLINE') return;
+
+    const checkFatigue = async () => {
+      try {
+        const data = await getFatigueCheck(token);
+        setFatigue(data);
+        if (data.must_take_break || data.hours_remaining <= 0) {
+          logAudit('FATIGUE_BREAK_REQUIRED', { hours_remaining: data.hours_remaining });
+        }
+      } catch (err) {
+        console.warn('Failed to fetch fatigue check:', err);
+      }
+    };
+
+    checkFatigue();
+    const interval = setInterval(checkFatigue, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [token, dutyState]);
 
@@ -1008,6 +1035,16 @@ export default function DriverTerminalPage() {
 
       {/* 2. SOS EMERGENCY PULSE TRIGGER MODAL */}
       <SosModal />
+
+      {/* MANDATORY BREAK BANNER — fatigue safety gate */}
+      {fatigue && (fatigue.must_take_break || fatigue.hours_remaining <= 0) && dutyState !== 'OFFLINE' && (
+        <div className="fixed top-0 inset-x-0 z-[100002] bg-negative-400 px-4 py-3 flex items-center justify-center gap-2 font-mono text-label-small text-white shadow-elevation-2 text-center">
+          <span className="animate-pulse text-base">🛑</span>
+          <span className="font-bold uppercase tracking-wider">
+            Mandatory rest break required — {fatigue.message || 'you have reached the daily driving limit. Please go offline and rest.'}
+          </span>
+        </div>
+      )}
 
       {/* FORCE-MATCH BANNER */}
       {forceMatched && dutyState !== 'ONLINE' && dutyState !== 'OFFLINE' && (

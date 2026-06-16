@@ -1,11 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { getDriverPerformance, DriverPerformanceResponse } from '@/api/client';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function DriverPerformancePage() {
   const t = useTranslations('driverPerformance');
-  const metrics = {
+  const { token } = useAuthStore();
+  const [data, setData] = useState<DriverPerformanceResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fallbackMetrics = {
     rating: 4.92,
     acceptance: 96,
     cancellation: 2.1,
@@ -13,25 +20,47 @@ export default function DriverPerformancePage() {
     trips: 412
   };
 
-  const compliments = [
+  const fallbackCompliments = [
     { label: t('compliment1'), count: 184 },
     { label: t('compliment2'), count: 142 },
     { label: t('compliment3'), count: 96 },
     { label: t('compliment4'), count: 88 }
   ];
 
-  const reviews = [
+  const fallbackReviews = [
     { name: 'Anirban Das', rating: 5, date: '2026-06-03', text: t('review1Text') },
     { name: 'Rohan Sen', rating: 5, date: '2026-06-01', text: t('review2Text') },
     { name: 'Priya Dey', rating: 4, date: '2026-05-28', text: t('review3Text') }
   ];
 
-  const tiers = [
+  const fallbackTiers = [
     { name: t('tier1Name'), perks: t('tier1Perks') },
     { name: t('tier2Name'), perks: t('tier2Perks') },
     { name: t('tier3Name'), perks: t('tier3Perks') },
     { name: t('tier4Name'), perks: t('tier4Perks') }
   ];
+
+  const load = useCallback(async () => {
+    if (!token) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const res = await getDriverPerformance(token);
+      setData(res);
+      setError(null);
+    } catch (err) {
+      console.warn('[DriverPerformance] fetch failed:', err);
+      setError('Live performance data is unavailable.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const metrics = data?.metrics ?? fallbackMetrics;
+  const compliments = data?.compliments ?? fallbackCompliments;
+  const reviews = data?.reviews ?? fallbackReviews;
+  const tiers = data?.tiers ?? fallbackTiers;
 
   return (
     <div className="space-y-6 text-left">
@@ -39,6 +68,8 @@ export default function DriverPerformancePage() {
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
         <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+        {error && <p className="text-content-negative text-[10px] font-mono mt-2">{error}</p>}
+        {loading && <p className="text-content-tertiary text-[10px] font-mono mt-2 animate-pulse uppercase tracking-wider">Loading performance…</p>}
       </div>
 
       {/* Primary Metrics Grid */}

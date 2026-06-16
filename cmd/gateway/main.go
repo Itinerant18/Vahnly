@@ -223,6 +223,7 @@ func main() {
 
 	driverAccountHandler := gatewayHttp.NewDriverAccountHandler(dbPool)
 	driverFeaturesHandler := gatewayHttp.NewDriverFeaturesHandler(dbPool)
+	driverEngagementHandler := gatewayHttp.NewDriverEngagementHandler(dbPool)
 	driverEarningsHandler := gatewayHttp.NewDriverEarningsHandler(dbPool, redisClusterClient, payoutWriter, log.New(os.Stdout, "[DRIVER_EARNINGS] ", log.LstdFlags))
 	driverSelfServiceHandler := gatewayHttp.NewDriverSelfServiceHandler(dbPool, redisClusterClient, objStore, supportWriter, log.New(os.Stdout, "[DRIVER_SELF] ", log.LstdFlags))
 	driverSafetyHandler := gatewayHttp.NewSafetyHandler(dbPool)
@@ -654,6 +655,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/driver-account/wallet", authGuard.AuthenticateJWT(driverFeaturesHandler.GetWallet))
 	mux.HandleFunc("GET /api/v1/driver-account/training", authGuard.AuthenticateJWT(driverFeaturesHandler.ListTraining))
 	mux.HandleFunc("POST /api/v1/driver-account/training/{id}/submit", authGuard.AuthenticateJWT(driverFeaturesHandler.SubmitTrainingQuiz))
+
+	// Driver Engagement (incentives, performance, notifications, profile, referrals).
+	mux.HandleFunc("GET /api/v1/driver/incentives", authGuard.AuthenticateJWT(driverEngagementHandler.GetIncentives))
+	mux.HandleFunc("GET /api/v1/driver/performance", authGuard.AuthenticateJWT(driverEngagementHandler.GetPerformance))
+	mux.HandleFunc("PATCH /api/v1/driver/notifications/{id}/read", authGuard.AuthenticateJWT(driverEngagementHandler.MarkNotificationRead))
+	mux.HandleFunc("PATCH /api/v1/driver/profile", authGuard.AuthenticateJWT(driverEngagementHandler.UpdateProfile))
+	mux.HandleFunc("GET /api/v1/driver/me/documents", authGuard.AuthenticateJWT(driverEngagementHandler.ListMyDocuments))
+	mux.HandleFunc("GET /api/v1/driver/referrals", authGuard.AuthenticateJWT(driverEngagementHandler.GetReferrals))
 
 	// Driver odometer ingestion endpoint (Phase 2: The Odometer Writer)
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))

@@ -1,18 +1,41 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { FareDisplay } from '@/components/ds';
+import { getDriverReferrals } from '@/api/client';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function DriverReferPage() {
   const t = useTranslations('driverRefer');
-  const code = 'DRV-ANIKET-998';
+  const { token } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const stats = {
+  const [code, setCode] = useState('DRV-ANIKET-998');
+  const [stats, setStats] = useState({
     joined: 3,
     pending: 1,
     earnings: 1500.00
-  };
+  });
+
+  const load = useCallback(async () => {
+    if (!token) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const res = await getDriverReferrals(token);
+      setCode(res.code);
+      setStats(res.stats);
+      setError(null);
+    } catch (err) {
+      console.warn('[DriverRefer] fetch failed:', err);
+      setError('Live referral data is unavailable.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -33,6 +56,8 @@ export default function DriverReferPage() {
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
         <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">{t('subtitle')}</p>
+        {error && <p className="text-content-negative text-[10px] font-mono mt-2">{error}</p>}
+        {loading && <p className="text-content-tertiary text-[10px] font-mono mt-2 animate-pulse uppercase tracking-wider">Loading referrals…</p>}
       </div>
 
       {/* Code card */}

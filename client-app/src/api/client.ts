@@ -1256,3 +1256,112 @@ export async function deleteDriverAccount(token: string): Promise<{ status: stri
   return request<{ status: string }>("/api/v1/driver/account", { method: "DELETE", token });
 }
 
+// ─── Driver-account: incentives / performance / referrals / profile / docs ─────
+// Field names mirror the current page mock objects so the live JSON drops straight
+// into the existing renders.
+
+export interface DriverIncentiveQuest {
+  title: string;
+  desc: string;
+  completed: number;
+  total: number;
+  reward: number;
+  expiry: string;
+}
+
+export interface DriverSurgePrediction {
+  zone: string;
+  multiplier: string;
+}
+
+export interface DriverIncentivesResponse {
+  quests: DriverIncentiveQuest[];
+  surge_predictions: DriverSurgePrediction[];
+}
+
+export async function getDriverIncentives(token: string): Promise<DriverIncentivesResponse> {
+  return request<DriverIncentivesResponse>("/api/v1/driver/incentives", { method: "GET", token });
+}
+
+export interface DriverPerformanceMetrics {
+  rating: number;
+  acceptance: number;
+  cancellation: number;
+  completion: number;
+  trips: number;
+}
+
+export interface DriverPerformanceCompliment {
+  label: string;
+  count: number;
+}
+
+export interface DriverPerformanceReview {
+  name: string;
+  rating: number;
+  date: string;
+  text: string;
+}
+
+export interface DriverPerformanceTier {
+  name: string;
+  perks: string;
+}
+
+export interface DriverPerformanceResponse {
+  metrics: DriverPerformanceMetrics;
+  compliments: DriverPerformanceCompliment[];
+  reviews: DriverPerformanceReview[];
+  tiers: DriverPerformanceTier[];
+}
+
+export async function getDriverPerformance(token: string): Promise<DriverPerformanceResponse> {
+  return request<DriverPerformanceResponse>("/api/v1/driver/performance", { method: "GET", token });
+}
+
+export interface DriverReferralsResponse {
+  code: string;
+  stats: {
+    joined: number;
+    pending: number;
+    earnings: number;
+  };
+}
+
+export async function getDriverReferrals(token: string): Promise<DriverReferralsResponse> {
+  return request<DriverReferralsResponse>("/api/v1/driver/referrals", { method: "GET", token });
+}
+
+export interface DriverKycDocument {
+  name: string;
+  status: string;
+  date: string;
+}
+
+export async function getDriverDocuments(token: string): Promise<{ documents: DriverKycDocument[] }> {
+  return request<{ documents: DriverKycDocument[] }>("/api/v1/driver/me/documents", { method: "GET", token });
+}
+
+export async function updateDriverProfile(
+  token: string,
+  body: { name?: string; bio?: string },
+): Promise<{ name?: string; bio?: string; status?: string }> {
+  return request("/api/v1/driver/profile", { method: "PATCH", token, body });
+}
+
+export async function markNotificationRead(token: string, id: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/notifications/${id}/read`, { method: "PATCH", token });
+}
+
+// ─── Safety: fatigue / mandatory rest break ────────────────────────────────────
+
+export interface FatigueCheckResponse {
+  must_take_break: boolean;
+  hours_remaining: number;
+  message?: string;
+}
+
+export async function getFatigueCheck(token: string): Promise<FatigueCheckResponse> {
+  return request<FatigueCheckResponse>("/api/v1/driver/safety/fatigue-check", { method: "GET", token });
+}
+
