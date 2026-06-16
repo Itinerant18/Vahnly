@@ -9,7 +9,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "drivers-for-u.name" $ }}-{{ $svc }}-pdb
+  name: {{ include "vahnly.name" $ }}-{{ $svc }}-pdb
   labels:
     app: {{ $svc }}
 spec:

@@ -211,7 +211,7 @@ export default function LoginPage() {
       <div className="flex flex-[2] flex-col items-center justify-center gap-4 px-6 pt-safe-top">
         <Logo />
         <div className="text-center">
-          <h1 className="text-display-small text-content-primary mt-4">Drivers for U</h1>
+          <h1 className="text-display-small text-content-primary mt-4">Vahnly</h1>
           <p className="text-paragraph-large text-content-secondary mt-2">
             Your car. Our driver.
           </p>

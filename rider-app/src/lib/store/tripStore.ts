@@ -102,6 +102,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       if (typeof window !== "undefined") {
         if (res.order.status === "COMPLETED" || res.order.status === "CANCELLED") {
           window.localStorage.removeItem(OTP_STORAGE_KEY);
+        } else if (res.otp) {
+          // Server is now the source of truth for the pre-pickup OTP.
+          set({ otp: res.otp });
+          window.localStorage.setItem(OTP_STORAGE_KEY, res.otp);
         } else {
           const saved = window.localStorage.getItem(OTP_STORAGE_KEY);
           if (saved) set({ otp: saved });

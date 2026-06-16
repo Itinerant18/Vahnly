@@ -64,8 +64,9 @@ function SupportBody() {
   const [trips, setTrips] = useState<Order[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<string | null>(preOrderId);
   const [message, setMessage] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [submitNote, setSubmitNote] = useState<string | null>(null);
+  const [createdTicket, setCreatedTicket] = useState<SupportTicket | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
 
   // Ticket list / thread
@@ -106,22 +107,24 @@ function SupportBody() {
   const canSubmit = !!category && (!needsTrip || !!selectedTrip) && message.trim().length >= 5;
 
   const submit = async () => {
-    if (!canSubmit || !cat) return;
+    if (!canSubmit || !cat || submitting) return;
     const subject = `${cat.label} — ${message.trim().slice(0, 60)}`;
+    setSubmitting(true);
+    setSubmitError(null);
     try {
-      await supportApi.create({
+      const ticket = await supportApi.create({
         category: cat.key,
         subject,
         message: message.trim(),
         order_id: selectedTrip ?? undefined,
         user_type: "RIDER",
       });
-      setSubmitNote(null);
+      setCreatedTicket(ticket);
       refreshTickets();
-    } catch {
-      setSubmitNote("We couldn't reach support right now, but we've noted your request.");
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "We couldn't submit your ticket. Please try again.");
     } finally {
-      setSubmitted(true);
+      setSubmitting(false);
     }
   };
 
@@ -266,30 +269,43 @@ function SupportBody() {
     );
   }
 
-  // ─── Submitted confirmation ─────────────────────────────────────────────────
-  if (submitted) {
+  const resetForm = () => {
+    setCreatedTicket(null);
+    setCategory(null);
+    setSelectedTrip(null);
+    setMessage("");
+    setSubmitError(null);
+  };
+
+  // ─── Submitted confirmation (only after a real success) ─────────────────────
+  if (createdTicket) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-positive text-3xl">
           ✅
         </div>
-        <p className="text-base font-bold text-content-primary">Ticket submitted</p>
+        <p className="text-base font-bold text-content-primary">Ticket #{createdTicket.id.slice(0, 8)} created</p>
         <p className="max-w-xs text-sm text-content-secondary">
           We&apos;ve received your request. Our team will reply within 24 hours.
         </p>
-        {submitNote && <p className="max-w-xs text-xs text-content-tertiary">{submitNote}</p>}
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setCategory(null);
-            setSelectedTrip(null);
-            setMessage("");
-            setSubmitNote(null);
-          }}
-          className="mt-2 rounded-2xl bg-background-secondary px-5 py-2.5 text-sm font-semibold text-content-primary"
-        >
-          Done
-        </button>
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => {
+              const t = createdTicket;
+              resetForm();
+              void openThread(t);
+            }}
+            className="rounded-2xl bg-interactive-primary px-5 py-2.5 text-sm font-bold text-interactive-primary-text"
+          >
+            View ticket
+          </button>
+          <button
+            onClick={resetForm}
+            className="rounded-2xl bg-background-secondary px-5 py-2.5 text-sm font-semibold text-content-primary"
+          >
+            Done
+          </button>
+        </div>
       </div>
     );
   }
@@ -361,11 +377,12 @@ function SupportBody() {
           />
           <button
             onClick={submit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
             className="mt-3 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text disabled:opacity-40"
           >
-            Submit Ticket
+            {submitting ? "Submitting…" : "Submit Ticket"}
           </button>
+          {submitError && <p className="mt-2 text-sm text-content-negative">{submitError}</p>}
         </div>
       )}
 

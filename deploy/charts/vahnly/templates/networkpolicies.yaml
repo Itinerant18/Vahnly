@@ -9,7 +9,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-default-deny-ingress
+  name: {{ include "vahnly.name" . }}-default-deny-ingress
 spec:
   podSelector: {}
   policyTypes: ["Ingress"]
@@ -19,7 +19,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-gateway-ingress
+  name: {{ include "vahnly.name" . }}-gateway-ingress
 spec:
   podSelector:
     matchLabels:
@@ -37,7 +37,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-gateway-metrics-ingress
+  name: {{ include "vahnly.name" . }}-gateway-metrics-ingress
 spec:
   podSelector:
     matchLabels:
@@ -57,7 +57,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-app-egress
+  name: {{ include "vahnly.name" . }}-app-egress
 spec:
   podSelector: {}
   policyTypes: ["Egress"]

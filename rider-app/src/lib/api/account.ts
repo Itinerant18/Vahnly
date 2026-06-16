@@ -39,6 +39,11 @@ export const accountApi = {
       "/api/v1/rider/me/emergency-contacts",
       c,
     ),
+  updateEmergency: (id: string, c: EmergencyContactInput) =>
+    apiClient.put<{ message: string }>(
+      `/api/v1/rider/me/emergency-contacts/${id}`,
+      c,
+    ),
   removeEmergency: (id: string) =>
     apiClient.del<{ message: string }>(
       `/api/v1/rider/me/emergency-contacts/${id}`,
@@ -75,7 +80,7 @@ export const accountApi = {
       prefs,
     ),
 
-  // Account deletion (irreversible)
+  // Account deletion (irreversible). Backend route is DELETE /api/v1/rider/me.
   deleteAccount: () =>
-    apiClient.del<{ message: string }>("/api/v1/rider/account"),
+    apiClient.del<{ message: string }>("/api/v1/rider/me"),
 };

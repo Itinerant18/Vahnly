@@ -6,12 +6,34 @@ import { cmsApi } from "@/lib/api/cms";
 import type { CMSDocument, CMSDocumentType } from "@/lib/api/types";
 import { Capacitor } from "@capacitor/core";
 
-const TABS: { type: CMSDocumentType; label: string }[] = [
+// "LICENSES" is a local, static tab — it has no CMS document behind it.
+type TabKey = CMSDocumentType | "LICENSES";
+
+const TABS: { type: TabKey; label: string }[] = [
   { type: "TERMS_OF_SERVICE", label: "Terms of Service" },
   { type: "PRIVACY_POLICY", label: "Privacy Policy" },
   { type: "CANCELLATION_POLICY", label: "Cancellation Policy" },
   { type: "REFUND_POLICY", label: "Refund Policy" },
+  { type: "LICENSES", label: "Licenses" },
 ];
+
+const LICENSES_DOC: CMSDocument = {
+  type: "TERMS_OF_SERVICE",
+  title: "Open-Source Licenses",
+  html: `
+    <p>This app is built with open-source software. We gratefully acknowledge the
+    projects below, each used under its respective license.</p>
+    <ul>
+      <li><strong>React</strong> &amp; <strong>Next.js</strong> — MIT License</li>
+      <li><strong>Capacitor</strong> — MIT License</li>
+      <li><strong>Tailwind CSS</strong> — MIT License</li>
+      <li><strong>Zustand</strong> — MIT License</li>
+      <li><strong>Maplibre GL</strong> — BSD-3-Clause License</li>
+    </ul>
+    <p>Full license texts are available on request at the support contact listed
+    in the app.</p>
+  `,
+};
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const cacheKey = (type: CMSDocumentType) => `dfu_legal_${type}`;
@@ -58,15 +80,22 @@ function formatDate(iso?: string): string | null {
 }
 
 export default function LegalPage() {
-  const [active, setActive] = useState<CMSDocumentType>("TERMS_OF_SERVICE");
+  const [active, setActive] = useState<TabKey>("TERMS_OF_SERVICE");
   const [doc, setDoc] = useState<CMSDocument | null>(null);
   const [loading, setLoading] = useState(false);
   const [errored, setErrored] = useState(false);
 
   const loadDoc = useCallback(
-    async (type: CMSDocumentType, opts?: { force?: boolean }) => {
+    async (type: TabKey, opts?: { force?: boolean }) => {
       const force = opts?.force ?? false;
       setErrored(false);
+
+      // Static, local tab — no network, no cache.
+      if (type === "LICENSES") {
+        setDoc(LICENSES_DOC);
+        setLoading(false);
+        return;
+      }
 
       const cached = readCache(type);
       if (!force && cached && Date.now() - cached.ts < CACHE_TTL) {

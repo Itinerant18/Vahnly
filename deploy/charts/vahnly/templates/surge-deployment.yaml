@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-surge
+  name: {{ include "vahnly.name" . }}-surge
   labels:
     app: surge
 spec:
@@ -19,19 +19,19 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
+            {{- include "vahnly.securityContext" . | nindent 12 }}
           command: ["/entrypoint"]
           env:
             - name: KAFKA_BROKERS
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
-            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
+            {{- include "vahnly.redisAuthEnv" . | nindent 12 }}
             - name: SURGE_CITY_PREFIX
               value: {{ .Values.global.region | quote }}
             - name: SURGE_TRACKED_CELLS
               value: {{ .Values.surge.trackedCells | quote }}
-            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
+            {{- include "vahnly.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: 8080
               name: health

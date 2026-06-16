@@ -84,7 +84,10 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     set({ tripType: t });
     get().fetchFareEstimate();
   },
-  setDurationHours: (h) => set({ durationHours: h }),
+  setDurationHours: (h) => {
+    set({ durationHours: h });
+    get().fetchFareEstimate();
+  },
   setSelectedCar: (carId) => set({ selectedCarId: carId, oneTimeCar: null }),
   setOneTimeCar: (car) => set({ oneTimeCar: car, selectedCarId: null }),
   setPersonsCount: (n) => set({ personsCount: Math.max(1, Math.min(8, n)) }),
@@ -92,14 +95,37 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   setPromoCode: (code) => set({ promoCode: code }),
 
   validatePromo: async () => {
-    const { promoCode, fareEstimate } = get();
-    if (!promoCode || !fareEstimate) {
+    const s = get();
+    if (!s.promoCode || !s.pickup) {
       set({ promoResult: null });
       return;
     }
-    // The backend validates the promo as part of the fare estimate; re-fetch to
-    // surface the applied discount.
-    get().fetchFareEstimate();
+    // The backend prices the promo inside fare-estimate. Call it directly
+    // (bypassing the 500ms debounce) so we can surface the applied discount and
+    // throw when the code is rejected (no discount produced).
+    set({ isSearching: true });
+    try {
+      const est = await fareApi.estimate({
+        pickup_lat: s.pickup.lat,
+        pickup_lng: s.pickup.lng,
+        dropoff_lat: s.dropoff?.lat,
+        dropoff_lng: s.dropoff?.lng,
+        trip_type: s.tripType,
+        duration_hours: s.durationHours,
+        promo_code: s.promoCode,
+        d4m_care: s.d4mCare,
+        payment_method: s.paymentMethod,
+      });
+      const discount = est.fare_breakdown.promo_discount_paise;
+      set({
+        fareEstimate: est,
+        promoResult:
+          discount > 0 ? { code: s.promoCode, discount_paise: discount } : null,
+      });
+      if (discount <= 0) throw new Error("promo_invalid");
+    } finally {
+      set({ isSearching: false });
+    }
   },
 
   setD4mCare: (on) => {

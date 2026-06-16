@@ -10,7 +10,7 @@ export function ShareTripSheet({ onClose }: ShareTripSheetProps) {
   const activeOrder = useTripStore((s) => s.activeOrder);
   const shareToken = activeOrder?.trip_share_token;
   const shareUrl = shareToken
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/${shareToken}`
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/trip-share?token=${shareToken}`
     : "";
 
   const copyLink = async () => {

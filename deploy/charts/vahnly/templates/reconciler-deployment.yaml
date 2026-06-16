@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-reconciler
+  name: {{ include "vahnly.name" . }}-reconciler
   labels:
     app: reconciler
 spec:
@@ -19,13 +19,13 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
+            {{- include "vahnly.securityContext" . | nindent 12 }}
           command: ["/entrypoint"]
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-db-credentials
+                  name: {{ include "vahnly.name" . }}-db-credentials
                   key: database-url
             - name: KAFKA_BROKERS
               value: {{ .Values.global.env.kafkaBrokers | quote }}
@@ -33,7 +33,7 @@ spec:
               value: {{ .Values.global.region | quote }}
             - name: RECONCILER_METRICS_PORT
               value: "8091"
-            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
+            {{- include "vahnly.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: 8091
               name: metrics

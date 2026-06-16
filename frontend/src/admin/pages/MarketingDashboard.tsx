@@ -1562,7 +1562,7 @@ export const MarketingDashboard: React.FC = () => {
 									<input
 										type="text"
 										required
-										placeholder="e.g. notifications.driversforu.com"
+										placeholder="e.g. notifications.vahnly.com"
 										value={newDomain.domain}
 										onChange={e => setNewDomain({ ...newDomain, domain: e.target.value })}
 										className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 focus:outline-none focus:border-content-primary font-mono font-bold"

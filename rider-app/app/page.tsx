@@ -3,7 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
+import { ordersApi } from '@/lib/api/orders';
 import Link from 'next/link';
+
+// Statuses for which an in-progress trip should send the rider straight to the
+// live screen instead of the home tab.
+const LIVE_TRIP_STATUSES = [
+  'ASSIGNED',
+  'EN_ROUTE_TO_PICKUP',
+  'ARRIVED_AT_PICKUP',
+  'DELIVERING',
+] as const;
 
 export default function IndexPage() {
   const router = useRouter();
@@ -12,9 +22,27 @@ export default function IndexPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (token) {
-      router.replace('/home');
-    }
+    if (!token) return;
+    // Logged-in rider: check for an active trip before routing. If one is
+    // in progress, jump to the live screen; otherwise land on home.
+    let cancelled = false;
+    ordersApi
+      .active()
+      .then((res) => {
+        if (cancelled) return;
+        const status = res.order?.status;
+        if (status && (LIVE_TRIP_STATUSES as readonly string[]).includes(status)) {
+          router.replace('/trip/live');
+        } else {
+          router.replace('/home');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) router.replace('/home');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token, router]);
 
   if (!mounted) {

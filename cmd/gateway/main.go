@@ -196,6 +196,16 @@ func main() {
 	riderAppHandler := riderHttp.NewRiderHandler(riderAppRepo, riderAuthSvc, riderOnboardingSvc, riderReferralSvc, riderAppLogger)
 	riderAuthMW := riderHttp.NewRiderAuthMiddleware(riderAuthSvc)
 
+	// Supplementary rider handlers (payments, insurance, support, notification
+	// preferences, nearby drivers, public CMS) sharing the same pgx pool + logger.
+	riderPaymentHandler := riderHttp.NewPaymentHandler(dbPool, riderAppLogger)
+	riderInsuranceHandler := riderHttp.NewInsuranceHandler(dbPool, riderAppLogger)
+	riderSupportHandler := riderHttp.NewSupportHandler(dbPool, riderAppLogger)
+	riderNotifPrefsHandler := riderHttp.NewNotifPrefsHandler(dbPool, riderAppLogger)
+	riderNearbyHandler := riderHttp.NewNearbyHandler(dbPool, riderAppLogger)
+	riderCMSHandler := riderHttp.NewCMSHandler(dbPool, riderAppLogger)
+	riderPhotoHandler := riderHttp.NewPhotoHandler(objStore, riderAppLogger)
+
 	// Reward referrals on the referred rider's first completed trip. Wired via the
 	// gateway completion callback (in-process) rather than a separate Kafka consumer.
 	gatewayHttp.RiderTripCompletedCallback = func(orderID, riderID string) {
@@ -698,6 +708,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/rider/me/referral", riderAuthMW.Require(riderAppHandler.HandleGetReferral))
 	mux.HandleFunc("GET /api/v1/rider/me/notifications", riderAuthMW.Require(riderAppHandler.HandleListNotifications))
 	mux.HandleFunc("PATCH /api/v1/rider/me/notifications/{id}/read", riderAuthMW.Require(riderAppHandler.HandleMarkNotificationRead))
+	mux.HandleFunc("POST /api/v1/rider/me/photo", riderAuthMW.Require(riderPhotoHandler.HandleUploadPhoto))
 
 	// Rider App: fare estimate + booking lifecycle. Protected routes are RIDER-scoped;
 	// trip-share is public (sanitized, token-gated).
@@ -709,8 +720,38 @@ func main() {
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/rate", riderAuthMW.Require(riderBookingHandler.HandleRateDriver))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", riderAuthMW.Require(riderBookingHandler.HandleSOS))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/stops", riderAuthMW.Require(riderBookingHandler.HandleAddStop))
+	mux.HandleFunc("PATCH /api/v1/rider/orders/{orderId}/drop", riderAuthMW.Require(riderBookingHandler.HandleChangeDrop))
 	mux.HandleFunc("PATCH /api/v1/rider/orders/{orderId}/extend", riderAuthMW.Require(riderBookingHandler.HandleExtend))
+	mux.HandleFunc("GET /api/v1/rider/orders/{orderId}/invoice", riderAuthMW.Require(riderBookingHandler.HandleInvoice))
 	mux.HandleFunc("GET /api/v1/trip-share/{shareToken}", riderBookingHandler.HandleTripShare)
+
+	// Rider App: payment methods (cards stored as brand+last4, UPI as VPA).
+	mux.HandleFunc("GET /api/v1/rider/me/payment-methods", riderAuthMW.Require(riderPaymentHandler.HandleListPaymentMethods))
+	mux.HandleFunc("POST /api/v1/rider/me/payment-methods", riderAuthMW.Require(riderPaymentHandler.HandleAddPaymentMethod))
+	mux.HandleFunc("DELETE /api/v1/rider/me/payment-methods/{methodId}", riderAuthMW.Require(riderPaymentHandler.HandleDeletePaymentMethod))
+	mux.HandleFunc("PATCH /api/v1/rider/me/payment-methods/{methodId}/set-default", riderAuthMW.Require(riderPaymentHandler.HandleSetDefaultPaymentMethod))
+	mux.HandleFunc("GET /api/v1/payment/verify-upi", riderAuthMW.Require(riderPaymentHandler.HandleVerifyUPI))
+
+	// Rider App: D4M-Care insurance claims + per-order coverage lookup.
+	mux.HandleFunc("GET /api/v1/rider/insurance/claims", riderAuthMW.Require(riderInsuranceHandler.HandleListClaims))
+	mux.HandleFunc("POST /api/v1/rider/insurance/claims", riderAuthMW.Require(riderInsuranceHandler.HandleFileClaim))
+	mux.HandleFunc("GET /api/v1/rider/insurance/coverage/{orderId}", riderAuthMW.Require(riderInsuranceHandler.HandleCoverage))
+
+	// Rider App: support tickets (creator_type='RIDER' on shared support tables).
+	mux.HandleFunc("POST /api/v1/rider/support/tickets", riderAuthMW.Require(riderSupportHandler.HandleCreateTicket))
+	mux.HandleFunc("GET /api/v1/rider/support/tickets", riderAuthMW.Require(riderSupportHandler.HandleListTickets))
+	mux.HandleFunc("GET /api/v1/rider/support/tickets/{id}", riderAuthMW.Require(riderSupportHandler.HandleGetTicket))
+	mux.HandleFunc("POST /api/v1/rider/support/tickets/{id}/reply", riderAuthMW.Require(riderSupportHandler.HandleReplyTicket))
+
+	// Rider App: notification preferences (per-category push/SMS/email toggles).
+	mux.HandleFunc("GET /api/v1/rider/notifications/preferences", riderAuthMW.Require(riderNotifPrefsHandler.HandleGetPreferences))
+	mux.HandleFunc("PATCH /api/v1/rider/notifications/preferences", riderAuthMW.Require(riderNotifPrefsHandler.HandleUpdatePreferences))
+
+	// Rider App: nearby-driver markers for the map idle state (deterministic stub).
+	mux.HandleFunc("GET /api/v1/rider/nearby-drivers", riderAuthMW.Require(riderNearbyHandler.HandleNearbyDrivers))
+
+	// Public CMS legal/policy documents (no auth — rendered on unauthenticated screens).
+	mux.HandleFunc("GET /api/v1/cms/document", riderCMSHandler.HandleGetDocument)
 
 	// Rider live-trip WebSocket (token in query; authenticated via RiderFromJWT).
 	// Rider live-trip stream. Ticket-authenticated (single-use ?ticket= minted by

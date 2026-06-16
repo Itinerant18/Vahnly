@@ -1,9 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useNotificationStore } from "@/lib/store/notificationStore";
+import { useAuthStore } from "@/lib/store/authStore";
 
 function HomeIcon({ active }: { active: boolean }) {
   const c = active ? "var(--accent-400)" : "var(--content-secondary)";
@@ -57,7 +59,22 @@ const NAV = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Auth guard: no token → bounce to login. Render nothing until we've confirmed
+  // a token exists, so the app shell never flashes for signed-out users.
+  useEffect(() => {
+    if (!token) {
+      router.replace("/login");
+    } else {
+      setAuthChecked(true);
+    }
+  }, [token, router]);
+
+  if (!authChecked) return null;
 
   return (
     <div className="min-h-screen bg-background-primary pb-[68px]">

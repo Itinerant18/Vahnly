@@ -4,7 +4,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-gateway
+  name: {{ include "vahnly.name" . }}-gateway
   labels:
     app: gateway
   annotations:
@@ -28,7 +28,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "drivers-for-u.name" . }}-gateway-svc
+                name: {{ include "vahnly.name" . }}-gateway-svc
                 port:
                   number: 80
 {{- if .Values.ingress.adminAllowlist.sourceRanges }}
@@ -42,7 +42,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-gateway-admin
+  name: {{ include "vahnly.name" . }}-gateway-admin
   labels:
     app: gateway
   annotations:
@@ -67,7 +67,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "drivers-for-u.name" . }}-gateway-svc
+                name: {{ include "vahnly.name" . }}-gateway-svc
                 port:
                   number: 80
 {{- end }}

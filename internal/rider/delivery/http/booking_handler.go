@@ -189,6 +189,28 @@ func (h *BookingHandler) HandleAddStop(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, order)
 }
 
+func (h *BookingHandler) HandleChangeDrop(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		DropoffLat     float64 `json:"dropoff_lat"`
+		DropoffLng     float64 `json:"dropoff_lng"`
+		DropoffAddress string  `json:"dropoff_address"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	order, err := h.booking.ChangeDrop(r.Context(), id, r.PathValue("orderId"), req.DropoffLat, req.DropoffLng, req.DropoffAddress)
+	if err != nil {
+		h.writeBookingError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, order)
+}
+
 func (h *BookingHandler) HandleExtend(w http.ResponseWriter, r *http.Request) {
 	id, ok := h.riderID(w, r)
 	if !ok {

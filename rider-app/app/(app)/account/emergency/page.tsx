@@ -15,6 +15,7 @@ export default function EmergencyPage() {
   const [autoShare, setAutoShare] = useState(false);
   const [showTip, setShowTip] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<EmergencyContact | null>(null);
 
   const load = () => {
     setError(false);
@@ -84,52 +85,80 @@ export default function EmergencyPage() {
                   {c.relationship ? ` · ${c.relationship}` : ""}
                 </p>
               </div>
-              <button onClick={() => remove(c.id)} className="text-xs font-semibold text-content-negative">
-                Delete
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setEditing(c);
+                    setAdding(false);
+                  }}
+                  className="text-xs font-semibold text-content-accent"
+                >
+                  Edit
+                </button>
+                <button onClick={() => remove(c.id)} className="text-xs font-semibold text-content-negative">
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {!atMax &&
-        (adding ? (
-          <AddContactForm
-            order={contacts?.length ?? 0}
-            autoShare={autoShare}
-            onCancel={() => setAdding(false)}
-            onSaved={() => {
-              setAdding(false);
-              load();
-            }}
-          />
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
-          >
-            + Add Contact
-          </button>
-        ))}
-      {atMax && <p className="mt-4 text-center text-xs text-content-tertiary">Maximum of 3 contacts reached</p>}
+      {editing ? (
+        <AddContactForm
+          editing={editing}
+          order={editing.display_order ?? 0}
+          autoShare={autoShare}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      ) : (
+        <>
+          {!atMax &&
+            (adding ? (
+              <AddContactForm
+                order={contacts?.length ?? 0}
+                autoShare={autoShare}
+                onCancel={() => setAdding(false)}
+                onSaved={() => {
+                  setAdding(false);
+                  load();
+                }}
+              />
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
+              >
+                + Add Contact
+              </button>
+            ))}
+          {atMax && <p className="mt-4 text-center text-xs text-content-tertiary">Maximum of 3 contacts reached</p>}
+        </>
+      )}
     </AccountScaffold>
   );
 }
 
 function AddContactForm({
+  editing,
   order,
   autoShare,
   onCancel,
   onSaved,
 }: {
+  editing?: EmergencyContact;
   order: number;
   autoShare: boolean;
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [relationship, setRelationship] = useState("");
+  const [name, setName] = useState(editing?.name ?? "");
+  const [phone, setPhone] = useState(editing?.phone ?? "");
+  const [relationship, setRelationship] = useState(editing?.relationship ?? "");
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [saving, setSaving] = useState(false);
 
@@ -149,11 +178,15 @@ function AddContactForm({
       name: name.trim(),
       phone,
       relationship: relationship.trim() || undefined,
-      auto_share_trip: autoShare,
+      auto_share_trip: editing ? editing.auto_share_trip : autoShare,
       display_order: order,
     };
     try {
-      await accountApi.addEmergency(payload);
+      if (editing) {
+        await accountApi.updateEmergency(editing.id, payload);
+      } else {
+        await accountApi.addEmergency(payload);
+      }
       onSaved();
     } catch {
       setErrors({ name: "Could not save. Try again." });
@@ -199,7 +232,7 @@ function AddContactForm({
           disabled={saving}
           className="flex-1 rounded-xl bg-interactive-primary py-3 text-sm font-bold text-interactive-primary-text disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : editing ? "Update" : "Save"}
         </button>
       </div>
     </div>

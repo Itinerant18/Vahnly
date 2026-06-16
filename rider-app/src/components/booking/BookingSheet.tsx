@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { garageApi } from "@/lib/api/garage";
+import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
-import type { GarageCar, PaymentMethod, TripType } from "@/lib/api/types";
+import type { GarageCar, LocationPoint, PaymentMethod, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
   { value: "IN_CITY_ROUND",    label: "Round Trip" },
@@ -94,11 +95,107 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
+// ── PlaceInput — debounced Nominatim search with a results dropdown ───────────
+function PlaceInput({
+  value,
+  placeholder,
+  icon,
+  onSelect,
+  onClear,
+}: {
+  value: string;
+  placeholder: string;
+  icon: React.ReactNode;
+  onSelect: (place: LocationPoint) => void;
+  onClear?: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [open, setOpen] = useState(false);
+
+  // Debounce ~400ms; ignore stale responses if the query changed mid-flight.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      searchPlaces(q).then((r) => {
+        if (!cancelled) {
+          setResults(r);
+          setOpen(true);
+        }
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  const choose = (r: GeocodeResult) => {
+    onSelect({ lat: r.lat, lng: r.lng, address: r.display_name });
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">{icon}</div>
+        <input
+          className="flex-1 bg-transparent text-paragraph-medium text-content-primary
+            outline-none placeholder:text-content-tertiary"
+          placeholder={placeholder}
+          value={query || value}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => { if (results.length) setOpen(true); }}
+        />
+        {(value || query) && onClear && (
+          <button
+            type="button"
+            onClick={() => { onClear(); setQuery(""); setResults([]); setOpen(false); }}
+            className="text-content-tertiary hover:text-content-primary text-label-small min-w-[24px] text-center"
+            aria-label="Clear location"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {open && results.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-sm
+          border border-border-opaque bg-background-primary shadow-elevation-3">
+          {results.map((r, i) => (
+            <button
+              key={`${r.lat},${r.lng},${i}`}
+              type="button"
+              onClick={() => choose(r)}
+              className="flex w-full items-start gap-2 px-3 py-2.5 text-left min-h-[44px]
+                hover:bg-background-secondary transition-base
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mt-0.5 flex-shrink-0">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" fill="currentColor" className="text-content-tertiary" />
+              </svg>
+              <span className="text-paragraph-small text-content-primary line-clamp-2">{r.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main BookingSheet ─────────────────────────────────────────────────────────
+type Snap = "peek" | "half" | "full";
+
 export function BookingSheet() {
   const router = useRouter();
   const sheetRef = useRef<HTMLDivElement>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [snapPoint, setSnapPoint] = useState<Snap>("peek");
   const dragStartY = useRef(0);
   const dragStartPx = useRef(0);
   const isDragging = useRef(false);
@@ -132,19 +229,22 @@ export function BookingSheet() {
   const needsDuration = tripType === "IN_CITY_ROUND" || tripType === "OUTSTATION" || tripType === "MINI_OUTSTATION";
   const needsDrop = tripType !== "IN_CITY_ROUND";
 
-  // ── Drag/snap logic ────────────────────────────────────────────────────────
+  // ── Drag/snap logic (3 snaps: peek ~120px, half ~55%, full ~92%) ─────────────
+  // Values are "px from the top of the viewport" where the sheet's top edge sits.
+  // Smaller = sheet pulled further up / more content visible.
   const getSnapPx = useCallback(() => {
     const h = sheetRef.current?.offsetHeight ?? (typeof window !== "undefined" ? window.innerHeight : 800);
     return {
-      collapsed: h - 120,
-      expanded: Math.round(h * 0.15),
+      peek: h - 120,            // ~120px visible
+      half: Math.round(h * 0.45), // ~55% height visible
+      full: Math.round(h * 0.08), // ~92% height visible
     };
   }, []);
 
   const onTouchStart = (e: React.TouchEvent) => {
     const snap = getSnapPx();
     dragStartY.current = e.touches[0].clientY;
-    dragStartPx.current = expanded ? snap.expanded : snap.collapsed;
+    dragStartPx.current = snap[snapPoint];
     isDragging.current = true;
   };
 
@@ -152,7 +252,7 @@ export function BookingSheet() {
     if (!isDragging.current) return;
     const delta = e.touches[0].clientY - dragStartY.current;
     const snap = getSnapPx();
-    const clamped = Math.max(snap.expanded, Math.min(snap.collapsed, dragStartPx.current + delta));
+    const clamped = Math.max(snap.full, Math.min(snap.peek, dragStartPx.current + delta));
     setDragPx(clamped);
   };
 
@@ -160,21 +260,30 @@ export function BookingSheet() {
     isDragging.current = false;
     if (dragPx !== null) {
       const snap = getSnapPx();
-      const mid = (snap.expanded + snap.collapsed) / 2;
-      setExpanded(dragPx < mid);
+      // Snap to whichever of the three points is nearest on release.
+      const nearest = (["peek", "half", "full"] as const).reduce((best, key) =>
+        Math.abs(snap[key] - dragPx) < Math.abs(snap[best] - dragPx) ? key : best,
+      "peek");
+      setSnapPoint(nearest);
       setDragPx(null);
     }
   };
 
-  const snap = typeof window !== "undefined" ? getSnapPx() : { collapsed: 680, expanded: 120 };
+  // Tap on the handle cycles peek → half → full → peek.
+  const onHandleTap = () => {
+    setSnapPoint((s) => (s === "peek" ? "half" : s === "half" ? "full" : "peek"));
+  };
+
+  const snap = typeof window !== "undefined" ? getSnapPx() : { peek: 680, half: 360, full: 64 };
   const translateY = dragPx !== null
     ? `${dragPx}px`
-    : expanded
-      ? `${snap.expanded}px`
-      : `calc(100% - 120px)`;
+    : snapPoint === "peek"
+      ? `calc(100% - 120px)`
+      : `${snap[snapPoint]}px`;
 
   // ── Promo ──────────────────────────────────────────────────────────────────
   const applyPromo = async () => {
+    setPromoCode(promoInput);
     try {
       await validatePromo();
       setPromoStatus("ok");
@@ -215,7 +324,7 @@ export function BookingSheet() {
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          onClick={() => setExpanded((e) => !e)}
+          onClick={onHandleTap}
         >
           <div className="mx-auto h-1 w-9 rounded-pill bg-border-opaque" />
         </div>
@@ -239,57 +348,31 @@ export function BookingSheet() {
             </div>
           </Section>
 
-          {/* [2] Pickup */}
+          {/* [2] Pickup — current location prefilled by home page; type to search */}
           <Section>
-            <div className="flex items-center gap-3">
-              {/* accent-400 dot */}
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
-                <div className="h-3 w-3 rounded-pill bg-accent-400" />
-              </div>
-              <input
-                className="flex-1 bg-transparent text-paragraph-medium text-content-primary
-                  outline-none placeholder:text-content-tertiary"
-                placeholder="Pickup location"
-                value={pickup?.address ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setPickup(val ? { lat: 22.5726, lng: 88.3639, address: val } : null);
-                }}
-              />
-              {pickup?.address && (
-                <button
-                  type="button"
-                  onClick={() => setPickup(null)}
-                  className="text-content-tertiary hover:text-content-primary text-label-small min-w-[24px] text-center"
-                  aria-label="Clear pickup"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+            <PlaceInput
+              value={pickup?.address ?? ""}
+              placeholder="Pickup location"
+              icon={<div className="h-3 w-3 rounded-pill bg-accent-400" />}
+              onSelect={setPickup}
+              onClear={() => setPickup(null)}
+            />
           </Section>
 
           {/* [3] Drop — hidden for Round Trip */}
           {needsDrop && (
             <Section>
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
-                  {/* gray pin */}
+              <PlaceInput
+                value={dropoff?.address ?? ""}
+                placeholder="Where to?"
+                icon={
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" fill="currentColor" className="text-content-tertiary" />
                   </svg>
-                </div>
-                <input
-                  className="flex-1 bg-transparent text-paragraph-medium text-content-primary
-                    outline-none placeholder:text-content-tertiary"
-                  placeholder="Where to?"
-                  value={dropoff?.address ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDropoff(val ? { lat: 22.5926, lng: 88.3839, address: val } : null);
-                  }}
-                />
-              </div>
+                }
+                onSelect={setDropoff}
+                onClear={() => setDropoff(null)}
+              />
             </Section>
           )}
 
@@ -400,7 +483,7 @@ export function BookingSheet() {
                   onClick={() => setPersonsCount(personsCount - 1)}
                   disabled={personsCount <= 1}
                   aria-label="Decrease persons"
-                  className="flex h-9 w-9 items-center justify-center rounded-sm
+                  className="flex h-11 w-11 items-center justify-center rounded-sm
                     bg-background-secondary border border-border-opaque
                     text-label-large text-content-primary
                     disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
@@ -417,7 +500,7 @@ export function BookingSheet() {
                   onClick={() => setPersonsCount(personsCount + 1)}
                   disabled={personsCount >= 8}
                   aria-label="Increase persons"
-                  className="flex h-9 w-9 items-center justify-center rounded-sm
+                  className="flex h-11 w-11 items-center justify-center rounded-sm
                     bg-background-secondary border border-border-opaque
                     text-label-large text-content-primary
                     disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed

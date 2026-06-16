@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useAuthStore } from "@/lib/store/authStore";
 import { authApi } from "@/lib/api/auth";
+import { API_BASE_URL, TOKEN_STORAGE_KEY } from "@/lib/api/client";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { compressImage, blobToDataUrl } from "@/lib/utils/imageCompress";
 
@@ -28,6 +29,39 @@ function validate(field: Field, value: string): string | undefined {
     if (Number.isNaN(d.getTime()) || d > new Date()) return "Invalid date";
   }
   return undefined;
+}
+
+interface PhotoUploadResponse {
+  data?: { url?: string };
+}
+
+/**
+ * Upload the (compressed) photo to S3 via the multipart endpoint.
+ * Returns the hosted URL on success, or null when uploads are unconfigured
+ * (503) or the request fails — letting the caller fall back to a data-URL.
+ */
+async function uploadPhotoToS3(blob: Blob): Promise<string | null> {
+  const token =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
+      : null;
+  if (!token) return null;
+
+  const form = new FormData();
+  form.append("file", blob, "profile.jpg");
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/rider/me/photo`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as PhotoUploadResponse;
+    return body.data?.url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export default function ProfilePage() {
@@ -58,7 +92,25 @@ export default function ProfilePage() {
     setUploadPct(10);
     try {
       const blob = await compressImage(file, 800, 0.8);
-      setUploadPct(60);
+      setUploadPct(40);
+
+      // Try uploading to S3 first; fall back to an inline data-URL if the
+      // upload endpoint is unconfigured (503) or otherwise fails.
+      const url = await uploadPhotoToS3(blob);
+      if (url) {
+        setUploadPct(90);
+        setPhoto(url);
+        try {
+          await authApi.updateProfile({ profile_photo_url: url });
+        } catch {
+          /* keep the local preview even if the profile save fails */
+        }
+        setUploadPct(100);
+        setTimeout(() => setUploadPct(null), 400);
+        return;
+      }
+
+      // Fallback: inline data-URL (saved with the rest of the form on Save).
       const dataUrl = await blobToDataUrl(blob);
       setUploadPct(100);
       setPhoto(dataUrl);

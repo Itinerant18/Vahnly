@@ -1,8 +1,8 @@
 {
-  "name": "drivers-for-u-e2e",
+  "name": "vahnly-e2e",
   "version": "0.1.0",
   "private": true,
-  "description": "Cross-app Playwright e2e + visual-regression suite for the Drivers-for-u frontends.",
+  "description": "Cross-app Playwright e2e + visual-regression suite for the Vahnly frontends.",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",

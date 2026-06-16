@@ -11,14 +11,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "drivers-for-u.name" $ }}-{{ $h.name }}-hpa
+  name: {{ include "vahnly.name" $ }}-{{ $h.name }}-hpa
   labels:
     app: {{ $h.name }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "drivers-for-u.name" $ }}-{{ $h.name }}
+    name: {{ include "vahnly.name" $ }}-{{ $h.name }}
   minReplicas: {{ $h.min }}
   maxReplicas: {{ $h.max }}
   metrics:

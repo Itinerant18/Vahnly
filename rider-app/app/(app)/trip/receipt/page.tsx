@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ordersApi } from "@/lib/api/orders";
+import { API_BASE_URL, TOKEN_STORAGE_KEY } from "@/lib/api/client";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 
@@ -17,29 +17,37 @@ function ReceiptContent() {
   const fare = completedFare;
   const order = activeOrder;
 
-  const [emailSent, setEmailSent] = useState(false);
-  const [loading, setLoading] = useState<"pdf" | "email" | null>(null);
-
   const targetId = orderId || fare?.orderId || order?.id || "";
 
+  // Fetch the server-generated invoice PDF and trigger a download.
+  // Falls back to browser print-to-PDF if the request fails.
   const handleDownloadPDF = async () => {
-    if (!targetId) return;
-    setLoading("pdf");
-    try {
-      window.open(`/api/v1/rider/orders/${targetId}/invoice`, "_blank");
-    } finally {
-      setLoading(null);
+    const token =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
+        : null;
+    if (!targetId || !token) {
+      window.print();
+      return;
     }
-  };
 
-  const handleEmailReceipt = async () => {
-    if (!targetId) return;
-    setLoading("email");
     try {
-      await fetch(`/api/v1/rider/orders/${targetId}/send-receipt`, { method: "POST" });
-      setEmailSent(true);
-    } finally {
-      setLoading(null);
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/rider/orders/${targetId}/invoice`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) throw new Error(`invoice fetch failed (${res.status})`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `invoice-${targetId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.print();
     }
   };
 
@@ -162,30 +170,25 @@ function ReceiptContent() {
         <div className="space-y-3">
           <button
             onClick={handleDownloadPDF}
-            disabled={loading === "pdf"}
-            className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary"
           >
             <span className="text-xl">📄</span>
             <div>
               <p className="text-sm font-semibold text-content-primary">Download PDF</p>
-              <p className="text-xs text-content-secondary">Save receipt to device</p>
+              <p className="text-xs text-content-secondary">Print or save receipt to device</p>
             </div>
           </button>
 
           <button
-            onClick={handleEmailReceipt}
-            disabled={loading === "email" || emailSent}
-            className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary disabled:opacity-60"
+            disabled
+            className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque opacity-50"
           >
-            <span className="text-xl">{emailSent ? "✅" : "📧"}</span>
-            <div>
-              <p className="text-sm font-semibold text-content-primary">
-                {emailSent ? "Receipt Sent!" : "Email Receipt"}
-              </p>
-              <p className="text-xs text-content-secondary">
-                {emailSent ? "Check your inbox" : "Send to registered email"}
-              </p>
+            <span className="text-xl">📧</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-content-primary">Email Receipt</p>
+              <p className="text-xs text-content-secondary">Send to registered email</p>
             </div>
+            <span className="text-xs text-content-tertiary">Coming soon</span>
           </button>
 
           <button

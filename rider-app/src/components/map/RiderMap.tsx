@@ -143,10 +143,10 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
     <div className="relative h-full w-full">
       <div ref={mapRef} className="h-full w-full" />
 
-      {/* ETA halo */}
+      {/* Driver-count halo — hidden when no drivers are nearby */}
       {nearbyDrivers.length > 0 && (
         <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-          Drivers ~3 min away
+          {nearbyDrivers.length} {nearbyDrivers.length === 1 ? "driver" : "drivers"} nearby
         </div>
       )}
 

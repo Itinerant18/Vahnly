@@ -8,12 +8,14 @@ import type { RiderWebSocketMessage } from "@/lib/websocket/types";
 import { useTripStore } from "@/lib/store/tripStore";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { ordersApi } from "@/lib/api/orders";
+import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { StatusBanner } from "@/components/trip/StatusBanner";
 import { DriverCard } from "@/components/trip/DriverCard";
 import { OTPDisplay } from "@/components/trip/OTPDisplay";
 import { SOSModal } from "@/components/trip/SOSModal";
 import { RideCheckModal } from "@/components/trip/RideCheckModal";
 import { ShareTripSheet } from "@/components/trip/ShareTripSheet";
+import { TripTimeline } from "@/components/trip/TripTimeline";
 import { FareDisplay } from "@/components/ds/FareDisplay";
 
 const TripMap = dynamic(() => import("@/components/trip/TripMap"), {
@@ -103,6 +105,201 @@ function CancelConfirmSheet({
   );
 }
 
+// ── Extend duration sheet ─────────────────────────────────────────────────────
+function ExtendSheet({
+  onExtend,
+  onClose,
+}: {
+  onExtend: (hours: number) => void;
+  onClose: () => void;
+}) {
+  const OPTIONS = [1, 2, 4];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
+      <div
+        className="w-full rounded-t-lg bg-background-primary p-6 shadow-elevation-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+        <h3 className="text-heading-small text-content-primary">Extend trip</h3>
+        <p className="mt-2 text-paragraph-medium text-content-secondary">
+          Add more hours to your booking. Extra time is charged at your trip&apos;s hourly rate.
+        </p>
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {OPTIONS.map((h) => (
+            <button
+              key={h}
+              type="button"
+              onClick={() => onExtend(h)}
+              className="rounded-sm bg-background-secondary border border-border-opaque
+                py-3 text-label-medium text-content-primary cursor-pointer
+                hover:bg-background-tertiary transition-base
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
+              +{h}h
+            </button>
+          ))}
+        </div>
+        <div className="h-4" />
+      </div>
+    </div>
+  );
+}
+
+// ── Collapsible trip-details card ─────────────────────────────────────────────
+function TripDetailsCard() {
+  const [open, setOpen] = useState(false);
+  const order      = useTripStore((s) => s.activeOrder);
+  const tripStatus = useTripStore((s) => s.tripStatus);
+  if (!order) return null;
+
+  const coords = (lat?: number, lng?: number) =>
+    lat != null && lng != null ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : "—";
+
+  return (
+    <div className="rounded-md bg-background-primary/90 border border-border-opaque backdrop-blur-sm shadow-elevation-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-3 min-h-[48px]
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 rounded-md"
+      >
+        <span className="text-label-medium text-content-primary">Trip details</span>
+        <svg
+          width="16" height="16" viewBox="0 0 24 24" fill="none"
+          className={`transition-transform text-content-tertiary ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="border-t border-border-opaque px-4 py-3 space-y-3">
+          {/* Status timeline */}
+          <TripTimeline status={tripStatus} />
+
+          <dl className="space-y-2 pt-1 text-paragraph-small">
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-secondary">Pickup</dt>
+              <dd className="text-right font-mono tabular-nums text-content-primary">
+                {coords(order.pickup_lat, order.pickup_lng)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-secondary">Drop</dt>
+              <dd className="text-right font-mono tabular-nums text-content-primary">
+                {coords(order.dropoff_lat, order.dropoff_lng)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-secondary">Payment</dt>
+              <dd className="text-content-primary">{order.payment_method ?? "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-secondary">Passengers</dt>
+              <dd className="text-content-primary tabular-nums">{order.persons_count ?? 1}</dd>
+            </div>
+            {order.promo_code && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-content-secondary">Promo</dt>
+                <dd className="text-content-primary">{order.promo_code}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-secondary">D4M Care</dt>
+              <dd className={order.d4m_care_opted ? "text-content-positive" : "text-content-secondary"}>
+                {order.d4m_care_opted ? "Active" : "Not added"}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Change-drop input sheet ───────────────────────────────────────────────────
+function ChangeDropSheet({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (result: GeocodeResult) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      const found = await searchPlaces(q);
+      if (!cancelled) {
+        setResults(found);
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  return (
+    <div className="absolute inset-x-4 bottom-48 z-30">
+      <div className="overflow-hidden rounded-sm bg-background-primary border border-border-opaque shadow-elevation-2">
+        <div className="flex">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 bg-transparent px-4 py-3 text-paragraph-medium
+              text-content-primary placeholder:text-content-tertiary outline-none"
+            placeholder="Change drop-off address"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onClose();
+            }}
+          />
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+        {(searching || results.length > 0) && (
+          <div className="max-h-48 overflow-y-auto border-t border-border-opaque">
+            {searching && results.length === 0 ? (
+              <p className="px-4 py-3 text-paragraph-small text-content-tertiary">Searching…</p>
+            ) : (
+              results.map((r) => (
+                <button
+                  key={`${r.lat},${r.lng}`}
+                  type="button"
+                  onClick={() => onSelect(r)}
+                  className="block w-full px-4 py-3 text-left text-paragraph-small text-content-primary
+                    hover:bg-background-secondary transition-base cursor-pointer
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                >
+                  {r.display_name}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function LiveTripView({ tripId }: { tripId: string }) {
   const router = useRouter();
@@ -119,6 +316,8 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
   const [showCancel,  setShowCancel]  = useState(false);
   const [rideCheckMsg, setRideCheckMsg] = useState<string | null>(null);
   const [addStopInput, setAddStopInput] = useState(false);
+  const [changeDropInput, setChangeDropInput] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
 
   const pickup  = activeOrder ? { lat: activeOrder.pickup_lat,  lng: activeOrder.pickup_lng  } : null;
   const dropoff = activeOrder?.dropoff_lat && activeOrder?.dropoff_lng
@@ -231,6 +430,33 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
     } catch {}
   };
 
+  const handleExtend = useCallback(
+    async (hours: number) => {
+      if (!activeOrder) return;
+      setShowExtend(false);
+      try {
+        await ordersApi.extend(activeOrder.id, hours);
+      } catch {}
+    },
+    [activeOrder],
+  );
+
+  const handleChangeDrop = useCallback(
+    async (result: GeocodeResult) => {
+      if (!activeOrder) return;
+      setChangeDropInput(false);
+      try {
+        await ordersApi.changeDrop(activeOrder.id, {
+          lat: result.lat,
+          lng: result.lng,
+          address: result.display_name,
+        });
+        await useTripStore.getState().hydrateActiveOrder();
+      } catch {}
+    },
+    [activeOrder],
+  );
+
   const inTrip = tripStatus === "DELIVERING";
 
   return (
@@ -258,8 +484,8 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
         {inTrip && (
           <>
             <FAB icon="+" label="Stop"   onClick={() => setAddStopInput(true)} />
-            <FAB icon="↗" label="Drop"   onClick={() => {}} />
-            <FAB icon="⏱" label="Extend" onClick={() => {}} />
+            <FAB icon="📍" label="Drop"   onClick={() => setChangeDropInput(true)} />
+            <FAB icon="⏱" label="Extend" onClick={() => setShowExtend(true)} />
           </>
         )}
         <FAB icon="🆘" label="SOS" onClick={() => setShowSOS(true)} danger />
@@ -278,6 +504,9 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
 
         {/* OTP (ARRIVED_AT_PICKUP) */}
         <OTPDisplay />
+
+        {/* Collapsible trip details + status timeline */}
+        <TripDetailsCard />
 
         {/* Driver card */}
         <DriverCard
@@ -315,6 +544,12 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
         </div>
       )}
 
+      {/* Change Drop input */}
+      {changeDropInput && (
+        <ChangeDropSheet onSelect={handleChangeDrop} onClose={() => setChangeDropInput(false)} />
+      )}
+
+      {showExtend  && <ExtendSheet onExtend={handleExtend} onClose={() => setShowExtend(false)} />}
       {showSOS     && <SOSModal onClose={() => setShowSOS(false)} />}
       {showShare   && <ShareTripSheet onClose={() => setShowShare(false)} />}
       {showCancel  && <CancelConfirmSheet onCancel={handleCancel} onClose={() => setShowCancel(false)} />}

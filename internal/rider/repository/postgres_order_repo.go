@@ -29,6 +29,7 @@ type RiderOrderRepository interface {
 	GetOrderForRider(ctx context.Context, orderID, riderID string) (*domain.RiderOrder, error)
 	GetOrderByID(ctx context.Context, orderID string) (*domain.RiderOrder, error)
 	GetOrderByShareToken(ctx context.Context, token string) (*domain.RiderOrder, error)
+	GetPickupOTP(ctx context.Context, orderID string) (string, error)
 	ListOrders(ctx context.Context, riderID string, f OrderFilter) ([]*domain.RiderOrder, int64, error)
 	CancelOrder(ctx context.Context, orderID, riderID, reason string, feePaise int64) error
 	RateOrder(ctx context.Context, p RateParams) (assignedDriverID string, err error)
@@ -38,6 +39,7 @@ type RiderOrderRepository interface {
 	GetLastGPSPoint(ctx context.Context, orderID string) (lat, lng float64, ok bool, err error)
 	UpdateOrderStops(ctx context.Context, orderID, riderID string, stopsJSON []byte, newBaseFare int64, newSurge float64) error
 	UpdateBookedDuration(ctx context.Context, orderID, riderID string, hours int, newBaseFare int64) error
+	UpdateOrderDropoff(ctx context.Context, orderID, riderID string, lat, lng float64, address string, newBaseFare int64, newSurge float64) error
 }
 
 type InsertOrderParams struct {
@@ -51,6 +53,7 @@ type InsertOrderParams struct {
 	BaseFarePaise          int64
 	SurgeMultiplier        float64
 	OTPHash                string
+	RiderPickupOTP         string // plaintext pickup OTP, surfaced on the active-order screen
 	GarageCarID            *string
 	OneTimeCarMake         *string
 	OneTimeCarModel        *string
@@ -124,7 +127,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 		INSERT INTO orders (
 			city_prefix, customer_id, rider_id, status,
 			pickup_location, dropoff_location, pickup_h3_cell, pickup_osm_node_id,
-			base_fare_paise, surge_multiplier, otp_hash,
+			base_fare_paise, surge_multiplier, otp_hash, rider_pickup_otp,
 			garage_car_id, one_time_car_make, one_time_car_model, one_time_car_type, one_time_car_transmission,
 			payment_method, promo_code, promo_discount_paise, d4m_care_opted,
 			trip_share_token, trip_share_expires_at, persons_count, scheduled_at, rider_stops,
@@ -132,15 +135,15 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 		) VALUES (
 			$1, $2::uuid, $3::uuid, 'CREATED'::order_status_enum,
 			ST_GeographyFromText($4), ST_GeographyFromText($5), $6, 0,
-			$7, $8, $9,
-			$10::uuid, $11, $12, $13, $14,
-			$15, $16, $17, $18,
-			$19, $20, $21, $22, $23,
-			$24
+			$7, $8, $9, $10,
+			$11::uuid, $12, $13, $14, $15,
+			$16, $17, $18, $19,
+			$20, $21, $22, $23, $24,
+			$25
 		) RETURNING id::text`,
 		p.CityPrefix, p.RiderID, p.RiderID,
 		pickupGeom, dropoffGeom, p.PickupH3Cell,
-		p.BaseFarePaise, p.SurgeMultiplier, p.OTPHash,
+		p.BaseFarePaise, p.SurgeMultiplier, p.OTPHash, p.RiderPickupOTP,
 		p.GarageCarID, p.OneTimeCarMake, p.OneTimeCarModel, p.OneTimeCarType, p.OneTimeCarTransmission,
 		p.PaymentMethod, p.PromoCode, p.PromoDiscountPaise, p.D4MCareOpted,
 		p.TripShareToken, p.TripShareExpiresAt, p.PersonsCount, p.ScheduledAt, p.WaypointsJSON,
@@ -234,6 +237,22 @@ func (r *postgresOrderRepo) GetOrderByShareToken(ctx context.Context, token stri
 		return nil, ErrOrderNotFound
 	}
 	return o, err
+}
+
+// GetPickupOTP returns the plaintext pickup OTP for an order (empty if not set).
+func (r *postgresOrderRepo) GetPickupOTP(ctx context.Context, orderID string) (string, error) {
+	var otp *string
+	err := r.dbPool.QueryRow(ctx, `SELECT rider_pickup_otp FROM orders WHERE id = $1::uuid`, orderID).Scan(&otp)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrOrderNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if otp == nil {
+		return "", nil
+	}
+	return *otp, nil
 }
 
 func (r *postgresOrderRepo) ListOrders(ctx context.Context, riderID string, f OrderFilter) ([]*domain.RiderOrder, int64, error) {
@@ -477,6 +496,27 @@ func (r *postgresOrderRepo) UpdateOrderStops(ctx context.Context, orderID, rider
 		UPDATE orders SET rider_stops = $3, base_fare_paise = $4, surge_multiplier = $5
 		WHERE id = $1::uuid AND rider_id = $2::uuid AND status = 'DELIVERING'::order_status_enum`,
 		orderID, riderID, stopsJSON, newBaseFare, newSurge)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrOrderNotFound
+	}
+	return nil
+}
+
+// UpdateOrderDropoff moves the dropoff point and re-prices an in-progress trip.
+// orders has no dropoff_address column (only the dropoff_location geography), so
+// the supplied address is intentionally not persisted. Valid while the trip is
+// active (heading to pickup, at pickup, or delivering).
+func (r *postgresOrderRepo) UpdateOrderDropoff(ctx context.Context, orderID, riderID string, lat, lng float64, address string, newBaseFare int64, newSurge float64) error {
+	dropoffGeom := fmt.Sprintf("SRID=4326;POINT(%f %f)", lng, lat)
+	tag, err := r.dbPool.Exec(ctx, `
+		UPDATE orders
+		SET dropoff_location = ST_GeographyFromText($3), base_fare_paise = $4, surge_multiplier = $5
+		WHERE id = $1::uuid AND rider_id = $2::uuid
+		  AND status IN ('EN_ROUTE_TO_PICKUP'::order_status_enum, 'ARRIVED_AT_PICKUP'::order_status_enum, 'DELIVERING'::order_status_enum)`,
+		orderID, riderID, dropoffGeom, newBaseFare, newSurge)
 	if err != nil {
 		return err
 	}

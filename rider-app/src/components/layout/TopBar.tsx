@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { useTripStore } from "@/lib/store/tripStore";
 
 const CITIES = ["KOL", "BLR"];
 
 export function TopBar() {
+  const router = useRouter();
   const [city, setCity] = useState("KOL");
   const [cityOpen, setCityOpen] = useState(false);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const activeOrder = useTripStore((s) => s.activeOrder);
-  const triggerSOS = useTripStore((s) => s.triggerSOS);
 
   return (
     <div className="flex items-center justify-between px-4 py-3">
@@ -46,7 +47,7 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         {/* Notification bell */}
         <div className="relative">
-          <button aria-label="Notifications" className="flex h-10 w-10 items-center justify-center rounded-full bg-background-tertiary">
+          <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="flex h-10 w-10 items-center justify-center rounded-full bg-background-tertiary">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="var(--content-primary)" strokeWidth="1.5" />
               <path d="M13.73 21a2 2 0 01-3.46 0" stroke="var(--content-primary)" strokeWidth="1.5" strokeLinecap="round" />
@@ -61,7 +62,7 @@ export function TopBar() {
 
         {/* SOS button — pulsing when active order exists */}
         <button
-          onClick={() => { if (activeOrder) triggerSOS(); }}
+          onClick={() => { if (activeOrder) router.push("/trip/live"); }}
           disabled={!activeOrder}
           className={`flex h-10 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-content-primary transition-opacity ${
             activeOrder ? "animate-pulse bg-negative-400" : "bg-surface-negative opacity-60"

@@ -384,6 +384,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		BaseFarePaise:          est.dispatchFarePaise,
 		SurgeMultiplier:        est.FareBreakdown.SurgeMultiplier,
 		OTPHash:                sha256Hex(otpPlain),
+		RiderPickupOTP:         otpPlain,
 		GarageCarID:            garageCarID,
 		OneTimeCarMake:         otMake,
 		OneTimeCarModel:        otModel,
@@ -452,6 +453,9 @@ type ActiveOrderResult struct {
 	Order          *domain.RiderOrder `json:"order"`
 	Driver         *DriverPublic      `json:"driver,omitempty"`
 	DriverLocation *LatLng            `json:"driver_location,omitempty"`
+	// OTP is the pickup OTP, exposed only while the driver is approaching pickup so the
+	// rider's live-trip screen can recover it on cold start. Empty otherwise.
+	OTP string `json:"otp"`
 }
 
 func (s *BookingService) GetActiveOrder(ctx context.Context, riderID string) (*ActiveOrderResult, error) {
@@ -487,6 +491,14 @@ func (s *BookingService) GetActiveOrder(ctx context.Context, riderID string) (*A
 		}
 		if loc, ok := s.driverLiveLocation(ctx, order.CityPrefix, *order.AssignedDriverID); ok {
 			res.DriverLocation = loc
+		}
+	}
+	// Surface the pickup OTP only while the driver is approaching pickup; once the trip
+	// is underway the OTP has been consumed and must not be re-displayed.
+	switch order.Status {
+	case "ASSIGNED", "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP":
+		if otp, err := s.orders.GetPickupOTP(ctx, order.ID); err == nil {
+			res.OTP = otp
 		}
 	}
 	return res, nil
@@ -556,6 +568,12 @@ func (s *BookingService) CancelOrder(ctx context.Context, riderID, orderID, reas
 
 func (s *BookingService) ListHistory(ctx context.Context, riderID string, f repository.OrderFilter) ([]*domain.RiderOrder, int64, error) {
 	return s.orders.ListOrders(ctx, riderID, f)
+}
+
+// GetOrderByID returns an order by id without rider scoping. Callers (e.g. the
+// invoice handler) must verify ownership against order.RiderID themselves.
+func (s *BookingService) GetOrderByID(ctx context.Context, orderID string) (*domain.RiderOrder, error) {
+	return s.orders.GetOrderByID(ctx, orderID)
 }
 
 // ---- rate driver ----
@@ -773,6 +791,47 @@ func (s *BookingService) AddStop(ctx context.Context, riderID, orderID string, s
 		return nil, err
 	}
 	if err := s.orders.UpdateOrderStops(ctx, orderID, riderID, stopsJSON, newFare, mult); err != nil {
+		return nil, err
+	}
+
+	s.notifyDriverOrderUpdated(ctx, orderID, newFare)
+	return s.orders.GetOrderForRider(ctx, orderID, riderID)
+}
+
+// ChangeDrop moves the dropoff of an in-progress trip (mid-trip change-drop),
+// re-prices over the existing stop chain to the new dropoff, persists it, and
+// notifies the driver. Valid while heading to pickup, at pickup, or delivering.
+func (s *BookingService) ChangeDrop(ctx context.Context, riderID, orderID string, lat, lng float64, address string) (*domain.RiderOrder, error) {
+	order, err := s.orders.GetOrderForRider(ctx, orderID, riderID)
+	if err != nil {
+		return nil, err
+	}
+	switch order.Status {
+	case "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP", "DELIVERING":
+		// active — change-drop allowed
+	default:
+		return nil, ErrTripNotActive
+	}
+	if !inIndiaBBox(lat, lng) {
+		return nil, ErrInvalidBooking
+	}
+
+	// Re-price over the existing stop chain to the NEW dropoff. Set the new dropoff
+	// on the order struct before calling waypointRoadMeters so the final leg lands
+	// at the new destination.
+	order.DropoffLat = &lat
+	order.DropoffLng = &lng
+
+	var wp waypointData
+	if len(order.RiderStops) > 0 {
+		_ = json.Unmarshal(order.RiderStops, &wp)
+	}
+	road := waypointRoadMeters(order, wp.Stops)
+	newFare, mult, err := s.quoter.GetFareQuote(ctx, order.CityPrefix, order.PickupH3Cell, road)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.orders.UpdateOrderDropoff(ctx, orderID, riderID, lat, lng, address, newFare, mult); err != nil {
 		return nil, err
 	}
 

@@ -44,6 +44,9 @@ export default function PaymentsPage() {
   const [autoPay, setAutoPay] = useState(false);
   const [billing, setBilling] = useState<Billing>(EMPTY_BILLING);
   const [toast, setToast] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const flash = (m: string) => {
     setToast(m);
@@ -51,16 +54,19 @@ export default function PaymentsPage() {
   };
 
   // ─── Load ──────────────────────────────────────────────────────────────────
+  const refresh = async () => {
+    const data = await paymentsApi.list();
+    setCards(data.cards ?? []);
+    setUpis(data.upis ?? []);
+  };
+
   useEffect(() => {
     (async () => {
       try {
-        const data = await paymentsApi.list();
-        setCards(data.cards ?? []);
-        setUpis(data.upis ?? []);
-      } catch {
-        // No backend — page stays usable as local-only.
-        setCards([]);
-        setUpis([]);
+        await refresh();
+        setLoadError(null);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "Couldn't load payment methods.");
       }
     })();
 
@@ -102,33 +108,38 @@ export default function PaymentsPage() {
       exp_year: Number(expYear) || undefined,
       name: cardName || undefined,
     };
+    setSaving(true);
+    setCardError(null);
     try {
+      // Server returns the full list incl. the new card (brand + last4 only).
       const data = await paymentsApi.add(input);
       setCards(data.cards ?? []);
       setUpis(data.upis ?? []);
-      flash("Card added");
-    } catch {
-      flash("Payment gateway unavailable");
-    } finally {
       resetCardForm();
+      const added = (data.cards ?? []).find((c) => c.last4 === last4(digits));
+      flash(added ? `${added.brand} •••• ${added.last4} added` : "Card added");
+    } catch (e) {
+      setCardError(e instanceof Error ? e.message : "Couldn't add card. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const removeCard = async (id: string) => {
-    setCards((list) => list.filter((c) => c.id !== id));
     try {
       await paymentsApi.remove(id);
-    } catch {
-      // Optimistic removal already applied.
+      await refresh();
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Couldn't remove card.");
     }
   };
 
   const setDefaultCard = async (id: string) => {
-    setCards((list) => list.map((c) => ({ ...c, is_default: c.id === id })));
     try {
       await paymentsApi.setDefault(id);
-    } catch {
-      // Optimistic update already applied.
+      await refresh();
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Couldn't update default.");
     }
   };
 
@@ -146,31 +157,31 @@ export default function PaymentsPage() {
     setUpiErr(null);
 
     try {
-      await paymentsApi.verifyUpi(vpa);
+      const verify = await paymentsApi.verifyUpi(vpa);
+      if (!verify.valid) {
+        setUpiErr("This UPI ID could not be verified.");
+        return;
+      }
     } catch {
-      // Stub — proceed regardless.
+      // verify is a stub; don't block add on its failure.
     }
 
     try {
       const data = await paymentsApi.add({ type: "UPI", vpa });
       setCards(data.cards ?? []);
       setUpis(data.upis ?? []);
-    } catch {
-      // Optimistic local add so the UI works with no backend.
-      setUpis((list) => [
-        ...list,
-        { id: `local-${Date.now()}`, vpa, is_default: list.length === 0 },
-      ]);
+      setNewUpi("");
+    } catch (e) {
+      setUpiErr(e instanceof Error ? e.message : "Couldn't add UPI ID.");
     }
-    setNewUpi("");
   };
 
   const removeUpi = async (id: string) => {
-    setUpis((list) => list.filter((u) => u.id !== id));
     try {
       await paymentsApi.remove(id);
-    } catch {
-      // Optimistic removal already applied.
+      await refresh();
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Couldn't remove UPI ID.");
     }
   };
 
@@ -185,7 +196,7 @@ export default function PaymentsPage() {
       }
       return next;
     });
-    flash("Auto-pay preference saved");
+    flash("Auto-pay preference saved on this device");
   };
 
   const saveBilling = () => {
@@ -194,11 +205,17 @@ export default function PaymentsPage() {
     } catch {
       // Ignore storage failures.
     }
-    flash("Billing details saved");
+    flash("Billing details saved on this device");
   };
 
   return (
     <AccountScaffold title="Payments">
+      {loadError && (
+        <div className="mb-4 rounded-xl bg-surface-negative px-4 py-3 text-sm text-content-negative">
+          {loadError}
+        </div>
+      )}
+
       {/* Saved cards */}
       <Section title="Saved Cards">
         {cards.length === 0 ? (
@@ -247,7 +264,7 @@ export default function PaymentsPage() {
         {showCardForm ? (
           <div className="space-y-3 rounded-2xl bg-background-secondary p-4">
             <div className="rounded-xl bg-background-tertiary px-3 py-2 text-xs text-content-secondary">
-              Payment gateway integration coming soon
+              We store only your card brand and last 4 digits — never the full number.
             </div>
             <input
               value={cardNumber}
@@ -282,6 +299,7 @@ export default function PaymentsPage() {
               placeholder="Name on card"
               className={INPUT}
             />
+            {cardError && <p className="text-xs text-content-negative">{cardError}</p>}
             <div className="flex gap-2">
               <button
                 onClick={resetCardForm}
@@ -291,10 +309,10 @@ export default function PaymentsPage() {
               </button>
               <button
                 onClick={saveCard}
-                disabled={!cardMasked || !expMonth || !expYear}
+                disabled={!cardMasked || !expMonth || !expYear || saving}
                 className="flex-1 rounded-2xl bg-interactive-primary py-3 text-sm font-bold text-interactive-primary-text disabled:opacity-40"
               >
-                Save Card
+                {saving ? "Saving…" : "Save Card"}
               </button>
             </div>
           </div>
@@ -356,18 +374,19 @@ export default function PaymentsPage() {
         {upiErr && <p className="mt-1 text-xs text-content-negative">{upiErr}</p>}
       </Section>
 
-      {/* Auto-pay */}
+      {/* Auto-pay (device-local preference) */}
       <Section title="Auto-pay">
         <Toggle
           label="Auto-pay trip fares"
-          desc="Charge default method automatically at trip end"
+          desc="Saved on this device · charges default method at trip end"
           on={autoPay}
           onChange={toggleAutoPay}
         />
       </Section>
 
-      {/* Billing address */}
+      {/* Billing address (device-local) */}
       <Section title="Billing Address (GST)">
+        <p className="-mt-1 mb-3 text-xs text-content-tertiary">Saved on this device for your invoices.</p>
         <div className="space-y-3">
           <input
             value={billing.name}

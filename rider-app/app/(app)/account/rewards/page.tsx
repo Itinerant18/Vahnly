@@ -25,10 +25,11 @@ const TIERS = [
   { name: "Platinum", min: 15, perks: ["24/7 concierge", "Free D4M Care", "10% cashback"] },
 ];
 
+const PROMO_STORAGE_KEY = "dfu_promo_code";
+
 export default function RewardsPage() {
   const [code, setCode] = useState("");
-  const [applied, setApplied] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [savedCode, setSavedCode] = useState<string | null>(null);
   const [trips, setTrips] = useState(0);
   const [showExpired, setShowExpired] = useState(false);
 
@@ -37,17 +38,40 @@ export default function RewardsPage() {
       .history({ status: "COMPLETED", limit: 1 })
       .then((r) => setTrips(r.total ?? 0))
       .catch(() => setTrips(0));
+
+    try {
+      const stored = localStorage.getItem(PROMO_STORAGE_KEY);
+      if (stored) {
+        setSavedCode(stored);
+        setCode(stored);
+      }
+    } catch {
+      // localStorage unavailable — ignore.
+    }
   }, []);
 
-  const apply = () => {
-    const found = ACTIVE.find((o) => o.code === code.trim().toUpperCase());
-    if (!found) {
-      setErr("Invalid or expired code");
-      setApplied(null);
-      return;
+  // Promo codes are validated by fare-estimate at checkout, not here.
+  // We just remember the rider's chosen code so booking can pre-fill it.
+  const saveCode = () => {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return;
+    try {
+      localStorage.setItem(PROMO_STORAGE_KEY, trimmed);
+    } catch {
+      // Ignore storage failures.
     }
-    setApplied(found.code);
-    setErr(null);
+    setSavedCode(trimmed);
+    setCode(trimmed);
+  };
+
+  const clearCode = () => {
+    try {
+      localStorage.removeItem(PROMO_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+    setSavedCode(null);
+    setCode("");
   };
 
   const tierIdx = trips >= 15 ? 2 : trips >= 5 ? 1 : 0;
@@ -65,12 +89,28 @@ export default function RewardsPage() {
           placeholder="Enter promo code"
           className="flex-1 rounded-xl bg-background-tertiary px-4 py-3 text-sm uppercase tracking-wider text-content-primary outline-none placeholder:text-content-tertiary placeholder:normal-case focus:ring-1 focus:ring-border-accent"
         />
-        <button onClick={apply} className="rounded-xl bg-interactive-primary px-5 text-sm font-bold text-interactive-primary-text">
-          Apply
+        <button
+          onClick={saveCode}
+          disabled={!code.trim() || code.trim().toUpperCase() === savedCode}
+          className="rounded-xl bg-interactive-primary px-5 text-sm font-bold text-interactive-primary-text disabled:opacity-40"
+        >
+          Save
         </button>
       </div>
-      {err && <p className="mt-1.5 text-xs text-content-negative">{err}</p>}
-      {applied && <p className="mt-1.5 text-xs text-content-positive">✓ {applied} applied</p>}
+      {savedCode ? (
+        <div className="mt-1.5 flex items-center justify-between">
+          <p className="text-xs text-content-positive">
+            ✓ {savedCode} saved — applied at checkout
+          </p>
+          <button onClick={clearCode} className="text-xs font-semibold text-content-secondary">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <p className="mt-1.5 text-xs text-content-tertiary">
+          Codes are validated and applied when you book your next ride.
+        </p>
+      )}
 
       {/* Loyalty */}
       <div className="mt-6 rounded-2xl bg-background-secondary p-4">

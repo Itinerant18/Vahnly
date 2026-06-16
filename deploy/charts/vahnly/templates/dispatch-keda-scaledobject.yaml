@@ -6,14 +6,14 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-dispatch-scaler
+  name: {{ include "vahnly.name" . }}-dispatch-scaler
   labels:
     app: dispatch
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "drivers-for-u.name" . }}-dispatch
+    name: {{ include "vahnly.name" . }}-dispatch
   minReplicaCount: {{ .Values.dispatch.autoscaling.minReplicas }}
   maxReplicaCount: {{ .Values.dispatch.autoscaling.maxReplicas }}
   cooldownPeriod: {{ .Values.dispatch.autoscaling.cooldownPeriod | default 120 }}

@@ -36,6 +36,10 @@ export interface CreateOrderResult {
 
 export interface ActiveOrderResult {
   order: Order;
+  // Plaintext pickup OTP — the server returns it only while the trip is pre-pickup
+  // (ASSIGNED / EN_ROUTE_TO_PICKUP / ARRIVED_AT_PICKUP), empty once the trip starts.
+  // Lets a cold-start recover the code instead of relying on on-device storage.
+  otp?: string;
   driver?: { first_name: string; rating: number };
   driver_location?: { lat: number; lng: number };
 }
@@ -91,6 +95,13 @@ export const ordersApi = {
   extend: (orderId: string, extendHours: number) =>
     apiClient.patch<Order>(`/api/v1/rider/orders/${orderId}/extend`, {
       extend_hours: extendHours,
+    }),
+
+  changeDrop: (orderId: string, point: { lat: number; lng: number; address: string }) =>
+    apiClient.patch<Order>(`/api/v1/rider/orders/${orderId}/drop`, {
+      dropoff_lat: point.lat,
+      dropoff_lng: point.lng,
+      dropoff_address: point.address,
     }),
 
   tripShare: (shareToken: string) =>

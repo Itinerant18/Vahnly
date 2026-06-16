@@ -5,6 +5,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { useAuthStore } from "@/lib/store/authStore";
 import { authApi } from "@/lib/api/auth";
 import { accountApi } from "@/lib/api/account";
+import { useThemeStore } from "@/lib/store/themeStore";
 import type { NotificationPreferences, NotifChannelPrefs } from "@/lib/api/types";
 import { Capacitor } from "@capacitor/core";
 
@@ -52,23 +53,6 @@ function defaultPrefs(): NotificationPreferences {
   };
 }
 
-function applyTheme(t: Theme) {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  const dark =
-    t === "Dark" ||
-    (t === "System" &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
-  if (dark) {
-    root.classList.add("dark");
-    root.classList.remove("light");
-  } else {
-    root.classList.add("light");
-    root.classList.remove("dark");
-  }
-}
-
 function normalizePerm(s: string | undefined): PermState {
   if (s === "granted") return "granted";
   if (s === "denied") return "denied";
@@ -79,11 +63,17 @@ export default function SettingsPage() {
   const logout = useAuthStore((s) => s.logout);
 
   const [lang, setLang] = useState("en");
-  const [theme, setTheme] = useState<Theme>("Dark");
+  // Theme is owned by the shared themeStore (applies [data-theme] to <html>,
+  // initialised in ThemeProvider). Settings only reads/writes through it.
+  const storeTheme = useThemeStore((s) => s.theme);
+  const setStoreTheme = useThemeStore((s) => s.setTheme);
+  const theme: Theme =
+    storeTheme === "dark" ? "Dark" : storeTheme === "light" ? "Light" : "System";
   const [unit, setUnit] = useState<(typeof UNITS)[number]>("km");
   const [prefs, setPrefs] = useState<NotificationPreferences>(defaultPrefs);
   const [locationPerm, setLocationPerm] = useState<PermState>("ask");
   const [notifPerm, setNotifPerm] = useState<PermState>("ask");
+  const [womenSafety, setWomenSafety] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
   const persist = (key: string, value: unknown) => {
@@ -93,11 +83,9 @@ export default function SettingsPage() {
   // Mount: load stored prefs, apply theme, fetch server notif prefs, read permissions.
   useEffect(() => {
     const storedLang = load("dfu_lang", "en");
-    const storedTheme = load<Theme>("dfu_theme", "Dark");
     setLang(storedLang);
-    setTheme(storedTheme);
     setUnit(load("dfu_unit", "km"));
-    applyTheme(storedTheme);
+    setWomenSafety(load("dfu_women_safety", false));
 
     let active = true;
 
@@ -136,9 +124,7 @@ export default function SettingsPage() {
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   const selectTheme = (t: Theme) => {
-    setTheme(t);
-    persist("dfu_theme", t);
-    applyTheme(t);
+    setStoreTheme(t === "Dark" ? "dark" : t === "Light" ? "light" : "system");
   };
 
   // ── Notification prefs ──────────────────────────────────────────────────────
@@ -156,6 +142,16 @@ export default function SettingsPage() {
           /* keep optimistic state; localStorage already persisted */
         }
       })();
+      return next;
+    });
+  };
+
+  // ── Women safety mode ───────────────────────────────────────────────────────
+  // No server field on Rider; persist to localStorage only.
+  const toggleWomenSafety = () => {
+    setWomenSafety((v) => {
+      const next = !v;
+      persist("dfu_women_safety", next);
       return next;
     });
   };
@@ -347,6 +343,29 @@ export default function SettingsPage() {
             onRequest={requestNotifications}
             onOpenSettings={openDeviceSettings}
           />
+        </div>
+      </Group>
+
+      {/* Safety */}
+      <Group title="Safety">
+        <div className="rounded-2xl bg-background-secondary p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm text-content-primary">Women Safety Mode</span>
+              <span className="text-xs text-content-secondary">Prioritise verified drivers and extra safety checks</span>
+            </div>
+            <button
+              onClick={toggleWomenSafety}
+              role="switch"
+              aria-checked={womenSafety}
+              aria-label="Women Safety Mode"
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${womenSafety ? "bg-accent-400" : "bg-background-tertiary"}`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${womenSafety ? "translate-x-5" : "translate-x-0.5"}`}
+              />
+            </button>
+          </div>
         </div>
       </Group>
 

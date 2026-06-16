@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "drivers-for-u.name" . }}-gateway
+  name: {{ include "vahnly.name" . }}-gateway
   labels:
     app: gateway
 spec:
@@ -20,7 +20,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            {{- include "drivers-for-u.securityContext" . | nindent 12 }}
+            {{- include "vahnly.securityContext" . | nindent 12 }}
           command: ["/entrypoint"]
           env:
             - name: TARGET_SERVICE
@@ -30,27 +30,27 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-db-credentials
+                  name: {{ include "vahnly.name" . }}-db-credentials
                   key: database-url
             - name: KAFKA_BROKERS
               value: {{ .Values.global.env.kafkaBrokers | quote }}
             - name: REDIS_CLUSTER_NODES
               value: {{ .Values.global.env.redisClusterNodes | quote }}
-            {{- include "drivers-for-u.redisAuthEnv" . | nindent 12 }}
+            {{- include "vahnly.redisAuthEnv" . | nindent 12 }}
             - name: JWT_SECRET_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-app-secrets
+                  name: {{ include "vahnly.name" . }}-app-secrets
                   key: jwt-signing-key
             - name: FIELD_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-app-secrets
+                  name: {{ include "vahnly.name" . }}-app-secrets
                   key: field-encryption-key
             - name: PAYMENT_WEBHOOK_SIGNING_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-app-secrets
+                  name: {{ include "vahnly.name" . }}-app-secrets
                   key: payment-webhook-signing-secret
             - name: S3_BUCKET
               value: {{ .Values.objectStorage.bucket | quote }}
@@ -61,12 +61,12 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-app-secrets
+                  name: {{ include "vahnly.name" . }}-app-secrets
                   key: aws-access-key-id
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "drivers-for-u.name" . }}-app-secrets
+                  name: {{ include "vahnly.name" . }}-app-secrets
                   key: aws-secret-access-key
             - name: SUPPORTED_REGIONS_MATRIX
               value: {{ .Values.gateway.supportedRegions | quote }}
@@ -74,7 +74,7 @@ spec:
               value: {{ .Values.gateway.metricsPort | default 9090 | quote }}
             - name: APP_VERSION
               value: {{ .Values.image.tag | quote }}
-            {{- include "drivers-for-u.kafkaSecurityEnv" . | nindent 12 }}
+            {{- include "vahnly.kafkaSecurityEnv" . | nindent 12 }}
           ports:
             - containerPort: {{ .Values.gateway.httpPort }}
               name: http
