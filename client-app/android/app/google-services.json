@@ -1,79 +1,45 @@
 {
   "project_info": {
-    "project_number": "28756899203",
-    "project_id": "drivers-for-u-app",
-    "storage_bucket": "drivers-for-u-app.firebasestorage.app"
+    "project_number": "1016868477506",
+    "project_id": "vahnly-platform",
+    "storage_bucket": "vahnly-platform.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:28756899203:android:916eb0f8b5050b349532b6",
+        "mobilesdk_app_id": "1:1016868477506:android:ac85012fd450dd0f43abdb",
         "android_client_info": {
           "package_name": "com.vahnly.driver"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "28756899203-rsadkuifgqd0ht51uoaa6b9irsb0b8uf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCrXR9P1EDCtoklZcm9OKcUENtrYXOhUOE"
+          "current_key": "AIzaSyBc5byg3MbbpSQHlHMAU3hdxfcevdNOYvM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "28756899203-rsadkuifgqd0ht51uoaa6b9irsb0b8uf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "28756899203-0g1fji011jq0v75gdabtqdh7gts3cgho.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.vahnly.driver"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:28756899203:android:6bcc2dfa3cb116669532b6",
+        "mobilesdk_app_id": "1:1016868477506:android:2cb3e626b1fefb8343abdb",
         "android_client_info": {
           "package_name": "com.vahnly.rider"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "28756899203-rsadkuifgqd0ht51uoaa6b9irsb0b8uf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCrXR9P1EDCtoklZcm9OKcUENtrYXOhUOE"
+          "current_key": "AIzaSyBc5byg3MbbpSQHlHMAU3hdxfcevdNOYvM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "28756899203-rsadkuifgqd0ht51uoaa6b9irsb0b8uf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "28756899203-0g1fji011jq0v75gdabtqdh7gts3cgho.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.vahnly.driver"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "dfu-rider-app",
+    "site": "vahnly-rider",
     "public": "out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "trailingSlash": true,

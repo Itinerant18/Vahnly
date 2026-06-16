@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "dfu-driver-app",
+    "site": "vahnly-driver",
     "public": "out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "trailingSlash": true,

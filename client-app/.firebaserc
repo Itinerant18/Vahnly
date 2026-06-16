@@ -1,11 +1,11 @@
 {
   "projects": {
-    "default": "drivers-for-u-app"
+    "default": "vahnly-platform"
   },
   "targets": {
-    "drivers-for-u-app": {
+    "vahnly-platform": {
       "hosting": {
-        "driver": ["dfu-driver-app"]
+        "driver": ["vahnly-driver"]
       }
     }
   }
