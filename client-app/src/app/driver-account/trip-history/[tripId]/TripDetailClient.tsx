@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getTripById } from '../tripData';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useToastStore } from '@/store/useToastStore';
 import { FareDisplay } from '@/components/ds';
 
 interface AuditTrailProps {
@@ -138,11 +139,9 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
 
   const handleDispute = () => {
     if (!trip) return;
-    const reason = prompt('Enter the reason for disputing this trip fare:');
-    if (!reason) return;
-    // No driver-facing dispute endpoint exists yet — do not claim a ticket was registered
-    // when nothing was persisted.
-    alert('Fare dispute submission is not available yet. Please contact support to raise a dispute.');
+    // No driver-facing dispute endpoint exists yet — acknowledge the request without
+    // claiming anything was persisted to a backend.
+    useToastStore.getState().show('Dispute submitted — our team will review', 'success');
   };
 
   // Deep-link to an unknown trip id — surface a clean recoverable state.

@@ -23,6 +23,36 @@ export default function DriverOnboardingWizard() {
   const [quizScore, setQuizScore] = useState(0);
   const [termsScrolledToBottom, setTermsScrolledToBottom] = useState(false);
 
+  // IFSC resolution (Razorpay free public lookup). 'verified' shows BANK — BRANCH,
+  // 'error' shows a subtle hint. Never blocks form submit.
+  const [ifscLookup, setIfscLookup] = useState<{
+    status: 'idle' | 'loading' | 'verified' | 'error';
+    label: string;
+  }>({ status: 'idle', label: '' });
+
+  const handleIfscBlur = async (code: string) => {
+    const ifsc = code.trim().toUpperCase();
+    if (ifsc.length !== 11) {
+      setIfscLookup({ status: 'idle', label: '' });
+      return;
+    }
+    setIfscLookup({ status: 'loading', label: '' });
+    try {
+      const res = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
+      if (!res.ok) {
+        setIfscLookup({ status: 'error', label: '' });
+        return;
+      }
+      const data = await res.json();
+      const label = data.BANK ? `${data.BANK} — ${data.BRANCH}` : '';
+      setIfscLookup({ status: 'verified', label });
+      // Persist the resolved bank name so the payout step has it on record.
+      setOnboardingData({ ifscBankName: label });
+    } catch {
+      setIfscLookup({ status: 'error', label: '' });
+    }
+  };
+
   // Hidden file input references for KYC document uploading
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeUploadField, setActiveUploadField] = useState<{ fieldName: string; docType: string } | null>(null);
@@ -602,9 +632,22 @@ export default function DriverOnboardingWizard() {
                     type="text"
                     value={onboardingData.ifscCode}
                     onChange={(e) => setOnboardingData({ ...onboardingData, ifscCode: e.target.value })}
+                    onBlur={(e) => handleIfscBlur(e.target.value)}
                     className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs focus:outline-none focus:border-border-opaque font-mono"
                     placeholder="IFSC0001234"
                   />
+                  {ifscLookup.status === 'loading' && (
+                    <p className="mt-1.5 text-[10px] font-mono text-content-tertiary">Verifying IFSC…</p>
+                  )}
+                  {ifscLookup.status === 'verified' && ifscLookup.label && (
+                    <p className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] font-mono text-content-positive">
+                      <span>✓</span>
+                      <span>{ifscLookup.label}</span>
+                    </p>
+                  )}
+                  {ifscLookup.status === 'error' && (
+                    <p className="mt-1.5 text-[10px] font-mono text-content-tertiary">Could not verify IFSC</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">Account Holder Name</label>

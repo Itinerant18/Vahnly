@@ -61,7 +61,7 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 	}
 
 	validEventTypes := map[string]bool{
-		"ADD_TOLL": true, "ADD_STOP": true, "REPORT_ISSUE": true,
+		"ADD_TOLL": true, "ADD_STOP": true, "REPORT_ISSUE": true, "NO_SHOW": true,
 		"toll_added": true, "parking_added": true, "waiting_added": true,
 		"TOLL_ADDED": true, "PARKING_ADDED": true, "WAITING_ADDED": true,
 	}
@@ -69,8 +69,11 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		http.Error(w, "invalid_event_type", http.StatusBadRequest)
 		return
 	}
-	if req.AmountPaise < 0 || (req.EventType != "REPORT_ISSUE" && req.AmountPaise <= 0) {
-		http.Error(w, "invalid_amount: must be greater than zero (or non-negative for REPORT_ISSUE)", http.StatusBadRequest)
+	// REPORT_ISSUE and NO_SHOW are zero-amount informational events; everything else is a
+	// billable mutation that must carry a positive amount.
+	zeroAmountOK := req.EventType == "REPORT_ISSUE" || req.EventType == "NO_SHOW"
+	if req.AmountPaise < 0 || (!zeroAmountOK && req.AmountPaise <= 0) {
+		http.Error(w, "invalid_amount: must be greater than zero (or non-negative for REPORT_ISSUE/NO_SHOW)", http.StatusBadRequest)
 		return
 	}
 
@@ -128,8 +131,9 @@ func (h *GatewayHandler) HandleDriverAddOrderEvent(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// 2. Post unbalanced credit entry for the driver to trigger discrepancy alert (skip for REPORT_ISSUE)
-	if req.EventType != "REPORT_ISSUE" {
+	// 2. Post unbalanced credit entry for the driver to trigger discrepancy alert
+	// (skip for zero-amount informational events REPORT_ISSUE / NO_SHOW)
+	if req.EventType != "REPORT_ISSUE" && req.EventType != "NO_SHOW" {
 		ledgerInsert := `
 			INSERT INTO financial_ledger_entries (order_id, city_prefix, regional_settlement_zone, account_type, entry_type, amount_paise, description, created_at)
 			VALUES ($1::uuid, $2, $2, 'DRIVER_EARNINGS', 'CREDIT', $3, $4, NOW())

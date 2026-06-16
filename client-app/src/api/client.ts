@@ -898,7 +898,7 @@ export async function addOrderEvent(
   token: string,
   orderId: string,
   payload: {
-    event_type: 'ADD_TOLL' | 'ADD_STOP' | 'REPORT_ISSUE' | 'toll_added' | 'parking_added' | 'waiting_added';
+    event_type: 'ADD_TOLL' | 'ADD_STOP' | 'REPORT_ISSUE' | 'NO_SHOW' | 'toll_added' | 'parking_added' | 'waiting_added';
     amount_paise: number;
     description: string;
   },

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useToastStore } from '@/store/useToastStore';
 import {
   getVehicles, createVehicle, uploadVehicleDocument, deleteVehicleNew,
   type DriverVehicleFull, type VehicleDocSlot, type VehicleDocStatus,
@@ -52,6 +53,7 @@ function DocSlot({ doc, label, onUpload }: { doc: VehicleDocSlot; label: string;
 export default function DriverVehiclesPage() {
   const t = useTranslations('vehicles');
   const { token } = useAuthStore();
+  const showToast = useToastStore((s) => s.show);
   const [vehicles, setVehicles] = useState<DriverVehicleFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -61,7 +63,7 @@ export default function DriverVehiclesPage() {
   const load = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try { setVehicles((await getVehicles(token)).vehicles); }
-    catch (e) { console.warn('[Vehicles] load failed', e); }
+    catch { useToastStore.getState().show('Could not load vehicles.', 'error'); }
     finally { setLoading(false); }
   }, [token]);
 
@@ -79,22 +81,23 @@ export default function DriverVehiclesPage() {
       setShowAdd(false);
       setForm({ make: '', model: '', year: '', plate: '', fuel_type: 'PETROL', car_type: 'SEDAN', transmission: 'MANUAL' });
       await load();
-    } catch { alert('Could not add vehicle.'); }
+      showToast('Vehicle added.', 'success');
+    } catch { showToast('Could not add vehicle.', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleUpload = async (vehicleId: string, type: string, file: File, expiry: string) => {
     if (!token) return;
-    try { await uploadVehicleDocument(token, vehicleId, type, file, expiry); await load(); }
-    catch { alert('Upload failed.'); }
+    try { await uploadVehicleDocument(token, vehicleId, type, file, expiry); await load(); showToast('Document uploaded.', 'success'); }
+    catch { showToast('Upload failed.', 'error'); }
   };
 
   const handleDelete = async (id: string) => {
     if (!token || !confirm('Remove this vehicle?')) return;
-    try { await deleteVehicleNew(token, id); await load(); }
+    try { await deleteVehicleNew(token, id); await load(); showToast('Vehicle removed.', 'success'); }
     catch (e: unknown) {
       const status = (e as { status?: number })?.status;
-      alert(status === 409 ? 'Cannot delete during an active trip.' : 'Delete failed.');
+      showToast(status === 409 ? 'Cannot delete during an active trip.' : 'Delete failed.', 'error');
     }
   };
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore, DutyState } from '@/store/useDriverDutyStore';
-import { verifyTripOTP, ApiClientError } from '@/api/client';
+import { verifyTripOTP, addOrderEvent, ApiClientError } from '@/api/client';
+import { useToastStore } from '@/store/useToastStore';
 import { FareDisplay } from '@/components/ds';
 
 interface ArrivedVerificationPaneProps {
@@ -142,6 +143,8 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [noShowSubmitting, setNoShowSubmitting] = useState(false);
+  const showToast = useToastStore((s) => s.show);
 
   const orderId = activeTrip?.order_id;
 
@@ -237,15 +240,31 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
     }
   };
 
-  const handleNoShow = () => {
+  const handleNoShow = async () => {
     if (elapsedSeconds <= 300) {
-      alert('Cannot report no-show during initial 5-minute wait.');
+      showToast('Cannot report no-show during the initial 5-minute wait.', 'error');
       return;
     }
-    if (confirm('Report rider no-show? Trip will be cancelled.')) {
+    if (!orderId || !token) {
+      showToast('Session expired. Please re-authenticate.', 'error');
+      return;
+    }
+    setNoShowSubmitting(true);
+    try {
+      await addOrderEvent(token, orderId, {
+        event_type: 'NO_SHOW',
+        amount_paise: 0,
+        description: 'Rider did not show at pickup',
+      });
       logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId, reason: 'RIDER_NO_SHOW' });
+      showToast('No-show reported. You are back online.', 'success');
+      // Mirror the cancel/reset path: clear the active trip and return to idle.
       setActiveTrip(null);
       setDutyState('ONLINE');
+    } catch (err) {
+      showToast('Could not report no-show. Please try again.', 'error');
+    } finally {
+      setNoShowSubmitting(false);
     }
   };
 
@@ -375,14 +394,16 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
         {/* No-show */}
         <button
           type="button"
-          disabled={elapsedSeconds <= 300}
+          disabled={elapsedSeconds <= 300 || noShowSubmitting}
           onClick={handleNoShow}
           className="w-full text-center text-label-medium text-content-negative py-3 min-h-[44px]
             cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed
             hover:opacity-80 transition-base
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
         >
-          Report No-Show{elapsedSeconds <= 300 ? ` (${freeMin}:${freeSec} remaining)` : ''}
+          {noShowSubmitting
+            ? 'Reporting…'
+            : `Report No-Show${elapsedSeconds <= 300 ? ` (${freeMin}:${freeSec} remaining)` : ''}`}
         </button>
       </form>
     </div>

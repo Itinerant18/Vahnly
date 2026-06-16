@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useToastStore } from '@/store/useToastStore';
 import { getDriverTraining, TrainingModule } from '@/api/client';
 
 export default function DriverTrainingPage() {
@@ -25,7 +26,7 @@ export default function DriverTrainingPage() {
     }
     getDriverTraining(token)
       .then((res) => setModules(res.modules))
-      .catch((err) => console.warn('Failed to load training:', err))
+      .catch(() => useToastStore.getState().show('Could not load training modules.', 'error'))
       .finally(() => setLoading(false));
   }, [token]);
 

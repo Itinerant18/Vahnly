@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useLocaleSwitch, SUPPORTED_LOCALES, type Locale } from '@/i18n/LocaleProvider';
 import { getPref, setPref } from '@/lib/prefs';
 import { isBiometricAvailable, enrollBiometric } from '@/lib/biometric';
+import { useToastStore } from '@/store/useToastStore';
 import {
   updateLanguage, updateNotificationPrefs, changeDriverPassword, deleteDriverAccount,
   type NotificationPrefs,
@@ -29,6 +30,7 @@ export default function DriverSettingsPage() {
   const router = useRouter();
   const { token, logout } = useAuthStore();
   const { locale, setLocale } = useLocaleSwitch();
+  const showToast = useToastStore((s) => s.show);
 
   const [prefs, setPrefs] = useState<NotificationPrefs>({ trip_offers: true, earnings: true, promotions: true, safety: true });
   const [navApp, setNavApp] = useState<NavApp>('GOOGLE');
@@ -54,7 +56,7 @@ export default function DriverSettingsPage() {
 
   const savePrefs = async (next: NotificationPrefs) => {
     setPrefs(next);
-    if (token) { try { await updateNotificationPrefs(token, next); flash(); } catch { /* ignore */ } }
+    if (token) { try { await updateNotificationPrefs(token, next); flash(); } catch { showToast('Could not save notification preferences.', 'error'); } }
   };
 
   const onNav = (app: NavApp) => { setNavApp(app); void setPref(NAV_KEY, app); flash(); };
@@ -64,7 +66,7 @@ export default function DriverSettingsPage() {
     if (!bioEnabled) {
       // Trigger the real OS biometric prompt; only persist on success.
       const ok = await enrollBiometric(token ?? 'driver');
-      if (!ok) { alert(t('biometricUnavailable')); return; }
+      if (!ok) { showToast(t('biometricUnavailable'), 'error'); return; }
       setBioEnabled(true);
       void setPref(BIO_KEY, 'true');
     } else {
@@ -96,7 +98,7 @@ export default function DriverSettingsPage() {
       router.replace('/login');
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
-      alert(status === 409 ? 'Finish your active trip before deleting.' : 'Could not delete account.');
+      showToast(status === 409 ? 'Finish your active trip before deleting.' : 'Could not delete account.', 'error');
     }
   };
 

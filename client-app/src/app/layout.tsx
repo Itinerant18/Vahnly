@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { ThemeProvider } from "@/lib/providers/ThemeProvider";
+import { Toaster } from "@/components/Toaster";
 
 // ── Inter — display, body, labels ──────────────────────────────────────────
 // RULE: Inter for ALL prose, headings, labels, addresses, phone numbers.
@@ -45,6 +46,7 @@ export default function RootLayout({
         <LocaleProvider>
           <ThemeProvider>{children}</ThemeProvider>
         </LocaleProvider>
+        <Toaster />
       </body>
     </html>
   );

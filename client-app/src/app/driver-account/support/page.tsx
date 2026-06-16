@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useToastStore } from '@/store/useToastStore';
 import {
   createSupportTicket, getSupportTickets, getSupportTicket, replySupportTicket,
   uploadSupportAttachment, getTripHistory,
@@ -24,6 +25,7 @@ type CatTile = { key: TicketCategory; label: string; icon: string };
 export default function DriverSupportPage() {
   const t = useTranslations('support');
   const { token } = useAuthStore();
+  const showToast = useToastStore((s) => s.show);
   const [view, setView] = useState<'new' | 'list' | 'thread'>('new');
   const [tickets, setTickets] = useState<SupportTicketListItem[]>([]);
 
@@ -54,7 +56,7 @@ export default function DriverSupportPage() {
 
   const loadTickets = useCallback(async () => {
     if (!token) return;
-    try { setTickets((await getSupportTickets(token)).tickets); } catch (e) { console.warn(e); }
+    try { setTickets((await getSupportTickets(token)).tickets); } catch { useToastStore.getState().show('Could not load your tickets.', 'error'); }
   }, [token]);
 
   useEffect(() => {
@@ -66,13 +68,13 @@ export default function DriverSupportPage() {
   const openThread = async (id: string) => {
     if (!token) return;
     setActiveId(id); setView('thread'); setThread(null);
-    try { setThread(await getSupportTicket(token, id)); } catch (e) { console.warn(e); }
+    try { setThread(await getSupportTicket(token, id)); } catch { showToast('Could not open this ticket.', 'error'); }
   };
 
   const handleAttach = async (file: File) => {
     if (!token) return;
     try { const { url } = await uploadSupportAttachment(token, file); setAttachments((a) => [...a, url]); }
-    catch { alert('Attachment upload failed.'); }
+    catch { showToast('Attachment upload failed.', 'error'); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,14 +89,14 @@ export default function DriverSupportPage() {
       setCreatedNumber(res.ticket_number);
       setCategory(null); setSubject(''); setDescription(''); setOrderId(''); setAttachments([]);
       await loadTickets();
-    } catch { alert('Could not submit ticket.'); }
+    } catch { showToast('Could not submit ticket.', 'error'); }
     finally { setSubmitting(false); }
   };
 
   const handleReply = async () => {
     if (!token || !activeId || !replyMsg.trim()) return;
-    try { await replySupportTicket(token, activeId, replyMsg); setReplyMsg(''); await openThread(activeId); }
-    catch { alert('Reply failed.'); }
+    try { await replySupportTicket(token, activeId, replyMsg); setReplyMsg(''); await openThread(activeId); showToast('Reply sent.', 'success'); }
+    catch { showToast('Reply failed.', 'error'); }
   };
 
   return (
