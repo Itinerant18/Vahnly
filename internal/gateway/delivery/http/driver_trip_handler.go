@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/segmentio/kafka-go"
 
 	"github.com/platform/driver-delivery/internal/observability"
 )
@@ -267,36 +266,17 @@ func (h *GatewayHandler) HandleDriverCarIssueReport(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Notify admin via Kafka first; only flag admin_notified if the publish succeeded.
-	adminNotified := false
-	evt := map[string]interface{}{
-		"order_id":            orderID,
-		"driver_id":           driverID,
-		"rider_garage_car_id": garageCarID,
-		"issue_type":          req.IssueType,
-		"description":         req.Description,
-		"reported_at":         time.Now().UTC(),
-	}
-	if payload, mErr := json.Marshal(evt); mErr == nil {
-		if pErr := h.kafkaWriter.WriteMessages(ctx, kafka.Message{
-			Topic: "trip.car.issue",
-			Key:   []byte(orderID),
-			Value: payload,
-		}); pErr == nil {
-			adminNotified = true
-		} else {
-			log.Printf("[CAR_ISSUE] kafka publish failed for order %s: %v", orderID, pErr)
-		}
-	}
-
+	// The admin Car Issues dashboard reads car_issue_reports directly, so persisting the
+	// report IS the notification. (Previously this also produced to a `trip.car.issue` Kafka
+	// topic that had no consumer — dropped to avoid a dead-letter pipe.)
 	var descArg interface{}
 	if req.Description != "" {
 		descArg = req.Description
 	}
 	_, err = h.dbPool.Exec(ctx, `
 		INSERT INTO car_issue_reports (order_id, driver_id, rider_garage_car_id, issue_type, description, admin_notified)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)
-	`, orderID, driverID, garageCarID, req.IssueType, descArg, adminNotified)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, true)
+	`, orderID, driverID, garageCarID, req.IssueType, descArg)
 	if err != nil {
 		log.Printf("[CAR_ISSUE] failed inserting report for order %s: %v", orderID, err)
 		http.Error(w, "failed_to_save_report", http.StatusInternalServerError)
@@ -305,7 +285,7 @@ func (h *GatewayHandler) HandleDriverCarIssueReport(w http.ResponseWriter, r *ht
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{
 		"success":        true,
-		"admin_notified": adminNotified,
+		"admin_notified": true,
 		"message":        "Car issue reported",
 	})
 }

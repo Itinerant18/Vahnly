@@ -373,6 +373,16 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 						continue
 					}
 
+					// SOS / safety incidents carry richer fields than AssignmentFrame, and the
+					// admin terminal (order_id=global-sos) parses them as JSON. Forward verbatim.
+					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"incident_type"`) {
+						select {
+						case session.MessageChan <- []byte(msg.Payload):
+						default:
+						}
+						continue
+					}
+
 					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
 					var binaryBuffer []byte
 					var marshalErr error

@@ -235,10 +235,27 @@ func main() {
 	incidentLogger := log.New(os.Stdout, "[INCIDENT_ADMIN] ", log.LstdFlags)
 	incidentAdminHandler := adminHttp.NewIncidentAdminHandler(dbPool, redisClusterClient, brokersList, incidentLogger)
 
+	// Push SOS incidents to the admin's live stream (order_id=global-sos) so the dashboard
+	// receives them in realtime instead of only on its 8s poll. The route key is global-sos;
+	// the real trip id is preserved as trip_id. The backplane multiplexer forwards payloads
+	// containing "incident_type" verbatim to the matching session.
+	publishSOSLive := func(inc adminHttp.StalledTripIncident) {
+		live := map[string]any{}
+		b, _ := json.Marshal(inc)
+		if json.Unmarshal(b, &live) != nil {
+			return
+		}
+		live["trip_id"] = inc.OrderID
+		live["order_id"] = "global-sos"
+		if lb, mErr := json.Marshal(live); mErr == nil {
+			_ = redisClusterClient.Publish(mainCtx, gatewayHttp.RedisPubSubChannel, string(lb)).Err()
+		}
+	}
+
 	// Bind global SOS broadcast callback to populate the admin incident panel queue
 	gatewayHttp.SOSCallback = func(tripID string, lat, lng float64) {
 		observability.SOSAlertsTotal.Inc()
-		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
+		inc := adminHttp.StalledTripIncident{
 			OrderID:              tripID,
 			DriverID:             "drv-ambient-alpha",
 			DriverName:           "Aniket Karmakar",
@@ -257,7 +274,9 @@ func main() {
 			BatteryLevel:         100.0,
 			Latitude:             lat,
 			Longitude:            lng,
-		})
+		}
+		incidentAdminHandler.AddIncident(inc)
+		publishSOSLive(inc)
 	}
 
 	driverHttp.SOSCallback = func(driverID string, tripID string, lat, lng float64) {
@@ -282,7 +301,7 @@ func main() {
 			cityPrefix = "KOL"
 		}
 
-		incidentAdminHandler.AddIncident(adminHttp.StalledTripIncident{
+		inc := adminHttp.StalledTripIncident{
 			OrderID:              tripID,
 			DriverID:             driverID,
 			DriverName:           driverName,
@@ -301,7 +320,9 @@ func main() {
 			BatteryLevel:         100.0,
 			Latitude:             lat,
 			Longitude:            lng,
-		})
+		}
+		incidentAdminHandler.AddIncident(inc)
+		publishSOSLive(inc)
 	}
 
 	gatewayHttp.StalledTripCallback = func(driverID string, tripID string, lat, lng float64, duration int) {
