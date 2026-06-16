@@ -1,0 +1,15 @@
+- generic [ref=e6]:
+  - generic [ref=e7]:
+    - heading "drivers-for-u" [level=1] [ref=e8]
+    - paragraph [ref=e9]: Operations control room terminal
+  - generic [ref=e35]:
+    - generic [ref=e36]:
+      - strong [ref=e37]: Mandatory MFA Gate
+      - text: ": Two-factor enrolment required before access. Enroll a TOTP secret, then log in with a 6-digit code.. Enter the 6-digit code from your authenticator app."
+    - generic [ref=e38]:
+      - generic [ref=e39]: Two-Factor Passcode (6 Digits)
+      - textbox "000 000" [active] [ref=e40]
+    - generic [ref=e41]:
+      - button "Back" [ref=e42] [cursor=pointer]
+      - button "Authenticate" [ref=e43] [cursor=pointer]
+  - generic [ref=e34]: "FINGERPRINT: fp-web-cr-e2843e70ac97424a"

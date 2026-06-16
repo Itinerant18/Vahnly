@@ -269,7 +269,7 @@ function UnifiedLoginContent() {
         {/* Logo/Branding */}
         <div className="text-center mb-8">
           <h1 className="text-heading-large font-bold tracking-tight text-content-primary">
-            DRIVERS-FOR-U
+            VAHNLY
           </h1>
           <p className="text-label-small text-content-secondary uppercase tracking-wider mt-1">
             Enterprise Fleet Access Gateway

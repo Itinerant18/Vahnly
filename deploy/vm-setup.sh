@@ -13,10 +13,10 @@ sudo usermod -aG docker $USER
 echo "[OK] Docker installed: $(docker --version)"
 
 echo "==> Step 4: Cloning repo..."
-if [ ! -d "Drivers-for-u" ]; then
-  git clone https://github.com/Itinerant18/Drivers-for-u.git
+if [ ! -d "Vahnly" ]; then
+  git clone https://github.com/Itinerant18/Vahnly.git
 fi
-cd Drivers-for-u
+cd Vahnly
 
 echo "==> Step 4: Creating .env..."
 cat > .env <<EOF

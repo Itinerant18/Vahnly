@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Drivers-for-u one-shot local bootstrap. Brings up the full Docker Compose
+    Vahnly one-shot local bootstrap. Brings up the full Docker Compose
     stack (Postgres, Kafka, 6-shard Redis, Triton, all 11 Go services) and
     prints a connection map. Idempotent: safe to re-run.
 
@@ -163,7 +163,7 @@ if (-not $SkipSeed) {
 # ── 8. Print connection map ──────────────────────────────────────────────────
 Write-Host ""
 Write-Host "=========================================================================="
-Write-Host " Drivers-for-u stack is up."
+Write-Host " Vahnly stack is up."
 Write-Host "=========================================================================="
 Write-Host "  PostgreSQL     -> localhost:5432  (user=postgres db=delivery_platform)"
 Write-Host "  Kafka EXTERNAL -> localhost:19092 (use INTERNAL 9092 from inside compose)"

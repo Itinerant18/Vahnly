@@ -111,7 +111,7 @@ func (h *AdminRiderHandler) HandleUpdateRiderStatus(w http.ResponseWriter, r *ht
 	if !req.Active && h.notifier != nil {
 		_ = h.notifier.NotifyRider(ctx, id, "ACCOUNT_DEACTIVATED",
 			"Your account has been deactivated",
-			"Your DriversForU account has been deactivated. Contact support for assistance.",
+			"Your Vahnly account has been deactivated. Contact support for assistance.",
 			map[string]any{"reason": req.Reason})
 	}
 

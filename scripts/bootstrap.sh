@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Drivers-for-u — one-shot local bootstrap (Linux / macOS)
+# Vahnly — one-shot local bootstrap (Linux / macOS)
 # =============================================================================
 # Brings up the full Docker Compose stack. Idempotent. Mirrors
 # scripts/bootstrap.ps1 for cross-platform parity.
@@ -115,7 +115,7 @@ fi
 cat <<EOF
 
 ==========================================================================
- Drivers-for-u stack is up.
+ Vahnly stack is up.
 ==========================================================================
   PostgreSQL     -> localhost:5432  (user=postgres db=delivery_platform)
   Kafka EXTERNAL -> localhost:19092 (use INTERNAL 9092 from inside compose)

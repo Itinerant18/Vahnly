@@ -1,0 +1,30 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e5]
+      - generic [ref=e8]:
+        - heading "Drivers for U" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Your car. Our driver.
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Enter your mobile number" [level=2] [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - generic [ref=e16]: 🇮🇳
+            - generic [ref=e17]: "+91"
+          - textbox "98765 43210" [ref=e18]
+        - generic [ref=e19]:
+          - generic [ref=e20]: Referral Code (optional)
+          - textbox "e.g. DFU1A2B3" [ref=e21]
+        - button "Send OTP" [disabled] [ref=e22]
+        - generic [ref=e25]: or
+        - generic [ref=e27]:
+          - button "Google" [ref=e28] [cursor=pointer]:
+            - img [ref=e29]
+            - text: Google
+          - button "Apple Soon" [disabled] [ref=e34]:
+            - img [ref=e35]
+            - text: Apple
+            - generic [ref=e37]: Soon
+      - paragraph [ref=e38]: By continuing, you agree to our Terms of Service and Privacy Policy
+  - alert [ref=e39]

@@ -10,7 +10,7 @@ import (
 )
 
 // GlobalTracerName isolates your microservice orchestration tracer
-const GlobalTracerName = "drivers-for-u-backbone"
+const GlobalTracerName = "vahnly-backbone"
 
 // InitTracerProvider configures the global trace management structures on boot
 func InitTracerProvider(serviceName string) (*sdktrace.TracerProvider, error) {

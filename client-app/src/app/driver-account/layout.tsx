@@ -37,7 +37,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
           <div className="overflow-y-auto space-y-6 scrollbar-thin pr-1">
             {/* Logo */}
             <div className="pb-4 border-b border-border-opaque">
-              <h2 className="text-sm font-extrabold tracking-widest font-mono text-white">DRIVERS-FOR-U</h2>
+              <h2 className="text-sm font-extrabold tracking-widest font-mono text-white">VAHNLY</h2>
               <span className="text-[8px] font-mono text-content-tertiary uppercase tracking-widest">Core Account Hub</span>
             </div>
 

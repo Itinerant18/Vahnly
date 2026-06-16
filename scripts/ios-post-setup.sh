@@ -137,4 +137,4 @@ echo "  2. Uncomment FirebaseCore/FirebaseMessaging imports in AppDelegate.swift
 echo "  3. Right-click App folder in Xcode → Add Files → GoogleService-Info.plist (already copied)"
 echo "     Ensure 'Add to target: App' is checked"
 echo "  4. Replace placeholder icons: ./scripts/generate-icons.sh $APP_DIR"
-echo "  5. Set bundle identifier in Signing & Capabilities to com.driversforu.$FLAVOR"
+echo "  5. Set bundle identifier in Signing & Capabilities to com.vahnly.$FLAVOR"

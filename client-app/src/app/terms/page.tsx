@@ -106,7 +106,7 @@ export default function TermsOfService() {
 
             <div className="prose prose-invert max-w-none text-content-secondary space-y-6 text-paragraph-medium leading-relaxed">
               <p>
-                Welcome to <strong>Drivers-For-U</strong>. By accessing or using our unified dispatch ride matching 
+                Welcome to <strong>Vahnly</strong>. By accessing or using our unified dispatch ride matching 
                 ecosystem, including our mobile and web applications (the "Service"), you agree to be bound by these 
                 Terms of Service. If you do not agree to all terms, you are prohibited from utilizing the Service.
               </p>
@@ -114,11 +114,11 @@ export default function TermsOfService() {
               <div>
                 <h2 className="text-heading-large text-white mb-3">1. Scope of Service</h2>
                 <p>
-                  Drivers-For-U acts exclusively as a technology dispatch matching platform that connects independent 
+                  Vahnly acts exclusively as a technology dispatch matching platform that connects independent 
                   riders with independent professional drivers. 
                 </p>
                 <p className="mt-2">
-                  <strong>Non-Carrier Status:</strong> Drivers-For-U does not operate as a transportation provider, 
+                  <strong>Non-Carrier Status:</strong> Vahnly does not operate as a transportation provider, 
                   nor does it employ drivers. Any matches or agreements made between a rider and a driver represent an 
                   agreement solely between those parties.
                 </p>
@@ -167,11 +167,11 @@ export default function TermsOfService() {
               <div>
                 <h2 className="text-heading-large text-white mb-3">5. Disclaimer and Limitation of Liability</h2>
                 <p>
-                  DRIVERS-FOR-U PROVIDES THE SERVICE ON AN "AS IS" AND "AS AVAILABLE" BASIS. WE DISCLAIM ALL WARRANTIES, EXPRESS 
+                  VAHNLY PROVIDES THE SERVICE ON AN "AS IS" AND "AS AVAILABLE" BASIS. WE DISCLAIM ALL WARRANTIES, EXPRESS 
                   OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
                 </p>
                 <p className="mt-2">
-                  To the maximum extent permitted by law, Drivers-For-U is not liable for direct, indirect, incidental, punitive, 
+                  To the maximum extent permitted by law, Vahnly is not liable for direct, indirect, incidental, punitive, 
                   or consequential damages arising out of matching operations, driver performance, trip safety, or platform downtime.
                 </p>
               </div>
@@ -179,7 +179,7 @@ export default function TermsOfService() {
               <div>
                 <h2 className="text-heading-large text-white mb-3">6. Governing Law</h2>
                 <p>
-                  These Terms of Service and any disputes arising out of your relationship with Drivers-For-U are governed 
+                  These Terms of Service and any disputes arising out of your relationship with Vahnly are governed 
                   exclusively by the laws of India, under the jurisdiction of Kolkata courts.
                 </p>
               </div>
@@ -197,7 +197,7 @@ export default function TermsOfService() {
 
         {/* Footer info */}
         <div className="mt-8 text-center text-[10px] text-content-tertiary font-mono">
-          <span>Drivers-For-U © 2026. All rights reserved.</span>
+          <span>Vahnly © 2026. All rights reserved.</span>
         </div>
       </div>
     </div>

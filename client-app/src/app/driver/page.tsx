@@ -950,7 +950,7 @@ export default function DriverTerminalPage() {
     return (
       <div className="min-h-screen bg-background-primary text-content-primary p-6 sm:p-12 font-body flex flex-col justify-between">
         <header className="border-b border-border-opaque pb-6 text-left">
-          <h1 className="text-heading-large font-mono tracking-tight uppercase">DRIVERS-FOR-U</h1>
+          <h1 className="text-heading-large font-mono tracking-tight uppercase">VAHNLY</h1>
         </header>
 
         <main className="flex-grow flex flex-col items-center justify-center max-w-md mx-auto text-center space-y-6">
@@ -1143,7 +1143,7 @@ export default function DriverTerminalPage() {
             ☰
           </button>
           <div>
-            <h1 className="text-label-large font-mono tracking-tight uppercase text-content-primary">DRIVERS-FOR-U</h1>
+            <h1 className="text-label-large font-mono tracking-tight uppercase text-content-primary">VAHNLY</h1>
             <div className="flex items-center gap-1.5 mt-0.5 font-mono text-label-small text-content-tertiary">
               <span>HUB: {cityPrefix}</span>
               <span>·</span>

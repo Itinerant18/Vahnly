@@ -30,7 +30,7 @@ export async function enrollBiometric(driverHandle: string): Promise<boolean> {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge,
-        rp: { name: "Drivers-For-U" },
+        rp: { name: "Vahnly" },
         user: { id: userId, name: driverHandle || "driver", displayName: "Driver" },
         pubKeyCredParams: [
           { type: "public-key", alg: -7 },

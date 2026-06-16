@@ -24,7 +24,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drivers-For-U | Unified Dispatch Platform",
+  title: "Vahnly | Unified Dispatch Platform",
   description:
     "High-performance, secure dynamic ride dispatch matching ecosystem client application.",
   verification: {

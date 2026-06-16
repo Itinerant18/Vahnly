@@ -96,7 +96,7 @@ if ! grep -q "com.google.gms.google-services" "$BUILD_GRADLE"; then
 fi
 
 # Write MyFirebaseMessagingService.kt
-PACKAGE="com.driversforu.$(basename $APP_DIR | sed 's/client-app/driver/;s/rider-app/rider/')"
+PACKAGE="com.vahnly.$(basename $APP_DIR | sed 's/client-app/driver/;s/rider-app/rider/')"
 KOTLIN_DIR="$APP_DIR/android/app/src/main/java/$(echo $PACKAGE | tr '.' '/')"
 mkdir -p "$KOTLIN_DIR"
 
@@ -125,5 +125,5 @@ echo "Done. Remaining manual steps:"
 echo "  1. Add google-services classpath to project-level android/build.gradle:"
 echo "       classpath 'com.google.gms:google-services:4.4.2'   (inside buildscript.dependencies)"
 echo "  2. Run: ./scripts/generate-icons.sh $APP_DIR   (launcher icons)"
-echo "  3. Set applicationId in app/build.gradle to com.driversforu.$FLAVOR"
+echo "  3. Set applicationId in app/build.gradle to com.vahnly.$FLAVOR"
 echo "  4. Open in Android Studio: cd $APP_DIR && npm run open:android"

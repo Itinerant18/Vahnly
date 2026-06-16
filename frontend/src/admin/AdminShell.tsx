@@ -234,7 +234,7 @@ export const AdminShell: React.FC = () => {
             className="text-heading-small text-content-primary whitespace-nowrap cursor-pointer select-none"
             onClick={() => navigate('/')}
           >
-            drivers-for-u
+            vahnly
           </h1>
 
           {/* Global Search */}

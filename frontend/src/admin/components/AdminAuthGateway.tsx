@@ -222,7 +222,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
 
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-content-primary font-move">drivers-for-u</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-content-primary font-move">vahnly</h1>
           <p className="text-content-secondary text-xs mt-1.5 font-medium">Operations control room terminal</p>
         </div>
 

@@ -62,10 +62,10 @@ export default function Home() {
       <header className="relative z-10 w-full max-w-6xl mx-auto flex justify-between items-center py-4 border-b border-border-opaque">
         <div className="flex items-center gap-2">
           <span className="h-8 w-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-lg">
-            D
+            V
           </span>
           <span className="font-extrabold tracking-tight font-move text-lg text-white">
-            DRIVERS-FOR-U
+            VAHNLY
           </span>
         </div>
         
@@ -91,7 +91,7 @@ export default function Home() {
           </h1>
           
           <p className="text-content-secondary text-sm md:text-base leading-relaxed">
-            Drivers-For-U runs a secure, high-performance dynamic ride dispatch匹配 matching ecosystem. 
+            Vahnly runs a secure, high-performance dynamic ride dispatch匹配 matching ecosystem. 
             Our platform allows registered independent professional drivers to connect with booking requests 
             across supported metropolitan regions, optimizing route navigation and transaction routing.
           </p>
@@ -159,7 +159,7 @@ export default function Home() {
             </Link>
           </div>
           <div>
-            <span>Drivers-For-U © 2026. Support Contact: </span>
+            <span>Vahnly © 2026. Support Contact: </span>
             <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-white underline">
               karmakaraniket018@gmail.com
             </a>

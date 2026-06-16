@@ -248,7 +248,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 				Subject:   dbUserID,
 				ExpiresAt: jwt.NewNumericDate(enrolExp),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
-				Issuer:    "drivers-for-u-auth",
+				Issuer:    "vahnly-auth",
 			},
 		}
 		enrolToken, signErr := jwt.NewWithClaims(jwt.SigningMethodHS256, enrolClaims).SignedString(h.jwtSecret)
@@ -312,7 +312,7 @@ func (h *AdminAuthHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Reque
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-auth",
+			Issuer:    "vahnly-auth",
 		},
 	}
 
@@ -449,7 +449,7 @@ func (h *AdminAuthHandler) HandleChangePassword(w http.ResponseWriter, r *http.R
 			Subject:   adminID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-auth",
+			Issuer:    "vahnly-auth",
 		},
 	}
 	tokenString, signErr := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
@@ -498,7 +498,7 @@ func (h *AdminAuthHandler) HandleEnroll2FA(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"secret":       secret,
-		"otpauth_uri":  totpEnrolmentURI(secret, email, "Drivers-For-U Admin"),
+		"otpauth_uri":  totpEnrolmentURI(secret, email, "Vahnly Admin"),
 		"instructions": "Scan in an authenticator app, then verify a 6-digit code at next login.",
 	})
 }

@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.driversforu.rider',
-  appName: 'Drivers For U',
+  appId: 'com.vahnly.rider',
+  appName: 'Vahnly',
   webDir: 'out',
   plugins: {
     PushNotifications: {

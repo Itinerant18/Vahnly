@@ -32,7 +32,7 @@ func (c *CORSMiddleware) Handler(next http.Handler) http.Handler {
 		allowed[admin] = true
 	}
 	// ALLOWED_ORIGINS is the canonical comma-separated production allow-list
-	// (e.g. "https://app.driversforu.com,capacitor://localhost"). CORS_ALLOWED_ORIGINS
+	// (e.g. "https://app.vahnly.com,capacitor://localhost"). CORS_ALLOWED_ORIGINS
 	// is accepted as a legacy alias.
 	for _, env := range []string{"ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"} {
 		for _, o := range strings.Split(os.Getenv(env), ",") {

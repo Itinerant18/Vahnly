@@ -1,6 +1,6 @@
 # Production Monitoring
 
-Prometheus + Grafana + Alertmanager for the Drivers-for-u platform, plus the Go
+Prometheus + Grafana + Alertmanager for the Vahnly platform, plus the Go
 metrics they scrape and a synthetic uptime check.
 
 ## What's here

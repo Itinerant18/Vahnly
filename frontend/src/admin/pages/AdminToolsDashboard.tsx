@@ -172,7 +172,7 @@ export function AdminToolsDashboard() {
   const approveBulk = async (id: string) => {
     await fetch(`${API}/tools/bulk-operations/${id}/approve`, {
       method: 'POST', headers: authHeaders(true),
-      body: JSON.stringify({ approved_by: 'admin@drivers-for-u.in' }),
+      body: JSON.stringify({ approved_by: 'admin@vahnly.in' }),
     });
     load();
   };
@@ -180,7 +180,7 @@ export function AdminToolsDashboard() {
   const submitExport = async (q: ExportQuery) => {
     await fetch(`${API}/tools/exports/jobs`, {
       method: 'POST', headers: authHeaders(true),
-      body: JSON.stringify({ query_id: q.id, query_name: q.name, params: {}, created_by: 'admin@drivers-for-u.in' }),
+      body: JSON.stringify({ query_id: q.id, query_name: q.name, params: {}, created_by: 'admin@vahnly.in' }),
     });
     load();
   };

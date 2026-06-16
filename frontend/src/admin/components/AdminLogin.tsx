@@ -45,7 +45,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
 
         {/* Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-display-small text-content-primary tracking-tight">drivers-for-u</h1>
+          <h1 className="text-display-small text-content-primary tracking-tight">vahnly</h1>
           <p className="text-label-medium text-content-secondary mt-2">Operations Dashboard Security Gateway</p>
         </div>
 

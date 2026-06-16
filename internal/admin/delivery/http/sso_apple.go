@@ -148,7 +148,7 @@ func (h *AdminAuthHandler) HandleSSOAppleCallback(w http.ResponseWriter, r *http
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-auth",
+			Issuer:    "vahnly-auth",
 		},
 	}
 	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)

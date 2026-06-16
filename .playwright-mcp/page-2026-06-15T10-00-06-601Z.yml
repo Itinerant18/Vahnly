@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - heading "DRIVERS-FOR-U" [level=1] [ref=e7]
+        - paragraph [ref=e8]: Enterprise Fleet Access Gateway
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: Driver Phone Number
+          - generic [ref=e12]:
+            - generic:
+              - generic: "+91"
+            - textbox "99999 88888" [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]: Secure PIN / Password
+          - textbox "••••••••" [ref=e17]
+        - generic [ref=e18]:
+          - button "Authenticate & Access" [ref=e19] [cursor=pointer]:
+            - generic [ref=e20]: Authenticate & Access
+          - button "Sign up as Driver Partner" [ref=e21] [cursor=pointer]:
+            - generic [ref=e22]: Sign up as Driver Partner
+      - generic [ref=e23]:
+        - button "Google Sign-In" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: Google Sign-In
+        - button "Apple Sign-In" [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: Apple Sign-In
+    - contentinfo [ref=e28]: Secure SHA-256 Token Vault • Active Sandbox Session
+  - alert [ref=e29]

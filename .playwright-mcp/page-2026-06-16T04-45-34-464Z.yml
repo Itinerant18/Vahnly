@@ -1,0 +1,27 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e5]
+      - generic [ref=e8]:
+        - heading "Drivers for U" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Your car. Our driver.
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e49]:
+          - heading "Enter 6-digit OTP" [level=2] [ref=e50]
+          - paragraph [ref=e51]: Sent to +91 9876543210
+        - group "OTP code" [ref=e52]:
+          - textbox "OTP digit 1" [active] [ref=e53]
+          - textbox "OTP digit 2" [ref=e54]
+          - textbox "OTP digit 3" [ref=e55]
+          - textbox "OTP digit 4" [ref=e56]
+          - textbox "OTP digit 5" [ref=e57]
+          - textbox "OTP digit 6" [ref=e58]
+        - paragraph [ref=e59]:
+          - text: Resend OTP in
+          - generic [ref=e60]: 30s
+        - button "Change number" [ref=e61]
+      - paragraph [ref=e38]: By continuing, you agree to our Terms of Service and Privacy Policy
+  - button "Open Next.js Dev Tools" [ref=e45] [cursor=pointer]:
+    - img [ref=e46]
+  - alert [ref=e39]

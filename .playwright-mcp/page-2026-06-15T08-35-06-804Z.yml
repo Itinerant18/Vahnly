@@ -1,0 +1,16 @@
+- generic [ref=e45]:
+  - generic [ref=e46]:
+    - heading "Set a new password" [level=1] [ref=e47]
+    - paragraph [ref=e48]: Your account is on a temporary password. Choose a new one to continue.
+  - generic [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e51]: Current (temporary) password
+      - textbox [active] [ref=e52]
+    - generic [ref=e53]:
+      - generic [ref=e54]: New password (min 8 chars)
+      - textbox [ref=e55]
+    - generic [ref=e56]:
+      - generic [ref=e57]: Confirm new password
+      - textbox [ref=e58]
+    - button "Update password & continue" [ref=e59] [cursor=pointer]
+    - button "Cancel and sign out" [ref=e60] [cursor=pointer]

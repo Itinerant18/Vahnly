@@ -24,8 +24,8 @@ export default function ReferPage() {
   };
   useEffect(load, []);
 
-  const shareUrl = `https://driversforu.app/r/${code}`;
-  const message = `Join Drivers-for-U with my code ${code} and we both earn ₹100! ${shareUrl}`;
+  const shareUrl = `https://vahnly.app/r/${code}`;
+  const message = `Join Vahnly with my code ${code} and we both earn ₹100! ${shareUrl}`;
 
   const copy = async () => {
     try {
@@ -47,7 +47,7 @@ export default function ReferPage() {
       return;
     }
     try {
-      await Share.share({ title: "Drivers-for-U", text: message, url: shareUrl });
+      await Share.share({ title: "Vahnly", text: message, url: shareUrl });
     } catch {
       try {
         await navigator.clipboard.writeText(message);

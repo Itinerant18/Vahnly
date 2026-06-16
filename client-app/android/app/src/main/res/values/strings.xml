@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vahnly Driver</string>
+    <string name="title_activity_main">Vahnly Driver</string>
+    <string name="package_name">com.vahnly.driver</string>
+    <string name="custom_url_scheme">com.vahnly.driver</string>
+</resources>

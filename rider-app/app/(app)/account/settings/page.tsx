@@ -241,7 +241,7 @@ export default function SettingsPage() {
 
   const openDeviceSettings = () => {
     // @capacitor/app is not installed; provide guidance instead of deep-linking.
-    alert("Open your device Settings → Apps → Drivers-for-U to manage permissions.");
+    alert("Open your device Settings → Apps → Vahnly to manage permissions.");
   };
 
   return (

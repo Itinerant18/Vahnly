@@ -347,7 +347,7 @@ export default function DriverOnboardingWizard() {
           driverName: onboardingData.fullName,
           timestamp: new Date().toISOString()
         });
-        alert('Verification Completed! Welcome to Drivers-For-U Fleet Engine. Your application has been submitted for administrative KYC approval.');
+        alert('Verification Completed! Welcome to Vahnly Fleet Engine. Your application has been submitted for administrative KYC approval.');
         
         // Clear wizard store
         clearStore();

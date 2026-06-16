@@ -2,7 +2,7 @@
 # DEFAULT CHART VALUES
 # Production overrides live in deploy/production-values.yaml.
 # Deploy into a single namespace so the service-DNS below resolves:
-#   helm install drivers-for-u ./deploy/charts/drivers-for-u -n dispatch
+#   helm install vahnly ./deploy/charts/vahnly -n dispatch
 # =============================================================================
 global:
   environment: production
@@ -43,7 +43,7 @@ monitoring:
 # --build-arg TARGET_SERVICE=<svc>); publish one tag per service or override
 # image.repository per environment. TARGET_SERVICE is still passed for clarity.
 image:
-  repository: drivers-for-u/platform
+  repository: vahnly/platform
   tag: v1.2.0
   pullPolicy: IfNotPresent
 
@@ -62,7 +62,7 @@ secrets:
 # Kafka client security. Enable both for production SASL_SSL (PLAIN over TLS).
 # All producers/consumers read KAFKA_TLS_ENABLED + KAFKA_SASL_* via kafkacfg.
 # IMPORTANT: only flip these on once the broker has the matching listener + ACLs,
-# and every Kafka-talking deployment includes drivers-for-u.kafkaSecurityEnv.
+#   and every Kafka-talking deployment includes vahnly.kafkaSecurityEnv.
 kafka:
   tlsEnabled: false
   saslEnabled: false
@@ -104,7 +104,7 @@ ingress:
 # to ephemeral local disk (NOT for production). endpoint is for S3-compatible
 # services (MinIO/Supabase); leave empty for AWS S3.
 objectStorage:
-  bucket: "driversforu-kyc-vault"
+  bucket: "vahnly-kyc-vault"
   region: "ap-south-1"
   endpoint: ""
 

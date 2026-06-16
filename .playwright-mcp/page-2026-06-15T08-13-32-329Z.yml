@@ -1,0 +1,25 @@
+- generic [ref=e448]:
+  - generic [ref=e449]:
+    - heading "drivers-for-u" [level=1] [ref=e450]
+    - paragraph [ref=e451]: Operations control room terminal
+  - generic [ref=e452]:
+    - button "Sign in" [ref=e453] [cursor=pointer]
+    - button "Create account" [ref=e454] [cursor=pointer]
+  - generic [ref=e455]:
+    - generic [ref=e456]:
+      - generic [ref=e457]:
+        - generic [ref=e458]: Corporate Email
+        - textbox [ref=e459]
+      - generic [ref=e460]:
+        - generic [ref=e461]:
+          - generic [ref=e462]: Security Password
+          - button "Forgot Password?" [ref=e463] [cursor=pointer]
+        - textbox [ref=e464]
+      - button "Unlock Dashboard" [ref=e465] [cursor=pointer]
+    - generic [ref=e466]:
+      - generic [ref=e467]: Or Federated Identity SSO
+      - generic [ref=e468]:
+        - button "Sign in with Google Workspace" [ref=e469] [cursor=pointer]: Sign in with Google Workspace
+        - button "Sign in with Microsoft 365" [ref=e471] [cursor=pointer]: Sign in with Microsoft 365
+        - button "Enterprise SAML Portal" [ref=e473] [cursor=pointer]: Enterprise SAML Portal
+  - generic [ref=e476]: "FINGERPRINT: fp-web-cr-e2843e70ac97424a"

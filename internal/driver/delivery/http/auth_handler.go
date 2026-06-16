@@ -270,7 +270,7 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 			Subject:   dbDriverID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-driver-auth",
+			Issuer:    "vahnly-driver-auth",
 		},
 	}
 
@@ -468,7 +468,7 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 			Subject:   dbDriverID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-driver-auth",
+			Issuer:    "vahnly-driver-auth",
 		},
 	}
 

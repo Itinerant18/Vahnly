@@ -1,7 +1,7 @@
 #requires -Version 7.0
 <#
 .SYNOPSIS
-    Drivers-for-u teardown helper. Stops all services, removes containers and
+    Vahnly teardown helper. Stops all services, removes containers and
     volumes. Safe to re-run.
 
 .EXAMPLE

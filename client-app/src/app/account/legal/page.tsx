@@ -16,7 +16,7 @@ export default function LegalPoliciesPage() {
       paragraphs: [
         {
           heading: '1. Service Scope & Definition',
-          text: 'Drivers-For-U operates an on-demand matching platform connecting vehicle owners ("Riders") with certified professional drivers ("Partners"). The platform provides real-time allocation, billing ledger compilation, routing assistance, and secure digital handshakes. Riders are solely responsible for ensuring their vehicle is fully legal, registered, and carries active primary third-party liability insurance.'
+          text: 'Vahnly operates an on-demand matching platform connecting vehicle owners ("Riders") with certified professional drivers ("Partners"). The platform provides real-time allocation, billing ledger compilation, routing assistance, and secure digital handshakes. Riders are solely responsible for ensuring their vehicle is fully legal, registered, and carries active primary third-party liability insurance.'
         },
         {
           heading: '2. Rider Declarations & Vehicle Condition',
@@ -24,7 +24,7 @@ export default function LegalPoliciesPage() {
         },
         {
           heading: '3. Driver Safe Harbor & Limitation of Liability',
-          text: 'While all driver partners undergo background screening and practical verification, the platform acts as an intermediary. Drivers-For-U is not liable for direct, indirect, incidental, or consequential damages resulting from vehicle operation, including traffic infractions, engine failures, or transport delays, except as explicitly covered under the optional D4M Care insurance addon.'
+          text: 'While all driver partners undergo background screening and practical verification, the platform acts as an intermediary. Vahnly is not liable for direct, indirect, incidental, or consequential damages resulting from vehicle operation, including traffic infractions, engine failures, or transport delays, except as explicitly covered under the optional D4M Care insurance addon.'
         },
         {
           heading: '4. Digital Ledger & Automatic Billing',

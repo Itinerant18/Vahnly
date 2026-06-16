@@ -49,10 +49,10 @@ export default function IndexPage() {
       <header className="relative z-10 w-full max-w-6xl mx-auto px-6 py-6 flex justify-between items-center border-b border-slate-200/60">
         <div className="flex items-center gap-2">
           <span className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-            D
+            V
           </span>
           <span className="font-extrabold text-slate-900 tracking-tight text-lg">
-            Drivers-for-u
+            Vahnly
           </span>
         </div>
         
@@ -80,7 +80,7 @@ export default function IndexPage() {
           </h1>
           
           <p className="text-slate-600 text-base md:text-lg leading-relaxed">
-            Drivers-for-u provides a premium, safe, and dynamic ride matching ecosystem. 
+            Vahnly provides a premium, safe, and dynamic ride matching ecosystem. 
             Connect instantly with verified, highly trained independent drivers to navigate your car, 
             whether for daily commutes, road trips, or late-night events.
           </p>
@@ -148,7 +148,7 @@ export default function IndexPage() {
             </Link>
           </div>
           <div>
-            <span>Drivers-for-u © 2026. Admin Contact: </span>
+            <span>Vahnly © 2026. Admin Contact: </span>
             <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-slate-950 underline font-mono">
               karmakaraniket018@gmail.com
             </a>

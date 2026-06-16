@@ -44,7 +44,7 @@ grafana:
       providers:
         - name: dfu
           orgId: 1
-          folder: Drivers-for-u
+          folder: Vahnly
           type: file
           disableDeletion: false
           editable: true

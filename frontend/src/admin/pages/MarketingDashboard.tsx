@@ -1439,7 +1439,7 @@ export const MarketingDashboard: React.FC = () => {
 										<input
 											type="text"
 											required
-											placeholder="Welcome to Drivers-for-u!"
+											placeholder="Welcome to Vahnly!"
 											value={newEmailTemplate.subject}
 											onChange={e => setNewEmailTemplate({ ...newEmailTemplate, subject: e.target.value })}
 											className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold"

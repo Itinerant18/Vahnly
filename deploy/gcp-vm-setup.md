@@ -1,4 +1,4 @@
-# Hosting Drivers-for-u on a single GCP VM (docker-compose)
+# Hosting Vahnly on a single GCP VM (docker-compose)
 
 The cheapest way to get the **whole backend** publicly hosted on the GCP **$300 free
 trial**. It runs the existing `docker-compose.yml` (Postgres+PostGIS, Kafka, 6-node Redis
@@ -7,7 +7,7 @@ terminating HTTPS in front of the gateway. Frontends are hosted separately (Clou
 Firebase Hosting).
 
 > This is a **demo / staging** topology, not production HA. For production use the Helm
-> chart in `deploy/charts/drivers-for-u/` with managed Cloud SQL / Memorystore / Confluent.
+> chart in `deploy/charts/vahnly/` with managed Cloud SQL / Memorystore / Confluent.
 
 ---
 
@@ -58,7 +58,7 @@ echo "VM IP = $VM_IP   ->   create a DNS A record: $API_DOMAIN -> $VM_IP"
 gcloud compute firewall-rules create "${VM_NAME}-web" \
   --allow=tcp:22,tcp:80,tcp:443 \
   --target-tags="${VM_NAME}" \
-  --description="SSH + HTTP/HTTPS for Drivers-for-u demo"
+  --description="SSH + HTTP/HTTPS for Vahnly demo"
 
 # The VM. e2-standard-4 = lean (drop Triton); e2-standard-8 = runs everything.
 gcloud compute instances create "$VM_NAME" \
@@ -102,8 +102,8 @@ newgrp docker   # apply group without re-login
 ## 4. Clone the repo and create `.env` (on the VM)
 
 ```bash
-git clone https://github.com/Itinerant18/Drivers-for-u.git
-cd Drivers-for-u
+git clone https://github.com/Itinerant18/Vahnly.git
+cd Vahnly
 
 # Generate the boot-critical secrets. The gateway REFUSES to boot without these.
 # Any length is accepted (each is hashed to a 32-byte key internally).

@@ -158,7 +158,7 @@ func (h *AdminAuthHandler) HandleSSOGoogleCallback(w http.ResponseWriter, r *htt
 			Subject:   dbUserID,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "drivers-for-u-auth",
+			Issuer:    "vahnly-auth",
 		},
 	}
 	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)

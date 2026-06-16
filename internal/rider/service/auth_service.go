@@ -46,7 +46,7 @@ const (
 	otpMaxPerWindow  = 5
 	bcryptOTPCost    = 10
 	riderSessionTTL  = 72 * time.Hour
-	riderTokenIssuer = "drivers-for-u-rider-auth"
+	riderTokenIssuer = "vahnly-rider-auth"
 )
 
 // indiaPhoneRe matches an E.164 Indian mobile number: +91 followed by a 10-digit

@@ -33,7 +33,7 @@ func TestAWSURIEncode(t *testing.T) {
 // all required SigV4 query parameters present, and a hex signature appended.
 func TestPresignPut(t *testing.T) {
 	s := &S3Store{
-		bucket: "driversforu-vault", region: "ap-south-1",
+		bucket: "vahnly-vault", region: "ap-south-1",
 		accessKey: "AKIDEXAMPLE", secretKey: "secretkey", enabled: true,
 	}
 	uploadURL, publicURL, err := s.PresignPut("driver-docs/d1/abc-license.jpg", 15*time.Minute)
@@ -44,7 +44,7 @@ func TestPresignPut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bad url: %v", err)
 	}
-	if u.Host != "driversforu-vault.s3.ap-south-1.amazonaws.com" {
+	if u.Host != "vahnly-vault.s3.ap-south-1.amazonaws.com" {
 		t.Errorf("unexpected host: %s", u.Host)
 	}
 	q := u.Query()
@@ -59,7 +59,7 @@ func TestPresignPut(t *testing.T) {
 	if sig := q.Get("X-Amz-Signature"); len(sig) != 64 {
 		t.Errorf("signature not 64 hex chars: %q", sig)
 	}
-	if !strings.HasPrefix(publicURL, "https://driversforu-vault.s3.ap-south-1.amazonaws.com/driver-docs/d1/") {
+	if !strings.HasPrefix(publicURL, "https://vahnly-vault.s3.ap-south-1.amazonaws.com/driver-docs/d1/") {
 		t.Errorf("unexpected public url: %s", publicURL)
 	}
 }

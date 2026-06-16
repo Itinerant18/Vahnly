@@ -1,8 +1,8 @@
 {
-  "name": "drivers-for-u-frontend",
+  "name": "vahnly-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "Mobile client networking core + operations control-room dashboard for the Drivers-for-U dispatch platform.",
+  "description": "Mobile client networking core + operations control-room dashboard for the Vahnly dispatch platform.",
   "type": "module",
   "scripts": {
     "dev": "vite",

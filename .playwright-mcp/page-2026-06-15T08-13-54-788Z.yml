@@ -1,0 +1,44 @@
+- generic [ref=e448]:
+  - generic [ref=e449]:
+    - heading "drivers-for-u" [level=1] [ref=e450]
+    - paragraph [ref=e451]: Operations control room terminal
+  - generic [ref=e452]:
+    - button "Sign in" [ref=e453] [cursor=pointer]
+    - button "Create account" [active] [ref=e454] [cursor=pointer]
+  - generic [ref=e477]:
+    - generic [ref=e478]:
+      - generic [ref=e479]: Full Name
+      - textbox [ref=e480]
+    - generic [ref=e481]:
+      - generic [ref=e482]: Phone Number
+      - textbox [ref=e483]
+    - generic [ref=e484]:
+      - generic [ref=e485]: Corporate Email
+      - textbox [ref=e486]
+    - generic [ref=e487]:
+      - generic [ref=e488]: Password
+      - textbox [ref=e489]
+    - generic [ref=e490]:
+      - generic [ref=e491]:
+        - generic [ref=e492]: Hub Region
+        - combobox [ref=e493] [cursor=pointer]:
+          - option "KOL (Kolkata)" [selected]
+          - option "BLR (Bengaluru)"
+      - generic [ref=e494]:
+        - generic [ref=e495]: Role Group
+        - combobox [ref=e496] [cursor=pointer]:
+          - option "Super Admin"
+          - option "Operations Manager"
+          - option "Fleet Manager" [selected]
+          - option "Customer Support"
+          - option "Finance"
+          - option "Marketing"
+          - option "Analytics / BI"
+          - option "City Manager"
+          - option "Compliance / Safety"
+          - option "Read-only Auditor"
+    - generic [ref=e497]:
+      - generic [ref=e498]: Scoped Cities (comma separated)
+      - textbox [ref=e499]: KOL
+    - button "Register Corporate Profile" [ref=e500] [cursor=pointer]
+  - generic [ref=e476]: "FINGERPRINT: fp-web-cr-e2843e70ac97424a"

@@ -106,7 +106,7 @@ export default function PrivacyPolicy() {
 
             <div className="prose prose-invert max-w-none text-content-secondary space-y-6 text-paragraph-medium leading-relaxed">
               <p>
-                At <strong>Drivers-For-U</strong>, we prioritize the protection and confidentiality of your personal data. 
+                At <strong>Vahnly</strong>, we prioritize the protection and confidentiality of your personal data. 
                 This Privacy Policy explains how our unified dispatch matching platform collects, stores, uses, and protects 
                 information when you access our mobile and web applications (the "Service").
               </p>
@@ -190,7 +190,7 @@ export default function PrivacyPolicy() {
               <div>
                 <h2 className="text-heading-large text-white mb-3">6. Contact and Administration</h2>
                 <p>
-                  If you have questions, feedback, or data privacy requests regarding the Drivers-For-U platform, 
+                  If you have questions, feedback, or data privacy requests regarding the Vahnly platform, 
                   please reach out to our administration team at:
                 </p>
                 <p className="mt-2 font-mono text-xs text-white bg-black/60 p-3 rounded border border-border-opaque">
@@ -204,7 +204,7 @@ export default function PrivacyPolicy() {
 
         {/* Footer info */}
         <div className="mt-8 text-center text-[10px] text-content-tertiary font-mono">
-          <span>Drivers-For-U © 2026. All rights reserved.</span>
+          <span>Vahnly © 2026. All rights reserved.</span>
         </div>
       </div>
     </div>

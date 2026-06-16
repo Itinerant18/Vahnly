@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.driversforu.driver',
-  appName: 'DFU Driver',
+  appId: 'com.vahnly.driver',
+  appName: 'Vahnly Driver',
   webDir: 'out',
   plugins: {
     // Native Google Sign-In. The provider must also be enabled in the Firebase console, and
@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
       providers: ['google.com'],
     },
     BackgroundRunner: {
-      label: 'com.driversforu.background.worker',
+      label: 'com.vahnly.background.worker',
       src: 'background.js',
     },
     PushNotifications: {

@@ -348,7 +348,7 @@ func (h *OnboardingHandler) HandleGeneratePresignedURL(w http.ResponseWriter, r 
 		uploadURL, storageURL = up, pub
 	} else {
 		// Mock fallback (dev only) — no real bucket configured.
-		storageURL = fmt.Sprintf("https://driversforu-vault.s3.amazonaws.com/%s", objectKey)
+		storageURL = fmt.Sprintf("https://vahnly-vault.s3.amazonaws.com/%s", objectKey)
 		uploadURL = storageURL + "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=mock-key&X-Amz-Signature=mock-sig"
 	}
 

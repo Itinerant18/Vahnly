@@ -1,0 +1,332 @@
+- generic [ref=e3]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - heading "drivers-for-u" [level=1] [ref=e7] [cursor=pointer]
+      - generic [ref=e9]:
+        - img [ref=e10]
+        - textbox "Search trip, driver, rider, plate…" [ref=e13]
+    - generic [ref=e14]:
+      - button "KOL" [ref=e16] [cursor=pointer]:
+        - text: KOL
+        - img [ref=e17]
+      - generic [ref=e19]: Live
+      - button "Notifications" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - generic [ref=e25]: "5"
+      - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button "Quick actions" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+      - generic [ref=e32]:
+        - button "S" [active] [ref=e33] [cursor=pointer]
+        - generic [ref=e438]:
+          - generic [ref=e439]:
+            - generic [ref=e440]: Admin
+            - generic [ref=e441]: SUPER ADMIN
+          - button "Settings" [ref=e442] [cursor=pointer]
+          - button "Log out" [ref=e443] [cursor=pointer]:
+            - img [ref=e444]
+            - text: Log out
+  - generic [ref=e34]:
+    - complementary [ref=e35]:
+      - navigation [ref=e36]:
+        - generic [ref=e37]:
+          - button "Dashboard" [ref=e38] [cursor=pointer]:
+            - img [ref=e40]
+            - generic [ref=e45]: Dashboard
+          - button "Live Operations" [ref=e46] [cursor=pointer]:
+            - img [ref=e47]
+            - generic [ref=e49]: Live Operations
+        - generic [ref=e50]:
+          - generic [ref=e51]: Fleet
+          - button "Trips" [ref=e52] [cursor=pointer]:
+            - img [ref=e53]
+            - generic [ref=e57]: Trips
+          - button "Riders" [ref=e58] [cursor=pointer]:
+            - img [ref=e59]
+            - generic [ref=e62]: Riders
+          - button "Drivers" [ref=e63] [cursor=pointer]:
+            - img [ref=e64]
+            - generic [ref=e68]: Drivers
+          - button "Vehicles" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - generic [ref=e75]: Vehicles
+          - button "Car Issues" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e82]: Car Issues
+          - button "Dispatch & Zones" [ref=e83] [cursor=pointer]:
+            - img [ref=e84]
+            - generic [ref=e86]: Dispatch & Zones
+          - button "Pricing & Surge" [ref=e87] [cursor=pointer]:
+            - img [ref=e88]
+            - generic [ref=e90]: Pricing & Surge
+          - button "Manual Surge" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e94]: Manual Surge
+          - button "Driver Ops" [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e100]: Driver Ops
+        - generic [ref=e101]:
+          - generic [ref=e102]: Finance
+          - button "Promotions" [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+            - generic [ref=e108]: Promotions
+          - button "Promo Codes" [ref=e109] [cursor=pointer]:
+            - img [ref=e110]
+            - generic [ref=e114]: Promo Codes
+          - button "Payments & Finance" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e118]: Payments & Finance
+          - button "Payouts" [ref=e119] [cursor=pointer]:
+            - img [ref=e120]
+            - generic [ref=e123]: Payouts
+        - generic [ref=e124]:
+          - generic [ref=e125]: Engagement
+          - button "Support / Tickets" [ref=e126] [cursor=pointer]:
+            - img [ref=e127]
+            - generic [ref=e131]: Support / Tickets
+          - button "Safety & Incidents" [ref=e132] [cursor=pointer]:
+            - img [ref=e133]
+            - generic [ref=e136]: Safety & Incidents
+          - button "Marketing & Campaigns" [ref=e137] [cursor=pointer]:
+            - img [ref=e138]
+            - generic [ref=e141]: Marketing & Campaigns
+          - button "Communications" [ref=e142] [cursor=pointer]:
+            - img [ref=e143]
+            - generic [ref=e146]: Communications
+          - button "Content (CMS)" [ref=e147] [cursor=pointer]:
+            - img [ref=e148]
+            - generic [ref=e150]: Content (CMS)
+        - generic [ref=e151]:
+          - generic [ref=e152]: System
+          - button "Analytics & Reports" [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+            - generic [ref=e158]: Analytics & Reports
+          - button "Compliance & KYC" [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+            - generic [ref=e163]: Compliance & KYC
+          - button "Documents Vault" [ref=e164] [cursor=pointer]:
+            - img [ref=e165]
+            - generic [ref=e168]: Documents Vault
+          - button "Configuration" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+            - generic [ref=e173]: Configuration
+          - button "Audit Logs" [ref=e174] [cursor=pointer]:
+            - img [ref=e175]
+            - generic [ref=e177]: Audit Logs
+          - button "Developer / API" [ref=e178] [cursor=pointer]:
+            - img [ref=e179]
+            - generic [ref=e183]: Developer / API
+          - button "Notifications Center" [ref=e184] [cursor=pointer]:
+            - img [ref=e185]
+            - generic [ref=e188]: Notifications Center
+          - button "Corporate / B2B" [ref=e189] [cursor=pointer]:
+            - img [ref=e190]
+            - generic [ref=e195]: Corporate / B2B
+          - button "Team & Roles" [ref=e196] [cursor=pointer]:
+            - img [ref=e197]
+            - generic [ref=e202]: Team & Roles
+          - button "AI Intelligence" [ref=e203] [cursor=pointer]:
+            - img [ref=e204]
+            - generic [ref=e208]: AI Intelligence
+          - button "Platform Health" [ref=e209] [cursor=pointer]:
+            - img [ref=e210]
+            - generic [ref=e214]: Platform Health
+          - button "Carbon & ESG" [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e219]: Carbon & ESG
+          - button "Franchise / Multi-tenant" [ref=e220] [cursor=pointer]:
+            - img [ref=e221]
+            - generic [ref=e226]: Franchise / Multi-tenant
+          - button "Admin Tools" [ref=e227] [cursor=pointer]:
+            - img [ref=e228]
+            - generic [ref=e231]: Admin Tools
+      - button "Collapse sidebar" [ref=e232] [cursor=pointer]:
+        - img [ref=e233]
+        - generic [ref=e235]: Collapse
+    - main [ref=e236]:
+      - generic [ref=e238]:
+        - generic [ref=e239]:
+          - heading "Dashboard" [level=1] [ref=e240]
+          - generic [ref=e241]:
+            - button "Today" [ref=e242] [cursor=pointer]
+            - button "Week" [ref=e243] [cursor=pointer]
+            - button "Month" [ref=e244] [cursor=pointer]
+        - generic [ref=e245]:
+          - generic [ref=e246]:
+            - generic [ref=e247]: Total Trips
+            - generic [ref=e248]: "0"
+            - generic [ref=e249]: ↑0%
+          - generic [ref=e250]:
+            - generic [ref=e251]: Active Trips
+            - generic [ref=e252]: "0"
+            - generic [ref=e253]: ↑0
+          - generic [ref=e254]:
+            - generic [ref=e255]: New Signups
+            - generic [ref=e256]: "7"
+            - generic [ref=e257]: ↑100%
+          - generic [ref=e258]:
+            - generic [ref=e259]: Online Drivers
+            - generic [ref=e260]: 5/7
+            - generic [ref=e261]: ↑0%
+          - generic [ref=e262]:
+            - generic [ref=e263]: Cancellation Rate
+            - generic [ref=e264]: 0%
+            - generic [ref=e265]: ↑0%
+          - generic [ref=e266]:
+            - generic [ref=e267]: Avg ETA
+            - generic [ref=e268]: 0 min
+          - generic [ref=e269]:
+            - generic [ref=e270]: Avg Rating
+            - generic [ref=e271]: 4.72 ★
+          - generic [ref=e272]:
+            - generic [ref=e273]: Revenue
+            - generic [ref=e274]: ₹0
+            - generic [ref=e275]: ↑0%
+        - generic [ref=e276]:
+          - img [ref=e278]:
+            - generic [ref=e279]: Trips
+            - generic [ref=e280]: "0"
+            - generic [ref=e281]: "0.3"
+            - generic [ref=e282]: "0.5"
+            - generic [ref=e283]: "0.8"
+            - generic [ref=e284]: "1"
+            - generic [ref=e285]: 00:00
+            - generic [ref=e286]: 04:00
+            - generic [ref=e287]: 08:00
+            - generic [ref=e288]: 12:00
+            - generic [ref=e289]: 16:00
+            - generic [ref=e290]: 20:00
+            - generic [ref=e291]: 23:00
+            - generic [ref=e293]: "0"
+          - img [ref=e295]:
+            - generic [ref=e296]: Revenue
+            - generic [ref=e297]: ₹0
+            - generic [ref=e298]: ₹0.3
+            - generic [ref=e299]: ₹0.5
+            - generic [ref=e300]: ₹0.8
+            - generic [ref=e301]: ₹1
+            - generic [ref=e302]: 00:00
+            - generic [ref=e303]: 04:00
+            - generic [ref=e304]: 08:00
+            - generic [ref=e305]: 12:00
+            - generic [ref=e306]: 16:00
+            - generic [ref=e307]: 20:00
+            - generic [ref=e308]: 23:00
+            - generic [ref=e310]: ₹0
+          - img [ref=e312]:
+            - generic [ref=e313]: Cancellation rate
+            - generic [ref=e314]: 0%
+            - generic [ref=e315]: 0.3%
+            - generic [ref=e316]: 0.5%
+            - generic [ref=e317]: 0.8%
+            - generic [ref=e318]: 1%
+            - generic [ref=e319]: 00:00
+            - generic [ref=e320]: 04:00
+            - generic [ref=e321]: 08:00
+            - generic [ref=e322]: 12:00
+            - generic [ref=e323]: 16:00
+            - generic [ref=e324]: 20:00
+            - generic [ref=e325]: 23:00
+            - generic [ref=e327]: 0%
+          - img [ref=e329]:
+            - generic [ref=e330]: Drivers online
+            - generic [ref=e331]: "0"
+            - generic [ref=e332]: "0.3"
+            - generic [ref=e333]: "0.5"
+            - generic [ref=e334]: "0.8"
+            - generic [ref=e335]: "1"
+            - generic [ref=e336]: 00:00
+            - generic [ref=e337]: 04:00
+            - generic [ref=e338]: 08:00
+            - generic [ref=e339]: 12:00
+            - generic [ref=e340]: 16:00
+            - generic [ref=e341]: 20:00
+            - generic [ref=e342]: 23:00
+            - generic [ref=e344]: "0"
+        - generic [ref=e345]:
+          - heading "Rider Metrics" [level=2] [ref=e346]
+          - generic [ref=e347]:
+            - generic [ref=e348]:
+              - generic [ref=e349]: Active Riders Today
+              - generic [ref=e350]: "0"
+            - generic [ref=e351]:
+              - generic [ref=e352]: New Signups Today
+              - generic [ref=e353]: "0"
+            - generic [ref=e354]:
+              - generic [ref=e355]: Trips Booked Today
+              - generic [ref=e356]: "0"
+            - generic [ref=e357]:
+              - generic [ref=e358]: Avg Fare Today
+              - generic [ref=e359]: ₹0
+          - generic [ref=e360]:
+            - generic [ref=e362]: Daily bookings chart (insufficient data)
+            - generic [ref=e363]:
+              - generic [ref=e364]: Rider retention
+              - generic [ref=e365]:
+                - generic [ref=e366]:
+                  - generic [ref=e367]: 62%
+                  - generic [ref=e368]: Day 1
+                - generic [ref=e369]:
+                  - generic [ref=e370]: 38%
+                  - generic [ref=e371]: Day 7
+                - generic [ref=e372]:
+                  - generic [ref=e373]: 21%
+                  - generic [ref=e374]: Day 30
+        - generic [ref=e375]:
+          - generic [ref=e377]:
+            - heading "Recent trips" [level=2] [ref=e379]
+            - table [ref=e382]:
+              - rowgroup [ref=e383]:
+                - row "Trip ID Rider Driver Status Fare Duration" [ref=e384]:
+                  - columnheader "Trip ID" [ref=e385]
+                  - columnheader "Rider" [ref=e386]
+                  - columnheader "Driver" [ref=e387]
+                  - columnheader "Status" [ref=e388]
+                  - columnheader "Fare" [ref=e389]
+                  - columnheader "Duration" [ref=e390]
+              - rowgroup [ref=e391]:
+                - row "No results" [ref=e392]:
+                  - cell "No results" [ref=e393]:
+                    - generic [ref=e394]:
+                      - img [ref=e395]
+                      - generic [ref=e397]: No results
+          - generic [ref=e399]:
+            - generic [ref=e400]:
+              - heading "Live Alerts" [level=2] [ref=e401]
+              - generic [ref=e402]: "7"
+            - generic [ref=e403]:
+              - generic [ref=e404]:
+                - generic [ref=e405]: 1 hr ago
+                - generic [ref=e406]: signup
+              - paragraph [ref=e407]: New driver Subir Das registered in KOL
+            - generic [ref=e408]:
+              - generic [ref=e409]:
+                - generic [ref=e410]: 1 hr ago
+                - generic [ref=e411]: signup
+              - paragraph [ref=e412]: New driver Joydev Chatterjee registered in KOL
+            - generic [ref=e413]:
+              - generic [ref=e414]:
+                - generic [ref=e415]: 1 hr ago
+                - generic [ref=e416]: signup
+              - paragraph [ref=e417]: New driver Ramesh Sen registered in KOL
+            - generic [ref=e418]:
+              - generic [ref=e419]:
+                - generic [ref=e420]: 1 hr ago
+                - generic [ref=e421]: signup
+              - paragraph [ref=e422]: New driver Vikram Singh registered in KOL
+            - generic [ref=e423]:
+              - generic [ref=e424]:
+                - generic [ref=e425]: 1 hr ago
+                - generic [ref=e426]: signup
+              - paragraph [ref=e427]: New driver Unknown registered in KOL
+            - generic [ref=e428]:
+              - generic [ref=e429]:
+                - generic [ref=e430]: 1 hr ago
+                - generic [ref=e431]: signup
+              - paragraph [ref=e432]: New driver Unknown registered in KOL
+            - generic [ref=e433]:
+              - generic [ref=e434]:
+                - generic [ref=e435]: 1 hr ago
+                - generic [ref=e436]: signup
+              - paragraph [ref=e437]: New driver Unknown registered in KOL
