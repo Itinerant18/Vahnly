@@ -1231,8 +1231,11 @@ func main() {
 
 func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client *redis.ClusterClient) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        brokers,
-		Topic:          "order.assigned",
+		Brokers: brokers,
+		// Fan both assignment and cancellation events to the driver dispatch-stream channel.
+		// order.cancelled was previously produced with no consumer, so an assigned driver
+		// never learned in realtime that the rider cancelled.
+		GroupTopics:    []string{"order.assigned", "order.cancelled"},
 		GroupID:        "gateway-fanout-group-collective",
 		MinBytes:       10,
 		MaxBytes:       10e6,

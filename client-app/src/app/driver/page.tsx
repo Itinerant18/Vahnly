@@ -423,6 +423,17 @@ export default function DriverTerminalPage() {
         token,
         {
           onAssignment: (frame) => {
+            // Rider cancelled the order — arrives as an AssignmentFrame with status CANCELLED.
+            // Clear any pending offer / active assignment and return to searching.
+            if (frame.status === 'CANCELLED') {
+              logAudit('ORDER_CANCELLED_BY_RIDER', { orderId: frame.order_id, source: 'WEBSOCKET' });
+              useOfferStore.getState().clearOffer();
+              useDriverDutyStore.getState().setDutyState('ONLINE');
+              if (typeof window !== 'undefined') {
+                window.alert('Trip cancelled by the rider.');
+              }
+              return;
+            }
             void getPendingOffer(token)
               .then((pendingOffer) => {
                 if (pendingOffer.order) {

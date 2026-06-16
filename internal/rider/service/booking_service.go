@@ -534,6 +534,9 @@ func (s *BookingService) CancelOrder(ctx context.Context, riderID, orderID, reas
 			"order_id":  orderID,
 			"driver_id": *order.AssignedDriverID,
 			"reason":    reason,
+			// status makes the message self-describing on the assignments broadcast channel,
+			// so the assigned driver's dispatch stream can distinguish a cancellation.
+			"status": "CANCELLED",
 		})
 		_ = s.publisher.Publish(ctx, "order.cancelled", orderID, evt)
 	}
