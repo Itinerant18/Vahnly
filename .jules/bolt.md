@@ -1,0 +1,3 @@
+## 2024-05-24 - Removing Unnecessary Mutex in Sequential Graph Routing
+**Learning:** Found that `ComputeShortestPathETA` in `internal/routing/graph/contraction_hierarchies.go` was using a `sync.Mutex` inside a tight, purely sequential algorithm loop. The algorithm allocates local maps and priority queues which are not shared across goroutines, so the mutex locks were providing zero safety while adding measurable lock contention overhead to every edge evaluated.
+**Action:** Always verify if a variable being protected is actually shared across goroutines before adding mutex locks in hot code paths, especially algorithmic routing loops.
