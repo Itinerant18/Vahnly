@@ -21,6 +21,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	adminHttp "github.com/platform/driver-delivery/internal/admin/delivery/http"
+	authPkg "github.com/platform/driver-delivery/internal/auth"
 	"github.com/platform/driver-delivery/internal/crypto"
 	driverHttp "github.com/platform/driver-delivery/internal/driver/delivery/http"
 	gatewayHttp "github.com/platform/driver-delivery/internal/gateway/delivery/http"
@@ -189,6 +190,7 @@ func main() {
 	riderAppLogger := log.New(os.Stdout, "[RIDER_APP] ", log.LstdFlags)
 	riderAppRepo := riderRepo.NewPostgresRiderRepository(dbPool)
 	riderAuthSvc := riderSvc.NewAuthService(riderAppRepo, riderSvc.NewRedisRiderCache(redisClusterClient), riderSvc.LogSMSSender{Logger: riderAppLogger}, jwtSecret)
+	firebaseAuthHandler := authPkg.NewFirebaseAuthHandler(dbPool, riderAuthSvc, redisClusterClient, jwtSecret)
 	riderOnboardingSvc := riderSvc.NewOnboardingService(riderAppRepo)
 	// Rider push notifications + referral engine (Phase 5).
 	riderNotifier := notification.NewRiderNotifier(dbPool, notification.StubFCMSender{})
@@ -682,6 +684,9 @@ func main() {
 
 	// Driver odometer ingestion endpoint (Phase 2: The Odometer Writer)
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))
+
+	// Unified Firebase auth verify — public, handles both driver + rider post-Firebase flows.
+	mux.HandleFunc("POST /api/v1/auth/firebase/verify", firebaseAuthHandler.HandleFirebaseVerify)
 
 	// Rider App: auth + onboarding routes. Public OTP endpoints, then RIDER-scoped
 	// protected endpoints guarded by the standalone rider auth middleware.
