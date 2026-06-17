@@ -176,12 +176,33 @@ func (s *OnboardingService) AddGarageCar(ctx context.Context, riderID string, re
 		Year:              req.Year,
 		CarType:           strings.ToUpper(req.CarType),
 		Transmission:      strings.ToUpper(req.Transmission),
-		FuelType:          req.FuelType,
+		FuelType:          normalizeFuelType(req.FuelType),
 		RegistrationPlate: strings.ToUpper(strings.TrimSpace(req.RegistrationPlate)),
 		Color:             req.Color,
 		IsDefault:         req.IsDefault,
 	}
 	return s.repo.UpsertGarageCar(ctx, car)
+}
+
+// normalizeFuelType coerces free-text fuel input to the rider_garage CHECK enum
+// (PETROL/DIESEL/CNG/ELECTRIC/HYBRID). Anything unrecognised or empty becomes NULL,
+// which the constraint permits — so a stray "Petrol" or blank never 500s the insert.
+func normalizeFuelType(in *string) *string {
+	if in == nil {
+		return nil
+	}
+	v := strings.ToUpper(strings.TrimSpace(*in))
+	switch v {
+	case "PETROL", "DIESEL", "CNG", "ELECTRIC", "HYBRID":
+		return &v
+	case "GAS", "GASOLINE":
+		p := "PETROL"
+		return &p
+	case "EV":
+		e := "ELECTRIC"
+		return &e
+	}
+	return nil
 }
 
 // SavePlace validates the coordinates against the India bounding box and saves
