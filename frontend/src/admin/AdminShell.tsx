@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { adminRoutes, navItems, navGroups } from './adminRoutes';
 import { API_GATEWAY_BASE_URL } from '../config';
+import { getCityFilter, setCityFilter } from './auth';
 import { AdminAuthGateway } from './components/AdminAuthGateway';
 import { AdminChangePassword } from './components/AdminChangePassword';
 import { SsoCallback } from './components/SsoCallback';
@@ -28,14 +29,19 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
   Bell: IconBell, Corporate: IconTeam,
 };
 
-// ─── Notification items (mock) ──────────────────────────────────────────
-const mockNotifications = [
-  { id: '1', text: 'SOS triggered — Trip TRP-KOL-9281', time: '2 min ago', critical: true },
-  { id: '2', text: 'Surge multiplier hit 2.4x in Sector V', time: '8 min ago', critical: false },
-  { id: '3', text: 'Driver KYC rejected — DRV-0482', time: '15 min ago', critical: false },
-  { id: '4', text: 'Payout batch #421 failed reconciliation', time: '23 min ago', critical: true },
-  { id: '5', text: 'New driver signup spike — 12 in last hour', time: '31 min ago', critical: false },
-];
+// ─── Notification + search types ──────────────────────────────────────────
+interface AdminNotification {
+  id: string;
+  title: string;
+  severity: string;
+  status: string;
+  created_at: string;
+}
+
+interface SearchTrip { id: string; status: string; fare_paise: number; city_prefix: string }
+interface SearchDriver { id: string; name: string; phone: string; status: string }
+interface SearchRider { id: string; name: string; phone: string }
+interface SearchResults { trips: SearchTrip[]; drivers: SearchDriver[]; riders: SearchRider[] }
 
 // ─── Quick actions ──────────────────────────────────────────────────────
 const quickActions = [
@@ -98,9 +104,17 @@ export const AdminShell: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [selectedCities, setSelectedCities] = useState<string[]>(['KOL']);
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [selectedCities, setSelectedCities] = useState<string[]>(() => {
+    const persisted = getCityFilter();
+    return persisted.length > 0 ? persisted : ['KOL'];
+  });
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -111,6 +125,8 @@ export const AdminShell: React.FC = () => {
   const notifRef   = useRef<HTMLDivElement>(null);
   const quickRef   = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const searchRef  = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Apply persisted theme preference on mount
   useEffect(() => { themeStore.initTheme(); }, []);
@@ -122,9 +138,22 @@ export const AdminShell: React.FC = () => {
       if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setShowNotifications(false);
       if (quickRef.current   && !quickRef.current.contains(e.target as Node))   setShowQuickActions(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfileMenu(false);
+      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setShowSearchResults(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ⌘K / Ctrl+K focuses the global search input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, []);
 
   const checkSession = useCallback(async () => {
@@ -153,6 +182,78 @@ export const AdminShell: React.FC = () => {
 
   useEffect(() => { checkSession(); }, [checkSession]);
 
+  // ── Notifications: real unread count + recent items ──────────────────────
+  const fetchNotifications = useCallback(async () => {
+    if (sessionState !== 'AUTHED') return;
+    try {
+      const [listRes, statsRes] = await Promise.all([
+        fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/notifications`, { credentials: 'include' }),
+        fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/notifications/stats`, { credentials: 'include' }),
+      ]);
+      if (listRes.ok) {
+        const data = await listRes.json();
+        setNotifications((data.notifications ?? []) as AdminNotification[]);
+      }
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setUnreadCount(Number(stats.total_unread ?? 0));
+      }
+    } catch { /* ignore — bell just shows last-known state */ }
+  }, [sessionState]);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  // ── Global search (debounced) ────────────────────────────────────────────
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_GATEWAY_BASE_URL}/api/v1/admin/search?q=${encodeURIComponent(q)}`,
+          { credentials: 'include', signal: ctrl.signal },
+        );
+        if (res.ok) {
+          const body = await res.json();
+          const data = (body.data ?? {}) as Partial<SearchResults>;
+          setSearchResults({
+            trips: data.trips ?? [],
+            drivers: data.drivers ?? [],
+            riders: data.riders ?? [],
+          });
+          setShowSearchResults(true);
+        }
+      } catch { /* aborted or network — ignore */ }
+      finally { setSearchLoading(false); }
+    }, 250);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [searchQuery]);
+
+  const goToResult = useCallback((path: string) => {
+    navigate(path);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  }, [navigate]);
+
+  const acknowledgeNotification = useCallback(async (id: string) => {
+    try {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/notifications/${encodeURIComponent(id)}/acknowledge`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch { /* ignore */ }
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setUnreadCount((c) => Math.max(0, c - 1));
+    setShowNotifications(false);
+    navigate('/notifications');
+  }, [navigate]);
+
   const handleLoginSuccess = useCallback(() => {
     setSessionState('LOADING');
     checkSession();
@@ -171,16 +272,26 @@ export const AdminShell: React.FC = () => {
   }, []);
 
   const toggleCity = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city]
-    );
+    setSelectedCities((prev) => {
+      const next = prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city];
+      setCityFilter(next);
+      return next;
+    });
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-    console.log('[AdminShell] global search:', searchQuery);
+    if (!searchQuery.trim() || !searchResults) return;
+    // Enter jumps to the first available result, preferring trips → drivers → riders.
+    const first =
+      searchResults.trips[0]   ? `/trips/${searchResults.trips[0].id}` :
+      searchResults.drivers[0] ? `/drivers/${searchResults.drivers[0].id}` :
+      searchResults.riders[0]  ? `/riders/${searchResults.riders[0].id}` : null;
+    if (first) goToResult(first);
   };
+
+  const hasSearchResults = !!searchResults &&
+    (searchResults.trips.length + searchResults.drivers.length + searchResults.riders.length) > 0;
 
   if (location.pathname === '/sso-callback') return <SsoCallback />;
 
@@ -220,7 +331,7 @@ export const AdminShell: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
-  const isLiveEnv = true;
+  const isLiveEnv = import.meta.env.MODE === 'production';
 
   return (
     <div className="h-screen bg-background-primary text-content-primary flex flex-col font-sans selection:bg-content-primary selection:text-background-primary overflow-hidden">
@@ -238,20 +349,94 @@ export const AdminShell: React.FC = () => {
           </h1>
 
           {/* Global Search */}
-          <form onSubmit={handleSearch} className="flex-1 relative">
-            <div className={`flex items-center gap-2 bg-background-secondary rounded-pill px-4 py-2 transition-base ${searchFocused ? 'ring-1 ring-border-selected' : ''}`}>
-              <IconSearch size={16} className="text-content-tertiary flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Search trip, driver, rider, plate…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                className="bg-transparent text-paragraph-medium text-content-primary placeholder:text-content-tertiary outline-none w-full"
-              />
-            </div>
-          </form>
+          <div className="flex-1 relative" ref={searchRef}>
+            <form onSubmit={handleSearch}>
+              <div className={`flex items-center gap-2 bg-background-secondary rounded-pill px-4 py-2 transition-base ${searchFocused ? 'ring-1 ring-border-selected' : ''}`}>
+                <IconSearch size={16} className="text-content-tertiary flex-shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search trip, driver, rider, plate…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => { setSearchFocused(true); if (hasSearchResults) setShowSearchResults(true); }}
+                  onBlur={() => setSearchFocused(false)}
+                  className="bg-transparent text-paragraph-medium text-content-primary placeholder:text-content-tertiary outline-none w-full"
+                />
+                <kbd className="hidden sm:flex items-center gap-0.5 text-label-small text-content-tertiary font-mono border border-border-opaque rounded-sm px-1.5 py-0.5">⌘K</kbd>
+              </div>
+            </form>
+
+            {showSearchResults && searchQuery.trim().length >= 2 && (
+              <div className="absolute left-0 top-full mt-2 bg-background-primary rounded-md border border-border-opaque shadow-elevation-2 w-full z-50 animate-dropdown max-h-[420px] overflow-y-auto">
+                {searchLoading && !hasSearchResults && (
+                  <div className="px-4 py-3 text-paragraph-small text-content-tertiary animate-pulse">Searching…</div>
+                )}
+                {!searchLoading && !hasSearchResults && (
+                  <div className="px-4 py-3 text-paragraph-small text-content-tertiary">No matches for “{searchQuery.trim()}”.</div>
+                )}
+
+                {searchResults && searchResults.trips.length > 0 && (
+                  <div>
+                    <div className="px-4 pt-3 pb-1 text-label-small text-content-tertiary uppercase tracking-wider">Trips</div>
+                    {searchResults.trips.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => goToResult(`/trips/${t.id}`)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-background-secondary transition-base cursor-pointer flex items-center justify-between gap-3"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-paragraph-medium text-content-primary font-mono truncate">{t.id}</span>
+                          <span className="block text-mono-small text-content-tertiary">{t.city_prefix} · {t.status}</span>
+                        </span>
+                        <span className="text-mono-small text-content-secondary flex-shrink-0">₹{(t.fare_paise / 100).toFixed(2)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {searchResults && searchResults.drivers.length > 0 && (
+                  <div className="border-t border-border-opaque">
+                    <div className="px-4 pt-3 pb-1 text-label-small text-content-tertiary uppercase tracking-wider">Drivers</div>
+                    {searchResults.drivers.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => goToResult(`/drivers/${d.id}`)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-background-secondary transition-base cursor-pointer flex items-center justify-between gap-3"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-paragraph-medium text-content-primary truncate">{d.name}</span>
+                          <span className="block text-mono-small text-content-tertiary font-mono">{d.phone}</span>
+                        </span>
+                        <span className="text-mono-small text-content-secondary flex-shrink-0">{d.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {searchResults && searchResults.riders.length > 0 && (
+                  <div className="border-t border-border-opaque">
+                    <div className="px-4 pt-3 pb-1 text-label-small text-content-tertiary uppercase tracking-wider">Riders</div>
+                    {searchResults.riders.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => goToResult(`/riders/${r.id}`)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-background-secondary transition-base cursor-pointer flex items-center justify-between gap-3"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-paragraph-medium text-content-primary truncate">{r.name}</span>
+                          <span className="block text-mono-small text-content-tertiary font-mono">{r.phone}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: City, Env, Notifs, Quick Actions, Profile */}
@@ -301,28 +486,42 @@ export const AdminShell: React.FC = () => {
               className="relative p-2 rounded-pill hover:bg-background-secondary transition-base cursor-pointer"
             >
               <IconBell size={18} className="text-content-primary" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-interactive-primary text-interactive-primary-text text-[9px] font-bold rounded-pill flex items-center justify-center badge-pulse">
-                {mockNotifications.length}
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-interactive-primary text-interactive-primary-text text-[9px] font-bold rounded-pill flex items-center justify-center badge-pulse">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 bg-background-primary rounded-md border border-border-opaque shadow-elevation-2 w-[340px] z-50 animate-dropdown">
                 <div className="px-4 py-3 border-b border-border-opaque flex items-center justify-between">
                   <span className="text-label-large text-content-primary">Notifications</span>
-                  <span className="text-label-small text-content-tertiary font-mono">{mockNotifications.length} new</span>
+                  <span className="text-label-small text-content-tertiary font-mono">{unreadCount} unread</span>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
-                  {mockNotifications.map((n) => (
-                    <div key={n.id} className="px-4 py-3 hover:bg-background-secondary border-b border-border-opaque last:border-none flex items-start gap-2.5 cursor-pointer transition-base">
-                      {n.critical && (
-                        <span className="w-2 h-2 rounded-pill bg-negative-400 mt-1.5 flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-paragraph-medium text-content-primary leading-snug">{n.text}</div>
-                        <div className="text-mono-small text-content-tertiary mt-0.5">{n.time}</div>
-                      </div>
-                    </div>
-                  ))}
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-paragraph-small text-content-tertiary">No notifications.</div>
+                  ) : (
+                    notifications.map((n) => {
+                      const critical = n.severity === 'CRITICAL' || n.severity === 'HIGH';
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={() => acknowledgeNotification(n.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-background-secondary border-b border-border-opaque last:border-none flex items-start gap-2.5 cursor-pointer transition-base"
+                        >
+                          {critical && (
+                            <span className="w-2 h-2 rounded-pill bg-negative-400 mt-1.5 flex-shrink-0" />
+                          )}
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-paragraph-medium text-content-primary leading-snug">{n.title}</span>
+                            <span className="block text-mono-small text-content-tertiary mt-0.5">{new Date(n.created_at).toLocaleString()}</span>
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}

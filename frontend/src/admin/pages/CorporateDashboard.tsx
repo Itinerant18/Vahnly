@@ -217,6 +217,7 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [newEmp, setNewEmp] = useState<Partial<Employee>>({ role: 'EMPLOYEE', monthly_limit_paise: 0 });
+  const [editEmp, setEditEmp] = useState<Employee | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [bulkResult, setBulkResult] = useState<any>(null);
 
@@ -232,6 +233,22 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
     if (!selectedAccount) return;
     const res = await fetch(`${base}/${selectedAccount.id}/employees`, { method: 'POST', headers, body: JSON.stringify(newEmp) });
     if (res.ok) { setShowAdd(false); fetch_(); }
+  };
+
+  // Employee edits use the top-level PATCH /employees/{empId} route (not nested under corporate).
+  const empBase = base.replace(/\/corporate$/, '');
+  const saveEmployee = async () => {
+    if (!editEmp) return;
+    const res = await fetch(`${empBase}/employees/${editEmp.id}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({
+        name: editEmp.name, email: editEmp.email, phone: editEmp.phone,
+        department: editEmp.department, cost_center: editEmp.cost_center,
+        role: editEmp.role, monthly_limit_paise: editEmp.monthly_limit_paise,
+        is_active: editEmp.is_active,
+      }),
+    });
+    if (res.ok) { setEditEmp(null); fetch_(); }
   };
 
   const bulkUpload = async () => {
@@ -307,6 +324,38 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
         </div>
       )}
 
+      {editEmp && (
+        <div className="bg-background-primary rounded-xl border border-accent/30 p-4 space-y-3">
+          <div className="text-sm font-semibold text-content-primary">Edit Employee — {editEmp.name}</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {([{ label: 'Name', k: 'name' }, { label: 'Email', k: 'email' }, { label: 'Phone', k: 'phone' }, { label: 'Department', k: 'department' }, { label: 'Cost Center', k: 'cost_center' }] as { label: string; k: keyof Employee }[]).map(f => (
+              <div key={f.k}>
+                <label className="text-xs text-content-tertiary">{f.label}</label>
+                <input value={String(editEmp[f.k] ?? '')} onChange={e => setEditEmp({ ...editEmp, [f.k]: e.target.value })}
+                  className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
+              </div>
+            ))}
+            <div>
+              <label className="text-xs text-content-tertiary">Role</label>
+              <select value={editEmp.role} onChange={e => setEditEmp({ ...editEmp, role: e.target.value })}
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none">
+                {['EMPLOYEE','MANAGER','ADMIN'].map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-content-tertiary">Monthly Limit (₹)</label>
+              <input type="number" value={(editEmp.monthly_limit_paise ?? 0) / 100} onChange={e => setEditEmp({ ...editEmp, monthly_limit_paise: Number(e.target.value) * 100 })}
+                className="mt-1 w-full border border-background-secondary rounded px-3 py-1.5 text-sm bg-background-primary text-content-primary focus:outline-none" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editEmp.is_active} onChange={e => setEditEmp({ ...editEmp, is_active: e.target.checked })} /> Active</label>
+          <div className="flex gap-2">
+            <button onClick={saveEmployee} className="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">Save Changes</button>
+            <button onClick={() => setEditEmp(null)} className="px-4 py-1.5 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">Cancel</button>
+          </div>
+        </div>
+      )}
+
       {depts.length > 0 && (
         <div className="flex gap-1 flex-wrap text-xs">
           <span className="text-content-tertiary">Departments:</span>
@@ -324,6 +373,7 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
             <th className="text-left px-4 py-2.5">Role</th>
             <th className="text-right px-4 py-2.5">Limit/mo</th>
             <th className="text-left px-4 py-2.5">Status</th>
+            {isSuperAdmin && <th className="px-4 py-2.5"></th>}
           </tr></thead>
           <tbody>
             {employees.map(emp => (
@@ -335,6 +385,7 @@ const EmployeesTab: React.FC<{ base: string; headers: Record<string, string>; is
                 <td className="px-4 py-2.5"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_COLORS[emp.role] ?? 'bg-background-secondary text-content-secondary'}`}>{emp.role}</span></td>
                 <td className="px-4 py-2.5 text-xs text-right text-content-tertiary">{emp.monthly_limit_paise > 0 ? rupees(emp.monthly_limit_paise) : '—'}</td>
                 <td className="px-4 py-2.5"><span className={`text-[10px] ${emp.is_active ? 'text-content-positive' : 'text-content-tertiary'}`}>{emp.is_active ? '● Active' : '● Inactive'}</span></td>
+                {isSuperAdmin && <td className="px-4 py-2.5 text-right"><button onClick={() => { setEditEmp(emp); setShowAdd(false); }} className="text-xs text-accent hover:underline">Edit</button></td>}
               </tr>
             ))}
           </tbody>

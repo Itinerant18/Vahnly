@@ -98,7 +98,7 @@ export const LedgerReconciliation: React.FC = () => {
         }),
       });
 
-      if (response.status === 201) {
+      if (response.ok) {
         setAuditLog('SUCCESS: Corrective adjustment posted. Transaction stream fully balanced.');
         setDiscrepancies(discrepancies.filter((d) => d.order_id !== selectedRecord.order_id));
         setSelectedRecord(null);

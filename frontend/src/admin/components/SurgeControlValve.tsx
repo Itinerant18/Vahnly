@@ -17,13 +17,29 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'SUCCESS' | 'ERROR'; text: string } | null>(null);
 
+  // City reference points so the manual-surge zone has a real centroid.
+  const CITY_CENTERS: Record<string, [number, number]> = {
+    KOL: [22.5726, 88.3639],
+    BLR: [12.9716, 77.5946],
+    DEL: [28.6139, 77.209],
+    MUM: [19.076, 72.8777],
+  };
+
+  const authHeaders = (): HeadersInit => ({
+    'Content-Type': 'application/json',
+    'X-Admin-Role': localStorage.getItem('admin_role') || 'ADMIN',
+    'X-Admin-Email': localStorage.getItem('admin_email') || 'admin@platform.com',
+  });
+
+  // Pricing control now flows through the real manual-surge endpoint, not the
+  // removed /pricing/freeze path. The selected hex cell becomes a circular zone.
   const handleEnforceFreeze = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCellToken) return;
+    const multiplier = Math.max(1.1, maxMultiplier);
     if (!window.confirm(
-      `Freeze pricing for zone ${selectedCellToken}?\n\n` +
-      `This overrides live surge for the zone and affects every rider fare estimate ` +
-      `there until the freeze is lifted.`
+      `Apply a ${multiplier}x manual surge zone over cell ${selectedCellToken}?\n\n` +
+      `This affects every new booking in the zone for ${durationMinutes} minutes.`
     )) {
       return;
     }
@@ -31,24 +47,28 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
     setIsProcessing(true);
     setStatusMessage(null);
 
+    const [lat, lng] = CITY_CENTERS[cityPrefix] || CITY_CENTERS.KOL;
+
     try {
-      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/freeze`, {
+      const response = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/surge/manual`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
+          name: `CELL_${selectedCellToken}`,
           city_prefix: cityPrefix,
-          h3_cell: selectedCellToken,
-          max_multiplier: maxMultiplier,
+          center_lat: lat,
+          center_lng: lng,
+          radius_m: 1200,
+          multiplier,
           duration_minutes: durationMinutes,
+          reason: `Manual control valve on H3 cell ${selectedCellToken}`,
         }),
       });
 
       if (response.ok) {
         setStatusMessage({
           type: 'SUCCESS',
-          text: `Deflation engaged: ${selectedCellToken} capped at ${maxMultiplier}x for ${durationMinutes} mins.`,
+          text: `Surge zone engaged: ${selectedCellToken} at ${multiplier}x for ${durationMinutes} mins.`,
         });
         onOverrideExecuted();
       } else {
@@ -58,7 +78,7 @@ export const SurgeControlValve: React.FC<SurgeControlValveProps> = ({
         });
       }
     } catch {
-      setStatusMessage({ type: 'ERROR', text: 'Network timeout executing emergency database override.' });
+      setStatusMessage({ type: 'ERROR', text: 'Network timeout executing manual surge override.' });
     } finally {
       setIsProcessing(false);
     }

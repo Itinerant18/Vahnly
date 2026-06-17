@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SvgAreaChart } from '../components/SvgAreaChart';
-import { useDashboardData, TimeRange, RecentTrip } from '../hooks/useDashboardData';
+import { useDashboardData, TimeRange, RecentTrip, LiveDriver } from '../hooks/useDashboardData';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { getAdminRole } from '../auth';
+import { formatPaiseCompact } from '../lib/money';
 import { StatCard } from '../../components/ds/StatCard';
 import { AdminBadge } from '../../components/ds/AdminBadge';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+
+// Leaflet mini-map is dynamically imported so the map bundle loads only on the dashboard.
+const DashboardMiniMap = lazy(() => import('../components/DashboardMiniMap'));
 
 /* ------------------------------------------------------------------ */
 /*  Rider Metrics                                                       */
@@ -202,13 +207,62 @@ function RecentTripsTable({ trips }: { trips: RecentTrip[] }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Live Fleet Mini-Map                                                 */
+/* ------------------------------------------------------------------ */
+
+const FLEET_LEGEND: { color: string; label: string }[] = [
+  { color: 'bg-positive-400', label: 'Online' },
+  { color: 'bg-accent-400',   label: 'On trip' },
+  { color: 'bg-warning-400',  label: 'Idle' },
+  { color: 'bg-background-tertiary', label: 'Offline' },
+];
+
+function LiveFleetMapCard({ drivers }: { drivers: LiveDriver[] }) {
+  const navigate = useNavigate();
+  const located = drivers.filter((d) => d.lat != null && d.lng != null).length;
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/live')}
+      className="card p-0 overflow-hidden text-left cursor-pointer hover:shadow-elevation-2 transition-base flex flex-col"
+      title="Open Live Operations"
+    >
+      <div className="flex items-center justify-between px-500 py-400 border-b border-border-opaque">
+        <h2 className="text-heading-small text-content-primary">Live fleet</h2>
+        <span className="text-label-small text-content-tertiary uppercase tracking-wider">
+          {located} located → Live ↗
+        </span>
+      </div>
+      <div className="relative h-[220px] bg-background-secondary">
+        <Suspense fallback={
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-paragraph-small text-content-tertiary">Loading map…</span>
+          </div>
+        }>
+          <DashboardMiniMap drivers={drivers} />
+        </Suspense>
+      </div>
+      <div className="flex items-center gap-4 px-500 py-300 border-t border-border-opaque">
+        {FLEET_LEGEND.map((l) => (
+          <span key={l.label} className="inline-flex items-center gap-1.5 text-label-small text-content-secondary">
+            <span className={`w-2 h-2 rounded-pill ${l.color}`} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                      */
 /* ------------------------------------------------------------------ */
 
 export const DashboardHome: React.FC = () => {
   const {
     kpis, tripsChart, revenueChart, cancelChart, driversChart,
-    alerts, recentTrips, timeRange, setTimeRange,
+    alerts, recentTrips, drivers, timeRange, setTimeRange, error,
   } = useDashboardData();
 
   return (
@@ -221,16 +275,30 @@ export const DashboardHome: React.FC = () => {
           <TimeRangeToggle active={timeRange} onChange={setTimeRange} />
         </div>
 
-        {/* KPI Cards */}
+        {/* Error banner — shown instead of fabricated data when a fetch fails */}
+        {error && (
+          <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-500 py-400 flex items-center gap-2">
+            <span className="text-content-negative animate-pulse">●</span>
+            <p className="text-label-medium text-content-negative">
+              Some live data failed to load. Showing the latest available values — figures may be incomplete.
+            </p>
+          </div>
+        )}
+
+        {/* KPI Cards — 12 cards. `loading` placeholder until KPIs resolve. */}
         <div className="grid grid-cols-4 gap-4">
-          <StatCard label="Total Trips"       value={formatNumber(kpis.totalTrips)}      trend={{ value: kpis.totalTripsDelta }} />
-          <StatCard label="Active Trips"      value={formatNumber(kpis.activeTrips)}     trend={{ value: kpis.activeTripsChange, suffix: '' }} />
-          <StatCard label="New Signups"       value={formatNumber(kpis.newRiderSignups + kpis.newDriverSignups)} trend={{ value: kpis.newSignupsDelta }} />
-          <StatCard label="Online Drivers"    value={`${kpis.onlineDrivers}/${formatNumber(kpis.totalDrivers)}`} trend={{ value: kpis.onlineDriversDelta }} />
-          <StatCard label="Cancellation Rate" value={`${kpis.cancellationRate}%`}        trend={{ value: kpis.cancellationDelta }} />
-          <StatCard label="Avg ETA"           value={`${kpis.avgEtaMinutes} min`} />
-          <StatCard label="Avg Rating"        value={`${kpis.avgRating} ★`} />
-          <StatCard label="Revenue"           value={`₹${formatNumber(kpis.grossRevenue)}`} trend={{ value: kpis.revenueDelta }} />
+          <StatCard label="Total Trips"       value={kpis ? formatNumber(kpis.totalTrips) : '—'}  loading={!kpis} trend={kpis ? { value: kpis.totalTripsDelta } : null} />
+          <StatCard label="Active Trips"      value={kpis ? formatNumber(kpis.activeTrips) : '—'} loading={!kpis} trend={kpis ? { value: kpis.activeTripsChange, suffix: '' } : null} />
+          <StatCard label="New Signups"       value={kpis ? formatNumber(kpis.newRiderSignups + kpis.newDriverSignups) : '—'} loading={!kpis} trend={kpis ? { value: kpis.newSignupsDelta } : null} />
+          <StatCard label="Online Drivers"    value={kpis ? `${kpis.onlineDrivers}/${formatNumber(kpis.totalDrivers)}` : '—'} loading={!kpis} trend={kpis ? { value: kpis.onlineDriversDelta } : null} />
+          <StatCard label="Cancellation Rate" value={kpis ? `${kpis.cancellationRate}%` : '—'}    loading={!kpis} trend={kpis ? { value: kpis.cancellationDelta } : null} />
+          <StatCard label="Avg ETA"           value={kpis ? `${kpis.avgEtaMinutes} min` : '—'}    loading={!kpis} />
+          <StatCard label="Avg Rating"        value={kpis ? `${kpis.avgRating} ★` : '—'}          loading={!kpis} />
+          <StatCard label="Revenue"           value={kpis ? `₹${formatNumber(kpis.grossRevenue)}` : '—'} loading={!kpis} trend={kpis ? { value: kpis.revenueDelta } : null} />
+          <StatCard label="Promo Cost"        value={kpis ? formatPaiseCompact(kpis.promoCostPaise) : '—'} loading={!kpis} />
+          <StatCard label="Outstanding Payouts" value={kpis ? formatPaiseCompact(kpis.outstandingPayoutsPaise) : '—'} loading={!kpis} />
+          <StatCard label="Open Tickets / SLA Breaches" value={kpis ? `${formatNumber(kpis.openTickets)} / ${formatNumber(kpis.slaBreaches)}` : '—'} loading={!kpis} />
+          <StatCard label="SOS (24h)"         value={kpis ? formatNumber(kpis.sos24h) : '—'}      loading={!kpis} />
         </div>
 
         {/* Charts */}
@@ -240,6 +308,9 @@ export const DashboardHome: React.FC = () => {
           <SvgAreaChart data={cancelChart}  title="Cancellation rate" valueSuffix="%" />
           <SvgAreaChart data={driversChart} title="Drivers online" />
         </div>
+
+        {/* Live fleet mini-map — click to open Live Operations */}
+        <LiveFleetMapCard drivers={drivers} />
 
         {/* Rider Metrics */}
         <RiderMetricsSection />

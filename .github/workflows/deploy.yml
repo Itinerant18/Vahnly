@@ -68,11 +68,11 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Helm lint
-        run: helm lint deploy/charts/drivers-for-u/
+        run: helm lint deploy/charts/vahnly/
 
       - name: Deploy to staging
         run: |
-          helm upgrade --install drivers-for-u ./deploy/charts/drivers-for-u \
+          helm upgrade --install vahnly ./deploy/charts/vahnly \
             --namespace "$NAMESPACE" --create-namespace \
             -f ./deploy/production-values.yaml \
             --set image.repository=${REGISTRY}/${OWNER_LC}/dfu-gateway \
@@ -81,12 +81,12 @@ jobs:
 
       - name: Smoke test
         run: |
-          curl -sf https://api-staging.driversforu.com/health | \
+          curl -sf https://api.aniket.site/health | \
             python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok', d"
 
       - name: Rollback on failure
         if: failure()
-        run: helm rollback drivers-for-u -n "$NAMESPACE" || true
+        run: helm rollback vahnly -n "$NAMESPACE" || true
 
   production-deploy:
     needs: [check-secrets, staging-deploy]
@@ -110,7 +110,7 @@ jobs:
 
       - name: Deploy to production
         run: |
-          helm upgrade --install drivers-for-u ./deploy/charts/drivers-for-u \
+          helm upgrade --install vahnly ./deploy/charts/vahnly \
             --namespace "$NAMESPACE" --create-namespace \
             -f ./deploy/production-values.yaml \
             --set image.repository=${REGISTRY}/${OWNER_LC}/dfu-gateway \
@@ -119,9 +119,9 @@ jobs:
 
       - name: Smoke test
         run: |
-          curl -sf https://api.driversforu.com/health | \
+          curl -sf https://api.aniket.site/health | \
             python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok', d"
 
       - name: Rollback on failure
         if: failure()
-        run: helm rollback drivers-for-u -n "$NAMESPACE" || true
+        run: helm rollback vahnly -n "$NAMESPACE" || true

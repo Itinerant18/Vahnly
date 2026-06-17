@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
+import { API_GATEWAY_BASE_URL } from '../../config';
+import { AdminBadge } from '../../components/ds/AdminBadge';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,7 @@ const ALERT_ICONS: Record<string, string> = {
   PAYOUT_FAILURE: '💸',
 };
 
+// Severity → header-pill classes (used for the stats bar; per-item labels use AdminBadge).
 const SEVERITY_CLS: Record<string, string> = {
   CRITICAL: 'bg-surface-negative text-content-negative border border-negative-400',
   HIGH: 'bg-surface-warning text-content-warning border border-warning-400',
@@ -76,11 +79,14 @@ const SEVERITY_CLS: Record<string, string> = {
   LOW: 'bg-surface-accent text-content-accent border border-border-accent',
 };
 
-const STATUS_CLS: Record<string, string> = {
-  UNREAD: 'bg-surface-accent text-content-accent',
-  READ: 'bg-background-secondary text-content-secondary',
-  ACKNOWLEDGED: 'bg-surface-warning text-content-warning',
-  RESOLVED: 'bg-surface-positive text-content-positive',
+type BadgeVariant = 'positive' | 'negative' | 'warning' | 'accent' | 'neutral';
+
+const SEVERITY_VARIANT: Record<string, BadgeVariant> = {
+  CRITICAL: 'negative', HIGH: 'warning', MEDIUM: 'warning', LOW: 'accent',
+};
+
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  UNREAD: 'accent', READ: 'neutral', ACKNOWLEDGED: 'warning', RESOLVED: 'positive',
 };
 
 const CHANNELS = ['EMAIL', 'SLACK', 'SMS'];
@@ -89,11 +95,11 @@ const ALERT_TYPES = ['SOS', 'HIGH_CANCELLATION', 'SURGE_CAP', 'PAYMENT_GW_DOWN',
 // ── Helper components ─────────────────────────────────────────────────────────
 
 const SeverityBadge = ({ s }: { s: string }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_CLS[s] ?? 'bg-background-secondary text-content-secondary'}`}>{s}</span>
+  <AdminBadge label={s} variant={SEVERITY_VARIANT[s] ?? 'neutral'} />
 );
 
 const StatusBadge = ({ s }: { s: string }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[s] ?? 'bg-background-secondary text-content-secondary'}`}>{s}</span>
+  <AdminBadge label={s} variant={STATUS_VARIANT[s] ?? 'neutral'} />
 );
 
 const Toggle = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
@@ -111,6 +117,13 @@ export function NotificationsDashboard() {
   const [tab, setTab] = useState<'inbox' | 'rules' | 'recipients' | 'channels'>('inbox');
   const [stats, setStats] = useState<Stats | null>(null);
 
+  // Lightweight inline toast (matches TripDetail/SafetyDashboard — no shared admin toast).
+  const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const showToast = (text: string, kind: 'ok' | 'err' = 'ok') => {
+    setToast({ text, kind });
+    window.setTimeout(() => setToast(null), 3500);
+  };
+
   // Inbox state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
@@ -123,19 +136,19 @@ export function NotificationsDashboard() {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [editingRule, setEditingRule] = useState<AlertRule | null>(null);
 
-  // Recipients state
+  // Recipients state (read-only — recipients are GET-only; edits fold into PATCH /rules/{id})
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [selectedRuleId, setSelectedRuleId] = useState('');
-  const [newRecip, setNewRecip] = useState({ email: '', phone: '', slack_user_id: '' });
 
-  // Channels state
+  // Channels state (config is read-only — no channel-save route; use Test to verify connectivity)
   const [channels, setChannels] = useState<ChannelConfig[]>([]);
-  const [channelEdits, setChannelEdits] = useState<Record<string, Record<string, string | number | boolean>>>({});
 
-  const base = '/api/v1/admin/notifications';
+  const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/notifications`;
+  const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
+  const adminEmail = localStorage.getItem('admin_email') || '';
 
   const authHeaders = (json = false): Record<string, string> => {
-    const h: Record<string, string> = {};
+    const h: Record<string, string> = { 'X-Admin-Role': role, 'X-Admin-Email': adminEmail };
     if (json) h['Content-Type'] = 'application/json';
     return h;
   };
@@ -162,9 +175,6 @@ export function NotificationsDashboard() {
     if (tab === 'channels') {
       fetch(`${base}/channels`, { headers: authHeaders() }).then(r => r.json()).then(d => {
         setChannels(d.channels ?? []);
-        const edits: typeof channelEdits = {};
-        (d.channels ?? []).forEach((c: ChannelConfig) => { edits[c.channel] = { ...c.config, is_enabled: c.is_enabled }; });
-        setChannelEdits(edits);
       }).catch(() => {});
     }
   }, [tab, base]);
@@ -202,6 +212,7 @@ export function NotificationsDashboard() {
       body: JSON.stringify({ ids: [...checkedIds] }),
     });
     setNotifications(p => p.map(x => checkedIds.has(x.id) ? { ...x, status: 'ACKNOWLEDGED' } : x));
+    showToast(`Acknowledged ${checkedIds.size}`, 'ok');
     setCheckedIds(new Set());
     loadStats();
   };
@@ -220,42 +231,13 @@ export function NotificationsDashboard() {
     fetch(`${base}/rules`, { headers: authHeaders() }).then(r => r.json()).then(d => setRules(d.rules ?? []));
   };
 
-  const addRecipient = async () => {
-    if (!newRecip.email || !selectedRuleId) return;
-    const updated = [...recipients, { id: '', rule_id: selectedRuleId, ...newRecip }];
-    await fetch(`${base}/rules/${selectedRuleId}/recipients`, {
-      method: 'PUT',
-      headers: authHeaders(true),
-      body: JSON.stringify({ recipients: updated.map(({ email, phone, slack_user_id }) => ({ email, phone, slack_user_id })) }),
-    });
-    setNewRecip({ email: '', phone: '', slack_user_id: '' });
-    fetch(`${base}/rules/${selectedRuleId}/recipients`, { headers: authHeaders() }).then(r => r.json()).then(d => setRecipients(d.recipients ?? []));
-  };
-
-  const removeRecipient = async (rid: string) => {
-    const updated = recipients.filter(r => r.id !== rid);
-    await fetch(`${base}/rules/${selectedRuleId}/recipients`, {
-      method: 'PUT',
-      headers: authHeaders(true),
-      body: JSON.stringify({ recipients: updated.map(({ email, phone, slack_user_id }) => ({ email, phone, slack_user_id })) }),
-    });
-    setRecipients(updated);
-  };
-
-  const saveChannel = async (channel: string) => {
-    const edit = channelEdits[channel] ?? {};
-    const { is_enabled, ...config } = edit;
-    await fetch(`${base}/channels/${channel}`, {
-      method: 'PUT',
-      headers: authHeaders(true),
-      body: JSON.stringify({ config, is_enabled: !!is_enabled }),
-    });
-    alert(`${channel} config saved.`);
-  };
-
   const testChannel = async (channel: string) => {
-    const d = await fetch(`${base}/channels/${channel}/test`, { method: 'POST', headers: authHeaders() }).then(r => r.json());
-    alert(d.message ?? 'Test sent');
+    try {
+      const d = await fetch(`${base}/channels/${channel}/test`, { method: 'POST', headers: authHeaders() }).then(r => r.json());
+      showToast(d.message ?? `${channel} test sent`, 'ok');
+    } catch {
+      showToast(`${channel} test failed`, 'err');
+    }
   };
 
   const simulate = async (alertType: string) => {
@@ -264,6 +246,7 @@ export function NotificationsDashboard() {
       headers: authHeaders(true),
       body: JSON.stringify({ alert_type: alertType }),
     });
+    showToast(`Simulated ${alertType}`, 'ok');
     loadStats();
     loadNotifications();
   };
@@ -576,7 +559,8 @@ export function NotificationsDashboard() {
       {/* Tab: Recipients */}
       {tab === 'recipients' && (
         <div className="flex-1 overflow-y-auto p-6 max-w-2xl">
-          <h2 className="text-base font-semibold text-content-primary mb-4">Manage Recipients</h2>
+          <h2 className="text-base font-semibold text-content-primary mb-1">Rule Recipients</h2>
+          <p className="text-xs text-content-tertiary mb-4">Read-only view. Recipients are managed via the alert rule itself — edit the rule's channels under Alert Rules to change routing.</p>
           <div className="mb-4">
             <label className="text-xs text-content-tertiary block mb-1">Select Alert Rule</label>
             <select value={selectedRuleId} onChange={e => setSelectedRuleId(e.target.value)} className="w-full text-sm border border-border rounded px-3 py-2 bg-background-primary">
@@ -586,47 +570,29 @@ export function NotificationsDashboard() {
           </div>
 
           {selectedRuleId && (
-            <>
-              <div className="rounded border border-border overflow-hidden mb-4">
-                <table className="w-full text-sm">
-                  <thead className="bg-background-secondary border-b border-border text-xs text-content-tertiary">
-                    <tr>
-                      <th className="text-left px-4 py-2.5">Email</th>
-                      <th className="text-left px-4 py-2.5">Phone</th>
-                      <th className="text-left px-4 py-2.5">Slack User ID</th>
-                      <th className="px-4 py-2.5"></th>
+            <div className="rounded border border-border overflow-hidden mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-background-secondary border-b border-border text-xs text-content-tertiary">
+                  <tr>
+                    <th className="text-left px-4 py-2.5">Email</th>
+                    <th className="text-left px-4 py-2.5">Phone</th>
+                    <th className="text-left px-4 py-2.5">Slack User ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recipients.length === 0 && (
+                    <tr><td colSpan={3} className="px-4 py-4 text-center text-xs text-content-tertiary">No recipients configured</td></tr>
+                  )}
+                  {recipients.map(rec => (
+                    <tr key={rec.id} className="border-b border-border">
+                      <td className="px-4 py-2.5 text-xs">{rec.email}</td>
+                      <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.phone || '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.slack_user_id || '—'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {recipients.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-4 text-center text-xs text-content-tertiary">No recipients configured</td></tr>
-                    )}
-                    {recipients.map(rec => (
-                      <tr key={rec.id} className="border-b border-border">
-                        <td className="px-4 py-2.5 text-xs">{rec.email}</td>
-                        <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.phone || '—'}</td>
-                        <td className="px-4 py-2.5 text-xs text-content-tertiary">{rec.slack_user_id || '—'}</td>
-                        <td className="px-4 py-2.5">
-                          <button onClick={() => removeRecipient(rec.id)} className="text-xs text-content-negative hover:underline">Remove</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="border border-border rounded p-4 bg-background-secondary">
-                <p className="text-xs font-medium text-content-primary mb-3">Add Recipient</p>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <input placeholder="Email *" value={newRecip.email} onChange={e => setNewRecip({ ...newRecip, email: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
-                  <input placeholder="Phone" value={newRecip.phone} onChange={e => setNewRecip({ ...newRecip, phone: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
-                  <input placeholder="Slack @user or ID" value={newRecip.slack_user_id} onChange={e => setNewRecip({ ...newRecip, slack_user_id: e.target.value })} className="text-sm border border-border rounded px-2 py-1.5 bg-background-primary" />
-                </div>
-                <button onClick={addRecipient} disabled={!newRecip.email} className="px-4 py-1.5 bg-content-primary text-gray-0 text-sm rounded disabled:opacity-50 font-medium hover:bg-content-primary/90">
-                  Add Recipient
-                </button>
-              </div>
-            </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -634,51 +600,54 @@ export function NotificationsDashboard() {
       {/* Tab: Channels */}
       {tab === 'channels' && (
         <div className="flex-1 overflow-y-auto p-6">
-          <h2 className="text-base font-semibold text-content-primary mb-4">Delivery Channel Configuration</h2>
+          <h2 className="text-base font-semibold text-content-primary mb-1">Delivery Channels</h2>
+          <p className="text-xs text-content-tertiary mb-4">Channel credentials are managed server-side. Use Test to verify live connectivity.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {channels.map(ch => {
-              const edit = channelEdits[ch.channel] ?? {};
-              const isEnabled = edit.is_enabled as boolean ?? ch.is_enabled;
               const channelLabels: Record<string, string> = { EMAIL: '📧 Email (SMTP)', SLACK: '💬 Slack Webhook', SMS: '📱 SMS (Twilio)' };
-              const channelFields: Record<string, Array<{ key: string; label: string; type?: string }>> = {
-                EMAIL: [{ key: 'smtp_host', label: 'SMTP Host' }, { key: 'smtp_port', label: 'SMTP Port', type: 'number' }, { key: 'from_email', label: 'From Email' }, { key: 'from_name', label: 'From Name' }],
+              const channelFields: Record<string, Array<{ key: string; label: string }>> = {
+                EMAIL: [{ key: 'smtp_host', label: 'SMTP Host' }, { key: 'smtp_port', label: 'SMTP Port' }, { key: 'from_email', label: 'From Email' }, { key: 'from_name', label: 'From Name' }],
                 SLACK: [{ key: 'webhook_url', label: 'Webhook URL' }, { key: 'channel', label: 'Channel (#name)' }, { key: 'username', label: 'Bot Username' }],
                 SMS: [{ key: 'account_sid', label: 'Account SID' }, { key: 'auth_token', label: 'Auth Token' }, { key: 'from_number', label: 'From Number (+91...)' }],
               };
               const fields = channelFields[ch.channel] ?? [];
 
               return (
-                <div key={ch.channel} className={`border rounded-lg p-5 bg-background-primary ${isEnabled ? 'border-positive-400' : 'border-border'}`}>
+                <div key={ch.channel} className={`border rounded-lg p-5 bg-background-primary ${ch.is_enabled ? 'border-positive-400' : 'border-border'}`}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-content-primary text-sm">{channelLabels[ch.channel] ?? ch.channel}</h3>
-                    <Toggle
-                      checked={isEnabled}
-                      onChange={() => setChannelEdits(prev => ({ ...prev, [ch.channel]: { ...prev[ch.channel], is_enabled: !isEnabled } }))}
-                    />
+                    <AdminBadge label={ch.is_enabled ? 'enabled' : 'disabled'} variant={ch.is_enabled ? 'positive' : 'neutral'} />
                   </div>
                   <div className="space-y-2.5 mb-4">
                     {fields.map(f => (
                       <div key={f.key}>
                         <label className="text-[10px] text-content-tertiary block mb-0.5">{f.label}</label>
-                        <input
-                          type={f.type ?? 'text'}
-                          value={(edit[f.key] as string | number) ?? ''}
-                          onChange={e => setChannelEdits(prev => ({ ...prev, [ch.channel]: { ...prev[ch.channel], [f.key]: e.target.value } }))}
-                          className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background-primary font-mono"
-                        />
+                        <div className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background-secondary font-mono text-content-secondary truncate">
+                          {(ch.config?.[f.key] as string | number | undefined) ?? '—'}
+                        </div>
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => saveChannel(ch.channel)} className="flex-1 bg-content-primary text-gray-0 text-xs py-1.5 rounded font-medium hover:bg-content-primary/90">Save</button>
-                    <button onClick={() => testChannel(ch.channel)} className="px-3 text-xs py-1.5 border border-border rounded text-content-tertiary hover:bg-background-secondary">Test</button>
-                  </div>
+                  <button onClick={() => testChannel(ch.channel)} className="w-full px-3 text-xs py-1.5 border border-border rounded text-content-tertiary hover:bg-background-secondary">Test Connection</button>
                   {ch.updated_at && (
                     <p className="text-[10px] text-content-tertiary mt-2">Last updated: {new Date(ch.updated_at).toLocaleString()}</p>
                   )}
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-fade-in">
+          <div className={`rounded-pill px-4 py-2.5 text-xs font-semibold shadow-xl border ${
+            toast.kind === 'ok'
+              ? 'bg-surface-positive text-content-positive border-positive-400'
+              : 'bg-surface-negative text-content-negative border-negative-400'
+          }`}>
+            {toast.text}
           </div>
         </div>
       )}

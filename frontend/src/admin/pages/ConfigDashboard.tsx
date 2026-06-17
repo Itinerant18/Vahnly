@@ -186,16 +186,32 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
   }, []);
 
   const toggle = async (flag: FeatureFlag) => {
-    await fetch(`${base}/flags`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ flag_key: flag.flag_key, is_enabled: !flag.is_enabled }),
+    await fetch(`${base}/flags/${flag.flag_key}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ is_enabled: !flag.is_enabled }),
     });
     fetchFlags();
   };
 
   const saveEditing = async () => {
     if (!editing) return;
-    await fetch(`${base}/flags`, { method: 'POST', headers, body: JSON.stringify(editing) });
+    // Existing flags: PATCH per-flag (toggle/rollout/scope). New flags: POST to create.
+    if (editing.id) {
+      await fetch(`${base}/flags/${editing.flag_key}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({
+          is_enabled: editing.is_enabled,
+          rollout_percentage: editing.rollout_percentage,
+          target_cities: editing.target_cities,
+          target_roles: editing.target_roles,
+          is_kill_switch: editing.is_kill_switch,
+          name: editing.name,
+          description: editing.description,
+        }),
+      });
+    } else {
+      await fetch(`${base}/flags`, { method: 'POST', headers, body: JSON.stringify(editing) });
+    }
     setEditing(null); fetchFlags();
   };
 

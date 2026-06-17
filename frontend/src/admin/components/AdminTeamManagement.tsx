@@ -178,16 +178,20 @@ export const AdminTeamManagement: React.FC = () => {
   };
 
   const toggleSuspend = async (admin: AdminUser) => {
+    const nextStatus = admin.is_active ? 'SUSPENDED' : 'ACTIVE';
     if (!window.confirm(`Are you sure you want to ${admin.is_active ? 'SUSPEND' : 'ACTIVATE'} ${admin.full_name}?`)) return;
+    const reason = admin.is_active
+      ? (window.prompt('Reason for suspension (recorded in audit log):') ?? '')
+      : '';
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/suspend`, {
-        method: 'POST',
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/${encodeURIComponent(admin.id)}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          admin_id: admin.id,
-          suspend: admin.is_active
+          status: nextStatus,
+          reason
         })
       });
 
@@ -203,17 +207,35 @@ export const AdminTeamManagement: React.FC = () => {
   const resetMFA = async (adminId: string) => {
     if (!window.confirm('Are you sure you want to RESET the 2FA parameters for this administrator?')) return;
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/reset-2fa`, {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/${encodeURIComponent(adminId)}/reset-2fa`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ admin_id: adminId })
+        }
       });
 
       if (res.ok) {
         alert('MFA credentials have been cleared and reset successfully.');
         fetchAdmins();
+        fetchAuditLogs();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const forceLogout = async (admin: AdminUser) => {
+    if (!window.confirm(`Force-logout ${admin.full_name}? All active sessions will be revoked.`)) return;
+    try {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/team/${encodeURIComponent(admin.id)}/force-logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (res.ok) {
+        alert('All sessions for this administrator have been revoked.');
         fetchAuditLogs();
       }
     } catch (e) {
@@ -264,6 +286,8 @@ export const AdminTeamManagement: React.FC = () => {
                   <th className="pb-3 font-bold">Admin / Email</th>
                   <th className="pb-3 font-bold">Role</th>
                   <th className="pb-3 font-bold">City Scope</th>
+                  <th className="pb-3 font-bold">2FA</th>
+                  <th className="pb-3 font-bold">Last Active</th>
                   <th className="pb-3 font-bold">Status</th>
                   <th className="pb-3 font-bold text-right">Actions</th>
                 </tr>
@@ -285,6 +309,18 @@ export const AdminTeamManagement: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 font-mono font-bold">{admin.city_scope}</td>
+                    <td className="py-3">
+                      <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-bold ${
+                        admin.two_factor_enabled
+                          ? 'bg-background-secondary text-content-primary'
+                          : 'bg-background-primary border border-background-secondary text-content-tertiary'
+                      }`}>
+                        {admin.two_factor_enabled ? 'Enabled' : 'Off'}
+                      </span>
+                    </td>
+                    <td className="py-3 font-mono text-[10px] text-content-secondary">
+                      {admin.last_active_at ? new Date(admin.last_active_at).toLocaleString() : '—'}
+                    </td>
                     <td className="py-3">
                       <span className="flex items-center gap-1.5 font-medium">
                         <span className={`w-2 h-2 rounded-full ${admin.is_active ? 'bg-status-online' : 'bg-status-negative'}`} />
@@ -310,6 +346,13 @@ export const AdminTeamManagement: React.FC = () => {
                           title="Reset MFA Credentials"
                         >
                           2FA
+                        </button>
+                        <button
+                          onClick={() => forceLogout(admin)}
+                          className="bg-background-primary border border-background-secondary text-content-primary font-bold px-3 py-1 rounded-pill text-[10px] hover:bg-background-secondary"
+                          title="Revoke all active sessions"
+                        >
+                          Logout
                         </button>
                         <button
                           onClick={() => toggleSuspend(admin)}

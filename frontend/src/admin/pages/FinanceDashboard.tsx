@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { formatPaise } from '../lib/money';
+import { exportToCsv } from '../lib/tableTools';
 
 // --- TYPES ---
 interface Transaction {
@@ -127,7 +129,8 @@ function refundStatusBadge(status: string) {
 	return 'badge badge-neutral';
 }
 
-const monoAmt = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+// Finance surfaces show 2 decimal places; delegate to the shared formatter.
+const monoAmt = (paise: number) => formatPaise(paise, 2);
 
 export const FinanceDashboard: React.FC = () => {
 	const [activeTab, setActiveTab] = useState<TabType>('transactions');
@@ -146,6 +149,9 @@ export const FinanceDashboard: React.FC = () => {
 	const [selectedTxDetails, setSelectedTxDetails] = useState<any | null>(null);
 
 	const [refunds, setRefunds] = useState<Refund[]>([]);
+	const [selectedRefundIds, setSelectedRefundIds] = useState<string[]>([]);
+	const [refundBulkProcessing, setRefundBulkProcessing] = useState<boolean>(false);
+	const [partialAmounts, setPartialAmounts] = useState<Record<string, string>>({});
 	const [wallets, setWallets] = useState<Wallet[]>([]);
 	const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
 	const [selectedWalletEntries, setSelectedWalletEntries] = useState<WalletLedgerEntry[]>([]);
@@ -159,6 +165,9 @@ export const FinanceDashboard: React.FC = () => {
 	const [txGateway, setTxGateway] = useState<string>('');
 	const [txStatus, setTxStatus] = useState<string>('');
 	const [txSearch, setTxSearch] = useState<string>('');
+	const [txMethod, setTxMethod] = useState<string>('');
+	const [txMinAmount, setTxMinAmount] = useState<string>('');
+	const [txMaxAmount, setTxMaxAmount] = useState<string>('');
 	const [refundStatus, setRefundStatus] = useState<string>('');
 	const [walletSearch, setWalletSearch] = useState<string>('');
 	const [invoiceType, setInvoiceType] = useState<string>('');
@@ -277,6 +286,52 @@ export const FinanceDashboard: React.FC = () => {
 		} catch (err) { console.error(err); }
 	};
 
+	const toggleRefundSelect = (id: string) => {
+		setSelectedRefundIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+	};
+
+	const toggleRefundSelectAll = () => {
+		const pending = refunds.filter((r) => r.status === 'PENDING').map((r) => r.id);
+		setSelectedRefundIds((prev) => prev.length === pending.length ? [] : pending);
+	};
+
+	// Bulk approve loops POST /finance/refunds/{id}/approve — there is no batch endpoint.
+	const handleBulkApproveRefunds = async () => {
+		if (selectedRefundIds.length === 0) return;
+		if (!window.confirm(`Approve ${selectedRefundIds.length} refund(s)? This disburses money to customers.`)) return;
+		setRefundBulkProcessing(true);
+		let ok = 0; let failed = 0;
+		for (const id of selectedRefundIds) {
+			try {
+				const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/refunds/${id}/approve`, { method: 'POST', headers });
+				if (res.ok) ok++; else failed++;
+			} catch { failed++; }
+		}
+		setRefundBulkProcessing(false);
+		setSelectedRefundIds([]);
+		alert(`Approved ${ok} refund(s).${failed ? ` ${failed} failed.` : ''}`);
+		fetchRefunds();
+	};
+
+	// Partial refund: post a new refund for a sub-amount against the same transaction.
+	const handlePartialRefund = async (ref: Refund) => {
+		const raw = partialAmounts[ref.id];
+		const rupees = parseFloat(raw || '');
+		if (!rupees || rupees <= 0) { alert('Enter a partial amount greater than zero.'); return; }
+		if (rupees * 100 > ref.amount_paise) { alert('Partial amount cannot exceed the original refund amount.'); return; }
+		if (!window.confirm(`Issue a partial refund of ${formatPaise(Math.round(rupees * 100), 2)} against txn ${ref.transaction_id}?`)) return;
+		try {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/refunds`, {
+				method: 'POST', headers,
+				body: JSON.stringify({ transaction_id: ref.transaction_id, amount_paise: Math.round(rupees * 100), reason: `Partial refund of ${ref.reason}` }),
+			});
+			if (res.ok) {
+				setPartialAmounts((prev) => { const next = { ...prev }; delete next[ref.id]; return next; });
+				fetchRefunds();
+			} else alert(`Failed: ${await res.text()}`);
+		} catch (err) { console.error(err); }
+	};
+
 	const handleAdjustWallet = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!selectedWallet) return;
@@ -317,6 +372,34 @@ export const FinanceDashboard: React.FC = () => {
 		const params = new URLSearchParams();
 		if (invoiceType) params.append('invoice_type', invoiceType);
 		window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/invoices/export?${params.toString()}`);
+	};
+
+	// Client-side method + amount-range refinement on top of the server gateway/status/search filters.
+	const filteredTransactions = transactions.filter((tx) => {
+		if (txMethod && tx.method !== txMethod) return false;
+		const rupees = tx.amount_paise / 100;
+		if (txMinAmount && rupees < parseFloat(txMinAmount)) return false;
+		if (txMaxAmount && rupees > parseFloat(txMaxAmount)) return false;
+		return true;
+	});
+
+	const handleExportTransactions = () => {
+		exportToCsv<Transaction>(
+			`transactions-${new Date().toISOString().slice(0, 10)}.csv`,
+			[
+				{ key: 'id', label: 'Txn ID' },
+				{ key: 'order_id', label: 'Order ID' },
+				{ key: 'user_id', label: 'User ID' },
+				{ key: 'user_type', label: 'User Type' },
+				{ key: 'txn_type', label: 'Type' },
+				{ key: 'gateway', label: 'Gateway' },
+				{ key: 'method', label: 'Method' },
+				{ key: 'amount_paise', label: 'Amount (paise)' },
+				{ key: 'status', label: 'Status' },
+				{ key: 'created_at', label: 'Created At' },
+			],
+			filteredTransactions,
+		);
 	};
 
 	useEffect(() => {
@@ -457,6 +540,39 @@ export const FinanceDashboard: React.FC = () => {
 								<option value="REFUNDED">Refunded</option>
 							</>
 						))}
+						{filterSelect(txMethod, setTxMethod, (
+							<>
+								<option value="">All Methods</option>
+								<option value="CARD">Card</option>
+								<option value="UPI">UPI</option>
+								<option value="NETBANKING">Netbanking</option>
+								<option value="WALLET">Wallet</option>
+								<option value="CASH">Cash</option>
+							</>
+						))}
+						<input
+							type="number"
+							placeholder="Min ₹"
+							className="w-24 h-8 rounded-sm bg-background-secondary border border-border-opaque px-3 text-label-medium font-mono text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+							value={txMinAmount}
+							onChange={(e) => setTxMinAmount(e.target.value)}
+						/>
+						<input
+							type="number"
+							placeholder="Max ₹"
+							className="w-24 h-8 rounded-sm bg-background-secondary border border-border-opaque px-3 text-label-medium font-mono text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+							value={txMaxAmount}
+							onChange={(e) => setTxMaxAmount(e.target.value)}
+						/>
+						<button
+							onClick={handleExportTransactions}
+							className="h-8 px-4 bg-background-secondary hover:bg-background-tertiary border border-border-opaque text-content-primary rounded-pill text-label-small font-semibold transition-base flex items-center gap-1.5"
+						>
+							<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+							</svg>
+							Export CSV
+						</button>
 					</div>
 
 					<div className="card overflow-hidden p-0">
@@ -474,7 +590,7 @@ export const FinanceDashboard: React.FC = () => {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-border-opaque">
-								{transactions.map((tx) => (
+								{filteredTransactions.map((tx) => (
 									<tr
 										key={tx.id}
 										onClick={() => { setSelectedTx(tx); fetchTransactionDetails(tx.id); }}
@@ -509,7 +625,7 @@ export const FinanceDashboard: React.FC = () => {
 			{/* ══════════════════════════════════════════════════════════ */}
 			{activeTab === 'refunds' && (
 				<div className="space-y-4">
-					<div className="card flex gap-3 items-center">
+					<div className="card flex gap-3 items-center justify-between">
 						{filterSelect(refundStatus, setRefundStatus, (
 							<>
 								<option value="">All Refund Statuses</option>
@@ -518,12 +634,29 @@ export const FinanceDashboard: React.FC = () => {
 								<option value="FAILED">Failed</option>
 							</>
 						))}
+						{selectedRefundIds.length > 0 && (
+							<button
+								onClick={handleBulkApproveRefunds}
+								disabled={refundBulkProcessing}
+								className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
+							>
+								{refundBulkProcessing ? 'Approving…' : `Approve ${selectedRefundIds.length} selected`}
+							</button>
+						)}
 					</div>
 
 					<div className="card overflow-hidden p-0">
 						<table className="w-full text-left border-collapse">
 							<thead>
 								<tr className="bg-background-tertiary border-b border-border-opaque">
+									<th className={`${thCls} w-10`}>
+										<input
+											type="checkbox"
+											className="w-3.5 h-3.5 cursor-pointer accent-content-primary"
+											checked={selectedRefundIds.length > 0 && selectedRefundIds.length === refunds.filter((r) => r.status === 'PENDING').length}
+											onChange={toggleRefundSelectAll}
+										/>
+									</th>
 									<th className={thCls}>Refund ID</th>
 									<th className={thCls}>Txn ID</th>
 									<th className={thCls}>Reason</th>
@@ -538,6 +671,16 @@ export const FinanceDashboard: React.FC = () => {
 							<tbody className="divide-y divide-border-opaque">
 								{refunds.map((ref) => (
 									<tr key={ref.id} className="hover:bg-background-secondary transition-base">
+										<td className="p-3">
+											{ref.status === 'PENDING' && (
+												<input
+													type="checkbox"
+													className="w-3.5 h-3.5 cursor-pointer accent-content-primary"
+													checked={selectedRefundIds.includes(ref.id)}
+													onChange={() => toggleRefundSelect(ref.id)}
+												/>
+											)}
+										</td>
 										<td className="p-3 font-mono text-paragraph-small text-content-primary font-semibold truncate max-w-[120px]">{ref.id}</td>
 										<td className="p-3 font-mono text-paragraph-small text-content-secondary truncate max-w-[100px]">{ref.transaction_id}</td>
 										<td className={tdCls}>{ref.reason}</td>
@@ -548,9 +691,22 @@ export const FinanceDashboard: React.FC = () => {
 										<td className="p-3 font-mono text-paragraph-small text-content-secondary">{new Date(ref.created_at).toLocaleString()}</td>
 										<td className="p-3 text-right">
 											{ref.status === 'PENDING' && (
-												<div className="flex gap-1.5 justify-end">
-													<button onClick={() => handleProcessRefundAction(ref.id, 'approve')} className="btn-primary text-xs py-1 px-2">Approve</button>
-													<button onClick={() => handleProcessRefundAction(ref.id, 'reject')} className="border border-border-opaque hover:border-content-primary text-label-small font-semibold rounded-sm px-2 py-1 text-content-secondary hover:text-content-primary transition-base">Reject</button>
+												<div className="flex flex-col gap-1.5 items-end">
+													<div className="flex gap-1.5 justify-end">
+														<button onClick={() => handleProcessRefundAction(ref.id, 'approve')} className="btn-primary text-xs py-1 px-2">Approve</button>
+														<button onClick={() => handleProcessRefundAction(ref.id, 'reject')} className="border border-border-opaque hover:border-content-primary text-label-small font-semibold rounded-sm px-2 py-1 text-content-secondary hover:text-content-primary transition-base">Reject</button>
+													</div>
+													<div className="flex gap-1.5 justify-end items-center">
+														<input
+															type="number"
+															step="0.01"
+															placeholder="Partial ₹"
+															className="w-24 h-7 rounded-sm bg-background-secondary border border-border-opaque px-2 text-label-small font-mono text-content-primary text-right placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent-400"
+															value={partialAmounts[ref.id] ?? ''}
+															onChange={(e) => setPartialAmounts((prev) => ({ ...prev, [ref.id]: e.target.value }))}
+														/>
+														<button onClick={() => handlePartialRefund(ref)} className="border border-border-opaque hover:border-content-primary text-label-small font-semibold rounded-sm px-2 py-1 text-content-secondary hover:text-content-primary transition-base">Partial</button>
+													</div>
 												</div>
 											)}
 										</td>
@@ -736,6 +892,34 @@ export const FinanceDashboard: React.FC = () => {
 								</span>
 							</div>
 						</div>
+
+						{/* Matched / Unmatched / Errors breakdown derived from settled vs ledger totals. */}
+						<div className="grid grid-cols-3 gap-2">
+							{(() => {
+								const gateway = reconReport?.gateway_total_settled_paise ?? 0;
+								const ledger = reconReport?.internal_ledger_cash_paise ?? 0;
+								const discrepancy = reconReport ? Math.abs(reconReport.discrepancy_paise) : 0;
+								const matched = Math.min(gateway, ledger);
+								const errorRows = cashFloat.filter((c) => c.cash_float_paise !== 0).length;
+								return (
+									<>
+										<div className="bg-surface-positive border border-positive-200 rounded-sm p-2.5 text-center">
+											<div className="text-label-small uppercase tracking-wide text-content-positive">Matched</div>
+											<div className="font-mono text-paragraph-small text-content-positive font-semibold mt-1">{monoAmt(matched)}</div>
+										</div>
+										<div className="bg-surface-warning border border-warning-200 rounded-sm p-2.5 text-center">
+											<div className="text-label-small uppercase tracking-wide text-content-warning">Unmatched</div>
+											<div className="font-mono text-paragraph-small text-content-warning font-semibold mt-1">{monoAmt(discrepancy)}</div>
+										</div>
+										<div className="bg-surface-negative border border-negative-200 rounded-sm p-2.5 text-center">
+											<div className="text-label-small uppercase tracking-wide text-content-negative">Errors</div>
+											<div className="font-mono text-paragraph-small text-content-negative font-semibold mt-1">{errorRows}</div>
+										</div>
+									</>
+								);
+							})()}
+						</div>
+
 						<div className="flex justify-between items-center">
 							<span className="text-label-medium text-content-primary font-semibold">Total Reconciliation Error:</span>
 							<span className={`font-mono text-paragraph-small px-2 py-0.5 rounded-sm font-semibold ${

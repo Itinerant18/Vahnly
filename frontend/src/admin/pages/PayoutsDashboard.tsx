@@ -1,5 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { formatPaise } from '../lib/money';
+import { AdminBadge } from '../../components/ds';
+
+// Mask a bank account number to its last 4 digits, e.g. "1234567890" → "••••7890".
+function maskAccount(acct?: string | null): string {
+	if (!acct) return '—';
+	const last4 = acct.slice(-4);
+	return `••••${last4}`;
+}
+
+// Map payout status to an AdminBadge variant.
+function payoutBadgeVariant(status: string): 'positive' | 'negative' | 'warning' | 'accent' | 'neutral' {
+	switch (status) {
+		case 'PAID': return 'positive';
+		case 'APPROVED': return 'positive';
+		case 'FAILED': return 'negative';
+		case 'PENDING': return 'warning';
+		case 'PROCESSING': return 'accent';
+		case 'HELD': return 'accent';
+		default: return 'neutral';
+	}
+}
+
+interface PayoutSettings {
+	auto_payout_enabled: boolean;
+	schedule: string; // DAILY, WEEKLY, MONTHLY
+	min_paise: number;
+	max_paise: number;
+}
 
 interface Payout {
 	id: string;
@@ -49,6 +78,11 @@ export const PayoutsDashboard: React.FC = () => {
 
 	// Bulk operations status
 	const [bulkProcessing, setBulkProcessing] = useState<boolean>(false);
+
+	// Payout settings panel state
+	const [showSettings, setShowSettings] = useState<boolean>(false);
+	const [settings, setSettings] = useState<PayoutSettings | null>(null);
+	const [settingsSaving, setSettingsSaving] = useState<boolean>(false);
 
 	const role = localStorage.getItem('admin_role') || 'ADMIN';
 	const headers = {
@@ -212,15 +246,62 @@ export const PayoutsDashboard: React.FC = () => {
 		}
 	};
 
-	const getStatusColor = (status: string) => {
-		switch (status) {
-			case 'PENDING': return 'text-content-warning bg-surface-warning border-warning-400';
-			case 'APPROVED': return 'text-content-positive bg-surface-positive border-positive-400';
-			case 'PROCESSING': return 'text-content-accent bg-surface-accent border-border-accent';
-			case 'PAID': return 'text-content-primary bg-background-secondary border-border-opaque';
-			case 'FAILED': return 'text-content-negative bg-surface-negative border-negative-400';
-			case 'HELD': return 'text-content-accent bg-surface-accent border-border-accent';
-			default: return 'text-content-tertiary bg-background-secondary border-background-secondary';
+	// Mark an approved/processing payout as settled (POST /payouts/{id}/settle).
+	const handleSettle = async (id: string) => {
+		if (!window.confirm(`Mark payout ${id} as settled?\n\nThis confirms the bank transfer completed and closes the payout.`)) return;
+		try {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/${id}/settle`, {
+				method: 'POST',
+				headers,
+			});
+			if (res.ok) {
+				alert('Payout marked as settled.');
+				fetchPayouts();
+				if (selectedPayout?.id === id) setSelectedPayout(null);
+			} else {
+				alert(`Settle failed: ${await res.text()}`);
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Network error during settle');
+		}
+	};
+
+	const fetchSettings = async () => {
+		try {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/settings`, { headers });
+			if (res.ok) setSettings(await res.json());
+		} catch (err) {
+			console.error('Failed to fetch payout settings', err);
+		}
+	};
+
+	const openSettings = () => {
+		setShowSettings(true);
+		fetchSettings();
+	};
+
+	const handleSaveSettings = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!settings) return;
+		setSettingsSaving(true);
+		try {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/finance/payouts/settings`, {
+				method: 'PUT',
+				headers,
+				body: JSON.stringify(settings),
+			});
+			if (res.ok) {
+				alert('Payout settings saved.');
+				setShowSettings(false);
+			} else {
+				alert(`Failed to save settings: ${await res.text()}`);
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Network error saving settings');
+		} finally {
+			setSettingsSaving(false);
 		}
 	};
 
@@ -250,6 +331,16 @@ export const PayoutsDashboard: React.FC = () => {
 					<p className="text-xs text-content-tertiary mt-1">Review driver bank verification parameters, hold funds, bulk-approve payouts, and export banking batches.</p>
 				</div>
 				<div className="flex gap-2">
+					<button
+						onClick={openSettings}
+						className="px-4 py-2 border border-background-secondary bg-background-primary hover:bg-background-secondary text-content-primary rounded-pill text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+					>
+						<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+						</svg>
+						Payout Settings
+					</button>
 					<button
 						onClick={handleExportBatch}
 						className="px-4 py-2 border border-background-secondary bg-background-primary hover:bg-background-secondary text-content-primary rounded-pill text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
@@ -288,7 +379,7 @@ export const PayoutsDashboard: React.FC = () => {
 				<div className="bg-background-primary border border-background-secondary rounded-xl p-5 flex flex-col justify-between shadow-sm">
 					<span className="text-[11px] font-semibold text-content-tertiary uppercase tracking-wider">Held Funds</span>
 					<span className="text-2xl font-bold font-mono text-content-accent mt-2">
-						₹{((payouts.filter(p => p.status === 'HELD').reduce((acc, curr) => acc + curr.amount_paise, 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+						{formatPaise(payouts.filter(p => p.status === 'HELD').reduce((acc, curr) => acc + curr.amount_paise, 0), 2)}
 					</span>
 					<span className="text-[10px] text-content-tertiary font-mono mt-1">Flagged due to fraud/dispute</span>
 				</div>
@@ -420,18 +511,16 @@ export const PayoutsDashboard: React.FC = () => {
 												</span>
 											</div>
 										</td>
-										<td className="p-3 font-mono text-right text-content-tertiary">₹{(p.amount_paise / 100).toFixed(2)}</td>
+										<td className="p-3 font-mono text-right text-content-tertiary">{formatPaise(p.amount_paise, 2)}</td>
 										<td className="p-3 font-mono text-right text-content-tertiary">
-											₹{((p.tds_paise + p.professional_fees_paise) / 100).toFixed(2)}
+											{formatPaise(p.tds_paise + p.professional_fees_paise, 2)}
 											<span className="text-[9px] text-content-tertiary block">
-												(₹{(p.tds_paise / 100).toFixed(0)} + ₹{(p.professional_fees_paise / 100).toFixed(0)})
+												({formatPaise(p.tds_paise)} + {formatPaise(p.professional_fees_paise)})
 											</span>
 										</td>
-										<td className="p-3 font-mono text-right font-bold text-content-primary">₹{(p.net_amount_paise / 100).toFixed(2)}</td>
+										<td className="p-3 font-mono text-right font-bold text-content-primary">{formatPaise(p.net_amount_paise, 2)}</td>
 										<td className="p-3 text-center">
-											<span className={`inline-flex items-center text-[9px] font-bold border rounded-pill h-5 px-2 tracking-wider ${getStatusColor(p.status)}`}>
-												{p.status}
-											</span>
+											<AdminBadge label={p.status} variant={payoutBadgeVariant(p.status)} dot />
 										</td>
 										<td className="p-3 font-mono text-content-tertiary">{p.payout_batch_id || '—'}</td>
 										<td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -458,6 +547,14 @@ export const PayoutsDashboard: React.FC = () => {
 														className="px-2.5 py-1 bg-content-primary text-gray-0 rounded text-[10px] font-bold hover:bg-gray-800 transition"
 													>
 														Retry
+													</button>
+												)}
+												{(p.status === 'APPROVED' || p.status === 'PROCESSING') && (
+													<button
+														onClick={() => handleSettle(p.id)}
+														className="px-2.5 py-1 bg-surface-positive text-content-positive hover:bg-surface-positive rounded text-[10px] font-bold border border-positive-400 transition"
+													>
+														Settle
 													</button>
 												)}
 											</div>
@@ -518,7 +615,7 @@ export const PayoutsDashboard: React.FC = () => {
 								{selectedPayout.bank_name ? (
 									<>
 										<div className="font-semibold text-content-primary">{selectedPayout.bank_name}</div>
-										<div className="font-mono text-content-tertiary">Acc: {selectedPayout.bank_account_number}</div>
+										<div className="font-mono text-content-tertiary">Acc: {maskAccount(selectedPayout.bank_account_number)}</div>
 										<div className="font-mono text-content-tertiary">IFSC: {selectedPayout.bank_ifsc}</div>
 									</>
 								) : (
@@ -531,19 +628,19 @@ export const PayoutsDashboard: React.FC = () => {
 								<span className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-sans font-semibold">Financial Breakdown</span>
 								<div className="flex justify-between">
 									<span>Gross Amount:</span>
-									<span>₹{(selectedPayout.amount_paise / 100).toFixed(2)}</span>
+									<span>{formatPaise(selectedPayout.amount_paise, 2)}</span>
 								</div>
 								<div className="flex justify-between text-content-negative">
 									<span>TDS Tax Deduction (1%):</span>
-									<span>- ₹{(selectedPayout.tds_paise / 100).toFixed(2)}</span>
+									<span>- {formatPaise(selectedPayout.tds_paise, 2)}</span>
 								</div>
 								<div className="flex justify-between text-content-negative">
 									<span>Professional Commission Fee:</span>
-									<span>- ₹{(selectedPayout.professional_fees_paise / 100).toFixed(2)}</span>
+									<span>- {formatPaise(selectedPayout.professional_fees_paise, 2)}</span>
 								</div>
 								<div className="border-t border-background-secondary pt-1.5 flex justify-between font-bold text-content-primary">
 									<span>Net Settlement:</span>
-									<span>₹{(selectedPayout.net_amount_paise / 100).toFixed(2)}</span>
+									<span>{formatPaise(selectedPayout.net_amount_paise, 2)}</span>
 								</div>
 							</div>
 
@@ -564,9 +661,7 @@ export const PayoutsDashboard: React.FC = () => {
 							{/* Status */}
 							<div>
 								<span className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Payout Status</span>
-								<span className={`inline-flex items-center text-[9px] font-bold border rounded-pill h-5 px-2 tracking-wider ${getStatusColor(selectedPayout.status)}`}>
-									{selectedPayout.status}
-								</span>
+								<AdminBadge label={selectedPayout.status} variant={payoutBadgeVariant(selectedPayout.status)} dot />
 							</div>
 
 							{/* Batch / Reference */}
@@ -600,6 +695,14 @@ export const PayoutsDashboard: React.FC = () => {
 									className="px-4 py-1.5 bg-content-primary text-gray-0 text-xs font-semibold rounded-pill hover:bg-gray-800 transition"
 								>
 									Queue Retry
+								</button>
+							)}
+							{(selectedPayout.status === 'APPROVED' || selectedPayout.status === 'PROCESSING') && (
+								<button
+									onClick={() => { handleSettle(selectedPayout.id); }}
+									className="px-4 py-1.5 bg-content-primary text-gray-0 text-xs font-semibold rounded-pill hover:bg-gray-800 transition"
+								>
+									Mark Settled
 								</button>
 							)}
 							<button
@@ -647,6 +750,88 @@ export const PayoutsDashboard: React.FC = () => {
 								className="px-4 py-1.5 bg-content-primary text-gray-0 text-xs font-semibold rounded-pill hover:bg-gray-800 transition"
 							>
 								Lock Funds
+							</button>
+						</div>
+					</form>
+				</div>
+			)}
+
+			{/* ---- 3. Payout Settings Modal (GET + PUT /finance/payouts/settings) ---- */}
+			{showSettings && (
+				<div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
+					<form onSubmit={handleSaveSettings} className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-md w-full space-y-4 shadow-2xl">
+						<div className="border-b border-background-secondary pb-3 flex justify-between items-start">
+							<div>
+								<h3 className="text-sm font-bold text-content-primary">Payout Settings</h3>
+								<p className="text-[11px] text-content-tertiary mt-1">Configure automatic payout schedule and per-payout thresholds.</p>
+							</div>
+							<button type="button" onClick={() => setShowSettings(false)} className="text-content-tertiary hover:text-content-primary text-sm font-bold">✕</button>
+						</div>
+
+						{!settings ? (
+							<div className="py-8 text-center text-xs text-content-tertiary animate-pulse">Loading settings…</div>
+						) : (
+							<div className="space-y-4 text-xs">
+								<label className="flex items-center gap-3 text-content-secondary font-semibold cursor-pointer">
+									<input
+										type="checkbox"
+										className="w-4 h-4 cursor-pointer accent-content-primary"
+										checked={settings.auto_payout_enabled}
+										onChange={(e) => setSettings({ ...settings, auto_payout_enabled: e.target.checked })}
+									/>
+									<span>Enable automatic payouts</span>
+								</label>
+
+								<div>
+									<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Schedule</label>
+									<select
+										className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary font-semibold focus:outline-none focus:border-content-primary"
+										value={settings.schedule}
+										onChange={(e) => setSettings({ ...settings, schedule: e.target.value })}
+									>
+										<option value="DAILY">Daily</option>
+										<option value="WEEKLY">Weekly</option>
+										<option value="MONTHLY">Monthly</option>
+									</select>
+								</div>
+
+								<div className="grid grid-cols-2 gap-3">
+									<div>
+										<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Min Payout (₹)</label>
+										<input
+											type="number"
+											className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-2.5 font-mono text-content-primary focus:outline-none focus:border-content-primary"
+											value={settings.min_paise / 100}
+											onChange={(e) => setSettings({ ...settings, min_paise: Math.round((parseFloat(e.target.value) || 0) * 100) })}
+										/>
+									</div>
+									<div>
+										<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Max Payout (₹)</label>
+										<input
+											type="number"
+											className="w-full h-9 rounded bg-background-secondary border border-background-secondary px-2.5 font-mono text-content-primary focus:outline-none focus:border-content-primary"
+											value={settings.max_paise / 100}
+											onChange={(e) => setSettings({ ...settings, max_paise: Math.round((parseFloat(e.target.value) || 0) * 100) })}
+										/>
+									</div>
+								</div>
+							</div>
+						)}
+
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
+							<button
+								type="button"
+								onClick={() => setShowSettings(false)}
+								className="px-4 py-1.5 bg-background-secondary text-content-secondary hover:text-content-primary text-xs font-semibold rounded-pill transition"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								disabled={!settings || settingsSaving}
+								className="px-4 py-1.5 bg-content-primary text-gray-0 text-xs font-semibold rounded-pill hover:bg-gray-800 transition disabled:opacity-50"
+							>
+								{settingsSaving ? 'Saving…' : 'Save Settings'}
 							</button>
 						</div>
 					</form>

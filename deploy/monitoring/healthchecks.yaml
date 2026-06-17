@@ -65,7 +65,7 @@ spec:
               image: alpine/k8s:1.29.4 # bundles curl + kubectl + jq
               env:
                 - name: API_BASE
-                  value: "https://api.driversforu.com"
+                  value: "https://api.aniket.site"
                 # Optional Kafka REST proxy for publishing the failure event.
                 - name: KAFKA_REST_PROXY_URL
                   value: "" # e.g. http://kafka-rest.dispatch.svc:8082
@@ -127,7 +127,7 @@ spec:
                     if [ "$next" -ge 3 ] && [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
                       curl -fsS --max-time 5 -X POST "$ALERT_WEBHOOK_URL" \
                         -H 'Content-Type: application/json' \
-                        -d "{\"text\":\"DFU uptime check failed ${next}x — $API_BASE\"}" \
+                        -d "{\"text\":\"Vahnly uptime check failed ${next}x — $API_BASE\"}" \
                         >/dev/null 2>&1 || true
                     fi
                     exit 1

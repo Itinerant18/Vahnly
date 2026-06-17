@@ -92,7 +92,7 @@ migrations:
 ingress:
   enabled: false
   className: nginx
-  host: api.example.com
+  host: api.aniket.site
   tls:
     enabled: true
     secretName: gateway-tls

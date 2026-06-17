@@ -4,9 +4,27 @@ import { API_GATEWAY_BASE_URL } from '../../config';
 import { exportToCsv } from '../lib/tableTools';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
+// Avatar cell: render the real driver photo when a URL is present, else initials.
+function DriverAvatar({ row }: { row: DriverSummaryItem }) {
+  const photo = row.photo_url;
+  const initials = row.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 rounded-pill bg-background-tertiary border border-border-opaque flex items-center justify-center flex-shrink-0 overflow-hidden">
+        {photo ? (
+          <img src={photo} alt={row.name} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-label-small text-content-secondary">{initials}</span>
+        )}
+      </div>
+      <span className="text-paragraph-medium text-content-primary truncate">{row.name}</span>
+    </div>
+  );
+}
+
 // Column definitions for the DataTable hero component (built-in sort / loading / empty).
 const DRIVER_COLUMNS: ColumnDef<DriverSummaryItem>[] = [
-  { key: 'name', header: 'Photo / Name', type: 'avatar', sortable: true },
+  { key: 'name', header: 'Photo / Name', sortable: true, render: (_v, r) => <DriverAvatar row={r} /> },
   {
     key: 'phone', header: 'Phone',
     render: (v) => <span className="font-mono text-mono-small text-content-secondary">{String(v)}</span>,
@@ -51,6 +69,7 @@ export interface DriverSummaryItem {
 	cancellation_rate: number;
 	last_online: string;
 	transmission_capability: string; // MANUAL, AUTOMATIC, BOTH
+	photo_url?: string; // optional avatar URL; falls back to initials when absent
 	[key: string]: unknown; // satisfies DataTable's row constraint
 }
 
@@ -68,6 +87,7 @@ export const DriversList: React.FC = () => {
 	const [acceptanceMin, setAcceptanceMin] = useState<string>('');
 	const [cancellationMax, setCancellationMax] = useState<string>('');
 	const [tripsMin, setTripsMin] = useState<string>('');
+	const [docExpiry, setDocExpiry] = useState<string>('');
 
 	const fetchDrivers = async () => {
 		setLoading(true);
@@ -81,6 +101,7 @@ export const DriversList: React.FC = () => {
 			if (acceptanceMin) params.append('acceptance_min', (parseFloat(acceptanceMin) / 100).toString());
 			if (cancellationMax) params.append('cancellation_max', (parseFloat(cancellationMax) / 100).toString());
 			if (tripsMin) params.append('trips_min', tripsMin);
+			if (docExpiry) params.append('doc_expiry', docExpiry);
 
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 
@@ -103,7 +124,7 @@ export const DriversList: React.FC = () => {
 
 	useEffect(() => {
 		fetchDrivers();
-	}, [search, status, city, transmission, ratingMin, acceptanceMin, cancellationMax, tripsMin]);
+	}, [search, status, city, transmission, ratingMin, acceptanceMin, cancellationMax, tripsMin, docExpiry]);
 
 	const handleExportCsv = () => {
 		exportToCsv<DriverSummaryItem>('drivers.csv', [
@@ -130,6 +151,7 @@ export const DriversList: React.FC = () => {
 		setAcceptanceMin('');
 		setCancellationMax('');
 		setTripsMin('');
+		setDocExpiry('');
 	};
 
 	return (
@@ -236,7 +258,7 @@ export const DriversList: React.FC = () => {
 				</div>
 
 				{/* Advanced numeric filters */}
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-background-secondary">
+				<div className="grid grid-cols-1 md:grid-cols-5 gap-3 pt-2 border-t border-background-secondary">
 					{/* Trips count */}
 					<div>
 						<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Min Trips Completed</label>
@@ -271,6 +293,21 @@ export const DriversList: React.FC = () => {
 							value={cancellationMax}
 							onChange={(e) => setCancellationMax(e.target.value)}
 						/>
+					</div>
+
+					{/* Document Expiry */}
+					<div>
+						<label className="block text-[9px] uppercase text-content-tertiary font-semibold">Doc Expiry</label>
+						<select
+							className="w-full h-8 rounded-pill bg-background-secondary border border-background-secondary px-2.5 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+							value={docExpiry}
+							onChange={(e) => setDocExpiry(e.target.value)}
+						>
+							<option value="">All Documents</option>
+							<option value="expired">Expired</option>
+							<option value="expiring_30">Expiring within 30 days</option>
+							<option value="expiring_60">Expiring within 60 days</option>
+						</select>
 					</div>
 
 					<div className="flex justify-end items-end pb-1.5 col-span-1">

@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
-import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+import { DataTable, type ColumnDef, type BulkAction } from '../../components/ds/DataTable';
+import { AdminBadge } from '../../components/ds/AdminBadge';
+import { exportToCsv, type CsvColumn } from '../lib/tableTools';
+import { formatPaise } from '../lib/money';
 
 export interface TripItem {
   id: string;
@@ -31,23 +34,48 @@ export interface TripItem {
   [key: string]: unknown; // satisfies DataTable's row constraint
 }
 
+const PAGE_SIZE = 50;
+
+// CSV columns for the trips export (shared by full + selected export).
+const CSV_COLUMNS: CsvColumn<TripItem>[] = [
+  { key: 'id', label: 'Trip ID' },
+  { key: 'created_at', label: 'Date' },
+  { key: 'customer_id', label: 'Rider ID' },
+  { key: 'driver_name', label: 'Driver' },
+  { key: 'plate', label: 'Plate' },
+  { key: 'status', label: 'Status' },
+  { key: 'base_fare_paise', label: 'Fare (paise)' },
+  { key: 'rating', label: 'Rating' },
+  { key: 'payment_method', label: 'Payment' },
+  { key: 'trip_type', label: 'Type' },
+  { key: 'car_type', label: 'Car' },
+  { key: 'transmission', label: 'Transmission' },
+  { key: 'promo_applied', label: 'Promo' },
+];
+
 export const TripsList: React.FC = () => {
   const navigate = useNavigate();
   const [trips, setTrips] = useState<TripItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [city, setCity] = useState<string>('');
   const [tripType, setTripType] = useState<string>('');
   const [carType, setCarType] = useState<string>('');
   const [payment, setPayment] = useState<string>('');
+  const [transmission, setTransmission] = useState<string>('');
+  const [promo, setPromo] = useState<string>('');
+  const [d4mCare, setD4mCare] = useState<string>('');
+  const [dateStart, setDateStart] = useState<string>('');
+  const [dateEnd, setDateEnd] = useState<string>('');
   const [ratingLess3, setRatingLess3] = useState<boolean>(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkTagText, setBulkTagText] = useState<string>('');
-  const [showTagModal, setShowTagModal] = useState<boolean>(false);
-  const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
 
-  const fetchTrips = async () => {
+  // Convert a local datetime-local value (YYYY-MM-DDTHH:mm) to RFC3339 for the API.
+  const toRFC3339 = (local: string): string => (local ? new Date(local).toISOString() : '');
+
+  const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -57,7 +85,14 @@ export const TripsList: React.FC = () => {
       if (tripType) params.append('trip_type', tripType);
       if (carType) params.append('car_type', carType);
       if (payment) params.append('payment_method', payment);
+      if (transmission) params.append('transmission', transmission);
+      if (promo) params.append('promo_applied', promo);
+      if (d4mCare) params.append('d4m_care', d4mCare);
+      if (dateStart) params.append('date_start', toRFC3339(dateStart));
+      if (dateEnd) params.append('date_end', toRFC3339(dateEnd));
       if (ratingLess3) params.append('rating_less_than_3', 'true');
+      params.append('limit', String(PAGE_SIZE));
+      params.append('offset', String(page * PAGE_SIZE));
 
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
@@ -69,75 +104,35 @@ export const TripsList: React.FC = () => {
 
       if (res.ok) {
         const data = await res.json();
-        setTrips(data || []);
+        const list: TripItem[] = data || [];
+        setTrips(list);
+        setHasMore(list.length === PAGE_SIZE);
       }
     } catch (err) {
       console.error('Failed to fetch trips', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, status, city, tripType, carType, payment, transmission, promo, d4mCare, dateStart, dateEnd, ratingLess3, page]);
 
   useEffect(() => {
     fetchTrips();
-  }, [search, status, city, tripType, carType, payment, ratingLess3]);
+  }, [fetchTrips]);
 
-  const toggleSelect = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((item) => item !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
+  // Reset to first page whenever a filter changes.
+  useEffect(() => {
+    setPage(0);
+  }, [search, status, city, tripType, carType, payment, transmission, promo, d4mCare, dateStart, dateEnd, ratingLess3]);
+
+  const handleExportAll = () => {
+    exportToCsv<TripItem>(`trips_export_${new Date().toISOString().slice(0, 10)}.csv`, CSV_COLUMNS, trips);
   };
 
-  const handleExportCSV = () => {
-    if (trips.length === 0) return;
-    const headers = ['Trip ID', 'Date', 'Rider ID', 'Driver', 'Status', 'Fare (INR)', 'Rating', 'Payment', 'Type', 'Car', 'Plate'];
-    const rows = trips.map((t) => [
-      t.id,
-      new Date(t.created_at).toLocaleString(),
-      t.customer_id,
-      t.driver_name,
-      t.status,
-      (t.base_fare_paise / 100).toFixed(2),
-      t.rating || 'N/A',
-      t.payment_method,
-      t.trip_type,
-      t.car_type,
-      t.plate,
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' 
-      + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `trips_export_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleApplyBulkTag = () => {
-    if (!bulkTagText.trim() || selectedIds.length === 0) return;
-    const newTagsMap = { ...tagsMap };
-    selectedIds.forEach((id) => {
-      const current = newTagsMap[id] || [];
-      if (!current.includes(bulkTagText.trim())) {
-        newTagsMap[id] = [...current, bulkTagText.trim()];
-      }
-    });
-    setTagsMap(newTagsMap);
-    setBulkTagText('');
-    setShowTagModal(false);
-  };
-
-  const handleBulkRefund = async () => {
+  const handleBulkCancel = async (selectedIds: string[]) => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Are you sure you want to cancel and refund ${selectedIds.length} selected trips?`)) return;
+    if (!window.confirm(`Cancel ${selectedIds.length} selected trip(s)? This frees the assigned drivers.`)) return;
 
     const role = localStorage.getItem('admin_role') || 'ADMIN';
-
     let successCount = 0;
     for (const orderId of selectedIds) {
       try {
@@ -149,36 +144,29 @@ export const TripsList: React.FC = () => {
           },
           body: JSON.stringify({ order_id: orderId }),
         });
-        if (res.ok) {
-          successCount++;
-        }
+        if (res.ok) successCount++;
       } catch (err) {
-        console.error(`Refund failed for trip ${orderId}`, err);
+        console.error(`Cancel failed for trip ${orderId}`, err);
       }
     }
-
-    alert(`Refunded/Cancelled ${successCount} of ${selectedIds.length} selected trips.`);
-    setSelectedIds([]);
+    alert(`Cancelled ${successCount} of ${selectedIds.length} selected trips.`);
     fetchTrips();
   };
 
+  const handleExportSelected = (selectedIds: string[]) => {
+    const idSet = new Set(selectedIds);
+    const rows = trips.filter((t) => idSet.has(t.id));
+    if (rows.length === 0) return;
+    exportToCsv<TripItem>(`trips_export_${new Date().toISOString().slice(0, 10)}.csv`, CSV_COLUMNS, rows);
+  };
+
+  const BULK_ACTIONS: BulkAction[] = [
+    { label: 'Export Selected', onClick: handleExportSelected },
+    { label: 'Cancel', onClick: handleBulkCancel, variant: 'destructive' },
+  ];
+
   // Column definitions for the DataTable hero component.
-  // Selection + tags columns close over component state/handlers so the
-  // bulk-action bar and tag modal keep firing exactly as before.
   const TRIP_COLUMNS: ColumnDef<TripItem>[] = [
-    {
-      key: 'select', header: '', width: 40,
-      render: (_v, trip) => (
-        <span onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            className="w-3.5 h-3.5 rounded border-background-secondary text-content-primary focus:ring-0 focus:outline-none cursor-pointer"
-            checked={selectedIds.includes(trip.id)}
-            onChange={() => toggleSelect(trip.id)}
-          />
-        </span>
-      ),
-    },
     {
       key: 'id', header: 'Trip ID',
       render: (_v, trip) => (
@@ -204,6 +192,15 @@ export const TripsList: React.FC = () => {
       ),
     },
     {
+      key: 'route', header: 'Route',
+      render: (_v, trip) => (
+        <span className="text-[10px] text-content-secondary font-mono">
+          {trip.pickup_lat.toFixed(3)}, {trip.pickup_lng.toFixed(3)}
+          <span className="block text-content-tertiary">→ {trip.dropoff_lat.toFixed(3)}, {trip.dropoff_lng.toFixed(3)}</span>
+        </span>
+      ),
+    },
+    {
       key: 'city_prefix', header: 'City & Type',
       render: (_v, trip) => (
         <span className="text-xs text-content-secondary">
@@ -215,24 +212,14 @@ export const TripsList: React.FC = () => {
     {
       key: 'status', header: 'Status',
       render: (_v, trip) => (
-        <span
-          className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider ${
-            trip.status === 'COMPLETED'
-              ? 'bg-background-secondary text-content-primary border border-background-secondary'
-              : trip.status === 'CANCELLED'
-              ? 'bg-background-secondary text-content-tertiary'
-              : 'bg-content-primary text-gray-0'
-          }`}
-        >
-          {trip.status === 'ARRIVED_AT_PICKUP' ? 'Arrived' : trip.status.toLowerCase()}
-        </span>
+        <AdminBadge label={trip.status === 'ARRIVED_AT_PICKUP' ? 'Arrived' : trip.status.replace(/_/g, ' ').toLowerCase()} />
       ),
     },
     {
       key: 'base_fare_paise', header: 'Fare',
       render: (_v, trip) => (
         <span className="font-mono text-xs text-content-primary font-semibold">
-          ₹{(trip.base_fare_paise / 100).toFixed(2)}
+          {formatPaise(trip.base_fare_paise, 2)}
         </span>
       ),
     },
@@ -256,37 +243,6 @@ export const TripsList: React.FC = () => {
         <span className="text-[10px] font-medium text-content-secondary">{trip.payment_method}</span>
       ),
     },
-    {
-      key: 'tags', header: 'Tags',
-      render: (_v, trip) => {
-        const itemTags = tagsMap[trip.id] || [];
-        return (
-          <span onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-wrap gap-1 max-w-[150px]">
-              {itemTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center bg-background-secondary border border-background-secondary text-content-tertiary text-[9px] h-4 px-1.5 rounded-pill font-mono"
-                >
-                  {tag}
-                </span>
-              ))}
-              {itemTags.length === 0 && (
-                <button
-                  onClick={() => {
-                    setSelectedIds([trip.id]);
-                    setShowTagModal(true);
-                  }}
-                  className="text-[9px] text-content-tertiary hover:text-content-primary font-mono opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
-                >
-                  + add
-                </button>
-              )}
-            </div>
-          </span>
-        );
-      },
-    },
   ];
 
   return (
@@ -296,12 +252,21 @@ export const TripsList: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-content-primary">Trips</h1>
           <p className="text-xs text-content-tertiary mt-1">Manage and audit all vehicle bookings, states, and transactions</p>
         </div>
-        <Link
-          to="/trips/new"
-          className="inline-flex items-center justify-center bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-4 hover:bg-gray-800 transition-colors"
-        >
-          + Manual Booking
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportAll}
+            disabled={trips.length === 0}
+            className="inline-flex items-center justify-center border border-background-secondary text-content-primary text-xs font-semibold rounded-pill h-9 px-4 hover:bg-background-secondary transition-colors disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+          <Link
+            to="/trips/new"
+            className="inline-flex items-center justify-center bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-4 hover:bg-gray-800 transition-colors"
+          >
+            + Manual Booking
+          </Link>
+        </div>
       </div>
 
       {/* ---- Filters ---- */}
@@ -384,6 +349,71 @@ export const TripsList: React.FC = () => {
               <option value="Premium">Premium</option>
             </select>
           </div>
+
+          {/* Transmission */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Transmission</label>
+            <select
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+              value={transmission}
+              onChange={(e) => setTransmission(e.target.value)}
+            >
+              <option value="">All</option>
+              <option value="Manual">Manual</option>
+              <option value="Automatic">Automatic</option>
+            </select>
+          </div>
+
+          {/* Promo */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Promo</label>
+            <select
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+              value={promo}
+              onChange={(e) => setPromo(e.target.value)}
+            >
+              <option value="">All Promos</option>
+              <option value="WELCOME50">WELCOME50</option>
+              <option value="SAVEMORE">SAVEMORE</option>
+              <option value="None">No Promo</option>
+            </select>
+          </div>
+
+          {/* D4M Care */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">D4M Care</label>
+            <select
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+              value={d4mCare}
+              onChange={(e) => setD4mCare(e.target.value)}
+            >
+              <option value="">Any</option>
+              <option value="true">Protected</option>
+              <option value="false">Unprotected</option>
+            </select>
+          </div>
+
+          {/* Date Start */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">From</label>
+            <input
+              type="datetime-local"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
+              value={dateStart}
+              onChange={(e) => setDateStart(e.target.value)}
+            />
+          </div>
+
+          {/* Date End */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">To</label>
+            <input
+              type="datetime-local"
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
+              value={dateEnd}
+              onChange={(e) => setDateEnd(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="flex justify-between items-center border-t border-background-secondary pt-3">
@@ -426,6 +456,11 @@ export const TripsList: React.FC = () => {
               setTripType('');
               setCarType('');
               setPayment('');
+              setTransmission('');
+              setPromo('');
+              setD4mCare('');
+              setDateStart('');
+              setDateEnd('');
               setRatingLess3(false);
             }}
             className="text-[11px] text-content-tertiary hover:text-content-primary font-medium transition-colors"
@@ -435,44 +470,13 @@ export const TripsList: React.FC = () => {
         </div>
       </div>
 
-      {/* ---- Bulk Action Bar ---- */}
-      {selectedIds.length > 0 && (
-        <div className="bg-content-primary text-gray-0 rounded-xl px-5 py-3 flex justify-between items-center animate-fade-in shadow-lg">
-          <span className="text-xs font-mono font-medium">{selectedIds.length} trips selected</span>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowTagModal(true)}
-              className="text-[11px] font-semibold bg-background-tertiary/20 hover:bg-background-tertiary/30 text-gray-0 rounded-pill h-7 px-3 transition-colors"
-            >
-              Apply Tag
-            </button>
-            <button
-              onClick={handleBulkRefund}
-              className="text-[11px] font-semibold bg-background-tertiary/20 hover:bg-background-tertiary/30 text-gray-0 rounded-pill h-7 px-3 transition-colors"
-            >
-              Refund / Cancel
-            </button>
-            <button
-              onClick={handleExportCSV}
-              className="text-[11px] font-semibold bg-gray-0 text-content-primary hover:bg-background-tertiary rounded-pill h-7 px-3 transition-colors"
-            >
-              Export Selected CSV
-            </button>
-            <button
-              onClick={() => setSelectedIds([])}
-              className="text-[11px] text-gray-0/60 hover:text-gray-0 px-2 font-medium"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ---- Trips Table (DataTable hero component) ---- */}
       <DataTable<TripItem>
         columns={TRIP_COLUMNS}
         data={trips}
         loading={loading}
+        selectable
+        bulkActions={BULK_ACTIONS}
         rowKey={(t) => t.id}
         onRowClick={(t) => navigate(`/trips/${t.id}`)}
         emptyState={
@@ -483,42 +487,28 @@ export const TripsList: React.FC = () => {
         }
       />
 
-      {/* ---- Tag Modal ---- */}
-      {showTagModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
-            <div>
-              <h3 className="text-sm font-bold text-content-primary">Apply Tag to Trips</h3>
-              <p className="text-xs text-content-tertiary mt-1">Specify a classification tag for the {selectedIds.length} selected orders</p>
-            </div>
-            <input
-              type="text"
-              placeholder="e.g. HIGH_FARE, ESCALATION, FRAUD"
-              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono uppercase"
-              value={bulkTagText}
-              onChange={(e) => setBulkTagText(e.target.value.toUpperCase())}
-            />
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  setShowTagModal(false);
-                  setBulkTagText('');
-                }}
-                className="text-xs text-content-secondary hover:text-content-primary px-3"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleApplyBulkTag}
-                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
-                disabled={!bulkTagText.trim()}
-              >
-                Apply Tag
-              </button>
-            </div>
-          </div>
+      {/* ---- Pagination ---- */}
+      <div className="flex justify-between items-center">
+        <span className="text-[11px] text-content-tertiary font-mono">
+          Page {page + 1} · showing {trips.length} trip{trips.length === 1 ? '' : 's'}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || loading}
+            className="text-[11px] font-semibold border border-background-secondary text-content-primary rounded-pill h-8 px-4 hover:bg-background-secondary transition-colors disabled:opacity-40"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!hasMore || loading}
+            className="text-[11px] font-semibold border border-background-secondary text-content-primary rounded-pill h-8 px-4 hover:bg-background-secondary transition-colors disabled:opacity-40"
+          >
+            Next →
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

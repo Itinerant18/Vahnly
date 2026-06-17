@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
@@ -25,6 +25,40 @@ interface CMSAsset {
 }
 
 const LANGUAGES = ['en', 'hi', 'bn', 'ta', 'te', 'mr'];
+
+// Minimal Markdown → HTML renderer (headings, bold, italic, links, lists, code).
+// Escapes HTML first so user content can't inject markup, then applies inline rules.
+const renderMarkdown = (md: string): string => {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (s: string) => esc(s)
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" class="text-accent underline" target="_blank" rel="noreferrer">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+    .replace(/`([^`]+)`/g, '<code class="bg-background-secondary px-1 rounded font-mono text-[12px]">$1</code>');
+  const lines = md.split('\n');
+  const html: string[] = [];
+  let inList = false;
+  const closeList = () => { if (inList) { html.push('</ul>'); inList = false; } };
+  for (const line of lines) {
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) {
+      closeList();
+      const lvl = h[1].length;
+      const size = lvl === 1 ? 'text-lg font-bold' : lvl === 2 ? 'text-base font-bold' : 'text-sm font-semibold';
+      html.push(`<h${lvl} class="${size} text-content-primary mt-3 mb-1">${inline(h[2])}</h${lvl}>`);
+    } else if (/^\s*[-*]\s+/.test(line)) {
+      if (!inList) { html.push('<ul class="list-disc pl-5 space-y-0.5">'); inList = true; }
+      html.push(`<li>${inline(line.replace(/^\s*[-*]\s+/, ''))}</li>`);
+    } else if (line.trim() === '') {
+      closeList();
+    } else {
+      closeList();
+      html.push(`<p class="my-1">${inline(line)}</p>`);
+    }
+  }
+  closeList();
+  return html.join('');
+};
 const PAGE_TYPE_ICONS: Record<string, string> = {
   POLICY: '📜', FAQ: '❓', HELP_ARTICLE: '💡', ONBOARDING: '👋', BANNER: '📢', SPLASH: '🎨',
 };
@@ -106,9 +140,11 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
   const [editBody, setEditBody] = useState('');
   const [history, setHistory] = useState<ContentVersion[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/cms`;
 
@@ -150,6 +186,47 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
     if (!selected) return;
     const res = await fetch(`${base}/pages/${selected.id}/publish`, { method: 'POST', headers });
     if (res.ok) { setMsg('Published ✓'); fetchPages(); openPage({ ...selected, status: 'PUBLISHED' }); }
+  };
+
+  const restoreVersion = async (v: ContentVersion) => {
+    if (!selected) return;
+    if (!confirm(`Restore version v${v.version}? This saves it as the new current version.`)) return;
+    setSaving(true);
+    const res = await fetch(`${base}/pages/${selected.id}/content`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ language_code: activeLang, content_body: v.content_body }),
+    });
+    if (res.ok) {
+      setEditBody(v.content_body);
+      setMsg(`Restored v${v.version} ✓`);
+      setShowHistory(false);
+      openPage(selected);
+    } else setMsg('Error restoring');
+    setSaving(false);
+  };
+
+  // Wrap or insert markdown around the current textarea selection (toolbar buttons).
+  const applyMarkdown = (kind: 'bold' | 'italic' | 'heading' | 'link') => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const sel = editBody.slice(start, end);
+    let inserted: string;
+    let caretOffset = 0;
+    switch (kind) {
+      case 'bold': inserted = `**${sel || 'bold text'}**`; caretOffset = 2; break;
+      case 'italic': inserted = `*${sel || 'italic text'}*`; caretOffset = 1; break;
+      case 'heading': inserted = `## ${sel || 'Heading'}`; caretOffset = 3; break;
+      case 'link': inserted = `[${sel || 'link text'}](https://)`; caretOffset = 1; break;
+    }
+    const next = editBody.slice(0, start) + inserted + editBody.slice(end);
+    setEditBody(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = sel ? start + inserted.length : start + caretOffset;
+      ta.setSelectionRange(pos, sel ? pos : pos + (sel ? 0 : (inserted.length - caretOffset * 2)));
+    });
   };
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
@@ -229,13 +306,41 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                 ))}
               </div>
 
-              <textarea
-                value={editBody}
-                onChange={e => setEditBody(e.target.value)}
-                rows={16}
-                placeholder="Enter markdown content…"
-                className="w-full border border-background-secondary rounded-lg px-3 py-2.5 text-sm font-mono bg-background-primary text-content-primary resize-y focus:outline-none focus:ring-1 focus:ring-accent"
-              />
+              {/* Markdown toolbar */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <button type="button" onClick={() => applyMarkdown('bold')}
+                  className="text-xs font-bold border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary" title="Bold">B</button>
+                <button type="button" onClick={() => applyMarkdown('italic')}
+                  className="text-xs italic border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary" title="Italic">I</button>
+                <button type="button" onClick={() => applyMarkdown('heading')}
+                  className="text-xs font-semibold border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary" title="Heading">H</button>
+                <button type="button" onClick={() => applyMarkdown('link')}
+                  className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary" title="Link">🔗 Link</button>
+                <button type="button" onClick={() => setShowPreview(p => !p)}
+                  className="ml-auto text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">
+                  {showPreview ? 'Hide Preview' : 'Show Preview'}
+                </button>
+              </div>
+
+              {/* Editor + live preview */}
+              <div className={`grid gap-3 ${showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                <textarea
+                  ref={textareaRef}
+                  value={editBody}
+                  onChange={e => setEditBody(e.target.value)}
+                  rows={16}
+                  placeholder="Enter markdown content…"
+                  className="w-full border border-background-secondary rounded-lg px-3 py-2.5 text-sm font-mono bg-background-primary text-content-primary resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                {showPreview && (
+                  <div className="border border-background-secondary rounded-lg px-3 py-2.5 text-sm bg-background-secondary/20 text-content-primary overflow-auto"
+                    style={{ minHeight: '12rem' }}>
+                    {editBody.trim()
+                      ? <div dangerouslySetInnerHTML={{ __html: renderMarkdown(editBody) }} />
+                      : <span className="text-content-tertiary text-xs">Preview appears here…</span>}
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center gap-3">
                 <button onClick={saveContent} disabled={saving}
@@ -258,7 +363,15 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
                         {v.is_current && <span className="ml-2 bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded">current</span>}
                         <span className="ml-2 text-xs text-content-tertiary">{v.created_by_email}</span>
                       </div>
-                      <div className="text-xs text-content-tertiary">{new Date(v.created_at).toLocaleDateString('en-IN')}</div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-content-tertiary">{new Date(v.created_at).toLocaleDateString('en-IN')}</span>
+                        {!v.is_current && (
+                          <button onClick={() => restoreVersion(v)} disabled={saving}
+                            className="text-xs text-accent hover:underline disabled:opacity-50">
+                            Restore
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -272,25 +385,31 @@ const PagesTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) =>
 };
 
 // ── i18n Tab ─────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 100;
+
 const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => {
   const [strings, setStrings] = useState<I18NString[]>([]);
   const [total, setTotal] = useState(0);
   const [ns, setNs] = useState('');
   const [lang, setLang] = useState('');
   const [search, setSearch] = useState('');
+  const [offset, setOffset] = useState(0);
   const [editing, setEditing] = useState<Partial<I18NString> | null>(null);
   const [saving, setSaving] = useState(false);
 
   const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/cms`;
 
   const fetchStrings = useCallback(async () => {
-    const p = new URLSearchParams({ limit: '100' });
+    const p = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
     if (ns) p.set('namespace', ns);
     if (lang) p.set('language', lang);
     if (search) p.set('search', search);
     const res = await fetch(`${base}/i18n?${p}`, { headers });
     if (res.ok) { const d = await res.json(); setStrings(d.strings || []); setTotal(d.total || 0); }
-  }, [ns, lang, search]);
+  }, [ns, lang, search, offset]);
+
+  // Reset to first page whenever filters change.
+  useEffect(() => { setOffset(0); }, [ns, lang, search]);
 
   const save = async () => {
     if (!editing) return;
@@ -319,7 +438,9 @@ const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => 
         </select>
         <input type="text" placeholder="Search key or value…" value={search} onChange={e => setSearch(e.target.value)}
           className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-48 focus:outline-none focus:ring-1 focus:ring-accent" />
-        <span className="ml-auto text-xs text-content-tertiary">{total} strings</span>
+        <span className="ml-auto text-xs text-content-tertiary">
+          {total > 0 ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} of ${total}` : '0'} strings
+        </span>
         <button onClick={() => setEditing({ namespace: 'common', language_code: 'en', key_name: '', value: '', description: '' })}
           className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">
           + Add String
@@ -390,6 +511,27 @@ const I18NTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => 
         rowKey={(s) => String(s.id)}
         emptyState={<span className="text-paragraph-small text-content-tertiary">No strings found.</span>}
       />
+
+      {/* Pagination */}
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          <button
+            onClick={() => setOffset(o => Math.max(0, o - PAGE_SIZE))}
+            disabled={offset === 0}
+            className="px-3 py-1.5 border border-background-secondary rounded-lg text-content-secondary hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed">
+            ← Prev
+          </button>
+          <span className="text-content-tertiary">
+            Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+          </span>
+          <button
+            onClick={() => setOffset(o => o + PAGE_SIZE)}
+            disabled={offset + PAGE_SIZE >= total}
+            className="px-3 py-1.5 border border-background-secondary rounded-lg text-content-secondary hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed">
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 };

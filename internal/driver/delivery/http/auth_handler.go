@@ -2,12 +2,16 @@ package http
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -34,6 +38,7 @@ type DriverRegisterRequest struct {
 	Email        string `json:"email"`
 	Password     string `json:"password"`
 	CityPrefix   string `json:"city_prefix"`
+	PhoneToken   string `json:"phone_token,omitempty"`
 }
 
 type DriverAuthResponse struct {
@@ -44,6 +49,8 @@ type DriverAuthResponse struct {
 	VerificationStatus string    `json:"verification_status"`
 	OnboardingStep     int       `json:"onboarding_step"`
 	Name               string    `json:"name"`
+	PhoneVerified      bool      `json:"phone_verified"`
+	Phone              string    `json:"phone"`
 }
 
 type DriverAuthHandler struct {
@@ -132,13 +139,29 @@ func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if req.Phone == "" || req.Password == "" || req.Name == "" || req.CityPrefix == "" {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
+	if req.PhoneToken == "" {
+		http.Error(w, "Phone verification is required to complete registration", http.StatusBadRequest)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	// Verify phone token JWT
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(req.PhoneToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return h.jwtSecret, nil
+	})
+	if err != nil || !token.Valid || claims["purpose"] != "registration_phone" {
+		http.Error(w, "Invalid or expired phone verification token", http.StatusUnauthorized)
+		return
+	}
+	verifiedPhone := claims["sub"].(string)
+
+	if normalizePhone(req.Phone) != normalizePhone(verifiedPhone) {
+		http.Error(w, "Phone number mismatch between verification and registration", http.StatusBadRequest)
+		return
+	}
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -149,8 +172,8 @@ func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.
 
 	var newDriverID string
 	query := `
-		INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, onboarding_step, verification_status)
-		VALUES ($1, $2, $3, $4, $5, 'OFFLINE', false, 1, 'ONBOARDING')
+		INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, onboarding_step, verification_status, phone_verified)
+		VALUES ($1, $2, $3, $4, $5, 'OFFLINE', false, 1, 'ONBOARDING', true)
 		RETURNING id
 	`
 
@@ -220,18 +243,20 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 
 	var dbDriverID string
 	var dbName string
+	var dbPhone string
 	var dbPasswordHash string
 	var dbCityPrefix string
 	var dbVerificationStatus string
 	var dbOnboardingStep int
+	var dbPhoneVerified bool
 
 	query := `
-		SELECT id, name, password_hash, city_prefix, verification_status, onboarding_step
+		SELECT id, name, phone, password_hash, city_prefix, verification_status, onboarding_step, phone_verified
 		FROM drivers
 		WHERE phone = $1
 	`
 	err := h.dbPool.QueryRow(ctx, query, req.Phone).Scan(
-		&dbDriverID, &dbName, &dbPasswordHash, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep,
+		&dbDriverID, &dbName, &dbPhone, &dbPasswordHash, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep, &dbPhoneVerified,
 	)
 
 	if err != nil {
@@ -298,6 +323,8 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 		VerificationStatus: dbVerificationStatus,
 		OnboardingStep:     dbOnboardingStep,
 		Name:               dbName,
+		PhoneVerified:      dbPhoneVerified,
+		Phone:              dbPhone,
 	})
 }
 
@@ -309,6 +336,7 @@ type DriverGoogleLoginRequest struct {
 	Phone       string `json:"phone,omitempty"`
 	CityPrefix  string `json:"city_prefix,omitempty"`
 	Name        string `json:"name,omitempty"`
+	PhoneToken  string `json:"phone_token,omitempty"`
 }
 
 func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -379,17 +407,19 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 
 	var dbDriverID string
 	var dbName string
+	var dbPhone string
 	var dbCityPrefix string
 	var dbVerificationStatus string
 	var dbOnboardingStep int
+	var dbPhoneVerified bool
 
 	query := `
-		SELECT id, name, city_prefix, verification_status, onboarding_step
+		SELECT id, name, phone, city_prefix, verification_status, onboarding_step, phone_verified
 		FROM drivers
 		WHERE email = $1
 	`
 	err = h.dbPool.QueryRow(ctx, query, googleClaims.Email).Scan(
-		&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep,
+		&dbDriverID, &dbName, &dbPhone, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep, &dbPhoneVerified,
 	)
 
 	ip := getClientIP(r)
@@ -413,6 +443,27 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 				return
 			}
 
+			if req.PhoneToken == "" {
+				http.Error(w, "Phone verification is required to complete Google registration", http.StatusBadRequest)
+				return
+			}
+
+			// Verify phone token JWT
+			claims := jwt.MapClaims{}
+			token, err := jwt.ParseWithClaims(req.PhoneToken, claims, func(t *jwt.Token) (interface{}, error) {
+				return h.jwtSecret, nil
+			})
+			if err != nil || !token.Valid || claims["purpose"] != "registration_phone" {
+				http.Error(w, "Invalid or expired phone verification token", http.StatusUnauthorized)
+				return
+			}
+			verifiedPhone := claims["sub"].(string)
+
+			if normalizePhone(req.Phone) != normalizePhone(verifiedPhone) {
+				http.Error(w, "Phone number mismatch between verification and registration", http.StatusBadRequest)
+				return
+			}
+
 			// Perform registration
 			// Generate dummy password hash for Google login user
 			dummyPwd := "oauth-google-" + googleClaims.Sub
@@ -431,12 +482,12 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 			}
 
 			insertQuery := `
-				INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, onboarding_step, verification_status)
-				VALUES ($1, $2, $3, $4, $5, 'OFFLINE', false, 1, 'ONBOARDING')
-				RETURNING id, name, city_prefix, verification_status, onboarding_step
+				INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, onboarding_step, verification_status, phone_verified)
+				VALUES ($1, $2, $3, $4, $5, 'OFFLINE', false, 1, 'ONBOARDING', true)
+				RETURNING id, name, phone, city_prefix, verification_status, onboarding_step, phone_verified
 			`
-			err = h.dbPool.QueryRow(ctx, insertQuery, regName, req.Phone, googleClaims.Email, string(hashedPassword), req.CityPrefix).Scan(
-				&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep,
+			err = h.dbPool.QueryRow(ctx, insertQuery, regName, verifiedPhone, googleClaims.Email, string(hashedPassword), req.CityPrefix).Scan(
+				&dbDriverID, &dbName, &dbPhone, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep, &dbPhoneVerified,
 			)
 			if err != nil {
 				http.Error(w, "Driver Google registration failed, phone might be already registered", http.StatusConflict)
@@ -496,6 +547,243 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 		VerificationStatus: dbVerificationStatus,
 		OnboardingStep:     dbOnboardingStep,
 		Name:               dbName,
+		PhoneVerified:      dbPhoneVerified,
+		Phone:              dbPhone,
+	})
+}
+
+// India phone regex
+var indiaPhoneRe = regexp.MustCompile(`^\+91[6-9]\d{9}$`)
+
+// normalizePhone trims spaces and prefixes a bare 10-digit Indian number with +91.
+func normalizePhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if matched, _ := regexp.MatchString(`^[6-9]\d{9}$`, phone); matched {
+		return "+91" + phone
+	}
+	phone = strings.ReplaceAll(phone, " ", "")
+	phone = strings.ReplaceAll(phone, "-", "")
+	return phone
+}
+
+// generateOTP returns a cryptographically-random 6-digit numeric OTP.
+func generateOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+// HandleSendOTP generates and dispatches a login/verification OTP
+func (h *DriverAuthHandler) HandleSendOTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	phone := normalizePhone(req.Phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		http.Error(w, "Invalid phone number: must be a 10-digit Indian mobile number", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Rate limiting: max 5 requests per phone per hour
+	if h.redis != nil {
+		key := "driver:otp:rate:" + phone
+		n, err := h.redis.Incr(ctx, key).Result()
+		if err == nil {
+			if n == 1 {
+				_ = h.redis.Expire(ctx, key, time.Hour).Err()
+			}
+			if n > 5 {
+				http.Error(w, "OTP request rate limit exceeded. Try again in an hour.", http.StatusTooManyRequests)
+				return
+			}
+		}
+	}
+
+	otp, err := generateOTP()
+	if err != nil {
+		http.Error(w, "Failed to generate OTP", http.StatusInternalServerError)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(otp), 10)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(5 * time.Minute)
+	_, err = h.dbPool.Exec(ctx, `
+		INSERT INTO driver_otp_sessions (phone, otp_hash, purpose, expires_at)
+		VALUES ($1, $2, 'LOGIN', $3)`, phone, string(hash), expiresAt)
+	if err != nil {
+		http.Error(w, "Failed to store OTP session", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[DRIVER_SMS] OTP for %s is %s", phone, otp)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":            "OTP sent successfully",
+		"expires_in_seconds": 300,
+	})
+}
+
+// HandleVerifyOTP verifies driver OTP and returns session JWT (if registered) or phone_token (if unregistered)
+func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Phone string `json:"phone"`
+		OTP   string `json:"otp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	phone := normalizePhone(req.Phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		http.Error(w, "Invalid phone number", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var sessionID string
+	var otpHash string
+	var attempts int
+	var maxAttempts int
+
+	querySession := `
+		SELECT id, otp_hash, attempts, max_attempts
+		FROM driver_otp_sessions
+		WHERE phone = $1 AND purpose = 'LOGIN' AND used_at IS NULL AND expires_at > now()
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	err := h.dbPool.QueryRow(ctx, querySession, phone).Scan(&sessionID, &otpHash, &attempts, &maxAttempts)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "No active OTP session found or OTP expired", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	if attempts >= maxAttempts {
+		http.Error(w, "Too many verification attempts; request a new OTP", http.StatusUnauthorized)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(otpHash), []byte(req.OTP)); err != nil {
+		_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET attempts = attempts + 1 WHERE id = $1::uuid", sessionID)
+		http.Error(w, "Incorrect OTP", http.StatusUnauthorized)
+		return
+	}
+
+	_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET used_at = now() WHERE id = $1::uuid", sessionID)
+
+	// Check if driver exists
+	var dbDriverID string
+	var dbName string
+	var dbCityPrefix string
+	var dbVerificationStatus string
+	var dbOnboardingStep int
+
+	queryDriver := `
+		SELECT id, name, city_prefix, verification_status, onboarding_step
+		FROM drivers
+		WHERE phone = $1
+	`
+	err = h.dbPool.QueryRow(ctx, queryDriver, phone).Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Driver does not exist yet. Issue a short-lived signed registration phone_token
+			phoneTokenClaims := jwt.MapClaims{
+				"sub":     phone,
+				"exp":     time.Now().Add(15 * time.Minute).Unix(),
+				"purpose": "registration_phone",
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, phoneTokenClaims)
+			phoneTokenString, tErr := token.SignedString(h.jwtSecret)
+			if tErr != nil {
+				http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"is_new_driver": true,
+				"phone_token":   phoneTokenString,
+				"phone":         phone,
+			})
+			return
+		}
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Driver exists, verify their phone and log them in
+	_, _ = h.dbPool.Exec(ctx, "UPDATE drivers SET phone_verified = true, last_login_at = now() WHERE id = $1::uuid", dbDriverID)
+
+	// Issue JWT
+	expirationTime := time.Now().Add(7 * 24 * time.Hour)
+	jti := uuid.NewString()
+	claims := &middleware.CustomClaims{
+		UserID:    dbDriverID,
+		Role:      "DRIVER",
+		CityScope: dbCityPrefix,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
+			Subject:   dbDriverID,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "vahnly-driver-auth",
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.jwtSecret)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	if h.redis != nil {
+		_ = h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
+		Token:              tokenString,
+		ExpiresAt:          expirationTime,
+		Role:               "DRIVER",
+		DriverID:           dbDriverID,
+		VerificationStatus: dbVerificationStatus,
+		OnboardingStep:     dbOnboardingStep,
+		Name:               dbName,
+		PhoneVerified:      true,
+		Phone:              phone,
 	})
 }
 

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { AdminBadge } from '../../components/ds/AdminBadge';
+import { OdometerVerificationPanel } from '../components/OdometerVerificationPanel';
 
 interface GpsPoint {
   lat: number;
@@ -77,11 +79,26 @@ interface ComplaintItem {
   agent: string;
 }
 
-interface AuditLogItem {
-  timestamp: string;
-  action: string;
-  actor: string;
-  details: string;
+// Forensic audit trail (GET /admin/orders/{id}/forensic-audit).
+interface ForensicAudit {
+  order_id: string;
+  driver_id: string;
+  offer_timestamps: Record<string, unknown>;
+  odometer_inputs: Record<string, unknown>;
+  route_metrics: Record<string, unknown>;
+  hardware_state: Record<string, unknown>;
+  final_invoice: Record<string, unknown>;
+  captured_at: string;
+}
+
+// Driver pool entry (GET /admin/drivers).
+interface DriverPoolItem {
+  driver_id: string;
+  name: string;
+  phone: string;
+  city_prefix: string;
+  status: string;
+  [key: string]: unknown;
 }
 
 interface TripDetailResponse {
@@ -117,24 +134,55 @@ interface TripDetailResponse {
   fare_breakdown: FareBreakdown;
   payment_attempts: PaymentAttempt[];
   issues: ComplaintItem[];
-  audit_logs: AuditLogItem[];
 }
+
+// Destructive-action descriptors, fed into the shared confirm modal.
+type ConfirmAction = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive: boolean;
+  requireReason: boolean;
+  run: (reason: string) => Promise<boolean>;
+};
 
 export const TripDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<TripDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [gpsTrail, setGpsTrail] = useState<GpsPoint[]>([]);
+
+  // Toast (lightweight, inline — no shared admin toast exists).
+  const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const showToast = useCallback((text: string, kind: 'ok' | 'err' = 'ok') => {
+    setToast({ text, kind });
+    window.setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // Confirm modal state (reason input + loading).
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [confirmReason, setConfirmReason] = useState<string>('');
+
+  // Reassign picker.
   const [showReassignModal, setShowReassignModal] = useState<boolean>(false);
   const [reassignDriverId, setReassignDriverId] = useState<string>('');
+  const [driverPool, setDriverPool] = useState<DriverPoolItem[]>([]);
+  const [poolLoading, setPoolLoading] = useState<boolean>(false);
+
+  // Adjustment console.
   const [adjustmentAmt, setAdjustmentAmt] = useState<string>('');
   const [adjustmentType, setAdjustmentType] = useState<string>('refund');
   const [adjustmentReason, setAdjustmentReason] = useState<string>('');
-  const [gpsTrail, setGpsTrail] = useState<GpsPoint[]>([]);
+
+  // Forensic audit.
+  const [audit, setAudit] = useState<ForensicAudit | null>(null);
+  const [auditLoading, setAuditLoading] = useState<boolean>(true);
+
+  const role = () => localStorage.getItem('admin_role') || 'ADMIN';
 
   useEffect(() => {
-    const role = localStorage.getItem('admin_role') || 'ADMIN';
-    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/gps-trail`, { headers: { 'X-Admin-Role': role } })
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/gps-trail`, { headers: { 'X-Admin-Role': role() } })
       .then((r) => (r.ok ? r.json() : { trail: [] }))
       .then((d) => setGpsTrail(d.trail || []))
       .catch(() => setGpsTrail([]));
@@ -152,15 +200,11 @@ export const TripDetail: React.FC = () => {
     return { trailPos, pickup, drop, center, hasGeo: Boolean(pickup || trailPos.length) };
   }, [data, gpsTrail]);
 
-  const fetchTripDetail = async () => {
+  const fetchTripDetail = useCallback(async () => {
     setLoading(true);
     try {
-      const role = localStorage.getItem('admin_role') || 'ADMIN';
-
       const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}`, {
-        headers: {
-          'X-Admin-Role': role,
-        },
+        headers: { 'X-Admin-Role': role() },
       });
       if (res.ok) {
         const payload = await res.json();
@@ -171,71 +215,155 @@ export const TripDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchTripDetail();
+  }, [fetchTripDetail]);
+
+  // Forensic audit tab.
+  useEffect(() => {
+    setAuditLoading(true);
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/forensic-audit`, { headers: { 'X-Admin-Role': role() } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAudit(d))
+      .catch(() => setAudit(null))
+      .finally(() => setAuditLoading(false));
   }, [id]);
 
-  const handleAdminAction = async (actionPath: string, payload?: any) => {
+  // Generic per-id POST action helper. Returns whether it succeeded.
+  const postAction = useCallback(async (actionPath: string, payload?: Record<string, unknown>): Promise<boolean> => {
+    const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/${actionPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role() },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    if (!res.ok) {
+      const errMsg = await res.text();
+      throw new Error(errMsg || `Action '${actionPath}' failed`);
+    }
+    return true;
+  }, [id]);
+
+  // Cancel uses the collection route POST /admin/orders/cancel with body { order_id }.
+  const cancelOrder = useCallback(async (): Promise<boolean> => {
+    const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role() },
+      body: JSON.stringify({ order_id: id }),
+    });
+    if (!res.ok) {
+      const errMsg = await res.text();
+      throw new Error(errMsg || 'Cancellation failed');
+    }
+    return true;
+  }, [id]);
+
+  // Open the shared confirm modal for a destructive action.
+  const openConfirm = (action: ConfirmAction) => {
+    setConfirmReason('');
+    setConfirmAction(action);
+  };
+
+  const runConfirm = async () => {
+    if (!confirmAction) return;
+    if (confirmAction.requireReason && !confirmReason.trim()) {
+      showToast('A reason is required.', 'err');
+      return;
+    }
     setActionLoading(true);
     try {
-      const role = localStorage.getItem('admin_role') || 'ADMIN';
-
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/${actionPath}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Role': role,
-        },
-        body: payload ? JSON.stringify(payload) : undefined,
-      });
-
-      if (res.ok) {
-        alert(`Action '${actionPath}' executed successfully.`);
-        fetchTripDetail();
-      } else {
-        const errMsg = await res.text();
-        alert(`Action failed: ${errMsg}`);
-      }
+      await confirmAction.run(confirmReason.trim());
+      showToast(`${confirmAction.title} completed.`, 'ok');
+      setConfirmAction(null);
+      setConfirmReason('');
+      await fetchTripDetail();
     } catch (err) {
-      console.error(err);
-      alert('Network request execution failure.');
+      showToast(err instanceof Error ? err.message : 'Action failed.', 'err');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleReassignDriver = () => {
-    if (!reassignDriverId.trim()) return;
-    handleAdminAction('reassign', { driver_id: reassignDriverId });
-    setShowReassignModal(false);
-    setReassignDriverId('');
-  };
-
   const ADJUSTMENT_TYPE_MAP: Record<string, string> = {
     refund: 'PARTIAL_REFUND',
+    full_refund: 'FULL_REFUND',
     waive: 'WAIVE_FEE',
     bonus: 'ADD_BONUS',
   };
 
-  const handleApplyAdjustment = async () => {
+  // Fare adjustment routes through the same confirm modal (reason + loading + toast + refresh).
+  const requestAdjustment = () => {
+    const isFullRefund = adjustmentType === 'full_refund';
     const amt = Number(adjustmentAmt);
-    if (!adjustmentAmt.trim() || isNaN(amt) || amt <= 0) {
-      alert('Please enter a valid positive amount.');
+    if (!isFullRefund && (!adjustmentAmt.trim() || isNaN(amt) || amt <= 0)) {
+      showToast('Enter a valid positive amount.', 'err');
       return;
     }
     if (!adjustmentReason.trim()) {
-      alert('A reason is required for any fare adjustment.');
+      showToast('A reason is required for any fare adjustment.', 'err');
       return;
     }
-    await handleAdminAction('adjust', {
-      adjustment_type: ADJUSTMENT_TYPE_MAP[adjustmentType],
-      amount_paise: Math.round(amt * 100),
-      reason: adjustmentReason,
+    const total = data?.fare_breakdown.total ?? 0;
+    const amountPaise = isFullRefund ? Math.round(total * 100) : Math.round(amt * 100);
+    openConfirm({
+      title: 'Fare adjustment',
+      description: `Apply ${ADJUSTMENT_TYPE_MAP[adjustmentType]} of ₹${(amountPaise / 100).toFixed(2)} to this order? This posts an audited ledger entry.`,
+      confirmLabel: 'Apply Adjustment',
+      destructive: true,
+      requireReason: false,
+      run: async () => {
+        await postAction('adjust', {
+          adjustment_type: ADJUSTMENT_TYPE_MAP[adjustmentType],
+          amount_paise: amountPaise,
+          reason: adjustmentReason.trim(),
+        });
+        setAdjustmentAmt('');
+        setAdjustmentReason('');
+        return true;
+      },
     });
-    setAdjustmentAmt('');
-    setAdjustmentReason('');
+  };
+
+  // Reassign driver picker: load the live driver pool from GET /admin/drivers.
+  const openReassign = () => {
+    setReassignDriverId('');
+    setShowReassignModal(true);
+    setPoolLoading(true);
+    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers?status=ACTIVE`, { headers: { 'X-Admin-Role': role() } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: DriverPoolItem[]) => setDriverPool(d || []))
+      .catch(() => setDriverPool([]))
+      .finally(() => setPoolLoading(false));
+  };
+
+  const handleReassignDriver = async () => {
+    if (!reassignDriverId) return;
+    setActionLoading(true);
+    try {
+      await postAction('reassign', { driver_id: reassignDriverId });
+      showToast('Driver reassigned.', 'ok');
+      setShowReassignModal(false);
+      setReassignDriverId('');
+      await fetchTripDetail();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Reassign failed.', 'err');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Non-destructive Send Invoice keeps a plain click + toast.
+  const handleSendInvoice = async () => {
+    setActionLoading(true);
+    try {
+      await postAction('send-invoice');
+      showToast('Invoice queued for transmission.', 'ok');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Send invoice failed.', 'err');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   if (loading) {
@@ -256,7 +384,7 @@ export const TripDetail: React.FC = () => {
     );
   }
 
-  const { trip, timeline, polyline: _polyline, rider, driver, vehicle, fare_breakdown, payment_attempts, issues, audit_logs } = data;
+  const { trip, timeline, polyline: _polyline, rider, driver, vehicle, fare_breakdown, payment_attempts, issues } = data;
 
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6">
@@ -272,49 +400,70 @@ export const TripDetail: React.FC = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => handleAdminAction('reopen')}
-            disabled={actionLoading || trip.status !== 'CANCELLED' && trip.status !== 'COMPLETED'}
+            onClick={() => openConfirm({
+              title: 'Reopen trip',
+              description: 'Reopen this trip? It returns to CREATED and the driver is unassigned.',
+              confirmLabel: 'Reopen Trip',
+              destructive: false,
+              requireReason: false,
+              run: () => postAction('reopen'),
+            })}
+            disabled={actionLoading || (trip.status !== 'CANCELLED' && trip.status !== 'COMPLETED')}
             className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Reopen Trip
           </button>
           <button
-            onClick={() => setShowReassignModal(true)}
+            onClick={openReassign}
             disabled={actionLoading || trip.status === 'COMPLETED' || trip.status === 'CANCELLED'}
             className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Reassign Driver
           </button>
           <button
-            onClick={() => handleAdminAction('send-invoice')}
+            onClick={handleSendInvoice}
             disabled={actionLoading}
             className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Send Invoice
           </button>
           <button
-            onClick={() => handleAdminAction('fraud')}
+            onClick={() => openConfirm({
+              title: 'Mark fraudulent',
+              description: 'Mark this trip as fraudulent? It cancels the order and suspends the assigned driver.',
+              confirmLabel: 'Mark Fraudulent',
+              destructive: true,
+              requireReason: true,
+              run: () => postAction('fraud'),
+            })}
             disabled={actionLoading || trip.status === 'CANCELLED'}
             className="text-[11px] font-semibold bg-background-secondary hover:bg-background-tertiary text-content-primary rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
             Mark Fraudulent
           </button>
           <button
-            onClick={() => handleAdminAction('cancel')}
+            onClick={() => openConfirm({
+              title: 'Cancel trip',
+              description: 'Cancel this trip? This frees the assigned driver. The rider may need a manual refund.',
+              confirmLabel: 'Cancel Trip',
+              destructive: true,
+              requireReason: true,
+              run: () => cancelOrder(),
+            })}
             disabled={actionLoading || trip.status === 'CANCELLED'}
             className="text-[11px] font-semibold bg-content-primary hover:bg-gray-800 text-gray-0 rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
           >
-            Cancel & Refund
+            Cancel Trip
           </button>
         </div>
       </div>
 
       {/* ---- Split Layout ---- */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        
+
         {/* Left Side (3/5 width) */}
         <div className="lg:col-span-3 space-y-6">
-          
+
           {/* Map Vector Polyline */}
           <div className="bg-background-primary rounded-xl border border-background-secondary overflow-hidden">
             <div className="border-b border-background-secondary px-4 py-3 flex justify-between items-center">
@@ -477,6 +626,9 @@ export const TripDetail: React.FC = () => {
                 <span className="block text-xs font-bold text-content-primary mt-0.5">{vehicle.transmission}</span>
               </div>
             </div>
+
+            {/* Odometer / mileage forensic audit (was orphaned). */}
+            {id && <OdometerVerificationPanel orderId={id} />}
           </div>
 
         </div>
@@ -500,6 +652,12 @@ export const TripDetail: React.FC = () => {
                 <span className="text-content-secondary">Time Fare</span>
                 <span className="font-mono text-content-primary">₹{fare_breakdown.time.toFixed(2)}</span>
               </div>
+              {fare_breakdown.night > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-content-secondary">Night Charge</span>
+                  <span className="font-mono text-content-primary">₹{fare_breakdown.night.toFixed(2)}</span>
+                </div>
+              )}
               {fare_breakdown.surge > 0 && (
                 <div className="flex justify-between">
                   <span className="text-content-secondary">Surge Multiplier (x{trip.surge_multiplier})</span>
@@ -535,18 +693,26 @@ export const TripDetail: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Adjustment Type</label>
-                <div className="flex space-x-1 bg-background-secondary p-0.5 rounded-pill border border-background-secondary">
+                <div className="grid grid-cols-2 gap-1 bg-background-secondary p-0.5 rounded-pill border border-background-secondary">
                   <button
                     onClick={() => setAdjustmentType('refund')}
-                    className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
+                    className={`text-[10px] font-semibold h-7 rounded-pill transition-colors ${
                       adjustmentType === 'refund' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
-                    Refund
+                    Partial Refund
+                  </button>
+                  <button
+                    onClick={() => setAdjustmentType('full_refund')}
+                    className={`text-[10px] font-semibold h-7 rounded-pill transition-colors ${
+                      adjustmentType === 'full_refund' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
+                    }`}
+                  >
+                    Full Refund
                   </button>
                   <button
                     onClick={() => setAdjustmentType('waive')}
-                    className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
+                    className={`text-[10px] font-semibold h-7 rounded-pill transition-colors ${
                       adjustmentType === 'waive' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
@@ -554,7 +720,7 @@ export const TripDetail: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setAdjustmentType('bonus')}
-                    className={`flex-1 text-[10px] font-semibold h-7 rounded-pill transition-colors ${
+                    className={`text-[10px] font-semibold h-7 rounded-pill transition-colors ${
                       adjustmentType === 'bonus' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
                     }`}
                   >
@@ -563,12 +729,15 @@ export const TripDetail: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Amount (INR)</label>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">
+                  Amount (INR){adjustmentType === 'full_refund' && <span className="text-content-tertiary normal-case"> — preset to total ₹{fare_breakdown.total.toFixed(2)}</span>}
+                </label>
                 <input
                   type="text"
                   placeholder="₹0.00"
-                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
-                  value={adjustmentAmt}
+                  disabled={adjustmentType === 'full_refund'}
+                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono disabled:opacity-50"
+                  value={adjustmentType === 'full_refund' ? fare_breakdown.total.toFixed(2) : adjustmentAmt}
                   onChange={(e) => setAdjustmentAmt(e.target.value)}
                 />
               </div>
@@ -583,11 +752,11 @@ export const TripDetail: React.FC = () => {
                 />
               </div>
               <button
-                onClick={handleApplyAdjustment}
+                onClick={requestAdjustment}
                 disabled={actionLoading}
                 className="w-full bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 hover:bg-gray-800 transition-colors disabled:opacity-40"
               >
-                {actionLoading ? 'Applying…' : 'Apply Adjustment'}
+                Apply Adjustment
               </button>
             </div>
           </div>
@@ -606,13 +775,7 @@ export const TripDetail: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className="font-mono block text-content-primary font-semibold">₹{attempt.amount.toFixed(2)}</span>
-                    <span
-                      className={`text-[9px] uppercase font-bold tracking-wider ${
-                        attempt.status === 'SUCCEEDED' ? 'text-content-positive' : 'text-content-negative'
-                      }`}
-                    >
-                      {attempt.status.toLowerCase()}
-                    </span>
+                    <AdminBadge label={attempt.status.toLowerCase()} />
                   </div>
                 </div>
               ))}
@@ -641,63 +804,152 @@ export const TripDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Audit Logs */}
+          {/* Forensic Audit (GET /admin/orders/{id}/forensic-audit) */}
           <div className="bg-background-primary rounded-xl border border-background-secondary p-5 space-y-3">
-            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Audit logs</h2>
-            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-              {audit_logs.map((logItem, idx) => (
-                <div key={idx} className="text-xs">
-                  <div className="flex justify-between text-[10px] text-content-tertiary font-mono">
-                    <span>{new Date(logItem.timestamp).toLocaleString()}</span>
-                    <span>Actor: {logItem.actor}</span>
+            <h2 className="text-xs font-bold text-content-primary uppercase tracking-wider">Forensic Audit Trail</h2>
+            {auditLoading ? (
+              <div className="text-[11px] text-content-tertiary font-mono animate-pulse py-2">Compiling forensic audit…</div>
+            ) : !audit ? (
+              <div className="text-[11px] text-content-tertiary py-2">No forensic audit available for this trip.</div>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {([
+                  { label: 'Offer Timestamps', obj: audit.offer_timestamps },
+                  { label: 'Odometer Inputs', obj: audit.odometer_inputs },
+                  { label: 'Route Metrics', obj: audit.route_metrics },
+                  { label: 'Hardware State', obj: audit.hardware_state },
+                  { label: 'Final Invoice', obj: audit.final_invoice },
+                ] as const).map((section) => (
+                  <div key={section.label}>
+                    <h4 className="text-[10px] font-bold text-content-secondary uppercase tracking-wider mb-1">{section.label}</h4>
+                    <div className="space-y-1">
+                      {Object.entries(section.obj || {}).map(([k, v]) => (
+                        <div key={k} className="flex justify-between text-[10px]">
+                          <span className="text-content-tertiary">{k.replace(/_/g, ' ')}</span>
+                          <span className="font-mono text-content-primary text-right truncate max-w-[160px]">{String(v ?? '—')}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <h4 className="font-bold text-content-primary mt-0.5">{logItem.action}</h4>
-                  <p className="text-[10px] text-content-secondary mt-0.5">{logItem.details}</p>
+                ))}
+                <div className="text-[9px] text-content-tertiary font-mono pt-1 border-t border-background-secondary">
+                  Captured: {new Date(audit.captured_at).toLocaleString()}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
         </div>
 
       </div>
 
-      {/* ---- Reassign Driver Modal ---- */}
+      {/* ---- Confirm Modal (shared for destructive actions) ---- */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
+            <div>
+              <h3 className="text-sm font-bold text-content-primary">{confirmAction.title}</h3>
+              <p className="text-xs text-content-tertiary mt-1">{confirmAction.description}</p>
+            </div>
+            {confirmAction.requireReason && (
+              <div>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Reason (required, audited)</label>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="e.g. Rider no-show / fraud signal"
+                  className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
+                  value={confirmReason}
+                  onChange={(e) => setConfirmReason(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
+              <button
+                onClick={() => { setConfirmAction(null); setConfirmReason(''); }}
+                disabled={actionLoading}
+                className="text-xs text-content-secondary hover:text-content-primary px-3"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={runConfirm}
+                disabled={actionLoading || (confirmAction.requireReason && !confirmReason.trim())}
+                className={`text-xs font-semibold rounded-pill h-8 px-4 transition-colors disabled:opacity-40 ${
+                  confirmAction.destructive
+                    ? 'bg-negative-400 text-white hover:bg-negative-500'
+                    : 'bg-content-primary text-gray-0 hover:bg-gray-800'
+                }`}
+              >
+                {actionLoading ? 'Working…' : confirmAction.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Reassign Driver Modal (driver picker) ---- */}
       {showReassignModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
             <div>
               <h3 className="text-sm font-bold text-content-primary">Reassign Driver</h3>
-              <p className="text-xs text-content-tertiary mt-1">Search and assign another driver to this order</p>
+              <p className="text-xs text-content-tertiary mt-1">Select an active driver to reassign this order</p>
             </div>
-            <div>
-              <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Driver UUID</label>
-              <input
-                type="text"
-                placeholder="e.g. 5b1a5239-ab20-42d7-b50a-ea77419a84fb"
-                className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary font-mono"
-                value={reassignDriverId}
-                onChange={(e) => setReassignDriverId(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
+            {poolLoading ? (
+              <div className="py-8 text-center text-xs text-content-tertiary animate-pulse">Loading driver pool…</div>
+            ) : driverPool.length === 0 ? (
+              <div className="py-8 text-center text-xs text-content-tertiary">No active drivers available.</div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {driverPool.map((drv) => (
+                  <button
+                    key={drv.driver_id}
+                    onClick={() => setReassignDriverId(drv.driver_id)}
+                    className={`w-full text-left p-3 rounded-xl border flex justify-between items-center text-xs transition-colors ${
+                      reassignDriverId === drv.driver_id
+                        ? 'border-content-primary bg-background-tertiary font-bold'
+                        : 'border-background-secondary hover:bg-background-tertiary/50'
+                    }`}
+                  >
+                    <div>
+                      <span className="block text-content-primary">{drv.name}</span>
+                      <span className="block text-[10px] text-content-tertiary font-mono">{drv.phone}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-content-tertiary">{drv.city_prefix}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
               <button
-                onClick={() => {
-                  setShowReassignModal(false);
-                  setReassignDriverId('');
-                }}
+                onClick={() => { setShowReassignModal(false); setReassignDriverId(''); }}
+                disabled={actionLoading}
                 className="text-xs text-content-secondary hover:text-content-primary px-3"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReassignDriver}
-                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
-                disabled={!reassignDriverId.trim()}
+                className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors disabled:opacity-40"
+                disabled={actionLoading || !reassignDriverId}
               >
-                Reassign
+                {actionLoading ? 'Reassigning…' : 'Reassign'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Toast ---- */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-fade-in">
+          <div className={`rounded-pill px-4 py-2.5 text-xs font-semibold shadow-xl border ${
+            toast.kind === 'ok'
+              ? 'bg-surface-positive text-content-positive border-positive-400'
+              : 'bg-surface-negative text-content-negative border-negative-400'
+          }`}>
+            {toast.text}
           </div>
         </div>
       )}

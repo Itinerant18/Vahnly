@@ -10,6 +10,15 @@ interface DriverItem {
   city_prefix: string;
 }
 
+// Driver pool entry as returned by GET /admin/drivers.
+interface DriverSummaryResponse {
+  driver_id: string;
+  name: string;
+  phone: string;
+  city_prefix: string;
+  status: string;
+}
+
 export const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<number>(1);
@@ -24,6 +33,7 @@ export const ManualBooking: React.FC = () => {
   const [carModel, setCarModel] = useState<string>('Maruti Swift');
   const [carPlate, setCarPlate] = useState<string>('WB-02-AB-1234');
   const [carType, setCarType] = useState<string>('Hatchback');
+  const [transmission, setTransmission] = useState<string>('Manual');
 
   // Step 3: Config
   const [cityPrefix, setCityPrefix] = useState<string>('KOL');
@@ -36,35 +46,37 @@ export const ManualBooking: React.FC = () => {
   const [dropoffLat] = useState<number>(22.5855);
   const [dropoffLng] = useState<number>(88.4111);
 
-  // Step 4: Fare
+  // Step 4: Schedule
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
+  const [scheduledAt, setScheduledAt] = useState<string>('');
+
+  // Step 5: Fare
   const [baseFareINR, setBaseFareINR] = useState<number>(350);
 
-  // Step 5: Driver
+  // Step 6: Driver
   const [availableDrivers, setAvailableDrivers] = useState<DriverItem[]>([]);
   const [driversLoading, setDriversLoading] = useState<boolean>(false);
   const [assignedDriverId, setAssignedDriverId] = useState<string>('');
 
-  // Fetch online available drivers for assignment
+  // Fetch the online/active driver pool from GET /admin/drivers (NOT the KYC pending queue).
   const fetchDrivers = async () => {
     setDriversLoading(true);
     try {
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
-      // Call fleet drivers or compliance pending list, or fetch all online drivers
-      // Since there isn't a dedicated endpoint for searching drivers, we call a proxy or return seed drivers
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/pending`, {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers?status=ACTIVE`, {
         headers: {
           'X-Admin-Role': role,
         },
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const list = (data || []).map((d: any) => ({
-          id: d.id,
+        const data: DriverSummaryResponse[] = await res.json();
+        const list = (data || []).map((d) => ({
+          id: d.driver_id,
           name: d.name || 'Driver',
-          phone: d.phone || '+91 9999999999',
-          current_state: 'ONLINE_AVAILABLE',
+          phone: d.phone || '—',
+          current_state: d.status || 'ACTIVE',
           city_prefix: d.city_prefix || 'KOL',
         }));
         setAvailableDrivers(list);
@@ -73,25 +85,14 @@ export const ManualBooking: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      // Dev-only seed so the booking flow is testable without a live driver pool. In
-      // production a fetch failure shows an empty list, never fabricated drivers — never
-      // overwrite a successful fetch.
-      if (import.meta.env.DEV) {
-        setAvailableDrivers([
-          { id: '5b1a5239-ab20-42d7-b50a-ea77419a84fb', name: 'Aniket Karmakar', phone: '+91 7602676448', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
-          { id: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', name: 'Rajesh Das', phone: '+91 9876543210', current_state: 'ONLINE_AVAILABLE', city_prefix: 'KOL' },
-          { id: '7f8e9d0c-1b2a-3c4d-5e6f-7a8b9c0d1e2f', name: 'Sunil Sen', phone: '+91 9001100220', current_state: 'ONLINE_AVAILABLE', city_prefix: 'BLR' },
-        ]);
-      } else {
-        setAvailableDrivers([]);
-      }
+      setAvailableDrivers([]);
     } finally {
       setDriversLoading(false);
     }
   };
 
   useEffect(() => {
-    if (step === 5) {
+    if (step === 6) {
       fetchDrivers();
     }
   }, [step]);
@@ -112,14 +113,25 @@ export const ManualBooking: React.FC = () => {
     try {
       const role = localStorage.getItem('admin_role') || 'ADMIN';
 
+      // Send the full booking payload. The order service ignores fields it does not
+      // persist yet, but the contract carries the complete admin-entered context.
       const bookingPayload = {
         customer_id: customerId,
+        rider_phone: riderPhone,
         city_prefix: cityPrefix,
+        trip_type: tripType,
+        transmission,
+        car_model: carModel,
+        car_plate: carPlate,
+        car_type: carType,
+        pickup_address: pickupAddress,
+        dropoff_address: dropoffAddress,
         pickup_lat: pickupLat,
         pickup_lng: pickupLng,
         dropoff_lat: dropoffLat,
         dropoff_lng: dropoffLng,
         base_fare_paise: Math.round(baseFareINR * 100),
+        scheduled_at: scheduleMode === 'later' && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         assigned_driver_id: assignedDriverId || undefined,
       };
 
@@ -163,14 +175,15 @@ export const ManualBooking: React.FC = () => {
       <div className="max-w-xl mx-auto bg-background-primary rounded-xl border border-background-secondary overflow-hidden shadow-sm">
         {/* Step Indicator Header */}
         <div className="bg-background-secondary border-b border-background-secondary px-5 py-3 flex justify-between items-center text-[10px] uppercase font-bold tracking-wider text-content-tertiary font-mono">
-          <span>Step {step} of 6</span>
+          <span>Step {step} of 7</span>
           <span>
             {step === 1 && 'Rider Details'}
             {step === 2 && 'Car Selection'}
             {step === 3 && 'Config & Address'}
-            {step === 4 && 'Fare Estimate'}
-            {step === 5 && 'Driver Assignment'}
-            {step === 6 && 'Confirm Booking'}
+            {step === 4 && 'Schedule'}
+            {step === 5 && 'Fare Estimate'}
+            {step === 6 && 'Driver Assignment'}
+            {step === 7 && 'Confirm Booking'}
           </span>
         </div>
 
@@ -307,6 +320,23 @@ export const ManualBooking: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div>
+                <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Transmission</label>
+                <div className="flex space-x-2 bg-background-secondary p-0.5 rounded-pill border border-background-secondary">
+                  {['Manual', 'Automatic'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTransmission(t)}
+                      className={`flex-1 text-[11px] font-semibold h-7 rounded-pill transition-colors ${
+                        transmission === t ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -315,7 +345,7 @@ export const ManualBooking: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-content-primary">Trip Scoping & Addresses</h3>
-                <p className="text-xs text-content-tertiary mt-1">Specify destination route details and scheduling</p>
+                <p className="text-xs text-content-tertiary mt-1">Specify destination route details</p>
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
@@ -368,8 +398,47 @@ export const ManualBooking: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 4: Fare Quote */}
+          {/* STEP 4: Schedule */}
           {step === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-content-primary">Schedule Booking</h3>
+                <p className="text-xs text-content-tertiary mt-1">Dispatch immediately or schedule for a future date and time</p>
+              </div>
+              <div className="flex space-x-2 bg-background-secondary p-1 rounded-pill border border-background-secondary">
+                <button
+                  onClick={() => setScheduleMode('now')}
+                  className={`flex-1 text-xs font-semibold h-8 rounded-pill transition-colors ${
+                    scheduleMode === 'now' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
+                  }`}
+                >
+                  Dispatch Now
+                </button>
+                <button
+                  onClick={() => setScheduleMode('later')}
+                  className={`flex-1 text-xs font-semibold h-8 rounded-pill transition-colors ${
+                    scheduleMode === 'later' ? 'bg-content-primary text-gray-0' : 'text-content-secondary hover:bg-background-tertiary/50'
+                  }`}
+                >
+                  Schedule for Later
+                </button>
+              </div>
+              {scheduleMode === 'later' && (
+                <div>
+                  <label className="block text-[10px] uppercase text-content-tertiary font-semibold mb-1">Pickup Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 5: Fare Quote */}
+          {step === 5 && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-content-primary">Fare Quote Estimator</h3>
@@ -392,12 +461,12 @@ export const ManualBooking: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 5: Driver */}
-          {step === 5 && (
+          {/* STEP 6: Driver */}
+          {step === 6 && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-content-primary">Assign Driver</h3>
-                <p className="text-xs text-content-tertiary mt-1">Select from currently online available drivers or leave empty for auto-matching</p>
+                <p className="text-xs text-content-tertiary mt-1">Select from currently active drivers or leave empty for auto-matching</p>
               </div>
               {driversLoading ? (
                 <div className="p-12 text-center text-xs text-content-tertiary animate-pulse">Scanning available drivers...</div>
@@ -414,6 +483,9 @@ export const ManualBooking: React.FC = () => {
                     <span>Auto-Dispatch (Engine Match)</span>
                     <span className="text-[10px] text-content-tertiary font-mono">system assignment</span>
                   </button>
+                  {availableDrivers.length === 0 && (
+                    <div className="p-4 text-center text-[11px] text-content-tertiary">No active drivers found — auto-dispatch will be used.</div>
+                  )}
                   {availableDrivers.map((drv) => (
                     <button
                       key={drv.id}
@@ -428,7 +500,7 @@ export const ManualBooking: React.FC = () => {
                         <span className="block text-content-primary">{drv.name}</span>
                         <span className="block text-[10px] text-content-tertiary font-mono">{drv.phone}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-content-tertiary truncate max-w-[120px]">{drv.id}</span>
+                      <span className="text-[10px] font-mono text-content-tertiary truncate max-w-[120px]">{drv.city_prefix}</span>
                     </button>
                   ))}
                 </div>
@@ -436,8 +508,8 @@ export const ManualBooking: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 6: Confirm */}
-          {step === 6 && (
+          {/* STEP 7: Confirm */}
+          {step === 7 && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-content-primary">Confirm Booking Parameters</h3>
@@ -449,8 +521,20 @@ export const ManualBooking: React.FC = () => {
                   <span className="font-mono text-content-primary font-semibold truncate max-w-[200px]">{customerId}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-content-tertiary">Rider Phone:</span>
+                  <span className="font-mono text-content-primary font-semibold">{riderPhone || '—'}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-content-tertiary">Vehicle Selected:</span>
                   <span className="text-content-primary font-semibold">{carModel} ({carPlate})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-content-tertiary">Transmission:</span>
+                  <span className="text-content-primary font-semibold">{transmission}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-content-tertiary">Route:</span>
+                  <span className="text-content-primary font-semibold text-right truncate max-w-[220px]">{pickupAddress} → {dropoffAddress}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-content-tertiary">City prefix:</span>
@@ -459,6 +543,12 @@ export const ManualBooking: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-content-tertiary">Type of Trip:</span>
                   <span className="text-content-primary font-semibold capitalize">{tripType}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-content-tertiary">Schedule:</span>
+                  <span className="text-content-primary font-semibold">
+                    {scheduleMode === 'later' && scheduledAt ? new Date(scheduledAt).toLocaleString() : 'Immediate'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-content-tertiary">Base Fare:</span>
@@ -483,11 +573,15 @@ export const ManualBooking: React.FC = () => {
             >
               Back
             </button>
-            {step < 6 ? (
+            {step < 7 ? (
               <button
                 onClick={() => {
                   if (step === 1 && !customerId.trim()) {
                     alert('Please enter or generate a rider UUID.');
+                    return;
+                  }
+                  if (step === 4 && scheduleMode === 'later' && !scheduledAt) {
+                    alert('Please pick a scheduled date and time.');
                     return;
                   }
                   setStep(step + 1);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 
 export interface FareConfig {
@@ -64,9 +64,18 @@ const inputCls =
 const selectCls =
 	'h-8 rounded-sm bg-background-secondary border border-border-opaque px-3 text-label-medium text-content-primary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base';
 
+interface CityRecord { code: string; name: string }
+
+const CITY_CENTERS: Record<string, [number, number]> = {
+	KOL: [22.5726, 88.3639],
+	BLR: [12.9716, 77.5946],
+	DEL: [28.6139, 77.209],
+	MUM: [19.076, 72.8777],
+};
+
 export const PricingDashboard: React.FC = () => {
 	const [activeTab, setActiveTab] = useState<'fares' | 'surge' | 'commission'>('fares');
-	const [cities] = useState<string[]>(['KOL', 'BLR', 'DEL', 'MUM']);
+	const [cities, setCities] = useState<string[]>(['KOL', 'BLR', 'DEL', 'MUM']);
 	const [carTypes] = useState<string[]>(['Hatchback', 'Sedan', 'SUV', 'Premium']);
 	const [tripTypes] = useState<string[]>(['in-city round', 'one-way', 'mini-outstation', 'outstation']);
 
@@ -78,18 +87,65 @@ export const PricingDashboard: React.FC = () => {
 	const [fareLoading, setFareLoading] = useState<boolean>(true);
 	const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false);
 
+	// City × CarType matrix of base fares for the selected trip type.
+	const [matrix, setMatrix] = useState<Record<string, FareConfig>>({});
+	const [matrixLoading, setMatrixLoading] = useState<boolean>(false);
+	const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
+	const [matrixSaving, setMatrixSaving] = useState<boolean>(false);
+
 	const [surgeRules, setSurgeRules] = useState<SurgeRules | null>(null);
 	const [surgeLoading, setSurgeLoading] = useState<boolean>(true);
 	const [overrideCity, setOverrideCity] = useState<string>('KOL');
-	const [overrideCell, setOverrideCell] = useState<string>('893085811bbffff');
 	const [overrideMultiplier, setOverrideMultiplier] = useState<string>('2.0');
 	const [overrideDuration, setOverrideDuration] = useState<string>('30');
+	const [overrideZoneName, setOverrideZoneName] = useState<string>('');
 	const [overrideLoading, setOverrideLoading] = useState<boolean>(false);
 
 	const [selectedCommCity, setSelectedCommCity] = useState<string>('KOL');
 	const [selectedCommCar, setSelectedCommCar] = useState<string>('Hatchback');
 	const [commission, setCommission] = useState<CommissionSettings | null>(null);
 	const [commLoading, setCommLoading] = useState<boolean>(true);
+
+	// Cities are sourced from the registry, not hardcoded.
+	const fetchCities = useCallback(async () => {
+		try {
+			const role = localStorage.getItem('admin_role') || 'ADMIN';
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/cities`, { headers: { 'X-Admin-Role': role } });
+			if (res.ok) {
+				const data: { cities?: CityRecord[] } = await res.json();
+				const codes = (data.cities || []).map((c) => c.code).filter(Boolean);
+				if (codes.length) setCities(codes);
+			}
+		} catch (err) {
+			console.error('Failed to fetch cities', err);
+		}
+	}, []);
+
+	const matrixKey = (city: string, car: string) => `${city}::${car}`;
+
+	const fetchMatrix = useCallback(async () => {
+		setMatrixLoading(true);
+		const role = localStorage.getItem('admin_role') || 'ADMIN';
+		try {
+			const entries = await Promise.all(
+				cities.flatMap((c) => carTypes.map(async (car) => {
+					const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares?city=${c}&car_type=${car}&trip_type=${selectedTrip}`, {
+						headers: { 'X-Admin-Role': role },
+					});
+					const cfg: FareConfig | null = res.ok ? await res.json() : null;
+					return [matrixKey(c, car), cfg] as const;
+				}))
+			);
+			const next: Record<string, FareConfig> = {};
+			for (const [k, cfg] of entries) { if (cfg) next[k] = cfg; }
+			setMatrix(next);
+			setDirtyCells(new Set());
+		} catch (err) {
+			console.error('Failed to fetch fare matrix', err);
+		} finally {
+			setMatrixLoading(false);
+		}
+	}, [cities, carTypes, selectedTrip]);
 
 	const fetchFares = async () => {
 		setFareLoading(true);
@@ -138,7 +194,9 @@ export const PricingDashboard: React.FC = () => {
 		}
 	};
 
+	useEffect(() => { fetchCities(); }, [fetchCities]);
 	useEffect(() => { fetchFares(); }, [selectedCity, selectedCar, selectedTrip]);
+	useEffect(() => { if (activeTab === 'fares') fetchMatrix(); }, [activeTab, fetchMatrix]);
 	useEffect(() => {
 		if (activeTab === 'surge') fetchSurgeRules();
 		if (activeTab === 'commission') fetchCommission();
@@ -146,6 +204,7 @@ export const PricingDashboard: React.FC = () => {
 
 	const handleSaveFare = async () => {
 		if (!fare) return;
+		if (!window.confirm(`Commit a new fare version for ${selectedCity} · ${selectedCar} · ${selectedTrip}?`)) return;
 		try {
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares`, {
@@ -186,23 +245,75 @@ export const PricingDashboard: React.FC = () => {
 		} catch (err) { console.error(err); alert('Network request execution failure.'); }
 	};
 
+	// Manual surge now uses the real /surge/manual flow (not the removed /pricing/freeze).
 	const handlePostManualSurge = async () => {
+		const multiplier = Math.max(1.1, parseFloat(overrideMultiplier) || 1.1);
+		const name = overrideZoneName.trim() || `MANUAL_${overrideCity}_${Date.now()}`;
+		if (!window.confirm(`Activate a ${multiplier}x manual surge zone in ${overrideCity} for ${overrideDuration} minutes?\n\nThis affects all new bookings in the zone immediately.`)) return;
 		setOverrideLoading(true);
 		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/freeze`, {
+			const [lat, lng] = CITY_CENTERS[overrideCity] || CITY_CENTERS.KOL;
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/surge/manual`, {
 				method: 'POST',
-				headers: { 'X-Admin-Role': role, 'Content-Type': 'application/json' },
-				body: JSON.stringify({ city_prefix: overrideCity, h3_cell: overrideCell, max_multiplier: parseFloat(overrideMultiplier), duration_minutes: parseInt(overrideDuration) }),
+				headers: {
+					'X-Admin-Role': localStorage.getItem('admin_role') || 'ADMIN',
+					'X-Admin-Email': localStorage.getItem('admin_email') || 'admin@platform.com',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					name,
+					city_prefix: overrideCity,
+					center_lat: lat,
+					center_lng: lng,
+					radius_m: 1500,
+					multiplier,
+					duration_minutes: parseInt(overrideDuration) || 30,
+					reason: 'Manual surge engaged from pricing console',
+				}),
 			});
-			if (res.ok) alert('Emergency Surge Deflation Valve successfully engaged.');
-			else alert('Emergency pricing override failed. Check authorization clearances.');
+			if (res.ok) { alert(`Manual surge zone "${name}" activated at ${multiplier}x.`); setOverrideZoneName(''); }
+			else alert(`Manual surge activation failed: ${await res.text()}`);
 		} catch (err) { console.error(err); alert('Network request execution failure.'); }
 		finally { setOverrideLoading(false); }
 	};
 
+	// Inline matrix edit: update the base fare for a single City × CarType cell.
+	const updateMatrixCell = (city: string, car: string, rupees: string) => {
+		const key = matrixKey(city, car);
+		setMatrix((prev) => {
+			const existing = prev[key];
+			if (!existing) return prev;
+			return { ...prev, [key]: { ...existing, base_fare_paise: Math.round(parseFloat(rupees) * 100) || 0 } };
+		});
+		setDirtyCells((prev) => new Set(prev).add(key));
+	};
+
+	const handleSaveMatrix = async () => {
+		if (dirtyCells.size === 0) return;
+		if (!window.confirm(`Commit base-fare changes for ${dirtyCells.size} cell(s) (${selectedTrip})?`)) return;
+		setMatrixSaving(true);
+		const role = localStorage.getItem('admin_role') || 'ADMIN';
+		try {
+			const results = await Promise.all(Array.from(dirtyCells).map((key) => {
+				const cfg = matrix[key];
+				if (!cfg) return Promise.resolve(true);
+				return fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/fares`, {
+					method: 'POST',
+					headers: { 'X-Admin-Role': role, 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ...cfg, change_reason: cfg.change_reason?.trim() || `Matrix base-fare edit (${selectedTrip})` }),
+				}).then((r) => r.ok);
+			}));
+			const ok = results.filter(Boolean).length;
+			alert(`Committed ${ok}/${dirtyCells.size} matrix cell version(s).`);
+			fetchMatrix();
+			fetchFares();
+		} catch (err) { console.error(err); alert('Network request execution failure.'); }
+		finally { setMatrixSaving(false); }
+	};
+
 	const handleSaveCommission = async () => {
 		if (!commission) return;
+		if (!window.confirm(`Update driver take-rate commission for ${selectedCommCity} · ${selectedCommCar}?`)) return;
 		try {
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/pricing/commission`, {
@@ -284,6 +395,66 @@ export const PricingDashboard: React.FC = () => {
 						</button>
 					</div>
 
+					{/* ── City × Car Type base-fare matrix (trip type: {selectedTrip}) ── */}
+					<div className="card space-y-3">
+						<div className="flex items-center justify-between">
+							<div>
+								<h2 className="text-label-large uppercase tracking-wider text-content-primary">Base-Fare Matrix · {selectedTrip}</h2>
+								<p className="text-paragraph-small text-content-secondary mt-0.5">Inline-edit base fare (₹) per city × car class. Each saved cell commits a new fare version.</p>
+							</div>
+							<button
+								onClick={handleSaveMatrix}
+								disabled={matrixSaving || dirtyCells.size === 0}
+								className="btn-primary disabled:opacity-50"
+							>
+								{matrixSaving ? 'Saving…' : `Save Matrix (${dirtyCells.size})`}
+							</button>
+						</div>
+						{matrixLoading ? (
+							<div className="p-8 text-center text-paragraph-small text-content-tertiary animate-pulse">Loading fare matrix…</div>
+						) : (
+							<div className="rounded-sm border border-border-opaque overflow-x-auto">
+								<table className="w-full text-left border-collapse">
+									<thead>
+										<tr className="bg-background-tertiary border-b border-border-opaque">
+											<th className="p-3 text-label-small uppercase text-content-tertiary">City</th>
+											{carTypes.map((car) => (
+												<th key={car} className="p-3 text-label-small uppercase text-content-tertiary text-right">{car}</th>
+											))}
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-border-opaque">
+										{cities.map((c) => (
+											<tr key={c} className="hover:bg-background-secondary transition-base">
+												<td className="p-3 font-mono font-bold text-content-primary">{c}</td>
+												{carTypes.map((car) => {
+													const key = matrixKey(c, car);
+													const cell = matrix[key];
+													const dirty = dirtyCells.has(key);
+													return (
+														<td key={car} className="p-2 text-right">
+															{cell ? (
+																<input
+																	type="number"
+																	step="0.01"
+																	value={(cell.base_fare_paise / 100).toFixed(2)}
+																	onChange={(e) => updateMatrixCell(c, car, e.target.value)}
+																	className={`w-24 h-8 rounded-sm border px-2 text-mono-small font-mono text-right text-content-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base ${dirty ? 'border-accent-400' : 'border-transparent'}`}
+																/>
+															) : (
+																<span className="text-content-tertiary">—</span>
+															)}
+														</td>
+													);
+												})}
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						)}
+					</div>
+
 					{fareLoading || !fare ? (
 						<div className="p-12 text-center text-paragraph-small text-content-tertiary animate-pulse">Loading fare schedule configurations...</div>
 					) : (
@@ -331,6 +502,26 @@ export const PricingDashboard: React.FC = () => {
 								)}
 
 								<div className="border-t border-border-opaque pt-4 space-y-3">
+									<div className="grid grid-cols-2 gap-4">
+										<div>
+											<label className="block text-label-small uppercase text-content-tertiary mb-1">Effective From</label>
+											<input
+												type="date"
+												className="w-full h-9 rounded-sm bg-background-secondary border border-border-opaque px-3 text-label-medium font-mono text-content-primary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+												value={fare.effective_from ? fare.effective_from.split('T')[0] : ''}
+												onChange={(e) => setFare({ ...fare, effective_from: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+											/>
+										</div>
+										<div>
+											<label className="block text-label-small uppercase text-content-tertiary mb-1">Effective To</label>
+											<input
+												type="date"
+												className="w-full h-9 rounded-sm bg-background-secondary border border-border-opaque px-3 text-label-medium font-mono text-content-primary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+												value={fare.effective_to ? fare.effective_to.split('T')[0] : ''}
+												onChange={(e) => setFare({ ...fare, effective_to: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+											/>
+										</div>
+									</div>
 									<div>
 										<label className="block text-label-small uppercase text-content-tertiary mb-1">Audit Change Description (Reason)</label>
 										<input
@@ -455,8 +646,8 @@ export const PricingDashboard: React.FC = () => {
 
 					<div className="card space-y-4 h-fit">
 						<div>
-							<h3 className="text-label-medium uppercase tracking-wider text-content-primary">Emergency Surge Overlay</h3>
-							<p className="text-paragraph-small text-content-secondary mt-0.5">Directly engage deflation locks or manual multiplier limits on specific cells</p>
+							<h3 className="text-label-medium uppercase tracking-wider text-content-primary">Manual Surge Zone</h3>
+							<p className="text-paragraph-small text-content-secondary mt-0.5">Activate a time-boxed manual surge zone. For polygon-drawn zones use the dedicated Manual Surge map.</p>
 						</div>
 						<div className="space-y-3">
 							<div>
@@ -466,13 +657,13 @@ export const PricingDashboard: React.FC = () => {
 								</select>
 							</div>
 							<div>
-								<label className="block text-label-small uppercase text-content-tertiary mb-1">Spatial H3 Cell Index (Hex)</label>
-								<input type="text" className={`${inputCls} text-left`} value={overrideCell} onChange={(e) => setOverrideCell(e.target.value)} />
+								<label className="block text-label-small uppercase text-content-tertiary mb-1">Zone Name</label>
+								<input type="text" placeholder="e.g. CBD evening peak" className={`${inputCls} text-left`} value={overrideZoneName} onChange={(e) => setOverrideZoneName(e.target.value)} />
 							</div>
 							<div className="grid grid-cols-2 gap-3">
 								<div>
-									<label className="block text-label-small uppercase text-content-tertiary mb-1">Max Multiplier</label>
-									<input type="number" step="0.1" className={inputCls} value={overrideMultiplier} onChange={(e) => setOverrideMultiplier(e.target.value)} />
+									<label className="block text-label-small uppercase text-content-tertiary mb-1">Multiplier (1.1×–5.0×)</label>
+									<input type="number" step="0.1" min="1.1" max="5" className={inputCls} value={overrideMultiplier} onChange={(e) => setOverrideMultiplier(e.target.value)} />
 								</div>
 								<div>
 									<label className="block text-label-small uppercase text-content-tertiary mb-1">Duration (mins)</label>
@@ -484,7 +675,7 @@ export const PricingDashboard: React.FC = () => {
 								disabled={overrideLoading}
 								className="w-full bg-surface-negative text-content-negative border border-negative-200 text-label-small font-semibold rounded-pill h-9 hover:bg-negative-100 transition-base disabled:opacity-50"
 							>
-								{overrideLoading ? 'Engaging Override...' : 'Engage Emergency Pricing Valve'}
+								{overrideLoading ? 'Activating Zone…' : 'Activate Manual Surge Zone'}
 							</button>
 						</div>
 					</div>

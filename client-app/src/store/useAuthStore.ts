@@ -6,6 +6,7 @@ interface User {
   role: 'RIDER' | 'DRIVER' | 'ADMIN';
   name: string;
   phone: string;
+  phone_verified?: boolean;
 }
 
 interface AuthState {
@@ -14,6 +15,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  setPhoneVerified: (verified: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -33,6 +35,17 @@ export const useAuthStore = create<AuthState>()(
           }
         }
         set({ token: null, user: null, isAuthenticated: false });
+      },
+      setPhoneVerified: (verified) => {
+        set((state) => {
+          if (!state.user) return {};
+          return {
+            user: {
+              ...state.user,
+              phone_verified: verified,
+            },
+          };
+        });
       },
     }),
     {

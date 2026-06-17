@@ -1,6 +1,6 @@
 # =============================================================================
 # PRODUCTION OVERRIDES
-#   helm upgrade --install drivers-for-u ./deploy/charts/drivers-for-u \
+#   helm upgrade --install vahnly ./deploy/charts/vahnly \
 #     -n dispatch -f deploy/production-values.yaml
 #
 # Secrets (secrets.jwtSigningKey, secrets.fieldEncryptionKey, and the DB password
@@ -37,7 +37,7 @@ redis:
 # match an installed cert-manager ClusterIssuer.
 ingress:
   enabled: true
-  host: api.example.com # REPLACE with the production API hostname
+  host: api.aniket.site # REPLACE with the production API hostname
   tls:
     enabled: true
     clusterIssuer: letsencrypt-prod

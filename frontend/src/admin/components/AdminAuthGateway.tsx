@@ -205,15 +205,12 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
 
   const handleRecoverySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setStatusMessage({
-        type: 'SUCCESS',
-        text: 'Credentials recovery link dispatched. If registered, verify your inbox within 15 minutes.'
-      });
-      setIsLoading(false);
-      setRecoveryEmail('');
-    }, 1200);
+    // There is no self-service password-reset endpoint: temporary passwords are issued only
+    // through the SUPER_ADMIN invite flow. Be honest rather than faking a "reset link sent".
+    setStatusMessage({
+      type: 'ERROR',
+      text: 'No self-service reset. Contact your SUPER_ADMIN to issue a new temporary password.',
+    });
   };
 
   return (
@@ -505,7 +502,8 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
           // Forgot Password Form
           <form onSubmit={handleRecoverySubmit} className="space-y-4 text-left">
             <div className="text-xs text-content-secondary leading-relaxed">
-              Enter your registered corporate email to trigger credential lockout recovery loops.
+              Password reset is not self-service. Only a SUPER_ADMIN can issue a new temporary
+              password through the invite flow — contact yours to regain access.
             </div>
             <div>
               <label className="block text-[10px] uppercase tracking-wider font-bold text-content-secondary mb-2">Corporate Email</label>
@@ -517,7 +515,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
                 onChange={(e) => setRecoveryEmail(e.target.value)}
               />
             </div>
-            
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -528,10 +526,9 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
                 className="flex-1 bg-content-primary hover:bg-gray-200 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
-                {isLoading ? 'Processing...' : 'Recover Account'}
+                How to reset
               </button>
             </div>
           </form>

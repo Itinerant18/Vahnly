@@ -397,6 +397,10 @@ func main() {
 	adminRiderLogger := log.New(os.Stdout, "[RIDER_MGMT_ADMIN] ", log.LstdFlags)
 	adminRiderHandler := adminHttp.NewAdminRiderHandler(dbPool, redisClusterClient, riderNotifier, adminRiderLogger)
 
+	// Shell/search, team actions, rider & driver detail tabs, payout settings.
+	adminExtrasLogger := log.New(os.Stdout, "[ADMIN_EXTRAS] ", log.LstdFlags)
+	adminExtrasHandler := adminHttp.NewAdminExtrasHandler(dbPool, adminExtrasLogger)
+
 	driverLogger := log.New(os.Stdout, "[DRIVER_ADMIN] ", log.LstdFlags)
 	driverHandler := adminHttp.NewDriverHandler(dbPool, redisClusterClient, driverLogger)
 	driverHandler.SetObjectStore(objStore) // signed GET URLs for KYC docs (rule 1)
@@ -569,6 +573,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/login", driverAuthHandler.HandleDriverLogin)
 	mux.HandleFunc("POST /api/v1/driver/login/google", driverAuthHandler.HandleDriverGoogleLogin)
 	mux.HandleFunc("POST /api/v1/driver/register", driverAuthHandler.HandleDriverRegister)
+	mux.HandleFunc("POST /api/v1/driver/auth/send-otp", driverAuthHandler.HandleSendOTP)
+	mux.HandleFunc("POST /api/v1/driver/auth/verify-otp", driverAuthHandler.HandleVerifyOTP)
 	mux.HandleFunc("POST /api/v1/driver/onboarding/step/{step_id}", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleSaveStep))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/upload", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleUploadDocument))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/presigned-url", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleGeneratePresignedURL))
@@ -1150,11 +1156,49 @@ func main() {
 
 	// Administrative admin accounts and audit team controls
 	mux.HandleFunc("GET /api/v1/admin/team", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleListAdmins))
-	mux.HandleFunc("POST /api/v1/admin/team/invite", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleInviteAdmin))
+	mux.HandleFunc("POST /api/v1/admin/team/invite", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminExtrasHandler.HandleTeamInvite))
 	mux.HandleFunc("POST /api/v1/admin/team/edit-role", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleEditRole))
 	mux.HandleFunc("POST /api/v1/admin/team/suspend", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleSuspendAdmin))
 	mux.HandleFunc("POST /api/v1/admin/team/reset-2fa", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleReset2FA))
 	mux.HandleFunc("GET /api/v1/admin/team/audit", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminAuthHandler.HandleGetAuditLogs))
+
+	// ── Admin shell / global search / dashboard extras / team actions / detail tabs ──
+	// Broad read role set mirrors the sibling /admin/riders and /admin/drivers detail routes.
+	detailReadRoles := []string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE", "SUPPORT_LEAD", "SAFETY", "ANALYTICS"}
+
+	// A. Global search across trips/drivers/riders.
+	mux.HandleFunc("GET /api/v1/admin/search", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleGlobalSearch))
+
+	// A. Team actions (SUPER_ADMIN, like the existing team routes). The body-keyed
+	// /team/invite above is repointed to HandleTeamInvite; these are the path-scoped ops.
+	mux.HandleFunc("PATCH /api/v1/admin/team/{id}/status", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminExtrasHandler.HandleTeamSetStatus))
+	mux.HandleFunc("POST /api/v1/admin/team/{id}/reset-2fa", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminExtrasHandler.HandleTeamReset2FA))
+	mux.HandleFunc("POST /api/v1/admin/team/{id}/force-logout", authGuard.RequireAnyRole([]string{"SUPER_ADMIN"}, adminExtrasHandler.HandleTeamForceLogout))
+
+	// B. Rider detail tabs (scoped by rider id; empty-200 when the table is absent).
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/garage", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderGarage))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/payments", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderPayments))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/promos", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderPromos))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/ratings", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderRatings))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/risk", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderRisk))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/notifications", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderNotifications))
+	mux.HandleFunc("GET /api/v1/admin/riders/{id}/audit", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleRiderAudit))
+
+	// C. Driver detail tabs (scoped by driver id; empty-200 when the table is absent).
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/earnings", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverEarnings))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/payouts", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverPayouts))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/incentives", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverIncentives))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/training", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverTraining))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/performance", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverPerformance))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/notifications", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverNotifications))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/audit", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverAudit))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/safety", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverSafety))
+	mux.HandleFunc("GET /api/v1/admin/drivers/{id}/profile/support", authGuard.RequireAnyRole(detailReadRoles, adminExtrasHandler.HandleDriverSupport))
+
+	// D. Payout settings (finance roles).
+	payoutSettingsRoles := []string{"SUPER_ADMIN", "FINANCE", "FINANCIAL_AUDITOR"}
+	mux.HandleFunc("GET /api/v1/admin/finance/payouts/settings", authGuard.RequireAnyRole(payoutSettingsRoles, adminExtrasHandler.HandleGetPayoutSettings))
+	mux.HandleFunc("PUT /api/v1/admin/finance/payouts/settings", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "FINANCE"}, adminExtrasHandler.HandlePutPayoutSettings))
 
 	// Health/probe endpoints. Liveness (/live) is lenient — it only confirms the
 	// process is alive, so a transient DB/Redis blip never gets the pod killed.

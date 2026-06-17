@@ -1,25 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { formatPaise } from '../lib/money';
+import { AdminBadge, SideDrawer } from '../../components/ds';
 
+// Canonical promo-code shape from GET /admin/promo-codes (same backend table that
+// PromoCodesManager uses). Older /admin/promos/* fields are NOT used for codes.
 export interface PromoCode {
+	id: string;
 	code: string;
-	promo_type: string; // PERCENT, FLAT, FREE_RIDE, CASHBACK, FIRST_RIDE
-	value: number; // discount % or flat rupees
+	description: string;
+	discount_type: 'FLAT' | 'PERCENT';
+	discount_value: number; // FLAT = paise, PERCENT = raw percent
 	max_discount_paise: number;
 	min_fare_paise: number;
-	trip_types: string[];
-	car_types: string[];
-	cities: string[];
-	payment_methods: string[];
-	user_segment: string; // ALL, NEW, VIP
-	usage_cap_total: number;
-	usage_cap_per_user: number;
+	max_redemptions: number | null;
+	per_rider_limit: number;
+	total_redeemed: number;
+	city_prefix: string;
 	valid_from: string;
-	valid_to: string;
-	stackable: boolean;
-	status: string; // DRAFT, SCHEDULED, ACTIVE, PAUSED, EXPIRED
-	redemptions_count: number;
-	created_at?: string;
+	valid_until: string | null;
+	is_active: boolean;
+	total_savings_paise: number;
+}
+
+// Per-promo usage row from GET /promo-codes/{id}/usages.
+export interface PromoUsage {
+	id: string;
+	rider_id: string;
+	order_id: string | null;
+	discount_paise: number;
+	redeemed_at: string;
 }
 
 export interface BannerOffer {
@@ -58,13 +68,6 @@ export interface LoyaltySettings {
 	tiers: LoyaltyTier[];
 }
 
-export interface PromoAnalytics {
-	code: string;
-	redemptions: number;
-	gmv_impact_paise: number;
-	marketing_roi_percent: number;
-}
-
 export const CITIES = ['KOL', 'BLR', 'DEL', 'MUM'];
 export const CAR_TYPES = ['Hatchback', 'Sedan', 'SUV', 'Premium'];
 export const TRIP_TYPES = ['in-city round', 'one-way', 'mini-outstation', 'outstation'];
@@ -80,37 +83,34 @@ export const PromotionsDashboard: React.FC = () => {
 	const [promosLoading, setPromosLoading] = useState<boolean>(true);
 	const [statusFilter, setStatusFilter] = useState<string>('');
 	const [cityFilter, setCityFilter] = useState<string>('');
-	const [segmentFilter, setSegmentFilter] = useState<string>('');
+	const [typeFilter, setTypeFilter] = useState<string>('');
 
-	// Create Promo Modal
-	const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-	const [newPromo, setNewPromo] = useState<Partial<PromoCode>>({
+	// Create Promo Modal — fields map 1:1 onto POST /admin/promo-codes.
+	const NEW_PROMO_DEFAULTS = {
 		code: '',
-		promo_type: 'PERCENT',
-		value: 10,
+		discount_type: 'PERCENT' as 'FLAT' | 'PERCENT',
+		discount_value: 10,
 		max_discount_paise: 10000,
 		min_fare_paise: 5000,
-		trip_types: ['one-way'],
-		car_types: ['Hatchback', 'Sedan'],
-		cities: ['KOL'],
-		payment_methods: ['Stripe', 'Razorpay'],
-		user_segment: 'ALL',
-		usage_cap_total: 1000,
-		usage_cap_per_user: 1,
+		max_redemptions: 1000,
+		per_rider_limit: 1,
+		city_prefix: 'KOL',
 		valid_from: new Date().toISOString().slice(0, 16),
-		valid_to: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-		stackable: false,
-		status: 'ACTIVE',
-	});
+		valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+		is_active: true,
+	};
+	const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+	const [newPromo, setNewPromo] = useState<typeof NEW_PROMO_DEFAULTS>(NEW_PROMO_DEFAULTS);
 
 	// Bulk Upload Modal
 	const [showBulkModal, setShowBulkModal] = useState<boolean>(false);
 	const [bulkCsvText, setBulkCsvText] = useState<string>('');
 	const [bulkUploading, setBulkUploading] = useState<boolean>(false);
 
-	// Analytics Modal
-	const [selectedPromoAnalytics, setSelectedPromoAnalytics] = useState<PromoAnalytics | null>(null);
-	const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(false);
+	// Per-promo usage drill-down (GET /promo-codes/{id}/usages)
+	const [usagePromo, setUsagePromo] = useState<PromoCode | null>(null);
+	const [usageRows, setUsageRows] = useState<PromoUsage[]>([]);
+	const [usageLoading, setUsageLoading] = useState<boolean>(false);
 
 	// --- App Banners States ---
 	const [banners, setBanners] = useState<BannerOffer[]>([]);
@@ -147,13 +147,15 @@ export const PromotionsDashboard: React.FC = () => {
 	};
 
 	// --- Fetch Handlers ---
+	// Canonical promo-code list. Uses /admin/promo-codes (the same source as the
+	// dedicated Promo Codes manager) — NOT the legacy /admin/promos route.
 	const fetchPromos = async () => {
 		setPromosLoading(true);
 		try {
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos`, { headers });
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promo-codes`, { headers });
 			if (res.ok) {
 				const data = await res.json();
-				setPromos(data || []);
+				setPromos((data as PromoCode[]) || []);
 			}
 		} catch (err) {
 			console.error('Failed to fetch promos', err);
@@ -216,18 +218,20 @@ export const PromotionsDashboard: React.FC = () => {
 
 	// --- Action Handlers ---
 
-	// State toggle (Pause/Resume/Expire)
-	const handleUpdatePromoState = async (code: string, newStatus: string) => {
-		if (newStatus === 'EXPIRED' && !window.confirm(`Expire promo ${code}? This permanently deactivates a live promotion.`)) {
+	// Activate / deactivate a code via PATCH /promo-codes/{id}.
+	const handleTogglePromoActive = async (promo: PromoCode) => {
+		const next = !promo.is_active;
+		if (!next && !window.confirm(`Deactivate promo ${promo.code}? Riders can no longer redeem it.`)) {
 			return;
 		}
 		try {
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos/${code}/state`, {
-				method: 'POST',
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promo-codes/${promo.id}`, {
+				method: 'PATCH',
 				headers,
-				body: JSON.stringify({ status: newStatus }),
+				body: JSON.stringify({ is_active: next }),
 			});
 			if (res.ok) {
+				alert(`Promo ${promo.code} ${next ? 'activated' : 'deactivated'}.`);
 				fetchPromos();
 			} else {
 				alert('Failed to update promotion state.');
@@ -238,15 +242,15 @@ export const PromotionsDashboard: React.FC = () => {
 		}
 	};
 
-	// Create single promo code
+	// Create single promo code via POST /admin/promo-codes.
 	const handleCreatePromo = async () => {
-		if (!newPromo.code || !newPromo.promo_type) {
-			alert('Please fill out code identifier and promotion category.');
+		if (!newPromo.code.trim()) {
+			alert('Please enter a code identifier.');
 			return;
 		}
 		// Reject "discount forever" / unlimited promos before they reach the server.
 		const validFrom = newPromo.valid_from ? new Date(newPromo.valid_from) : new Date();
-		const validTo = newPromo.valid_to ? new Date(newPromo.valid_to) : null;
+		const validTo = newPromo.valid_until ? new Date(newPromo.valid_until) : null;
 		if (!validTo || isNaN(validTo.getTime()) || validTo.getTime() <= Date.now()) {
 			alert('Set a valid expiry date in the future.');
 			return;
@@ -255,50 +259,44 @@ export const PromotionsDashboard: React.FC = () => {
 			alert('Expiry must be after the start date.');
 			return;
 		}
-		if (!newPromo.value || newPromo.value <= 0) {
+		if (!newPromo.discount_value || newPromo.discount_value <= 0) {
 			alert('Discount value must be greater than zero.');
 			return;
 		}
-		if (!newPromo.usage_cap_total || newPromo.usage_cap_total <= 0) {
+		if (!newPromo.max_redemptions || newPromo.max_redemptions <= 0) {
 			alert('Set a total usage cap — unlimited promos are not allowed.');
 			return;
 		}
 		if (!window.confirm(
-			`Create promo ${newPromo.code} (${newPromo.promo_type}) valid until ${validTo.toLocaleString()}, total cap ${newPromo.usage_cap_total}?`
+			`Create promo ${newPromo.code} (${newPromo.discount_type}) valid until ${validTo.toLocaleString()}, total cap ${newPromo.max_redemptions}?`
 		)) {
 			return;
 		}
 		try {
 			const payload = {
-				...newPromo,
-				valid_from: new Date(newPromo.valid_from!).toISOString(),
-				valid_to: new Date(newPromo.valid_to!).toISOString(),
+				code: newPromo.code.trim().toUpperCase(),
+				discount_type: newPromo.discount_type,
+				// FLAT discount_value is stored in paise; PERCENT is a raw percent.
+				discount_value: newPromo.discount_type === 'FLAT'
+					? Math.round(newPromo.discount_value * 100)
+					: newPromo.discount_value,
+				max_discount_paise: newPromo.max_discount_paise,
+				min_fare_paise: newPromo.min_fare_paise,
+				max_redemptions: newPromo.max_redemptions,
+				per_rider_limit: newPromo.per_rider_limit,
+				city_prefix: newPromo.city_prefix,
+				valid_from: new Date(newPromo.valid_from).toISOString(),
+				valid_until: validTo.toISOString(),
+				is_active: newPromo.is_active,
 			};
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos`, {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promo-codes`, {
 				method: 'POST',
 				headers,
 				body: JSON.stringify(payload),
 			});
 			if (res.ok) {
 				setShowCreateModal(false);
-				setNewPromo({
-					code: '',
-					promo_type: 'PERCENT',
-					value: 10,
-					max_discount_paise: 10000,
-					min_fare_paise: 5000,
-					trip_types: ['one-way'],
-					car_types: ['Hatchback', 'Sedan'],
-					cities: ['KOL'],
-					payment_methods: ['Stripe', 'Razorpay'],
-					user_segment: 'ALL',
-					usage_cap_total: 1000,
-					usage_cap_per_user: 1,
-					valid_from: new Date().toISOString().slice(0, 16),
-					valid_to: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-					stackable: false,
-					status: 'ACTIVE',
-				});
+				setNewPromo(NEW_PROMO_DEFAULTS);
 				fetchPromos();
 			} else {
 				alert('Failed to create promo configuration.');
@@ -342,19 +340,21 @@ export const PromotionsDashboard: React.FC = () => {
 		}
 	};
 
-	// Open Analytics
-	const handleViewAnalytics = async (code: string) => {
-		setAnalyticsLoading(true);
+	// Open per-promo usage drill-down (GET /promo-codes/{id}/usages).
+	const handleViewUsages = async (promo: PromoCode) => {
+		setUsagePromo(promo);
+		setUsageRows([]);
+		setUsageLoading(true);
 		try {
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos/${code}/analytics`, { headers });
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promo-codes/${promo.id}/usages`, { headers });
 			if (res.ok) {
 				const data = await res.json();
-				setSelectedPromoAnalytics(data);
+				setUsageRows((data as PromoUsage[]) || []);
 			}
 		} catch (err) {
 			console.error(err);
 		} finally {
-			setAnalyticsLoading(false);
+			setUsageLoading(false);
 		}
 	};
 
@@ -499,14 +499,12 @@ export const PromotionsDashboard: React.FC = () => {
 
 	// Filters helper
 	const filteredPromos = promos.filter(p => {
-		if (statusFilter && p.status !== statusFilter) return false;
-		if (cityFilter && !p.cities.includes(cityFilter)) return false;
-		if (segmentFilter && p.user_segment !== segmentFilter) return false;
+		if (statusFilter === 'ACTIVE' && !p.is_active) return false;
+		if (statusFilter === 'INACTIVE' && p.is_active) return false;
+		if (cityFilter && p.city_prefix !== cityFilter) return false;
+		if (typeFilter && p.discount_type !== typeFilter) return false;
 		return true;
 	});
-
-	// Formatting Helpers
-	const formatPaise = (paise: number) => `₹${(paise / 100).toFixed(2)}`;
 
 	return (
 		<div className="w-full h-full overflow-y-auto p-6 space-y-6">
@@ -565,35 +563,33 @@ export const PromotionsDashboard: React.FC = () => {
 									onChange={(e) => setStatusFilter(e.target.value)}
 								>
 									<option value="">ALL STATUSES</option>
-									<option value="DRAFT">DRAFT</option>
-									<option value="SCHEDULED">SCHEDULED</option>
 									<option value="ACTIVE">ACTIVE</option>
-									<option value="PAUSED">PAUSED</option>
-									<option value="EXPIRED">EXPIRED</option>
+									<option value="INACTIVE">INACTIVE</option>
 								</select>
 							</div>
 
 							<div className="flex flex-col">
-								<label className="text-[10px] uppercase font-bold text-content-tertiary mb-1 font-sans">Filter Shard</label>
+								<label className="text-[10px] uppercase font-bold text-content-tertiary mb-1 font-sans">Filter City</label>
 								<select
 									className="h-8 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono font-semibold"
 									value={cityFilter}
 									onChange={(e) => setCityFilter(e.target.value)}
 								>
-									<option value="">ALL SHARDS</option>
+									<option value="">ALL CITIES</option>
 									{CITIES.map(c => <option key={c} value={c}>{c}</option>)}
 								</select>
 							</div>
 
 							<div className="flex flex-col">
-								<label className="text-[10px] uppercase font-bold text-content-tertiary mb-1 font-sans">User Segment</label>
+								<label className="text-[10px] uppercase font-bold text-content-tertiary mb-1 font-sans">Discount Type</label>
 								<select
 									className="h-8 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary font-mono font-semibold"
-									value={segmentFilter}
-									onChange={(e) => setSegmentFilter(e.target.value)}
+									value={typeFilter}
+									onChange={(e) => setTypeFilter(e.target.value)}
 								>
-									<option value="">ALL SEGMENTS</option>
-									{SEGMENTS.map(s => <option key={s} value={s}>{s}</option>)}
+									<option value="">ALL TYPES</option>
+									<option value="FLAT">FLAT</option>
+									<option value="PERCENT">PERCENT</option>
 								</select>
 							</div>
 						</div>
@@ -631,7 +627,7 @@ export const PromotionsDashboard: React.FC = () => {
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Type</th>
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Value</th>
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Caps (Max / Min)</th>
-										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Segment</th>
+										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">City</th>
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary text-center">Redemptions</th>
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Validity Range</th>
 										<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Status</th>
@@ -640,11 +636,11 @@ export const PromotionsDashboard: React.FC = () => {
 								</thead>
 								<tbody className="divide-y divide-background-secondary text-xs">
 									{filteredPromos.map((p) => (
-										<tr key={p.code} className="hover:bg-background-tertiary transition-colors">
+										<tr key={p.id} className="hover:bg-background-tertiary transition-colors">
 											<td className="p-4 font-mono font-bold text-content-primary text-sm tracking-wide">{p.code}</td>
-											<td className="p-4 font-semibold text-content-secondary">{p.promo_type}</td>
+											<td className="p-4 font-semibold text-content-secondary">{p.discount_type}</td>
 											<td className="p-4 font-mono text-content-primary font-bold">
-												{p.promo_type === 'PERCENT' ? `${p.value}%` : `₹${p.value}`}
+												{p.discount_type === 'PERCENT' ? `${p.discount_value}%` : formatPaise(p.discount_value)}
 											</td>
 											<td className="p-4 font-mono text-content-secondary space-y-0.5">
 												<div>Max: {formatPaise(p.max_discount_paise)}</div>
@@ -652,70 +648,32 @@ export const PromotionsDashboard: React.FC = () => {
 											</td>
 											<td className="p-4">
 												<span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-background-secondary text-content-primary">
-													{p.user_segment}
+													{p.city_prefix || 'ALL'}
 												</span>
 											</td>
 											<td className="p-4 text-center font-mono font-bold text-content-primary">
-												{p.redemptions_count} / {p.usage_cap_total}
+												{p.total_redeemed}{p.max_redemptions ? ` / ${p.max_redemptions}` : ''}
 											</td>
 											<td className="p-4 font-mono text-content-secondary space-y-0.5 text-[11px]">
 												<div>From: {new Date(p.valid_from).toLocaleDateString()}</div>
-												<div>To: {new Date(p.valid_to).toLocaleDateString()}</div>
+												<div>To: {p.valid_until ? new Date(p.valid_until).toLocaleDateString() : 'No expiry'}</div>
 											</td>
 											<td className="p-4">
-												<span
-													className={`inline-flex items-center text-[10px] font-bold uppercase rounded-pill h-5 px-2.5 tracking-wider border ${
-														p.status === 'ACTIVE'
-															? 'bg-background-primary text-content-primary border-background-secondary'
-															: p.status === 'PAUSED'
-															? 'bg-background-secondary text-status-pending border-background-secondary'
-															: p.status === 'EXPIRED'
-															? 'bg-background-secondary text-status-negative border-background-secondary'
-															: 'bg-background-secondary text-content-tertiary border-background-secondary'
-													}`}
-												>
-													<span
-														className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-															p.status === 'ACTIVE'
-																? 'bg-status-online'
-																: p.status === 'PAUSED'
-																? 'bg-status-pending'
-																: 'bg-status-negative'
-														}`}
-													/>
-													{p.status}
-												</span>
+												<AdminBadge label={p.is_active ? 'Active' : 'Inactive'} variant={p.is_active ? 'positive' : 'neutral'} dot />
 											</td>
 											<td className="p-4 text-right space-x-1 space-y-1">
 												<button
-													onClick={() => handleViewAnalytics(p.code)}
+													onClick={() => handleViewUsages(p)}
 													className="border border-background-secondary hover:border-content-primary text-[10px] font-bold px-2 py-1 rounded"
 												>
-													{analyticsLoading ? '...' : 'Analytics 📊'}
+													Usages
 												</button>
-												{p.status === 'ACTIVE' ? (
-													<button
-														onClick={() => handleUpdatePromoState(p.code, 'PAUSED')}
-														className="bg-background-secondary text-status-pending border border-background-secondary hover:border-status-pending text-[10px] font-bold px-2 py-1 rounded"
-													>
-														Pause
-													</button>
-												) : p.status === 'PAUSED' || p.status === 'DRAFT' ? (
-													<button
-														onClick={() => handleUpdatePromoState(p.code, 'ACTIVE')}
-														className="bg-content-primary text-gray-0 hover:bg-gray-800 text-[10px] font-bold px-2 py-1 rounded"
-													>
-														Resume
-													</button>
-												) : null}
-												{p.status !== 'EXPIRED' && (
-													<button
-														onClick={() => handleUpdatePromoState(p.code, 'EXPIRED')}
-														className="bg-background-secondary text-status-negative border border-background-secondary hover:border-status-negative text-[10px] font-bold px-2 py-1 rounded"
-													>
-														Expire
-													</button>
-												)}
+												<button
+													onClick={() => handleTogglePromoActive(p)}
+													className={`text-[10px] font-bold px-2 py-1 rounded border ${p.is_active ? 'bg-background-secondary text-status-negative border-background-secondary hover:border-status-negative' : 'bg-content-primary text-gray-0 border-content-primary hover:bg-gray-800'}`}
+												>
+													{p.is_active ? 'Deactivate' : 'Activate'}
+												</button>
 											</td>
 										</tr>
 									))}
@@ -1153,23 +1111,24 @@ export const PromotionsDashboard: React.FC = () => {
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Category Type</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Discount Type</label>
 								<select
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold text-content-primary focus:outline-none"
-									value={newPromo.promo_type}
-									onChange={(e) => setNewPromo({ ...newPromo, promo_type: e.target.value })}
+									value={newPromo.discount_type}
+									onChange={(e) => setNewPromo({ ...newPromo, discount_type: e.target.value as 'FLAT' | 'PERCENT' })}
 								>
-									{PROMO_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+									<option value="PERCENT">PERCENT</option>
+									<option value="FLAT">FLAT</option>
 								</select>
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Discount Value (rupees/percent)</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">{newPromo.discount_type === 'FLAT' ? 'Discount Amount (₹)' : 'Discount Percent (%)'}</label>
 								<input
 									type="number"
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 font-mono font-bold text-content-primary"
-									value={newPromo.value}
-									onChange={(e) => setNewPromo({ ...newPromo, value: parseFloat(e.target.value) || 0 })}
+									value={newPromo.discount_value}
+									onChange={(e) => setNewPromo({ ...newPromo, discount_value: parseFloat(e.target.value) || 0 })}
 								/>
 							</div>
 
@@ -1194,13 +1153,13 @@ export const PromotionsDashboard: React.FC = () => {
 							</div>
 
 							<div>
-								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">User Segment Shard</label>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">City</label>
 								<select
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold text-content-primary"
-									value={newPromo.user_segment}
-									onChange={(e) => setNewPromo({ ...newPromo, user_segment: e.target.value })}
+									value={newPromo.city_prefix}
+									onChange={(e) => setNewPromo({ ...newPromo, city_prefix: e.target.value })}
 								>
-									{SEGMENTS.map(s => <option key={s} value={s}>{s}</option>)}
+									{CITIES.map(c => <option key={c} value={c}>{c}</option>)}
 								</select>
 							</div>
 
@@ -1209,8 +1168,8 @@ export const PromotionsDashboard: React.FC = () => {
 								<input
 									type="number"
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 font-mono text-content-primary"
-									value={newPromo.usage_cap_total}
-									onChange={(e) => setNewPromo({ ...newPromo, usage_cap_total: parseInt(e.target.value) || 1000 })}
+									value={newPromo.max_redemptions}
+									onChange={(e) => setNewPromo({ ...newPromo, max_redemptions: parseInt(e.target.value) || 1000 })}
 								/>
 							</div>
 
@@ -1219,8 +1178,8 @@ export const PromotionsDashboard: React.FC = () => {
 								<input
 									type="number"
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2.5 font-mono text-content-primary"
-									value={newPromo.usage_cap_per_user}
-									onChange={(e) => setNewPromo({ ...newPromo, usage_cap_per_user: parseInt(e.target.value) || 1 })}
+									value={newPromo.per_rider_limit}
+									onChange={(e) => setNewPromo({ ...newPromo, per_rider_limit: parseInt(e.target.value) || 1 })}
 								/>
 							</div>
 
@@ -1239,22 +1198,10 @@ export const PromotionsDashboard: React.FC = () => {
 								<input
 									type="datetime-local"
 									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-mono text-content-primary"
-									value={newPromo.valid_to}
-									onChange={(e) => setNewPromo({ ...newPromo, valid_to: e.target.value })}
+									value={newPromo.valid_until}
+									onChange={(e) => setNewPromo({ ...newPromo, valid_until: e.target.value })}
 								/>
 							</div>
-						</div>
-
-						<div className="flex items-center space-x-3 text-xs pt-2">
-							<label className="flex items-center space-x-2 text-content-secondary font-semibold cursor-pointer">
-								<input
-									type="checkbox"
-									className="rounded bg-background-primary border-background-secondary text-content-primary focus:ring-0"
-									checked={newPromo.stackable}
-									onChange={() => setNewPromo({ ...newPromo, stackable: !newPromo.stackable })}
-								/>
-								<span>Allow stacking with other active coupon codes</span>
-							</label>
 						</div>
 
 						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-4">
@@ -1324,54 +1271,56 @@ export const PromotionsDashboard: React.FC = () => {
 				</div>
 			)}
 
-			{/* --- MODAL: ANALYTICS OVERLAY --- */}
-			{selectedPromoAnalytics && (
-				<div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-					<div className="bg-background-primary border border-background-secondary rounded-xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
-						<button
-							onClick={() => setSelectedPromoAnalytics(null)}
-							className="absolute top-4 right-4 text-content-tertiary hover:text-content-primary text-lg font-bold"
-						>
-							&times;
-						</button>
-
-						<div>
-							<h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Performance Analytics: {selectedPromoAnalytics.code}</h3>
-							<p className="text-[11px] text-content-tertiary mt-0.5">Dynamic marketing KPIs computed using standard SHA/FNV hashes</p>
-						</div>
-
-						<div className="grid grid-cols-1 gap-4 divide-y divide-background-secondary">
-							<div className="pt-2 flex justify-between items-center text-xs">
-								<span className="text-content-tertiary font-semibold">Total Redemptions</span>
-								<span className="font-mono font-bold text-content-primary text-base">{selectedPromoAnalytics.redemptions}</span>
+			{/* --- DRAWER: PROMO USAGE DRILL-DOWN (GET /promo-codes/{id}/usages) --- */}
+			<SideDrawer
+				isOpen={!!usagePromo}
+				onClose={() => setUsagePromo(null)}
+				title={usagePromo ? `Redemptions · ${usagePromo.code}` : 'Redemptions'}
+			>
+				{usagePromo && (
+					<div className="space-y-4">
+						<div className="grid grid-cols-2 gap-3">
+							<div className="bg-background-secondary border border-background-secondary rounded-xl p-3">
+								<div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Total Redeemed</div>
+								<div className="text-xl font-bold text-content-primary mt-1 font-mono">{usagePromo.total_redeemed}</div>
 							</div>
-
-							<div className="pt-4 flex justify-between items-center text-xs">
-								<span className="text-content-tertiary font-semibold">Gross Value GMV Impact</span>
-								<span className="font-mono font-bold text-content-primary text-base">{formatPaise(selectedPromoAnalytics.gmv_impact_paise)}</span>
-							</div>
-
-							<div className="pt-4 flex justify-between items-center text-xs">
-								<span className="text-content-tertiary font-semibold">Marketing Campaign ROI</span>
-								<span className="font-mono font-bold text-status-online text-base">{selectedPromoAnalytics.marketing_roi_percent.toFixed(1)}%</span>
+							<div className="bg-background-secondary border border-background-secondary rounded-xl p-3">
+								<div className="text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Total Savings</div>
+								<div className="text-xl font-bold text-content-primary mt-1 font-mono">{formatPaise(usagePromo.total_savings_paise)}</div>
 							</div>
 						</div>
 
-						<div className="bg-background-secondary p-3 rounded-lg border border-background-secondary text-[10px] text-content-tertiary font-mono">
-							Redemption counts and marketing ROI calculations are linked directly to active Redis hash metrics and transaction audits.
-						</div>
-
-						<div className="flex justify-end border-t border-background-secondary pt-4">
-							<button
-								onClick={() => setSelectedPromoAnalytics(null)}
-								className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-9 px-6 hover:bg-gray-800 transition-colors"
-							>
-								Close Overview
-							</button>
-						</div>
+						{usageLoading ? (
+							<div className="p-8 text-center text-xs text-content-tertiary animate-pulse">Loading redemption history...</div>
+						) : usageRows.length === 0 ? (
+							<div className="p-8 text-center text-xs text-content-tertiary border border-dashed border-background-secondary rounded-lg">
+								No redemptions recorded for this code yet.
+							</div>
+						) : (
+							<table className="w-full text-left border-collapse">
+								<thead>
+									<tr className="border-b border-background-secondary bg-background-secondary">
+										<th className="p-2 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Rider</th>
+										<th className="p-2 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Order</th>
+										<th className="p-2 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary text-right">Discount</th>
+										<th className="p-2 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Redeemed</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-background-secondary text-xs">
+									{usageRows.map((u) => (
+										<tr key={u.id} className="hover:bg-background-tertiary transition-colors">
+											<td className="p-2 font-mono text-content-secondary">{u.rider_id.substring(0, 8)}</td>
+											<td className="p-2 font-mono text-content-secondary">{u.order_id ? u.order_id.substring(0, 8) : '—'}</td>
+											<td className="p-2 font-mono text-right text-content-primary font-bold">{formatPaise(u.discount_paise)}</td>
+											<td className="p-2 font-mono text-content-tertiary">{new Date(u.redeemed_at).toLocaleString()}</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						)}
 					</div>
-				</div>
-			)}
+				)}
+			</SideDrawer>
 		</div>
 	);
 };

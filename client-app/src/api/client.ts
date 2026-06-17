@@ -44,11 +44,14 @@ export interface DriverAuthUser {
   role: 'DRIVER';
   name: string;
   current_state: string;
+  phone_verified?: boolean;
+  phone?: string;
 }
 
 export interface DriverLoginResponse {
   token: string;
   user: DriverAuthUser;
+  phone_verified?: boolean;
 }
 
 export interface DriverProfile {
@@ -219,6 +222,8 @@ interface DriverLoginRaw {
   name: string;
   verification_status?: string;
   onboarding_step?: number;
+  phone_verified?: boolean;
+  phone?: string;
 }
 
 export async function driverLogin(phone: string, password: string): Promise<DriverLoginResponse> {
@@ -234,7 +239,10 @@ export async function driverLogin(phone: string, password: string): Promise<Driv
       role: raw.role ?? 'DRIVER',
       name: raw.name,
       current_state: '',
+      phone_verified: raw.phone_verified,
+      phone: raw.phone || phone,
     },
+    phone_verified: raw.phone_verified,
   };
 }
 
@@ -244,6 +252,7 @@ export interface DriverGoogleLoginResponse {
   registered?: boolean;
   email?: string;
   name?: string;
+  phone_verified?: boolean;
 }
 
 interface DriverGoogleLoginRaw {
@@ -255,11 +264,13 @@ interface DriverGoogleLoginRaw {
   onboarding_step?: number;
   registered?: boolean;
   email?: string;
+  phone_verified?: boolean;
+  phone?: string;
 }
 
 export async function driverGoogleLogin(
   idToken: string,
-  regData?: { phone: string; cityPrefix: string; name?: string }
+  regData?: { phone: string; cityPrefix: string; name?: string; phoneToken?: string }
 ): Promise<DriverGoogleLoginResponse> {
   const payload = {
     id_token: idToken,
@@ -270,6 +281,7 @@ export async function driverGoogleLogin(
       phone: regData.phone,
       city_prefix: regData.cityPrefix,
       name: regData.name,
+      phone_token: regData.phoneToken,
     }),
   };
   const raw = await request<DriverGoogleLoginRaw>('/api/v1/driver/login/google', {
@@ -293,7 +305,10 @@ export async function driverGoogleLogin(
       role: raw.role ?? 'DRIVER',
       name: raw.name || '',
       current_state: '',
+      phone_verified: raw.phone_verified,
+      phone: raw.phone || regData?.phone || '',
     },
+    phone_verified: raw.phone_verified,
   };
 }
 
@@ -638,6 +653,56 @@ export interface QuizValidationResponse {
 export interface DriverRegisterResponse {
   message: string;
   driver_id: string;
+}
+
+export interface DriverSendOTPResponse {
+  message: string;
+  expires_in_seconds: number;
+}
+
+export interface DriverVerifyOTPResponse {
+  is_new_driver?: boolean;
+  phone_token?: string;
+  phone?: string;
+  token?: string;
+  user?: DriverAuthUser;
+  phone_verified?: boolean;
+}
+
+export async function sendDriverOTP(phone: string): Promise<DriverSendOTPResponse> {
+  return request<DriverSendOTPResponse>('/api/v1/driver/auth/send-otp', {
+    method: 'POST',
+    body: { phone },
+  });
+}
+
+export async function verifyDriverOTP(phone: string, otp: string): Promise<DriverVerifyOTPResponse> {
+  const res = await request<any>('/api/v1/driver/auth/verify-otp', {
+    method: 'POST',
+    body: { phone, otp },
+  });
+  
+  if (res.is_new_driver) {
+    return {
+      is_new_driver: true,
+      phone_token: res.phone_token,
+      phone: res.phone,
+    };
+  }
+  
+  return {
+    is_new_driver: false,
+    token: res.token,
+    user: {
+      id: res.driver_id,
+      role: res.role ?? 'DRIVER',
+      name: res.name,
+      current_state: '',
+      phone_verified: res.phone_verified,
+      phone: res.phone || phone,
+    },
+    phone_verified: res.phone_verified,
+  };
 }
 
 export async function driverRegister(payload: any): Promise<DriverRegisterResponse> {

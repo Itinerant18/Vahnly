@@ -3,6 +3,8 @@ import React, { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
 
+import PhoneVerificationGate from './PhoneVerificationGate';
+
 export default function AuthGuard({ children, allowedRole }: { children: React.ReactNode, allowedRole: 'RIDER' | 'DRIVER' }) {
   const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
@@ -42,6 +44,10 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
         </div>
       </div>
     );
+  }
+
+  if (allowedRole === 'DRIVER' && user?.phone_verified === false) {
+    return <PhoneVerificationGate />;
   }
 
   return <>{children}</>;

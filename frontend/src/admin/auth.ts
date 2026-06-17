@@ -24,3 +24,27 @@ export function decodeJwtRole(token: string | null): string | null {
 export function getAdminRole(): string {
   return localStorage.getItem('admin_role') || 'ADMIN';
 }
+
+// ── City scope filter ───────────────────────────────────────────────────────
+// The top-bar city selector persists its selection here so data pages can read the
+// current scope without prop-drilling through the router. Empty array = "all cities".
+export const CITY_FILTER_KEY = 'admin_city_filter';
+
+export function getCityFilter(): string[] {
+  try {
+    const raw = localStorage.getItem(CITY_FILTER_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((c): c is string => typeof c === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setCityFilter(cities: string[]): void {
+  try {
+    localStorage.setItem(CITY_FILTER_KEY, JSON.stringify(cities));
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+}

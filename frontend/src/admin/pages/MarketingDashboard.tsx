@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { exportToCsv, type CsvColumn } from '../lib/tableTools';
+import { AdminBadge } from '../../components/ds/AdminBadge';
 
 interface MarketingSegment {
 	id: number;
@@ -626,6 +628,71 @@ export const MarketingDashboard: React.FC = () => {
 		]);
 	};
 
+	// --- CSV exports for registry lists ---
+	const exportCampaignsCsv = () => {
+		const cols: CsvColumn<MarketingCampaign>[] = [
+			{ key: 'id', label: 'ID' },
+			{ key: 'name', label: 'Name' },
+			{ key: 'channel', label: 'Channel' },
+			{ key: 'segment_name', label: 'Segment' },
+			{ key: 'schedule_type', label: 'Schedule' },
+			{ key: 'status', label: 'Status' },
+			{ key: 'created_at', label: 'Created' },
+		];
+		exportToCsv<MarketingCampaign>(`campaigns_${new Date().toISOString().slice(0, 10)}.csv`, cols, campaigns);
+	};
+
+	const exportSegmentsCsv = () => {
+		const cols: CsvColumn<MarketingSegment>[] = [
+			{ key: 'id', label: 'ID' },
+			{ key: 'name', label: 'Name' },
+			{ key: 'description', label: 'Description' },
+			{ key: 'size', label: 'Size' },
+			{ key: 'created_at', label: 'Created' },
+		];
+		exportToCsv<MarketingSegment>(`segments_${new Date().toISOString().slice(0, 10)}.csv`, cols, segments);
+	};
+
+	// --- Send Push to Segment (standalone, non-campaign-builder flow) ---
+	const [showPushModal, setShowPushModal] = useState<boolean>(false);
+	const [pushForm, setPushForm] = useState({ name: '', segment_id: '', title: '', body: '' });
+	const [sendingPush, setSendingPush] = useState<boolean>(false);
+
+	const sendPushToSegment = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setSendingPush(true);
+		try {
+			const payload: Record<string, unknown> = {
+				name: pushForm.name || `Push blast ${new Date().toLocaleString()}`,
+				channel: 'PUSH',
+				schedule_type: 'IMMEDIATE',
+				variants: [{
+					name: 'Push',
+					weight: 1,
+					content: { title_template: pushForm.title, body_template: pushForm.body },
+				}],
+			};
+			if (pushForm.segment_id) payload.segment_id = parseInt(pushForm.segment_id);
+
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketing/campaigns`, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(payload),
+			});
+			if (res.ok) {
+				setShowPushModal(false);
+				setPushForm({ name: '', segment_id: '', title: '', body: '' });
+				const resCamp = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/marketing/campaigns`, { headers });
+				if (resCamp.ok) setCampaigns(await resCamp.json());
+				alert('Push blast queued to the selected segment.');
+			}
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setSendingPush(false);
+		}
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col bg-background-primary text-content-primary font-sans">
 			{/* ---- Header ---- */}
@@ -873,8 +940,27 @@ export const MarketingDashboard: React.FC = () => {
 						{/* Right: Active Campaigns & Analytics Queue */}
 						<div className="xl:col-span-2 space-y-4">
 							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Campaign Registry & Performance</h2>
-								
+								<div className="flex justify-between items-center border-b border-background-secondary pb-2">
+									<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Campaign Registry & Performance</h2>
+									<div className="flex items-center gap-2">
+										<button
+											type="button"
+											onClick={() => setShowPushModal(true)}
+											className="text-[10px] font-bold bg-content-primary text-gray-0 px-2.5 py-1 rounded hover:bg-gray-800 transition"
+										>
+											📲 Send Push to Segment
+										</button>
+										<button
+											type="button"
+											onClick={exportCampaignsCsv}
+											disabled={campaigns.length === 0}
+											className="text-[10px] font-bold bg-background-secondary border border-background-secondary hover:border-content-primary px-2.5 py-1 rounded transition disabled:opacity-50"
+										>
+											↓ CSV
+										</button>
+									</div>
+								</div>
+
 								<div className="divide-y divide-background-secondary">
 									{campaigns.length === 0 ? (
 										<div className="p-12 text-center text-xs text-content-tertiary font-semibold select-none">No campaigns built yet</div>
@@ -887,15 +973,10 @@ export const MarketingDashboard: React.FC = () => {
 														<div className="space-y-1">
 															<div className="flex items-center gap-2">
 																<h3 className="text-sm font-bold text-content-primary">{c.name}</h3>
-																<span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border ${
-																	c.status === 'ACTIVE' 
-																		? 'bg-surface-positive text-content-positive border-positive-400' 
-																		: c.status === 'PAUSED' 
-																		? 'bg-surface-warning text-content-warning border-warning-400'
-																		: 'bg-background-secondary text-content-tertiary border-background-secondary'
-																}`}>
-																	{c.status}
-																</span>
+																<AdminBadge
+																	label={c.status}
+																	variant={c.status === 'ACTIVE' ? 'positive' : c.status === 'PAUSED' ? 'warning' : 'neutral'}
+																/>
 															</div>
 															<p className="text-[10px] text-content-tertiary font-mono">
 																Channel: <span className="text-content-primary font-semibold">{c.channel}</span> | 
@@ -1124,8 +1205,18 @@ export const MarketingDashboard: React.FC = () => {
 
 						{/* Saved Audience segments list */}
 						<div className="lg:col-span-2 bg-background-primary border border-background-secondary rounded-xl p-5 shadow-sm space-y-4 text-xs">
-							<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-background-secondary pb-2">Saved Segments Registry</h2>
-							
+							<div className="flex justify-between items-center border-b border-background-secondary pb-2">
+								<h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Saved Segments Registry</h2>
+								<button
+									type="button"
+									onClick={exportSegmentsCsv}
+									disabled={segments.length === 0}
+									className="text-[10px] font-bold bg-background-secondary border border-background-secondary hover:border-content-primary px-2.5 py-1 rounded transition disabled:opacity-50"
+								>
+									↓ CSV
+								</button>
+							</div>
+
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{segments.map(s => (
 									<div key={s.id} className="p-4 bg-background-tertiary border border-background-secondary rounded-xl space-y-3 flex flex-col justify-between">
@@ -1300,11 +1391,7 @@ export const MarketingDashboard: React.FC = () => {
 										</div>
 
 										<div className="flex items-center gap-2">
-											<span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-												b.status === 'ACTIVE' ? 'bg-surface-positive0/10 text-content-positive border border-positive-400/20' : 'bg-background-secondary text-content-tertiary border border-background-secondary'
-											}`}>
-												{b.status}
-											</span>
+											<AdminBadge label={b.status} variant={b.status === 'ACTIVE' ? 'positive' : 'neutral'} />
 											<button
 												onClick={() => toggleBannerStatus(b.id, b.status)}
 												className="bg-background-primary border border-background-secondary hover:border-content-primary font-bold px-2.5 py-1 rounded transition"
@@ -1618,6 +1705,73 @@ export const MarketingDashboard: React.FC = () => {
 					</div>
 				)}
 			</div>
+
+			{/* Send Push to Segment Modal */}
+			{showPushModal && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm animate-fade-in">
+					<div className="bg-background-primary border border-background-secondary p-6 rounded-xl w-[420px] shadow-2xl space-y-4 text-xs">
+						<h3 className="font-bold text-content-primary text-sm border-b border-background-secondary pb-2 uppercase tracking-wider">Send Push to Segment</h3>
+						<form onSubmit={sendPushToSegment} className="space-y-4 text-content-secondary">
+							<div className="space-y-1">
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Blast Name (optional)</label>
+								<input
+									type="text"
+									value={pushForm.name}
+									onChange={e => setPushForm({ ...pushForm, name: e.target.value })}
+									placeholder="e.g. BLR Flash Push"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold focus:outline-none"
+								/>
+							</div>
+							<div className="space-y-1">
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Target Segment</label>
+								<select
+									value={pushForm.segment_id}
+									onChange={e => setPushForm({ ...pushForm, segment_id: e.target.value })}
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-2 font-semibold"
+								>
+									<option value="">All Segment Users</option>
+									{segments.map(s => (
+										<option key={s.id} value={s.id}>{s.name} (~{s.size} users)</option>
+									))}
+								</select>
+							</div>
+							<div className="space-y-1">
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Push Title</label>
+								<input
+									type="text"
+									required
+									value={pushForm.title}
+									onChange={e => setPushForm({ ...pushForm, title: e.target.value })}
+									placeholder="Hey {first_name}!"
+									className="w-full h-8 rounded bg-background-secondary border border-background-secondary px-3 font-semibold focus:outline-none"
+								/>
+							</div>
+							<div className="space-y-1">
+								<label className="block text-[9px] uppercase font-bold text-content-tertiary">Push Body</label>
+								<textarea
+									required
+									value={pushForm.body}
+									onChange={e => setPushForm({ ...pushForm, body: e.target.value })}
+									placeholder="Enjoy 20% off your next ride today."
+									className="w-full h-16 rounded bg-background-secondary border border-background-secondary p-2 focus:outline-none resize-none font-semibold"
+								/>
+							</div>
+							<div className="flex gap-2 justify-end">
+								<button
+									type="button"
+									onClick={() => setShowPushModal(false)}
+									className="bg-background-secondary hover:bg-background-tertiary text-content-primary font-bold px-3 py-1.5 rounded border border-background-secondary"
+								>
+									Cancel
+								</button>
+								<button type="submit" disabled={sendingPush} className="bg-content-primary text-gray-0 font-bold px-4 py-1.5 rounded hover:bg-gray-800 transition disabled:opacity-50">
+									{sendingPush ? 'Sending…' : '📲 Send Push'}
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			)}
 
 			{/* Save segment Modal */}
 			{showSaveSegmentModal && (

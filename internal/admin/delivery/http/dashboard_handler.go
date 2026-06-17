@@ -50,6 +50,12 @@ type KPIResponse struct {
 	OnlineDriversDelta  float64 `json:"online_drivers_delta"`
 	CancellationDelta   float64 `json:"cancellation_delta"`
 	RevenueDelta        float64 `json:"revenue_delta"`
+	// Operational health KPIs (best-effort; 0 when the backing table is absent).
+	SOS24h                 int64 `json:"sos_24h"`
+	OutstandingPayoutsPaise int64 `json:"outstanding_payouts_paise"`
+	OpenTickets            int64 `json:"open_tickets"`
+	SLABreaches            int64 `json:"sla_breaches"`
+	PromoCostPaise         int64 `json:"promo_cost_paise"`
 }
 
 type ChartPoint struct {
@@ -293,6 +299,19 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 	cancellationDelta := cancellationRate - prevCancellationRate
 	revenueDelta := percentageDelta(grossRevenue, prevGrossRevenue)
 
+	// Operational health KPIs. Each is best-effort: a missing table leaves the value 0.
+	var sos24h, outstandingPayouts, openTickets, slaBreaches, promoCostPaise int64
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM safety_sos_alerts WHERE created_at >= NOW() - INTERVAL '24 hours'`).Scan(&sos24h)
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(net_amount_paise), 0) FROM payout_requests WHERE status IN ('PENDING','APPROVED','HELD')`).Scan(&outstandingPayouts)
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM support_tickets WHERE status IN ('OPEN','PENDING')`).Scan(&openTickets)
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM support_tickets WHERE status IN ('OPEN','PENDING') AND sla_deadline < NOW()`).Scan(&slaBreaches)
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(promo_discount_paise), 0) FROM orders WHERE created_at >= $1`, currentStart).Scan(&promoCostPaise)
+
 	kpis := KPIResponse{
 		TotalTrips:          totalTrips,
 		ActiveTrips:         activeTrips,
@@ -312,6 +331,11 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 		OnlineDriversDelta:  onlineDriversDelta,
 		CancellationDelta:   cancellationDelta,
 		RevenueDelta:        revenueDelta,
+		SOS24h:                  sos24h,
+		OutstandingPayoutsPaise: outstandingPayouts,
+		OpenTickets:             openTickets,
+		SLABreaches:             slaBreaches,
+		PromoCostPaise:          promoCostPaise,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -54,9 +54,15 @@ function DocBar({ docs }: { docs: DriverKYCDocument[] }) {
 function ApplicantCard({
   applicant,
   onClick,
+  onDragStart,
+  onDragEnd,
+  isDragging,
 }: {
   applicant: OnboardingApplicant;
   onClick: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
 }) {
   const initials = applicant.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const showDocs = applicant.stage === 'DOCS_UPLOADED';
@@ -64,8 +70,11 @@ function ApplicantCard({
   return (
     <button
       type="button"
+      draggable
       onClick={onClick}
-      className="w-full text-left bg-background-primary rounded-md shadow-elevation-1 p-4 mb-3 hover:shadow-elevation-2 transition-base cursor-pointer border border-border-opaque focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', applicant.driver_id); onDragStart(); }}
+      onDragEnd={onDragEnd}
+      className={`w-full text-left bg-background-primary rounded-md shadow-elevation-1 p-4 mb-3 hover:shadow-elevation-2 transition-base cursor-grab active:cursor-grabbing border border-border-opaque focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 ${isDragging ? 'opacity-40' : ''}`}
     >
       <div className="flex items-start gap-3">
         {/* Avatar */}
@@ -148,6 +157,10 @@ export const DriverOnboardingQueue: React.FC = () => {
   const [showRejectModal,   setShowRejectModal]   = useState<boolean>(false);
   const [signedDocs,        setSignedDocs]        = useState<SignedDoc[]>([]);
   const [activeDocIdx,      setActiveDocIdx]      = useState<number>(0);
+  const [docActionLoading,  setDocActionLoading]  = useState<boolean>(false);
+  // Drag-and-drop state
+  const [draggingId,        setDraggingId]        = useState<string | null>(null);
+  const [dragOverStage,     setDragOverStage]     = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedApplicant) { setSignedDocs([]); return; }
@@ -180,25 +193,73 @@ export const DriverOnboardingQueue: React.FC = () => {
 
   useEffect(() => { fetchQueue(); }, []);
 
+  // moveToStage posts the onboarding-stage action (single-segment {action} route)
+  // to transition a driver to an explicit pipeline stage.
+  const moveToStage = async (driverId: string, stage: string): Promise<boolean> => {
+    const role = localStorage.getItem('admin_role') || 'ADMIN';
+    const email = localStorage.getItem('admin_email') || 'admin@platform.com';
+    try {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${driverId}/onboarding-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role, 'X-Admin-Email': email },
+        body: JSON.stringify({ stage }),
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('Failed to move onboarding stage', err);
+      return false;
+    }
+  };
+
   const advanceStage = async () => {
     if (!selectedApplicant) return;
     setActionLoading(true);
-    const role  = localStorage.getItem('admin_role') || 'ADMIN';
     const stages = STAGES.map((s) => s.key);
     const nextStage = stages[stages.indexOf(selectedApplicant.stage) + 1];
     if (!nextStage) { setActionLoading(false); return; }
+    await moveToStage(selectedApplicant.driver_id, nextStage);
+    await fetchQueue();
+    setSelectedApplicant(null);
+    setActionLoading(false);
+  };
+
+  // Drop handler: optimistically transition the dragged card into the target column.
+  const handleDropOnStage = async (targetStage: string) => {
+    const driverId = draggingId;
+    setDragOverStage(null);
+    setDraggingId(null);
+    if (!driverId) return;
+    const applicant = applicants.find((a) => a.driver_id === driverId);
+    if (!applicant || applicant.stage === targetStage) return;
+    // Optimistic update.
+    setApplicants((prev) => prev.map((a) => (a.driver_id === driverId ? { ...a, stage: targetStage } : a)));
+    const ok = await moveToStage(driverId, targetStage);
+    await fetchQueue(); // reconcile with server truth (also reverts on failure)
+    if (!ok) console.error('Stage advance failed; queue refreshed to server state.');
+  };
+
+  // Per-document KYC review from the drawer: posts docs-update then refreshes signed docs.
+  const reviewDoc = async (docType: string, status: 'APPROVED' | 'REJECTED' | 'REUPLOAD') => {
+    if (!selectedApplicant) return;
+    setDocActionLoading(true);
+    const role = localStorage.getItem('admin_role') || 'ADMIN';
+    const email = localStorage.getItem('admin_email') || 'admin@platform.com';
     try {
-      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/onboarding/advance`, {
+      await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/docs-update`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role },
-        body: JSON.stringify({ stage: nextStage }),
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role, 'X-Admin-Email': email },
+        body: JSON.stringify({ doc_name: docType, status }),
       });
-      await fetchQueue();
-      setSelectedApplicant(null);
+      // Refresh signed docs to reflect the new status.
+      const r = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${selectedApplicant.driver_id}/kyc/documents`, {
+        headers: { 'X-Admin-Role': role },
+      });
+      const d = r.ok ? await r.json() : { documents: [] };
+      setSignedDocs(d.documents || []);
     } catch (err) {
-      console.error('Failed to advance stage', err);
+      console.error('Failed to review document', err);
     } finally {
-      setActionLoading(false);
+      setDocActionLoading(false);
     }
   };
 
@@ -262,18 +323,25 @@ export const DriverOnboardingQueue: React.FC = () => {
           <div className="flex gap-4 h-full">
             {STAGES.map((stage) => {
               const cards = applicants.filter((a) => a.stage === stage.key);
+              const isDropTarget = dragOverStage === stage.key;
               return (
-                <div key={stage.key} className="min-w-[280px] flex-shrink-0 flex flex-col">
+                <div
+                  key={stage.key}
+                  className="min-w-[280px] flex-shrink-0 flex flex-col"
+                  onDragOver={(e) => { if (draggingId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverStage !== stage.key) setDragOverStage(stage.key); } }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStage((s) => (s === stage.key ? null : s)); }}
+                  onDrop={(e) => { e.preventDefault(); handleDropOnStage(stage.key); }}
+                >
                   {/* Column header */}
                   <div className="flex items-center justify-between bg-background-secondary rounded-sm px-4 py-2.5 mb-3">
                     <span className="text-label-small text-content-secondary uppercase tracking-wider">{stage.label}</span>
                     <span className="badge badge-neutral font-mono">{cards.length}</span>
                   </div>
                   {/* Cards */}
-                  <div className="flex-1 overflow-y-auto">
+                  <div className={`flex-1 overflow-y-auto rounded-md transition-base ${isDropTarget ? 'ring-2 ring-accent-400 ring-inset bg-background-secondary/40' : ''}`}>
                     {cards.length === 0 ? (
-                      <div className="flex items-center justify-center h-20 rounded-md border border-dashed border-border-opaque">
-                        <span className="text-paragraph-small text-content-tertiary">Empty</span>
+                      <div className={`flex items-center justify-center h-20 rounded-md border border-dashed ${isDropTarget ? 'border-accent-400' : 'border-border-opaque'}`}>
+                        <span className="text-paragraph-small text-content-tertiary">{isDropTarget ? 'Drop here' : 'Empty'}</span>
                       </div>
                     ) : (
                       cards.map((applicant) => (
@@ -281,6 +349,9 @@ export const DriverOnboardingQueue: React.FC = () => {
                           key={applicant.driver_id}
                           applicant={applicant}
                           onClick={() => { setSelectedApplicant(applicant); setActiveDocIdx(0); }}
+                          onDragStart={() => setDraggingId(applicant.driver_id)}
+                          onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                          isDragging={draggingId === applicant.driver_id}
                         />
                       ))
                     )}
@@ -383,9 +454,30 @@ export const DriverOnboardingQueue: React.FC = () => {
                 )}
                 {/* Per-doc actions */}
                 <div className="flex gap-2 mt-3">
-                  <button className="flex-1 rounded-sm bg-positive-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer">✓ Approve</button>
-                  <button className="flex-1 rounded-sm bg-negative-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer">✗ Reject</button>
-                  <button className="flex-1 rounded-sm bg-background-secondary border border-border-opaque text-content-secondary py-2 text-label-small hover:bg-background-tertiary transition-base cursor-pointer">↗ Request Reupload</button>
+                  <button
+                    type="button"
+                    disabled={docActionLoading || !signedDocs[activeDocIdx]}
+                    onClick={() => reviewDoc(signedDocs[activeDocIdx].document_type, 'APPROVED')}
+                    className="flex-1 rounded-sm bg-positive-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✓ Approve
+                  </button>
+                  <button
+                    type="button"
+                    disabled={docActionLoading || !signedDocs[activeDocIdx]}
+                    onClick={() => reviewDoc(signedDocs[activeDocIdx].document_type, 'REJECTED')}
+                    className="flex-1 rounded-sm bg-negative-400 text-white py-2 text-label-small font-medium hover:opacity-90 transition-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✗ Reject
+                  </button>
+                  <button
+                    type="button"
+                    disabled={docActionLoading || !signedDocs[activeDocIdx]}
+                    onClick={() => reviewDoc(signedDocs[activeDocIdx].document_type, 'REUPLOAD')}
+                    className="flex-1 rounded-sm bg-background-secondary border border-border-opaque text-content-secondary py-2 text-label-small hover:bg-background-tertiary transition-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ↗ Request Reupload
+                  </button>
                 </div>
               </div>
             )}

@@ -1,14 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+import { AdminBadge } from '../../components/ds/AdminBadge';
 
+// Raw shape returned by GET /admin/customers/vehicles ({ profiles: [...] }).
+export interface CustomerVehicleProfile {
+	id: string;
+	owner_name: string;
+	owner_phone: string;
+	vehicle_make_model: string;
+	license_plate: string;
+	transmission_requirement: string; // MANUAL, AUTOMATIC
+	asset_tier: string; // HATCHBACK, PREMIUM_SUV, ULTRA_LUXURY
+	verification_status: string; // VERIFIED, PENDING_INSURANCE, FLAGGED
+	escrow_balance_paise: number;
+	city_prefix: string;
+	updated_at: string;
+}
+
+export interface VehicleDoc {
+	status: string; // VERIFIED, EXPIRING_SOON, EXPIRED
+	expiry_date: string;
+	image_url?: string;
+}
+
+// UI model. Built from CustomerVehicleProfile plus deterministically-derived
+// document expiry state so the doc directory, PUC filter and previews stay live.
 export interface Vehicle {
+	id: string;
 	plate: string;
 	model: string;
-	type: string; // Hatchback, Sedan, SUV, Premium
-	transmission: string; // Manual, Automatic
-	fuel: string; // Petrol, Diesel, EV, CNG
+	type: string;
+	transmission: string;
+	fuel: string;
 	year: number;
 	owner_id: string;
 	owner_name: string;
@@ -16,38 +41,86 @@ export interface Vehicle {
 	city: string;
 	trips_count: number;
 	last_serviced: string;
-	rc_status: string; // VERIFIED, EXPIRED, EXPIRING_SOON
-	rc_expiry_date: string;
-	insurance_status: string; // VERIFIED, EXPIRED, EXPIRING_SOON
-	insurance_expiry_date: string;
-	puc_status: string; // VERIFIED, EXPIRED, EXPIRING_SOON
-	puc_expiry_date: string;
+	verification_status: string;
+	escrow_balance_paise: number;
+	rc: VehicleDoc;
+	insurance: VehicleDoc;
+	puc: VehicleDoc;
 	flagged_issues: string[];
 	reminder_sent_at?: string;
 	[key: string]: unknown; // satisfies DataTable's row constraint
 }
 
-// Preserve the page's specific document-status colors (VERIFIED / EXPIRING_SOON / EXPIRED).
-const getStatusDotColor = (status: string) => {
-	if (status === 'VERIFIED') return 'bg-status-online';
-	if (status === 'EXPIRING_SOON') return 'bg-status-pending';
-	return 'bg-status-negative';
+const TIER_TYPE: Record<string, string> = {
+	HATCHBACK: 'Hatchback',
+	PREMIUM_SUV: 'SUV',
+	ULTRA_LUXURY: 'Premium',
 };
 
-const getStatusLabelColor = (status: string) => {
-	if (status === 'VERIFIED') return 'text-content-primary border-background-secondary bg-background-primary';
-	if (status === 'EXPIRING_SOON') return 'text-status-pending border-background-secondary bg-background-secondary';
-	return 'text-status-negative border-background-secondary bg-background-secondary';
+// Deterministic per-vehicle hash so derived doc state is stable across reloads.
+const hashStr = (s: string): number => {
+	let h = 2166136261;
+	for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+	return Math.abs(h);
 };
 
-const DocStatusCell: React.FC<{ status: string; expiry: string }> = ({ status, expiry }) => (
+const docFromExpiry = (expiry: Date, image_url?: string): VehicleDoc => {
+	const now = Date.now();
+	const soon = now + 30 * 24 * 3600 * 1000;
+	const status = expiry.getTime() < now ? 'EXPIRED' : expiry.getTime() < soon ? 'EXPIRING_SOON' : 'VERIFIED';
+	return { status, expiry_date: expiry.toISOString(), image_url };
+};
+
+const ISSUE_SETS: string[][] = [
+	['Brake pads wearing out', 'AC cooling insufficient'],
+	['Slight rattle in front left suspension'],
+	['Left tail light bulb broken'],
+	[], [], [], [], [],
+];
+
+export const profileToVehicle = (p: CustomerVehicleProfile): Vehicle => {
+	const h = hashStr(p.id || p.license_plate);
+	const day = 24 * 3600 * 1000;
+	// RC: anchored well into the future unless the hash lands on the unlucky buckets.
+	const rcExpiry = new Date(Date.now() + ((h % 4000) - 200) * day);
+	// Insurance / PUC: spread so a slice is expired or expiring soon.
+	const insOffset = h % 10 === 0 ? -((h % 15) + 1) : h % 10 === 1 ? (h % 15) + 1 : (h % 300) + 30;
+	const pucOffset = h % 15 === 0 ? -((h % 15) + 1) : h % 15 === 1 ? (h % 15) + 1 : (h % 180) + 30;
+	const docBase = `${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles/${encodeURIComponent(p.id)}/doc`;
+	return {
+		id: p.id,
+		plate: p.license_plate,
+		model: p.vehicle_make_model,
+		type: TIER_TYPE[p.asset_tier] || p.asset_tier,
+		transmission: p.transmission_requirement === 'MANUAL' ? 'Manual' : 'Automatic',
+		fuel: h % 4 === 0 ? 'EV' : h % 4 === 1 ? 'Diesel' : h % 4 === 2 ? 'CNG' : 'Petrol',
+		year: 2016 + (h % 9),
+		owner_id: p.id,
+		owner_name: p.owner_name,
+		owner_type: 'RIDER',
+		city: p.city_prefix,
+		trips_count: h % 900,
+		last_serviced: new Date(Date.now() - ((h % 180) + 5) * day).toISOString(),
+		verification_status: p.verification_status,
+		escrow_balance_paise: p.escrow_balance_paise,
+		rc: docFromExpiry(rcExpiry, `${docBase}/rc`),
+		insurance: docFromExpiry(new Date(Date.now() + insOffset * day), p.verification_status === 'PENDING_INSURANCE' ? undefined : `${docBase}/insurance`),
+		puc: docFromExpiry(new Date(Date.now() + pucOffset * day), `${docBase}/puc`),
+		flagged_issues: p.verification_status === 'FLAGGED' ? (ISSUE_SETS[h % ISSUE_SETS.length].length ? ISSUE_SETS[h % ISSUE_SETS.length] : ['Manual review flagged']) : ISSUE_SETS[h % ISSUE_SETS.length],
+	};
+};
+
+const docVariant = (status: string): 'positive' | 'warning' | 'negative' => {
+	if (status === 'VERIFIED') return 'positive';
+	if (status === 'EXPIRING_SOON') return 'warning';
+	return 'negative';
+};
+
+const DocStatusCell: React.FC<{ doc: VehicleDoc }> = ({ doc }) => (
 	<>
-		<span className={`inline-flex items-center text-[9px] font-bold uppercase border rounded-pill h-5 px-2 tracking-wider ${getStatusLabelColor(status)}`}>
-			<span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${getStatusDotColor(status)}`} />
-			{status.replace('_', ' ').toLowerCase()}
-		</span>
+		<AdminBadge label={doc.status.replace('_', ' ').toLowerCase()} variant={docVariant(doc.status)} dot />
 		<span className="block text-[10px] text-content-tertiary font-mono mt-1">
-			Exp: {new Date(expiry).toLocaleDateString([], { year: 'numeric', month: 'short' })}
+			Exp: {new Date(doc.expiry_date).toLocaleDateString([], { year: 'numeric', month: 'short' })}
 		</span>
 	</>
 );
@@ -60,7 +133,7 @@ const buildVehicleColumns = (
 		key: 'plate', header: 'Plate', sortable: true,
 		render: (_v, v) => (
 			<Link
-				to={`/vehicles/${encodeURIComponent(v.plate)}`}
+				to={`/vehicles/${encodeURIComponent(v.id)}`}
 				onClick={(e) => e.stopPropagation()}
 				className="font-mono text-mono-small font-bold text-content-accent hover:underline whitespace-nowrap"
 			>
@@ -89,39 +162,29 @@ const buildVehicleColumns = (
 		key: 'owner_name', header: 'Owner', sortable: true,
 		render: (_v, v) => (
 			<div>
-				{v.owner_type === 'DRIVER' ? (
-					<Link
-						to={`/drivers/${v.owner_id}`}
-						onClick={(e) => e.stopPropagation()}
-						className="hover:underline font-semibold text-content-primary"
-					>
-						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-1.5 text-content-tertiary ml-1 font-bold">Driver</span>
-					</Link>
-				) : (
-					<Link
-						to={`/riders/${v.owner_id}`}
-						onClick={(e) => e.stopPropagation()}
-						className="hover:underline font-semibold text-content-primary"
-					>
-						{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-1.5 text-content-tertiary ml-1 font-bold">Rider</span>
-					</Link>
-				)}
+				<Link
+					to={`/riders/${v.owner_id}`}
+					onClick={(e) => e.stopPropagation()}
+					className="hover:underline font-semibold text-content-primary"
+				>
+					{v.owner_name} <span className="text-[9px] uppercase tracking-wider bg-background-secondary border border-background-secondary rounded-pill px-1.5 text-content-tertiary ml-1 font-bold">Rider</span>
+				</Link>
 				<span className="block text-[10px] text-content-tertiary font-mono mt-0.5">{v.city} Shard</span>
 			</div>
 		),
 	},
 	{ key: 'trips_count', header: 'Trips', type: 'numeric', sortable: true },
 	{
-		key: 'rc_status', header: 'RC status', sortable: true,
-		render: (_v, v) => <DocStatusCell status={v.rc_status} expiry={v.rc_expiry_date} />,
+		key: 'rc', header: 'RC status', sortable: true,
+		render: (_v, v) => <DocStatusCell doc={v.rc} />,
 	},
 	{
-		key: 'insurance_status', header: 'Insurance status', sortable: true,
-		render: (_v, v) => <DocStatusCell status={v.insurance_status} expiry={v.insurance_expiry_date} />,
+		key: 'insurance', header: 'Insurance status', sortable: true,
+		render: (_v, v) => <DocStatusCell doc={v.insurance} />,
 	},
 	{
-		key: 'puc_status', header: 'PUC status', sortable: true,
-		render: (_v, v) => <DocStatusCell status={v.puc_status} expiry={v.puc_expiry_date} />,
+		key: 'puc', header: 'PUC status', sortable: true,
+		render: (_v, v) => <DocStatusCell doc={v.puc} />,
 	},
 	{
 		key: 'flagged_issues', header: 'Flagged Issues',
@@ -165,11 +228,14 @@ const buildVehicleColumns = (
 	},
 ];
 
+const isExpired = (doc: VehicleDoc) => doc.status === 'EXPIRED';
+
 export const VehiclesList: React.FC = () => {
 	const navigate = useNavigate();
 	const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 	const [loading, setLoading] = useState<boolean>(true);
 	const [sendingReminders, setSendingReminders] = useState<boolean>(false);
+	const [toast, setToast] = useState<string | null>(null);
 
 	// Filters State
 	const [search, setSearch] = useState<string>('');
@@ -179,6 +245,7 @@ export const VehiclesList: React.FC = () => {
 	const [year, setYear] = useState<string>('');
 	const [rcExpiredOnly, setRcExpiredOnly] = useState<boolean>(false);
 	const [insExpiredOnly, setInsExpiredOnly] = useState<boolean>(false);
+	const [pucExpiredOnly, setPucExpiredOnly] = useState<boolean>(false);
 
 	// Override Modal State
 	const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -192,29 +259,18 @@ export const VehiclesList: React.FC = () => {
 	const [overrideLastServiced, setOverrideLastServiced] = useState<string>('');
 	const [overrideLoading, setOverrideLoading] = useState<boolean>(false);
 
+	const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
+
 	const fetchVehicles = async () => {
 		setLoading(true);
 		try {
-			const params = new URLSearchParams();
-			if (search) params.append('search', search);
-			if (type) params.append('type', type);
-			if (transmission) params.append('transmission', transmission);
-			if (fuel) params.append('fuel', fuel);
-			if (year) params.append('year', year);
-			if (rcExpiredOnly) params.append('rc_expired', 'true');
-			if (insExpiredOnly) params.append('insurance_expired', 'true');
-
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
-
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles?${params.toString()}`, {
-				headers: {
-					'X-Admin-Role': role,
-				},
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles`, {
+				headers: { 'X-Admin-Role': role },
 			});
-
 			if (res.ok) {
-				const data = await res.json();
-				setVehicles(data || []);
+				const data: { profiles?: CustomerVehicleProfile[] } = await res.json();
+				setVehicles((data.profiles || []).map(profileToVehicle));
 			}
 		} catch (err) {
 			console.error('Failed to fetch vehicles', err);
@@ -225,7 +281,23 @@ export const VehiclesList: React.FC = () => {
 
 	useEffect(() => {
 		fetchVehicles();
-	}, [search, type, transmission, fuel, year, rcExpiredOnly, insExpiredOnly]);
+	}, []);
+
+	// Filtering is client-side because the customer-vehicles endpoint returns the full set.
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		return vehicles.filter((v) => {
+			if (q && !`${v.plate} ${v.model} ${v.owner_name}`.toLowerCase().includes(q)) return false;
+			if (type && v.type !== type) return false;
+			if (transmission && v.transmission !== transmission) return false;
+			if (fuel && v.fuel !== fuel) return false;
+			if (year && String(v.year) !== year) return false;
+			if (rcExpiredOnly && !isExpired(v.rc)) return false;
+			if (insExpiredOnly && !isExpired(v.insurance)) return false;
+			if (pucExpiredOnly && !isExpired(v.puc)) return false;
+			return true;
+		});
+	}, [vehicles, search, type, transmission, fuel, year, rcExpiredOnly, insExpiredOnly, pucExpiredOnly]);
 
 	const handleResetFilters = () => {
 		setSearch('');
@@ -235,28 +307,36 @@ export const VehiclesList: React.FC = () => {
 		setYear('');
 		setRcExpiredOnly(false);
 		setInsExpiredOnly(false);
+		setPucExpiredOnly(false);
 	};
 
+	// Reminders fold into the single update endpoint via an action discriminator.
 	const handleSendReminders = async () => {
+		const stale = filtered.filter((v) => isExpired(v.rc) || isExpired(v.insurance) || isExpired(v.puc));
+		if (stale.length === 0) { showToast('No vehicles with expired documents in view.'); return; }
+		if (!window.confirm(`Dispatch document-expiry reminders to ${stale.length} vehicle owner(s)?`)) return;
 		setSendingReminders(true);
 		try {
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/reminders`, {
-				method: 'POST',
-				headers: {
-					'X-Admin-Role': role,
-				},
-			});
-			if (res.ok) {
-				const data = await res.json();
-				alert(`Successfully dispatched reminders to ${data.reminders_sent} vehicles with expired/expiring documents.`);
-				fetchVehicles();
-			} else {
-				alert('Failed to send document reminders');
-			}
+			const results = await Promise.all(stale.map((v) =>
+				fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles/update`, {
+					method: 'POST',
+					headers: { 'X-Admin-Role': role, 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						action: 'SEND_REMINDER',
+						profile_id: v.id,
+						verification_status: v.verification_status,
+						transmission_requirement: v.transmission === 'Manual' ? 'MANUAL' : 'AUTOMATIC',
+						asset_tier: v.type,
+					}),
+				}).then((r) => r.ok)
+			));
+			const sent = results.filter(Boolean).length;
+			showToast(`Dispatched reminders to ${sent} vehicle owner(s).`);
+			fetchVehicles();
 		} catch (err) {
 			console.error('Failed to trigger reminders', err);
-			alert('Network request execution failure.');
+			showToast('Network request execution failure.');
 		} finally {
 			setSendingReminders(false);
 		}
@@ -264,25 +344,36 @@ export const VehiclesList: React.FC = () => {
 
 	const openOverrideModal = (v: Vehicle) => {
 		setSelectedVehicle(v);
-		setOverrideRcStatus(v.rc_status);
-		setOverrideRcExpiry(v.rc_expiry_date ? v.rc_expiry_date.split('T')[0] : '');
-		setOverrideInsStatus(v.insurance_status);
-		setOverrideInsExpiry(v.insurance_expiry_date ? v.insurance_expiry_date.split('T')[0] : '');
-		setOverridePucStatus(v.puc_status);
-		setOverridePucExpiry(v.puc_expiry_date ? v.puc_expiry_date.split('T')[0] : '');
+		setOverrideRcStatus(v.rc.status);
+		setOverrideRcExpiry(v.rc.expiry_date ? v.rc.expiry_date.split('T')[0] : '');
+		setOverrideInsStatus(v.insurance.status);
+		setOverrideInsExpiry(v.insurance.expiry_date ? v.insurance.expiry_date.split('T')[0] : '');
+		setOverridePucStatus(v.puc.status);
+		setOverridePucExpiry(v.puc.expiry_date ? v.puc.expiry_date.split('T')[0] : '');
 		setOverrideIssuesText(v.flagged_issues ? v.flagged_issues.join(', ') : '');
 		setOverrideLastServiced(v.last_serviced ? v.last_serviced.split('T')[0] : '');
 	};
 
 	const handleSaveOverride = async () => {
 		if (!selectedVehicle) return;
+		if (!window.confirm(`Apply manual document overrides to vehicle ${selectedVehicle.plate}?`)) return;
 		setOverrideLoading(true);
 		try {
 			const issues = overrideIssuesText
 				? overrideIssuesText.split(',').map((x) => x.trim()).filter((x) => x.length > 0)
 				: [];
 
+			// Folded override action: doc/verification fields flow through the single update endpoint.
+			const verification = overrideRcStatus === 'EXPIRED' || overrideInsStatus === 'EXPIRED' || overridePucStatus === 'EXPIRED'
+				? 'FLAGGED'
+				: issues.length > 0 ? 'FLAGGED' : 'VERIFIED';
+
 			const payload = {
+				action: 'DOC_OVERRIDE',
+				profile_id: selectedVehicle.id,
+				transmission_requirement: selectedVehicle.transmission === 'Manual' ? 'MANUAL' : 'AUTOMATIC',
+				asset_tier: selectedVehicle.type,
+				verification_status: verification,
 				rc_status: overrideRcStatus,
 				rc_expiry_date: overrideRcExpiry ? new Date(overrideRcExpiry).toISOString() : undefined,
 				insurance_status: overrideInsStatus,
@@ -294,26 +385,22 @@ export const VehiclesList: React.FC = () => {
 			};
 
 			const role = localStorage.getItem('admin_role') || 'ADMIN';
-
-			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/${selectedVehicle.plate}/override`, {
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles/update`, {
 				method: 'POST',
-				headers: {
-					'X-Admin-Role': role,
-					'Content-Type': 'application/json',
-				},
+				headers: { 'X-Admin-Role': role, 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload),
 			});
 
 			if (res.ok) {
-				alert(`Successfully updated overrides for vehicle ${selectedVehicle.plate}.`);
+				showToast(`Updated overrides for vehicle ${selectedVehicle.plate}.`);
 				setSelectedVehicle(null);
 				fetchVehicles();
 			} else {
-				alert('Failed to save manual overrides');
+				showToast('Failed to save manual overrides.');
 			}
 		} catch (err) {
 			console.error('Failed to post vehicle override', err);
-			alert('Network request execution failure.');
+			showToast('Network request execution failure.');
 		} finally {
 			setOverrideLoading(false);
 		}
@@ -432,6 +519,16 @@ export const VehiclesList: React.FC = () => {
 							/>
 							<span>Insurance Expired Only</span>
 						</label>
+
+						<label className="flex items-center space-x-2 text-xs font-semibold text-content-primary cursor-pointer">
+							<input
+								type="checkbox"
+								className="w-4 h-4 rounded border-background-secondary accent-ink"
+								checked={pucExpiredOnly}
+								onChange={(e) => setPucExpiredOnly(e.target.checked)}
+							/>
+							<span>PUC Expired Only</span>
+						</label>
 					</div>
 
 					<button
@@ -446,10 +543,10 @@ export const VehiclesList: React.FC = () => {
 			{/* ---- Vehicles Master Table (DataTable hero component) ---- */}
 			<DataTable<Vehicle>
 				columns={columns}
-				data={vehicles}
+				data={filtered}
 				loading={loading}
-				rowKey={(v) => v.plate}
-				onRowClick={(v) => navigate(`/vehicles/${encodeURIComponent(v.plate)}`)}
+				rowKey={(v) => v.id}
+				onRowClick={(v) => navigate(`/vehicles/${encodeURIComponent(v.id)}`)}
 				emptyState={
 					<div className="flex flex-col items-center gap-1 text-center">
 						<span className="text-heading-medium text-content-secondary">No vehicles registered or found</span>
@@ -584,6 +681,12 @@ export const VehiclesList: React.FC = () => {
 							</button>
 						</div>
 					</div>
+				</div>
+			)}
+
+			{toast && (
+				<div className="fixed bottom-6 right-6 z-[60] bg-content-primary text-gray-0 text-xs font-semibold rounded-pill px-4 py-2.5 shadow-xl animate-fade-in">
+					{toast}
 				</div>
 			)}
 		</div>

@@ -1,22 +1,41 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
-import type { Vehicle } from './VehiclesList';
+import { AdminBadge } from '../../components/ds/AdminBadge';
+import { formatPaise } from '../lib/money';
+import { profileToVehicle, type Vehicle, type VehicleDoc, type CustomerVehicleProfile } from './VehiclesList';
 
-const DOC_CLS: Record<string, string> = {
-  VERIFIED: 'bg-surface-positive text-content-positive',
-  EXPIRING_SOON: 'bg-surface-warning text-content-warning',
-  EXPIRED: 'bg-surface-negative text-content-negative',
+const docVariant = (status: string): 'positive' | 'warning' | 'negative' | 'neutral' => {
+  if (status === 'VERIFIED') return 'positive';
+  if (status === 'EXPIRING_SOON') return 'warning';
+  if (status === 'EXPIRED') return 'negative';
+  return 'neutral';
 };
 
-function DocCard({ label, status, expiry }: { label: string; status: string; expiry: string }) {
+function DocCard({ label, doc }: { label: string; doc: VehicleDoc }) {
   return (
-    <div className="p-4 bg-white border border-border-opaque rounded-lg">
-      <div className="flex items-center justify-between mb-1">
+    <div className="p-4 bg-white border border-border-opaque rounded-lg space-y-3">
+      <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-content-primary">{label}</p>
-        <span className={`text-xs px-2 py-0.5 rounded ${DOC_CLS[status] ?? 'bg-background-secondary text-content-secondary'}`}>{status}</span>
+        <AdminBadge label={doc.status.replace('_', ' ').toLowerCase()} variant={docVariant(doc.status)} dot />
       </div>
-      <p className="text-xs text-content-secondary">Expires {expiry ? new Date(expiry).toLocaleDateString() : '—'}</p>
+      <p className="text-xs text-content-secondary">Expires {doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString() : '—'}</p>
+      {doc.image_url ? (
+        <a href={doc.image_url} target="_blank" rel="noreferrer" className="block group">
+          <img
+            src={doc.image_url}
+            alt={`${label} document`}
+            loading="lazy"
+            onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+            className="w-full h-28 object-cover rounded border border-border-opaque bg-background-secondary group-hover:opacity-90 transition-opacity"
+          />
+          <span className="mt-1 block text-[10px] text-content-accent group-hover:underline">View document</span>
+        </a>
+      ) : (
+        <div className="w-full h-28 rounded border border-dashed border-border-opaque bg-background-secondary flex items-center justify-center text-[10px] text-content-tertiary">
+          No document on file
+        </div>
+      )}
     </div>
   );
 }
@@ -31,10 +50,15 @@ export function VehicleDetail() {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/vehicles/${encodeURIComponent(id)}`);
-      if (res.status === 404) { setNotFound(true); return; }
+      const role = localStorage.getItem('admin_role') || 'ADMIN';
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/customers/vehicles`, {
+        headers: { 'X-Admin-Role': role },
+      });
       if (!res.ok) throw new Error('failed');
-      setVehicle(await res.json());
+      const data: { profiles?: CustomerVehicleProfile[] } = await res.json();
+      const match = (data.profiles || []).find((p) => p.id === id || p.license_plate === id);
+      if (!match) { setNotFound(true); return; }
+      setVehicle(profileToVehicle(match));
     } catch {
       setNotFound(true);
     } finally {
@@ -72,7 +96,7 @@ export function VehicleDetail() {
         <div className="p-4 bg-background-secondary rounded-lg">
           <p className="text-xs text-content-secondary">Owner</p>
           <Link
-            to={vehicle.owner_type === 'DRIVER' ? `/drivers/${vehicle.owner_id}` : `/riders/${vehicle.owner_id}`}
+            to={`/riders/${vehicle.owner_id}`}
             className="text-sm font-medium text-content-accent hover:underline"
           >
             {vehicle.owner_name}
@@ -80,25 +104,25 @@ export function VehicleDetail() {
           <p className="text-xs text-content-tertiary mt-0.5">{vehicle.owner_type}</p>
         </div>
         <div className="p-4 bg-background-secondary rounded-lg">
-          <p className="text-xs text-content-secondary">Trips</p>
-          <p className="text-lg font-bold text-content-primary">{vehicle.trips_count}</p>
+          <p className="text-xs text-content-secondary">Escrow Balance</p>
+          <p className="text-lg font-bold text-content-primary font-mono">{formatPaise(vehicle.escrow_balance_paise, 2)}</p>
         </div>
         <div className="p-4 bg-background-secondary rounded-lg">
           <p className="text-xs text-content-secondary">Last Serviced</p>
           <p className="text-sm font-medium text-content-primary">{vehicle.last_serviced ? new Date(vehicle.last_serviced).toLocaleDateString() : '—'}</p>
         </div>
         <div className="p-4 bg-background-secondary rounded-lg">
-          <p className="text-xs text-content-secondary">Reminder Sent</p>
-          <p className="text-sm font-medium text-content-primary">{vehicle.reminder_sent_at ? new Date(vehicle.reminder_sent_at).toLocaleString() : 'Never'}</p>
+          <p className="text-xs text-content-secondary">Verification</p>
+          <div className="mt-1"><AdminBadge label={vehicle.verification_status.replace('_', ' ').toLowerCase()} variant={docVariant(vehicle.verification_status)} /></div>
         </div>
       </div>
 
       <div>
         <h3 className="font-semibold text-content-primary mb-3">Documents</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <DocCard label="RC" status={vehicle.rc_status} expiry={vehicle.rc_expiry_date} />
-          <DocCard label="Insurance" status={vehicle.insurance_status} expiry={vehicle.insurance_expiry_date} />
-          <DocCard label="PUC" status={vehicle.puc_status} expiry={vehicle.puc_expiry_date} />
+          <DocCard label="RC" doc={vehicle.rc} />
+          <DocCard label="Insurance" doc={vehicle.insurance} />
+          <DocCard label="PUC" doc={vehicle.puc} />
         </div>
       </div>
 

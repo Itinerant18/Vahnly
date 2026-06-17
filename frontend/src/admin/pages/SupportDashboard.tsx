@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { AdminBadge } from '../../components/ds/AdminBadge';
+import { formatPaise } from '../lib/money';
 
 interface Ticket {
 	id: string;
@@ -84,6 +87,22 @@ interface Stats {
 	average_csat: number;
 }
 
+// A loosely-typed projection of an order / rider / driver detail record. Only a few
+// display fields are read; the rest of the payload is kept as unknown to avoid `any`.
+interface LinkedEntity {
+	id: string;
+	[key: string]: unknown;
+}
+
+// Pull the first present string field from a record (detail endpoints vary by entity).
+function pickString(obj: LinkedEntity, keys: string[]): string | undefined {
+	for (const k of keys) {
+		const v = obj[k];
+		if (typeof v === 'string' && v) return v;
+	}
+	return undefined;
+}
+
 type MainTab = 'TICKETS' | 'LOST_FOUND' | 'KNOWLEDGE_BASE';
 type TicketTab = 'ALL' | 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED';
 
@@ -136,6 +155,27 @@ export const SupportDashboard: React.FC = () => {
 	const [resolveTicketId, setResolveTicketId] = useState<string | null>(null);
 	const [resolveType, setResolveType] = useState<string>('MESSAGE');
 	const [resolveReason, setResolveReason] = useState<string>('');
+	// Refund (paise) / voucher (₹ value) amount captured when resolving with a monetary outcome.
+	const [resolveAmountRupees, setResolveAmountRupees] = useState<string>('');
+
+	// Merge: tickets selected in the inbox can be merged into a single primary ticket.
+	const [showMergeModal, setShowMergeModal] = useState<boolean>(false);
+	const [mergePrimaryId, setMergePrimaryId] = useState<string>('');
+
+	// Linked entity cards (trip / rider / driver) hydrated lazily for the open ticket.
+	const [linkedTrip, setLinkedTrip] = useState<LinkedEntity | null>(null);
+	const [linkedRider, setLinkedRider] = useState<LinkedEntity | null>(null);
+	const [linkedDriver, setLinkedDriver] = useState<LinkedEntity | null>(null);
+
+	// 1s tick driving the live SLA countdown timers.
+	const [nowTick, setNowTick] = useState<number>(Date.now());
+
+	// Lightweight inline toast (matches TripDetail — no shared admin toast).
+	const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+	const showToast = (text: string, kind: 'ok' | 'err' = 'ok') => {
+		setToast({ text, kind });
+		window.setTimeout(() => setToast(null), 3500);
+	};
 
 	// Create New entities forms
 	const [showCreateTicketModal, setShowCreateTicketModal] = useState<boolean>(false);
@@ -292,6 +332,45 @@ export const SupportDashboard: React.FC = () => {
 		}
 	}, [selectedTicket]);
 
+	// Auto-refresh the ticket queue every 15s so newly-created / reassigned tickets
+	// surface without a manual reload (only while on the tickets tab).
+	useEffect(() => {
+		if (activeMainTab !== 'TICKETS') return;
+		const t = setInterval(() => { fetchTickets(); fetchStats(); }, 15000);
+		return () => clearInterval(t);
+	}, [activeMainTab, activeTicketTab, filterPriority, filterCategory, filterSlaBreach, searchQuery]);
+
+	// 1s tick that drives every live SLA countdown timer in the queue + detail header.
+	useEffect(() => {
+		const t = setInterval(() => setNowTick(Date.now()), 1000);
+		return () => clearInterval(t);
+	}, []);
+
+	// Hydrate linked trip / rider / driver cards for the open ticket.
+	useEffect(() => {
+		const tkt = selectedTicketDetail?.ticket;
+		setLinkedTrip(null);
+		setLinkedRider(null);
+		setLinkedDriver(null);
+		if (!tkt) return;
+
+		const load = async (url: string, set: (e: LinkedEntity) => void) => {
+			try {
+				const res = await fetch(url, { headers });
+				if (res.ok) set(await res.json());
+			} catch (err) { console.error(err); }
+		};
+
+		if (tkt.linked_trip_id) {
+			void load(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${tkt.linked_trip_id}`, setLinkedTrip);
+		}
+		if (tkt.creator_type === 'RIDER') {
+			void load(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/${tkt.creator_id}`, setLinkedRider);
+		} else if (tkt.creator_type === 'DRIVER') {
+			void load(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers/${tkt.creator_id}`, setLinkedDriver);
+		}
+	}, [selectedTicketDetail?.ticket?.id]);
+
 	// Handlers
 	const handleSelectTicket = (tkt: Ticket) => {
 		setSelectedTicket(tkt);
@@ -421,28 +500,78 @@ export const SupportDashboard: React.FC = () => {
 		e.preventDefault();
 		if (!resolveTicketId) return;
 
+		// REFUND / VOUCHER outcomes carry a monetary amount, captured in rupees and
+		// sent to the backend as paise (1 rupee = 100 paise).
+		const amountPaise = Math.round(parseFloat(resolveAmountRupees || '0') * 100);
+		if ((resolveType === 'REFUND' || resolveType === 'VOUCHER') && amountPaise <= 0) {
+			showToast('Enter a valid amount for this resolution.', 'err');
+			return;
+		}
+
 		try {
+			const payload: Record<string, unknown> = {
+				resolution_type: resolveType,
+				resolution_reason: resolveReason,
+				agent_name: agentName,
+				agent_id: agentId,
+			};
+			if (resolveType === 'REFUND') payload.refund_amount_paise = amountPaise;
+			if (resolveType === 'VOUCHER') payload.voucher_value_paise = amountPaise;
+
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/support/tickets/${resolveTicketId}/resolve`, {
 				method: 'POST',
 				headers,
-				body: JSON.stringify({
-					resolution_type: resolveType,
-					resolution_reason: resolveReason,
-					agent_name: agentName,
-					agent_id: agentId,
-				}),
+				body: JSON.stringify(payload),
 			});
 			if (res.ok) {
 				setResolveTicketId(null);
 				setResolveReason('');
+				setResolveAmountRupees('');
 				if (selectedTicket?.id === resolveTicketId) {
 					fetchTicketDetail(resolveTicketId);
 				}
 				fetchTickets();
 				fetchStats();
+				showToast('Ticket resolved.', 'ok');
+			} else {
+				showToast('Failed to resolve ticket.', 'err');
 			}
 		} catch (err) {
 			console.error(err);
+			showToast('Failed to resolve ticket.', 'err');
+		}
+	};
+
+	// Merge: fold the selected tickets into a chosen primary ticket.
+	const handleMergeTickets = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (selectedTicketIds.length < 2 || !mergePrimaryId) return;
+		if (!window.confirm(`Merge ${selectedTicketIds.length} tickets into ${mergePrimaryId}? The other tickets will be closed and their threads folded in.`)) return;
+		try {
+			const sourceIds = selectedTicketIds.filter((id) => id !== mergePrimaryId);
+			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/support/tickets/merge`, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify({
+					primary_ticket_id: mergePrimaryId,
+					source_ticket_ids: sourceIds,
+					agent_name: agentName,
+					agent_id: agentId,
+				}),
+			});
+			if (res.ok) {
+				setShowMergeModal(false);
+				setSelectedTicketIds([]);
+				setMergePrimaryId('');
+				fetchTickets();
+				fetchStats();
+				showToast('Tickets merged.', 'ok');
+			} else {
+				showToast('Failed to merge tickets.', 'err');
+			}
+		} catch (err) {
+			console.error(err);
+			showToast('Failed to merge tickets.', 'err');
 		}
 	};
 
@@ -461,9 +590,13 @@ export const SupportDashboard: React.FC = () => {
 				if (selectedTicket?.id === id) {
 					fetchTicketDetail(id);
 				}
+				showToast('Ticket closed.', 'ok');
+			} else {
+				showToast('Failed to close ticket.', 'err');
 			}
 		} catch (err) {
 			console.error(err);
+			showToast('Failed to close ticket.', 'err');
 		}
 	};
 
@@ -607,6 +740,20 @@ export const SupportDashboard: React.FC = () => {
 	const isSlaBreached = (deadline: string, status: string): boolean => {
 		if (status === 'RESOLVED' || status === 'CLOSED') return false;
 		return new Date(deadline).getTime() < Date.now();
+	};
+
+	// Live SLA countdown string from the deadline relative to the 1s `nowTick`.
+	// Returns e.g. "02:14:09 left" or "01:05 over" once breached.
+	const slaCountdown = (deadline: string, status: string): { text: string; breached: boolean } => {
+		if (status === 'RESOLVED' || status === 'CLOSED') return { text: 'Closed', breached: false };
+		const diffMs = new Date(deadline).getTime() - nowTick;
+		const breached = diffMs < 0;
+		let s = Math.floor(Math.abs(diffMs) / 1000);
+		const h = Math.floor(s / 3600); s -= h * 3600;
+		const m = Math.floor(s / 60); s -= m * 60;
+		const pad = (n: number) => n.toString().padStart(2, '0');
+		const clock = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+		return { text: breached ? `${clock} over` : `${clock} left`, breached };
 	};
 
 	return (
@@ -795,6 +942,15 @@ export const SupportDashboard: React.FC = () => {
 														<span className="font-semibold text-content-primary">{tkt.creator_name} ({tkt.creator_type.toLowerCase()})</span>
 														<span>{new Date(tkt.created_at).toLocaleDateString()}</span>
 													</div>
+													{(() => {
+														const sla = slaCountdown(tkt.sla_deadline, tkt.status);
+														return (
+															<div className={`flex items-center gap-1 text-[10px] font-mono font-bold ${sla.breached ? 'text-status-negative' : 'text-status-online'}`}>
+																<span>{sla.breached ? '⚠️' : '⏱'}</span>
+																<span>SLA {sla.text}</span>
+															</div>
+														);
+													})()}
 													<div className="flex flex-wrap gap-1">
 														<span className="bg-background-secondary text-content-primary font-medium px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide">
 															{tkt.category.replace('_', ' ')}
@@ -822,6 +978,13 @@ export const SupportDashboard: React.FC = () => {
 											className="bg-background-primary text-content-primary text-[10px] font-bold px-3 py-1 rounded-pill hover:bg-background-secondary"
 										>
 											Claim Selected
+										</button>
+										<button
+											onClick={() => { setMergePrimaryId(selectedTicketIds[0]); setShowMergeModal(true); }}
+											disabled={selectedTicketIds.length < 2}
+											className="bg-background-primary text-content-primary text-[10px] font-bold px-3 py-1 rounded-pill hover:bg-background-secondary disabled:opacity-40"
+										>
+											Merge ({selectedTicketIds.length})
 										</button>
 										<button
 											onClick={() => setSelectedTicketIds([])}
@@ -920,15 +1083,14 @@ export const SupportDashboard: React.FC = () => {
 												<div className="text-xs font-mono font-bold text-content-primary mt-1">
 													{new Date(selectedTicketDetail.ticket.sla_deadline).toLocaleString()}
 												</div>
-												<div className={`text-[10px] font-bold mt-0.5 ${
-													isSlaBreached(selectedTicketDetail.ticket.sla_deadline, selectedTicketDetail.ticket.status)
-														? 'text-status-negative'
-														: 'text-status-online'
-												}`}>
-													{isSlaBreached(selectedTicketDetail.ticket.sla_deadline, selectedTicketDetail.ticket.status)
-														? '⚠️ SLA breached'
-														: '✓ Within SLA target'}
-												</div>
+												{(() => {
+													const sla = slaCountdown(selectedTicketDetail.ticket.sla_deadline, selectedTicketDetail.ticket.status);
+													return (
+														<div className={`text-[10px] font-mono font-bold mt-0.5 ${sla.breached ? 'text-status-negative' : 'text-status-online'}`}>
+															{sla.breached ? `⚠️ SLA breached — ${sla.text}` : `⏱ ${sla.text}`}
+														</div>
+													);
+												})()}
 											</div>
 										</div>
 
@@ -937,6 +1099,56 @@ export const SupportDashboard: React.FC = () => {
 												<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold">Resolution Closed Log</span>
 												<div className="text-content-primary font-semibold">Type: {selectedTicketDetail.ticket.resolution_type}</div>
 												<p className="text-content-secondary leading-snug">{selectedTicketDetail.ticket.resolution_reason}</p>
+											</div>
+										)}
+
+										{/* Linked entity cards (trip / rider / driver) */}
+										{(linkedTrip || linkedRider || linkedDriver) && (
+											<div className="pt-3 border-t border-background-secondary space-y-2">
+												<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold">Linked Records</span>
+												<div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+													{linkedTrip && (
+														<Link
+															to={`/trips/${linkedTrip.id}`}
+															className="block p-3 rounded-lg border border-background-secondary bg-background-tertiary hover:bg-background-secondary transition group"
+														>
+															<div className="flex justify-between items-center">
+																<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold">Trip</span>
+																{pickString(linkedTrip, ['status']) && <AdminBadge label={pickString(linkedTrip, ['status']) as string} />}
+															</div>
+															<div className="font-mono text-[11px] font-bold text-content-primary mt-1 truncate group-hover:underline">{String(linkedTrip.id).substring(0, 12)}…</div>
+															<div className="text-[10px] text-content-secondary mt-0.5 truncate">
+																{pickString(linkedTrip, ['pickup_address', 'pickup_label', 'origin']) ?? 'View trip detail →'}
+															</div>
+														</Link>
+													)}
+													{linkedRider && (
+														<Link
+															to={`/riders/${linkedRider.id}`}
+															className="block p-3 rounded-lg border border-background-secondary bg-background-tertiary hover:bg-background-secondary transition group"
+														>
+															<div className="flex justify-between items-center">
+																<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold">Rider</span>
+																{pickString(linkedRider, ['status', 'account_status']) && <AdminBadge label={pickString(linkedRider, ['status', 'account_status']) as string} />}
+															</div>
+															<div className="text-[11px] font-bold text-content-primary mt-1 truncate group-hover:underline">{pickString(linkedRider, ['name', 'full_name']) ?? String(linkedRider.id).substring(0, 12)}</div>
+															<div className="text-[10px] text-content-secondary mt-0.5 truncate font-mono">{pickString(linkedRider, ['phone', 'phone_number']) ?? 'View rider detail →'}</div>
+														</Link>
+													)}
+													{linkedDriver && (
+														<Link
+															to={`/drivers/${linkedDriver.id}`}
+															className="block p-3 rounded-lg border border-background-secondary bg-background-tertiary hover:bg-background-secondary transition group"
+														>
+															<div className="flex justify-between items-center">
+																<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold">Driver</span>
+																{pickString(linkedDriver, ['status', 'account_status']) && <AdminBadge label={pickString(linkedDriver, ['status', 'account_status']) as string} />}
+															</div>
+															<div className="text-[11px] font-bold text-content-primary mt-1 truncate group-hover:underline">{pickString(linkedDriver, ['name', 'full_name']) ?? String(linkedDriver.id).substring(0, 12)}</div>
+															<div className="text-[10px] text-content-secondary mt-0.5 truncate font-mono">{pickString(linkedDriver, ['phone', 'phone_number']) ?? 'View driver detail →'}</div>
+														</Link>
+													)}
+												</div>
 											</div>
 										)}
 									</div>
@@ -1376,6 +1588,29 @@ export const SupportDashboard: React.FC = () => {
 							</select>
 						</div>
 
+						{(resolveType === 'REFUND' || resolveType === 'VOUCHER') && (
+							<div>
+								<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-bold">
+									{resolveType === 'REFUND' ? 'Refund Amount (Rupees)' : 'Voucher Value (Rupees)'}
+								</label>
+								<input
+									type="number"
+									step="0.01"
+									min="0"
+									required
+									placeholder="e.g. 250.00"
+									className="w-full bg-background-primary border border-background-secondary rounded-md p-2 text-xs text-content-primary font-mono text-right focus:outline-none focus:border-content-primary"
+									value={resolveAmountRupees}
+									onChange={(e) => setResolveAmountRupees(e.target.value)}
+								/>
+								{resolveAmountRupees && (
+									<p className="text-[9px] text-content-tertiary mt-1 font-mono">
+										= {formatPaise(Math.round(parseFloat(resolveAmountRupees || '0') * 100), 2)} ({Math.round(parseFloat(resolveAmountRupees || '0') * 100)} paise)
+									</p>
+								)}
+							</div>
+						)}
+
 						<div>
 							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-bold">Resolution Reason Explanation</label>
 							<textarea
@@ -1391,7 +1626,7 @@ export const SupportDashboard: React.FC = () => {
 						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
 							<button
 								type="button"
-								onClick={() => { setResolveTicketId(null); setResolveReason(''); }}
+								onClick={() => { setResolveTicketId(null); setResolveReason(''); setResolveAmountRupees(''); }}
 								className="px-4 py-1.5 bg-background-secondary text-content-secondary hover:text-content-primary text-xs font-semibold rounded-pill transition"
 							>
 								Cancel
@@ -1749,6 +1984,86 @@ export const SupportDashboard: React.FC = () => {
 							</button>
 						</div>
 					</form>
+				</div>
+			)}
+
+			{/* ============================================================== */}
+			{/* ====================== MERGE MODAL ========================== */}
+			{/* ============================================================== */}
+			{showMergeModal && (
+				<div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
+					<form onSubmit={handleMergeTickets} className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-md w-full space-y-4 shadow-2xl">
+						<div>
+							<h3 className="text-sm font-bold text-content-primary">Merge Duplicate Tickets</h3>
+							<p className="text-[11px] text-content-tertiary mt-1">Fold {selectedTicketIds.length} selected tickets into one primary. The other tickets are closed and their threads are folded into the primary.</p>
+						</div>
+
+						<div>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1.5 font-bold">Primary Ticket (keep open)</label>
+							<select
+								className="w-full bg-background-primary border border-background-secondary rounded-md p-2 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+								value={mergePrimaryId}
+								onChange={(e) => setMergePrimaryId(e.target.value)}
+							>
+								{selectedTicketIds.map((id) => {
+									const tkt = tickets.find((t) => t.id === id);
+									return (
+										<option key={id} value={id}>
+											{id}{tkt ? ` — ${tkt.subject}` : ''}
+										</option>
+									);
+								})}
+							</select>
+						</div>
+
+						<div className="bg-background-tertiary border border-background-secondary rounded-lg p-3 space-y-1.5">
+							<span className="text-[9px] uppercase tracking-wider text-content-tertiary font-bold block">Tickets to fold in &amp; close</span>
+							{selectedTicketIds.filter((id) => id !== mergePrimaryId).length === 0 ? (
+								<p className="text-[11px] text-content-tertiary italic">Select a different primary to fold the rest in.</p>
+							) : (
+								selectedTicketIds.filter((id) => id !== mergePrimaryId).map((id) => {
+									const tkt = tickets.find((t) => t.id === id);
+									return (
+										<div key={id} className="text-[11px] font-mono text-content-secondary truncate">
+											{id}{tkt ? ` — ${tkt.subject}` : ''}
+										</div>
+									);
+								})
+							)}
+						</div>
+
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
+							<button
+								type="button"
+								onClick={() => { setShowMergeModal(false); setMergePrimaryId(''); }}
+								className="px-4 py-1.5 bg-background-secondary text-content-secondary hover:text-content-primary text-xs font-semibold rounded-pill transition"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								disabled={selectedTicketIds.length < 2 || !mergePrimaryId}
+								className="px-4 py-1.5 bg-content-primary text-gray-0 text-xs font-semibold rounded-pill hover:bg-gray-800 transition disabled:opacity-50"
+							>
+								Merge Tickets
+							</button>
+						</div>
+					</form>
+				</div>
+			)}
+
+			{/* ============================================================== */}
+			{/* =========================== TOAST =========================== */}
+			{/* ============================================================== */}
+			{toast && (
+				<div className="fixed bottom-6 right-6 z-[110] animate-fade-in">
+					<div className={`rounded-pill px-4 py-2.5 text-xs font-semibold shadow-xl border ${
+						toast.kind === 'ok'
+							? 'bg-surface-positive text-content-positive border-positive-400'
+							: 'bg-surface-negative text-content-negative border-negative-400'
+					}`}>
+						{toast.text}
+					</div>
 				</div>
 			)}
 		</div>

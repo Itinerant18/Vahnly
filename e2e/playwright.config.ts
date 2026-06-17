@@ -39,6 +39,11 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], baseURL: process.env.RIDER_URL ?? 'http://localhost:3050' },
     },
     {
+      name: 'driver',
+      testMatch: /driver-.*\.spec\.ts/,
+      use: { ...devices['Pixel 7'], baseURL: process.env.DRIVER_URL ?? 'http://localhost:3000' },
+    },
+    {
       name: 'admin',
       testMatch: /admin-.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: process.env.ADMIN_URL ?? 'http://localhost:5173' },

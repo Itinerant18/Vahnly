@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import { AdminBadge } from '../../components/ds/AdminBadge';
+import { formatPaise } from '../lib/money';
 
 interface SOSAlert {
 	id: string;
@@ -82,18 +84,6 @@ function incidentBadge(category: string) {
 	}
 }
 
-function severityBadge(severity: string) {
-	if (severity === 'HIGH') return 'badge badge-negative';
-	if (severity === 'MEDIUM') return 'badge badge-warning';
-	return 'badge badge-accent';
-}
-
-function anomalyStatusBadge(status: string) {
-	if (status === 'PENDING') return 'badge badge-warning';
-	if (status === 'ESCALATED_TO_SOS') return 'badge badge-negative';
-	return 'badge badge-neutral';
-}
-
 function sosBadge(status: string) {
 	if (status === 'ACTIVE') return 'badge badge-negative';
 	if (status === 'ACKNOWLEDGED') return 'badge badge-warning';
@@ -133,6 +123,17 @@ export const SafetyDashboard: React.FC = () => {
 	const [dialDuration, setDialDuration] = useState<number>(0);
 	const [simulating, setSimulating] = useState<boolean>(false);
 
+	// Incidents list filters (category + severity-style status narrowing).
+	const [incidentCategoryFilter, setIncidentCategoryFilter] = useState<string>('');
+	const [incidentStatusFilter, setIncidentStatusFilter] = useState<string>('');
+
+	// Lightweight inline toast (matches TripDetail/RiderDetail — no shared admin toast).
+	const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+	const showToast = (text: string, kind: 'ok' | 'err' = 'ok') => {
+		setToast({ text, kind });
+		window.setTimeout(() => setToast(null), 3500);
+	};
+
 	const adminRole = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
 	const adminId = '255e9024-d123-4063-9c6f-1662b7f2e8a5';
 	const headers = { 'X-Admin-Role': adminRole, 'X-Admin-ID': adminId, 'Content-Type': 'application/json' };
@@ -152,8 +153,22 @@ export const SafetyDashboard: React.FC = () => {
 		setWaveHeights([12, 18, 8, 22, 14, 28, 10, 16, 20, 12, 6, 18, 14, 24, 8]);
 	};
 
+	// Merge freshly-fetched alerts into the existing list: dedupe by id (newest record
+	// for each id wins) and sort newest-first so a just-triggered SOS surfaces at the top
+	// without dropping any in-flight agent state captured on the same id.
+	const mergeSos = (incoming: SOSAlert[]) => {
+		setSosAlerts((prev) => {
+			const byId = new Map<string, SOSAlert>();
+			for (const a of prev) byId.set(a.id, a);
+			for (const a of incoming) byId.set(a.id, a);
+			return Array.from(byId.values()).sort(
+				(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+			);
+		});
+	};
+
 	const fetchSOS = async () => {
-		try { const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/sos`, { headers }); if (res.ok) setSosAlerts(await res.json()); }
+		try { const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/sos`, { headers }); if (res.ok) mergeSos(await res.json()); }
 		catch (err) { console.error('Failed fetching SOS alerts:', err); }
 	};
 	const fetchIncidents = async () => {
@@ -172,8 +187,18 @@ export const SafetyDashboard: React.FC = () => {
 
 	useEffect(() => { reloadAll(); }, []);
 
+	// CRITICAL: the emergency-response queue must surface newly-triggered SOS alerts
+	// without a manual reload. Poll the SOS endpoint every 10s and anomalies every 8s
+	// (matching the on-screen "every 8s" label), merging by id so in-flight agent state
+	// is preserved. Intervals are torn down on unmount.
 	useEffect(() => {
-		let timer: any;
+		const sosTimer = setInterval(fetchSOS, 10000);
+		const anomalyTimer = setInterval(fetchAnomalies, 8000);
+		return () => { clearInterval(sosTimer); clearInterval(anomalyTimer); };
+	}, []);
+
+	useEffect(() => {
+		let timer: ReturnType<typeof setInterval> | undefined;
 		if (isDialing) { timer = setInterval(() => setDialDuration((prev) => prev + 1), 1000); }
 		return () => clearInterval(timer);
 	}, [isDialing]);
@@ -274,16 +299,18 @@ export const SafetyDashboard: React.FC = () => {
 				setShowAddBlockModal(false);
 				setNewBlockForm({ user_id: '', user_type: 'DRIVER', block_type: 'GLOBAL', target_user_id: '', target_user_type: 'RIDER', reason: '' });
 				fetchBlacklist();
-			}
-		} catch (err) { console.error(err); }
+				showToast('Blacklist block deployed.', 'ok');
+			} else { showToast('Failed to deploy block.', 'err'); }
+		} catch (err) { console.error(err); showToast('Failed to deploy block.', 'err'); }
 	};
 
 	const handleRemoveBlacklist = async (id: number) => {
 		if (!confirm('Are you sure you want to lift this block?')) return;
 		try {
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/safety/blacklist/${id}`, { method: 'DELETE', headers });
-			if (res.ok) fetchBlacklist();
-		} catch (err) { console.error(err); }
+			if (res.ok) { fetchBlacklist(); showToast('Block lifted.', 'ok'); }
+			else { showToast('Failed to lift block.', 'err'); }
+		} catch (err) { console.error(err); showToast('Failed to lift block.', 'err'); }
 	};
 
 	const triggerSimulateSos = async () => {
@@ -313,6 +340,11 @@ export const SafetyDashboard: React.FC = () => {
 		const secs = sec % 60;
 		return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 	};
+
+	const filteredIncidents = incidents.filter((inc) =>
+		(!incidentCategoryFilter || inc.category === incidentCategoryFilter) &&
+		(!incidentStatusFilter || inc.status === incidentStatusFilter),
+	);
 
 	const tabDef: { key: SafetyTab; label: string }[] = [
 		{ key: 'SOS', label: 'Live SOS alerts' },
@@ -581,13 +613,39 @@ export const SafetyDashboard: React.FC = () => {
 					<div className="w-full h-full flex divide-x divide-border-opaque">
 						{/* Incidents list */}
 						<div className="w-[360px] min-w-[360px] h-full flex flex-col bg-background-primary">
-							<div className="p-4 border-b border-border-opaque bg-background-secondary">
+							<div className="p-4 border-b border-border-opaque bg-background-secondary space-y-3">
 								<h2 className="text-label-small font-bold uppercase tracking-wider text-content-secondary">Investigation Reports</h2>
+								<div className="flex gap-2">
+									<select
+										value={incidentCategoryFilter}
+										onChange={(e) => setIncidentCategoryFilter(e.target.value)}
+										className="flex-1 h-8 bg-background-primary border border-border-opaque rounded-sm px-2 text-label-small text-content-secondary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+									>
+										<option value="">All Categories</option>
+										<option value="ACCIDENT">Accident</option>
+										<option value="HARASSMENT">Harassment</option>
+										<option value="THEFT">Theft</option>
+										<option value="RASH_DRIVING">Rash Driving</option>
+										<option value="VEHICLE_ISSUE">Vehicle Issue</option>
+										<option value="OTHER">Other</option>
+									</select>
+									<select
+										value={incidentStatusFilter}
+										onChange={(e) => setIncidentStatusFilter(e.target.value)}
+										className="flex-1 h-8 bg-background-primary border border-border-opaque rounded-sm px-2 text-label-small text-content-secondary focus:outline-none focus:ring-2 focus:ring-accent-400 transition-base"
+									>
+										<option value="">All Statuses</option>
+										<option value="OPEN">Open</option>
+										<option value="UNDER_INVESTIGATION">Under Investigation</option>
+										<option value="RESOLVED">Resolved</option>
+										<option value="CLOSED">Closed</option>
+									</select>
+								</div>
 							</div>
 							<div className="flex-1 overflow-y-auto divide-y divide-border-opaque">
-								{incidents.length === 0 ? (
+								{filteredIncidents.length === 0 ? (
 									<div className="p-8 text-center text-paragraph-small text-content-tertiary font-medium">No incident reports logged</div>
-								) : incidents.map((inc) => {
+								) : filteredIncidents.map((inc) => {
 									const isSelected = selectedIncident?.id === inc.id;
 									return (
 										<div
@@ -645,7 +703,7 @@ export const SafetyDashboard: React.FC = () => {
 											<div>
 												<span className="text-label-small text-content-tertiary font-bold uppercase tracking-wider block">Claim Amount</span>
 												<span className="font-mono font-semibold text-content-primary">
-													{selectedIncident.d4m_care_claim_amount_paise > 0 ? `₹${(selectedIncident.d4m_care_claim_amount_paise / 100).toLocaleString()}` : '₹0'}
+													{formatPaise(selectedIncident.d4m_care_claim_amount_paise)}
 												</span>
 											</div>
 										</div>
@@ -773,12 +831,12 @@ export const SafetyDashboard: React.FC = () => {
 											<tr key={anom.id} className="hover:bg-background-secondary transition-base">
 												<td className={`${tdCls} font-bold`}>{anom.id}</td>
 												<td className="p-4">
-													<span className="badge badge-warning">{anom.anomaly_type.replace('_', ' ')}</span>
+													<AdminBadge label={anom.anomaly_type.replace('_', ' ')} variant="warning" />
 												</td>
 												<td className="p-4 text-content-secondary">{anom.trip_id}</td>
-												<td className="p-4"><span className={severityBadge(anom.severity)}>{anom.severity}</span></td>
+												<td className="p-4"><AdminBadge label={anom.severity} variant={anom.severity === 'HIGH' ? 'negative' : anom.severity === 'MEDIUM' ? 'warning' : 'accent'} /></td>
 												<td className="p-4 text-content-primary font-sans max-w-[280px] truncate">{anom.description}</td>
-												<td className="p-4"><span className={anomalyStatusBadge(anom.status)}>{anom.status}</span></td>
+												<td className="p-4"><AdminBadge label={anom.status} variant={anom.status === 'PENDING' ? 'warning' : anom.status === 'ESCALATED_TO_SOS' ? 'negative' : 'neutral'} /></td>
 												<td className="p-4 text-right space-x-1.5 font-sans">
 													{anom.status === 'PENDING' && (
 														<>
@@ -944,6 +1002,19 @@ export const SafetyDashboard: React.FC = () => {
 					<div className="flex justify-between items-center">
 						<span className="text-label-small font-mono font-semibold">{formatDuration(dialDuration)}</span>
 						<button onClick={handleHangUp} className="bg-negative-500 hover:bg-negative-600 text-white text-label-small font-bold px-4 py-2 rounded-sm transition-base">Hang Up</button>
+					</div>
+				</div>
+			)}
+
+			{/* ─── Toast ────────────────────────────────────────────────── */}
+			{toast && (
+				<div className="fixed bottom-6 right-6 z-[110] animate-fade-in">
+					<div className={`rounded-pill px-4 py-2.5 text-label-small font-semibold shadow-xl border ${
+						toast.kind === 'ok'
+							? 'bg-surface-positive text-content-positive border-positive-400'
+							: 'bg-surface-negative text-content-negative border-negative-400'
+					}`}>
+						{toast.text}
 					</div>
 				</div>
 			)}

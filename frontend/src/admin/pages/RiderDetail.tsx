@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { API_GATEWAY_BASE_URL } from '../../config';
 
@@ -13,55 +13,46 @@ interface RiderOverviewTab {
 	devices: { device_name: string; os_version: string; app_version: string }[];
 }
 
+// ── Tab payload shapes (mirror the backend handler structs) ──────────────
 interface RiderCar {
-	make_model: string;
-	plate: string;
-	documents: { rc_status: string; insurance_status: string; puc_status: string };
-	expiry_alerts: string[];
+	id: string;
+	make: string;
+	model: string;
+	year: number;
+	car_type: string;
+	transmission: string;
+	fuel_type: string;
+	registration_plate: string;
+	color: string;
+	is_default: boolean;
+	is_active: boolean;
 }
 
-interface RiderGarageTab {
-	cars: RiderCar[];
-}
-
-interface RiderTransaction {
-	transaction_id: string;
+interface RiderTrip {
 	order_id: string;
-	amount_paise: number;
 	status: string;
-	gateway: string;
+	city_prefix: string;
+	fare_paise: number;
+	driver_name: string;
 	created_at: string;
 }
 
-interface RiderRefund {
-	refund_id: string;
+interface RiderPaymentTxn {
+	id: string;
 	order_id: string;
 	amount_paise: number;
-	status: string;
-	reason: string;
+	currency: string;
+	payment_status: string;
+	provider_type: string;
 	created_at: string;
-}
-
-interface RiderChargeback {
-	chargeback_id: string;
-	order_id: string;
-	amount_paise: number;
-	status: string;
-	created_at: string;
-}
-
-interface RiderPaymentsTab {
-	methods: { type: string; details: string }[];
-	transactions: RiderTransaction[];
-	refunds: RiderRefund[];
-	chargebacks: RiderChargeback[];
 }
 
 interface RiderWalletTransaction {
-	type: string;
 	amount_paise: number;
-	timestamp: string;
+	entry_type: string;
+	reason_code: string;
 	description: string;
+	created_at: string;
 }
 
 interface RiderWalletTab {
@@ -69,66 +60,45 @@ interface RiderWalletTab {
 	transactions: RiderWalletTransaction[];
 }
 
-interface RiderPromoApplied {
-	promo_code: string;
-	status: string;
-	timestamp: string;
+interface RiderPromoUsage {
+	promo_code_id: string;
+	code: string;
+	order_id: string;
+	discount_paise: number;
+	created_at: string;
 }
 
-interface RiderPromosTab {
-	applied: RiderPromoApplied[];
-	eligibility_flags: string[];
+interface RiderRating {
+	order_id: string;
+	rider_rating_for_driver: number | null;
+	driver_rating_for_rider: number | null;
+	rider_review_comment: string;
+	driver_review_comment: string;
+	created_at: string;
 }
 
-interface RiderSupportTicket {
-	ticket_id: string;
-	subject: string;
+interface RiderRiskSignal {
+	id: string;
+	fraud_type: string;
+	score: number;
 	status: string;
 	created_at: string;
 }
 
-interface RiderSupportChat {
-	chat_id: string;
-	subject: string;
-	last_message: string;
-	timestamp: string;
-}
-
-interface RiderCallRecording {
-	call_id: string;
-	duration_seconds: number;
-	timestamp: string;
-}
-
-interface RiderSupportTab {
-	tickets: RiderSupportTicket[];
-	chats: RiderSupportChat[];
-	call_recordings: RiderCallRecording[];
-}
-
-interface RiderRatingsTab {
-	average_given: number;
-	average_received: number;
-}
-
-interface RiderRiskTab {
-	score: number;
-	flags: string[];
-	blocked_reasons: string[];
-}
-
 interface RiderNotificationLog {
+	id: string;
 	type: string;
-	payload: string;
-	timestamp: string;
+	title: string;
+	body: string;
+	is_read: boolean;
+	created_at: string;
 }
 
 interface RiderAuditLogEntry {
 	id: string;
-	admin_user: string;
+	admin_email: string;
 	action: string;
 	details: string;
-	ip: string;
 	created_at: string;
 }
 
@@ -144,16 +114,18 @@ interface RiderDetailResponse {
 	tags: string[];
 	referral_source: string;
 	overview: RiderOverviewTab;
-	garage: RiderGarageTab;
-	payments: RiderPaymentsTab;
-	wallet: RiderWalletTab;
-	promos: RiderPromosTab;
-	support: RiderSupportTab;
-	ratings: RiderRatingsTab;
-	risk: RiderRiskTab;
-	notifications: RiderNotificationLog[];
-	audit_logs: RiderAuditLogEntry[];
 }
+
+// Generic helper for the lazily-loaded tab payloads coming from per-tab endpoints.
+interface LazyTabState<T> {
+	loading: boolean;
+	loaded: boolean;
+	data: T | null;
+}
+
+const emptyTab = <T,>(): LazyTabState<T> => ({ loading: false, loaded: false, data: null });
+
+type ConfirmKind = 'suspend' | 'block' | 'delete';
 
 export const RiderDetail: React.FC = () => {
 	const { id } = useParams<{ id: string }>();
@@ -162,6 +134,18 @@ export const RiderDetail: React.FC = () => {
 	const [loading, setLoading] = useState<boolean>(true);
 	const [activeTab, setActiveTab] = useState<string>('overview');
 	const [actionLoading, setActionLoading] = useState<boolean>(false);
+	const [toast, setToast] = useState<string | null>(null);
+
+	// Lazily-loaded tab payloads.
+	const [garageTab, setGarageTab] = useState<LazyTabState<RiderCar[]>>(emptyTab);
+	const [tripsTab, setTripsTab] = useState<LazyTabState<RiderTrip[]>>(emptyTab);
+	const [paymentsTab, setPaymentsTab] = useState<LazyTabState<RiderPaymentTxn[]>>(emptyTab);
+	const [walletTab, setWalletTab] = useState<LazyTabState<RiderWalletTab>>(emptyTab);
+	const [promosTab, setPromosTab] = useState<LazyTabState<RiderPromoUsage[]>>(emptyTab);
+	const [ratingsTab, setRatingsTab] = useState<LazyTabState<RiderRating[]>>(emptyTab);
+	const [riskTab, setRiskTab] = useState<LazyTabState<RiderRiskSignal[]>>(emptyTab);
+	const [notificationsTab, setNotificationsTab] = useState<LazyTabState<RiderNotificationLog[]>>(emptyTab);
+	const [auditTab, setAuditTab] = useState<LazyTabState<RiderAuditLogEntry[]>>(emptyTab);
 
 	// Modals State
 	const [showEditModal, setShowEditModal] = useState(false);
@@ -176,15 +160,26 @@ export const RiderDetail: React.FC = () => {
 	const [showMergeModal, setShowMergeModal] = useState(false);
 	const [duplicateId, setDuplicateId] = useState('');
 
-	const fetchRiderDetail = async () => {
+	// Confirm modal for destructive lifecycle actions (suspend / block / GDPR delete).
+	const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
+	const [confirmReason, setConfirmReason] = useState('');
+
+	const showToast = useCallback((msg: string) => {
+		setToast(msg);
+		window.setTimeout(() => setToast(null), 3200);
+	}, []);
+
+	const authHeaders = useCallback((): Record<string, string> => {
+		const role = localStorage.getItem('admin_role') || 'ADMIN';
+		const email = localStorage.getItem('admin_email') || 'admin@platform.com';
+		return { 'X-Admin-Role': role, 'X-Admin-Email': email };
+	}, []);
+
+	const fetchRiderDetail = useCallback(async () => {
 		setLoading(true);
 		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
-
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/${id}`, {
-				headers: {
-					'X-Admin-Role': role,
-				},
+				headers: authHeaders(),
 			});
 			if (res.ok) {
 				const payload = await res.json();
@@ -203,53 +198,156 @@ export const RiderDetail: React.FC = () => {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [id, authHeaders, navigate]);
 
 	useEffect(() => {
 		if (id) {
 			fetchRiderDetail();
 		}
-	}, [id]);
+	}, [id, fetchRiderDetail]);
 
-	const handleAction = async (actionSlug: string, body?: any) => {
+	// ── Lazy per-tab loader ────────────────────────────────────────────────
+	// Fetches `path` once a tab opens, stores the JSON in `setState`. `extract`
+	// pulls the tab payload out of the response shape (empty-200 tolerated).
+	const loadTab = useCallback(
+		async <T,>(
+			path: string,
+			state: LazyTabState<T>,
+			setState: React.Dispatch<React.SetStateAction<LazyTabState<T>>>,
+			extract: (json: unknown) => T,
+		) => {
+			if (state.loaded || state.loading) return;
+			setState({ loading: true, loaded: false, data: null });
+			try {
+				const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/${id}${path}`, {
+					headers: authHeaders(),
+				});
+				const json: unknown = res.ok ? await res.json().catch(() => null) : null;
+				setState({ loading: false, loaded: true, data: extract(json) });
+			} catch (err) {
+				console.error(`Failed to load rider tab ${path}`, err);
+				setState({ loading: false, loaded: true, data: extract(null) });
+			}
+		},
+		[id, authHeaders],
+	);
+
+	// Allow a tab to be force-refreshed (e.g. after a wallet adjustment).
+	const reloadWallet = useCallback(() => {
+		setWalletTab(emptyTab());
+	}, []);
+
+	useEffect(() => {
+		if (!id) return;
+		const asArray = <T,>(json: unknown, key?: string): T[] => {
+			if (Array.isArray(json)) return json as T[];
+			if (json && typeof json === 'object' && key) {
+				const v = (json as Record<string, unknown>)[key];
+				if (Array.isArray(v)) return v as T[];
+			}
+			return [];
+		};
+		switch (activeTab) {
+			case 'garage':
+				loadTab<RiderCar[]>('/garage', garageTab, setGarageTab, (j) => asArray<RiderCar>(j, 'cars'));
+				break;
+			case 'trips':
+				loadTab<RiderTrip[]>('/orders', tripsTab, setTripsTab, (j) => asArray<RiderTrip>(j, 'orders'));
+				break;
+			case 'payments':
+				loadTab<RiderPaymentTxn[]>('/payments', paymentsTab, setPaymentsTab, (j) =>
+					asArray<RiderPaymentTxn>(j, 'transactions'),
+				);
+				break;
+			case 'wallet':
+				loadTab<RiderWalletTab>('/wallet', walletTab, setWalletTab, (j) => {
+					const o = (j && typeof j === 'object' ? j : {}) as Record<string, unknown>;
+					return {
+						balance_paise: typeof o.balance_paise === 'number' ? o.balance_paise : 0,
+						transactions: asArray<RiderWalletTransaction>(o, 'transactions'),
+					};
+				});
+				break;
+			case 'promos':
+				loadTab<RiderPromoUsage[]>('/promos', promosTab, setPromosTab, (j) => asArray<RiderPromoUsage>(j, 'applied'));
+				break;
+			case 'ratings':
+				loadTab<RiderRating[]>('/ratings', ratingsTab, setRatingsTab, (j) => asArray<RiderRating>(j, 'ratings'));
+				break;
+			case 'risk':
+				loadTab<RiderRiskSignal[]>('/risk', riskTab, setRiskTab, (j) => asArray<RiderRiskSignal>(j, 'signals'));
+				break;
+			case 'notifications':
+				loadTab<RiderNotificationLog[]>('/notifications', notificationsTab, setNotificationsTab, (j) =>
+					asArray<RiderNotificationLog>(j, 'notifications'),
+				);
+				break;
+			case 'audit':
+				loadTab<RiderAuditLogEntry[]>('/audit', auditTab, setAuditTab, (j) =>
+					asArray<RiderAuditLogEntry>(j, 'audit_logs'),
+				);
+				break;
+		}
+	}, [
+		activeTab,
+		id,
+		loadTab,
+		garageTab,
+		tripsTab,
+		paymentsTab,
+		walletTab,
+		promosTab,
+		ratingsTab,
+		riskTab,
+		notificationsTab,
+		auditTab,
+	]);
+
+	// handleAction posts to /admin/riders/{id}/{actionSlug}. actionSlug may contain
+	// sub-paths (e.g. 'wallet/adjust') so a slash is intentional here.
+	const handleAction = async (actionSlug: string, body?: Record<string, unknown>): Promise<boolean> => {
 		setActionLoading(true);
 		try {
-			const role = localStorage.getItem('admin_role') || 'ADMIN';
-			const email = localStorage.getItem('admin_email') || 'admin@platform.com';
-
 			const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/riders/${id}/${actionSlug}`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Admin-Role': role,
-					'X-Admin-Email': email,
-				},
+				headers: { 'Content-Type': 'application/json', ...authHeaders() },
 				body: body ? JSON.stringify(body) : undefined,
 			});
 
 			if (res.ok) {
-				alert(`Action '${actionSlug}' executed successfully.`);
-				// Reset modals
+				showToast(`Action '${actionSlug}' executed successfully.`);
 				setShowEditModal(false);
 				setShowWalletModal(false);
 				setShowVoucherModal(false);
 				setShowMergeModal(false);
-				
 				fetchRiderDetail();
-			} else {
-				const msg = await res.text();
-				alert(`Action failed: ${msg}`);
+				return true;
 			}
+			const msg = await res.text();
+			showToast(`Action failed: ${msg || res.status}`);
+			return false;
 		} catch (err) {
 			console.error(err);
-			alert('Network request execution failure.');
+			showToast('Network request execution failure.');
+			return false;
 		} finally {
 			setActionLoading(false);
 		}
 	};
 
 	const handleImpersonate = () => {
-		alert(`Starting Read-Only Impersonation Session for Rider ID: ${id}.\nRedirecting client context...`);
+		showToast(`Starting read-only impersonation session for rider ${id}.`);
+	};
+
+	const runConfirm = async () => {
+		if (!confirmKind) return;
+		const slug = confirmKind; // 'suspend' | 'block' | 'delete'
+		const ok = await handleAction(slug, confirmReason.trim() ? { reason: confirmReason.trim() } : undefined);
+		if (ok) {
+			setConfirmKind(null);
+			setConfirmReason('');
+			if (slug === 'delete') navigate('/riders');
+		}
 	};
 
 	if (loading) {
@@ -269,26 +367,60 @@ export const RiderDetail: React.FC = () => {
 		{ id: 'payments', label: 'Payments' },
 		{ id: 'wallet', label: 'Wallet' },
 		{ id: 'promos', label: 'Promos' },
-		{ id: 'support', label: 'Support' },
 		{ id: 'ratings', label: 'Ratings' },
 		{ id: 'risk', label: 'Risk & Fraud' },
 		{ id: 'notifications', label: 'Notifications' },
 		{ id: 'audit', label: 'Audit Log' },
 	];
 
+	const TabLoading = () => (
+		<div className="p-12 text-center text-xs text-content-tertiary font-mono animate-pulse">Loading…</div>
+	);
+
+	const cars = garageTab.data ?? [];
+	const trips = tripsTab.data ?? [];
+	const transactions = paymentsTab.data ?? [];
+	const wallet = walletTab.data;
+	const promos = promosTab.data ?? [];
+	const ratings = ratingsTab.data ?? [];
+	const riskSignals = riskTab.data ?? [];
+	const notifications = notificationsTab.data ?? [];
+	const auditLogs = auditTab.data ?? [];
+
+	const confirmCopy: Record<ConfirmKind, { title: string; body: string; cta: string; danger: boolean }> = {
+		suspend: {
+			title: 'Suspend Account',
+			body: 'Temporarily suspend this rider. They will be unable to book trips until restored.',
+			cta: 'Suspend',
+			danger: false,
+		},
+		block: {
+			title: 'Block Account',
+			body: 'Permanently block this rider account. This prevents all platform access.',
+			cta: 'Block',
+			danger: true,
+		},
+		delete: {
+			title: 'GDPR Delete Profile',
+			body: 'CRITICAL: This executes the GDPR delete sequence. Profile info, email, phone, and wallet adjustments will be permanently wiped.',
+			cta: 'Delete Permanently',
+			danger: true,
+		},
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col lg:flex-row overflow-hidden bg-background-primary">
-			
+
 			{/* ---- Left Sidebar: Profile Overview & Actions ---- */}
 			<div className="w-full lg:w-[320px] bg-background-primary border-r border-background-secondary p-6 flex flex-col flex-shrink-0 overflow-y-auto space-y-6">
-				
+
 				{/* Basic Details Card */}
 				<div className="flex flex-col items-center text-center">
 					<div className="w-20 h-20 rounded-full bg-background-secondary border border-background-secondary flex items-center justify-center text-3xl font-bold text-content-primary">
 						{data.name.split(' ').map(n => n[0]).join('')}
 					</div>
 					<h2 className="text-lg font-bold text-content-primary mt-4">{data.name}</h2>
-					
+
 					{/* Status Badge */}
 					<div className="mt-2">
 						<span
@@ -353,7 +485,7 @@ export const RiderDetail: React.FC = () => {
 				{/* Quick Administrative Actions List */}
 				<div className="border-t border-background-secondary pt-4 space-y-2">
 					<h3 className="text-[10px] uppercase tracking-wider text-content-tertiary mb-2.5 font-bold">Admin Controls</h3>
-					
+
 					<button
 						onClick={() => setShowEditModal(true)}
 						className="w-full text-left text-xs text-content-secondary hover:text-content-primary font-semibold bg-background-tertiary rounded-pill px-4.5 py-2 transition-colors"
@@ -401,14 +533,14 @@ export const RiderDetail: React.FC = () => {
 					{data.status === 'ACTIVE' && (
 						<>
 							<button
-								onClick={() => handleAction('suspend')}
+								onClick={() => { setConfirmReason(''); setConfirmKind('suspend'); }}
 								className="w-full text-left text-xs text-status-pending bg-status-pending/5 hover:bg-status-pending/10 font-semibold rounded-pill px-4.5 py-2 transition-colors"
 							>
 								Suspend Account
 							</button>
 
 							<button
-								onClick={() => handleAction('block')}
+								onClick={() => { setConfirmReason(''); setConfirmKind('block'); }}
 								className="w-full text-left text-xs text-status-negative bg-status-negative/5 hover:bg-status-negative/10 font-semibold rounded-pill px-4.5 py-2 transition-colors"
 							>
 								Block Account
@@ -431,11 +563,7 @@ export const RiderDetail: React.FC = () => {
 					</button>
 
 					<button
-						onClick={() => {
-							if (window.confirm("CRITICAL WARNING: This executes GDPR delete sequence. Profile info, email, phone, and wallet adjustments will be permanently wiped. Proceed?")) {
-								handleAction('delete');
-							}
-						}}
+						onClick={() => { setConfirmReason(''); setConfirmKind('delete'); }}
 						className="w-full text-left text-xs text-content-tertiary hover:text-status-negative font-semibold px-4.5 py-2 transition-colors text-center"
 					>
 						GDPR Delete Profile
@@ -466,7 +594,7 @@ export const RiderDetail: React.FC = () => {
 
 				{/* Active Tab Contents Area */}
 				<div className="flex-1 overflow-y-auto p-6">
-					
+
 					{/* OVERVIEW TAB */}
 					{activeTab === 'overview' && (
 						<div className="space-y-6">
@@ -542,45 +670,55 @@ export const RiderDetail: React.FC = () => {
 
 					{/* GARAGE TAB */}
 					{activeTab === 'garage' && (
+						garageTab.loading ? <TabLoading /> : (
 						<div className="space-y-6">
-							{data.garage.cars.length === 0 ? (
+							{cars.length === 0 ? (
 								<div className="p-12 text-center text-xs text-content-tertiary">No saved cars on profile garage.</div>
 							) : (
-								data.garage.cars.map((car, idx) => (
-									<div key={idx} className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
+								cars.map((car) => (
+									<div key={car.id} className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
 										<div className="flex justify-between items-center">
-											<h3 className="text-sm font-bold text-content-primary">{car.make_model}</h3>
-											<span className="font-mono text-xs text-content-primary font-bold bg-background-secondary px-3 py-1 rounded">{car.plate}</span>
+											<h3 className="text-sm font-bold text-content-primary">
+												{car.make} {car.model}{car.year ? ` · ${car.year}` : ''}
+												{car.is_default && <span className="ml-2 text-[9px] font-bold uppercase bg-content-primary text-gray-0 px-2 py-0.5 rounded">Default</span>}
+											</h3>
+											<span className="font-mono text-xs text-content-primary font-bold bg-background-secondary px-3 py-1 rounded">{car.registration_plate}</span>
 										</div>
-										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-background-secondary pt-4">
+										<div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-background-secondary pt-4">
 											<div className="bg-background-tertiary p-3 rounded-xl">
-												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Registration (RC)</span>
-												<span className="text-xs font-semibold mt-1 block text-status-online">{car.documents.rc_status}</span>
+												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Type</span>
+												<span className="text-xs font-semibold mt-1 block text-content-primary uppercase">{car.car_type || '—'}</span>
 											</div>
 											<div className="bg-background-tertiary p-3 rounded-xl">
-												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Insurance Status</span>
-												<span className="text-xs font-semibold mt-1 block text-status-online">{car.documents.insurance_status}</span>
+												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Transmission</span>
+												<span className="text-xs font-semibold mt-1 block text-content-primary uppercase">{car.transmission || '—'}</span>
 											</div>
 											<div className="bg-background-tertiary p-3 rounded-xl">
-												<span className="block text-[10px] uppercase text-content-tertiary font-bold">PUC Certificate</span>
-												<span className="text-xs font-semibold mt-1 block text-status-online">{car.documents.puc_status}</span>
+												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Fuel</span>
+												<span className="text-xs font-semibold mt-1 block text-content-primary uppercase">{car.fuel_type || '—'}</span>
+											</div>
+											<div className="bg-background-tertiary p-3 rounded-xl">
+												<span className="block text-[10px] uppercase text-content-tertiary font-bold">Color</span>
+												<span className="text-xs font-semibold mt-1 block text-content-primary">{car.color || '—'}</span>
 											</div>
 										</div>
-										{car.expiry_alerts && car.expiry_alerts.length > 0 && (
+										{!car.is_active && (
 											<div className="bg-status-pending/5 border border-status-pending/25 p-3 rounded-xl text-status-pending text-xs font-semibold">
-												⚠️ Expiry Alerts: {car.expiry_alerts.join(', ')}
+												This vehicle is currently inactive on the rider's garage.
 											</div>
 										)}
 									</div>
 								))
 							)}
 						</div>
+						)
 					)}
 
 					{/* TRIPS TAB */}
 					{activeTab === 'trips' && (
+						tripsTab.loading ? <TabLoading /> : (
 						<div className="bg-background-primary border border-background-secondary rounded-xl overflow-hidden">
-							{data.payments.transactions.length === 0 ? (
+							{trips.length === 0 ? (
 								<div className="p-12 text-center text-xs text-content-tertiary">Rider has not made any trip reservations.</div>
 							) : (
 								<table className="w-full text-left border-collapse">
@@ -589,12 +727,13 @@ export const RiderDetail: React.FC = () => {
 											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Trip ID</th>
 											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Date</th>
 											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Fare</th>
-											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Payment</th>
+											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Driver</th>
+											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">City</th>
 											<th className="p-4 text-[10px] font-semibold uppercase tracking-wider text-content-tertiary">Status</th>
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-background-secondary text-xs text-content-secondary">
-										{data.payments.transactions.map((tx) => (
+										{trips.map((tx) => (
 											<tr key={tx.order_id} className="hover:bg-background-tertiary">
 												<td className="p-4 font-mono text-content-primary font-semibold">
 													<Link to={`/trips/${tx.order_id}`} className="underline hover:text-gray-800">
@@ -605,10 +744,13 @@ export const RiderDetail: React.FC = () => {
 													{new Date(tx.created_at).toLocaleString()}
 												</td>
 												<td className="p-4 font-mono text-content-primary font-semibold">
-													₹{(tx.amount_paise / 100).toFixed(2)}
+													₹{(tx.fare_paise / 100).toFixed(2)}
 												</td>
-												<td className="p-4 font-mono">
-													{tx.gateway}
+												<td className="p-4 font-sans">
+													{tx.driver_name}
+												</td>
+												<td className="p-4 font-mono uppercase">
+													{tx.city_prefix}
 												</td>
 												<td className="p-4 font-semibold text-status-online">
 													{tx.status}
@@ -619,109 +761,54 @@ export const RiderDetail: React.FC = () => {
 								</table>
 							)}
 						</div>
+						)
 					)}
 
 					{/* PAYMENTS TAB */}
 					{activeTab === 'payments' && (
-						<div className="space-y-6">
-							{/* Methods on File */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
-								<h3 className="text-sm font-bold text-content-primary font-sans">Payment Methods on File</h3>
-								<div className="divide-y divide-background-secondary">
-									{data.payments.methods.map((method, idx) => (
-										<div key={idx} className="py-3 flex justify-between items-center text-xs">
-											<span className="font-semibold text-content-primary font-mono uppercase bg-background-secondary px-2.5 py-0.5 rounded">{method.type}</span>
-											<span className="text-content-secondary font-mono font-medium">{method.details}</span>
-										</div>
-									))}
-								</div>
-							</div>
-
-							{/* Transaction Attempts */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
-								<h3 className="text-sm font-bold text-content-primary">Recent Billing Transactions</h3>
-								<div className="overflow-hidden rounded-xl border border-background-secondary">
-									{data.payments.transactions.length === 0 ? (
-										<div className="p-6 text-center text-xs text-content-tertiary">No billing transactions.</div>
-									) : (
-										<table className="w-full text-left text-xs border-collapse">
-											<thead>
-												<tr className="border-b border-background-secondary bg-background-secondary">
-													<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Tx ID</th>
-													<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Order</th>
-													<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Gateway</th>
-													<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Amount</th>
-													<th className="p-3 text-[10px] font-semibold uppercase text-content-tertiary">Status</th>
-												</tr>
-											</thead>
-											<tbody className="divide-y divide-background-secondary text-content-secondary font-mono">
-												{data.payments.transactions.map((tx) => (
-													<tr key={tx.transaction_id} className="hover:bg-background-tertiary">
-														<td className="p-3 font-semibold text-content-primary">{tx.transaction_id}</td>
-														<td className="p-3">TRP-{tx.order_id.substring(tx.order_id.length - 4).toUpperCase()}</td>
-														<td className="p-3 font-sans">{tx.gateway}</td>
-														<td className="p-3 font-bold text-content-primary">₹{(tx.amount_paise / 100).toFixed(2)}</td>
-														<td className="p-3 font-semibold text-status-online">{tx.status}</td>
-													</tr>
-												))}
-											</tbody>
-										</table>
-									)}
-								</div>
-							</div>
-
-							{/* Refunds / Chargebacks list */}
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-									<h4 className="text-xs font-bold text-content-primary">Refund History</h4>
-									{data.payments.refunds.length === 0 ? (
-										<div className="text-center p-6 text-xs text-content-tertiary border border-background-secondary rounded-xl">No refunds.</div>
-									) : (
-										<div className="space-y-2.5">
-											{data.payments.refunds.map((ref) => (
-												<div key={ref.refund_id} className="bg-background-tertiary p-3 rounded-xl text-xs space-y-1">
-													<div className="flex justify-between font-mono font-semibold text-content-primary">
-														<span>{ref.refund_id}</span>
-														<span>₹{(ref.amount_paise / 100).toFixed(2)}</span>
-													</div>
-													<p className="text-[10px] text-content-secondary">{ref.reason}</p>
-													<span className="block text-[9px] text-content-tertiary font-mono">{new Date(ref.created_at).toLocaleString()}</span>
-												</div>
-											))}
-										</div>
-									)}
-								</div>
-
-								<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-									<h4 className="text-xs font-bold text-content-primary">Chargeback Discrepancies</h4>
-									{data.payments.chargebacks.length === 0 ? (
-										<div className="text-center p-6 text-xs text-content-tertiary border border-background-secondary rounded-xl">No chargebacks logged.</div>
-									) : (
-										<div className="space-y-2.5">
-											{data.payments.chargebacks.map((cb) => (
-												<div key={cb.chargeback_id} className="bg-status-negative/5 p-3 rounded-xl text-xs space-y-1">
-													<div className="flex justify-between font-mono font-semibold text-status-negative">
-														<span>{cb.chargeback_id}</span>
-														<span>₹{(cb.amount_paise / 100).toFixed(2)}</span>
-													</div>
-													<span className="block text-[9px] text-content-tertiary font-mono">{new Date(cb.created_at).toLocaleString()}</span>
-												</div>
-											))}
-										</div>
-									)}
-								</div>
-							</div>
+						paymentsTab.loading ? <TabLoading /> : (
+						<div className="bg-background-primary border border-background-secondary rounded-xl overflow-hidden">
+							{transactions.length === 0 ? (
+								<div className="p-12 text-center text-xs text-content-tertiary">No billing transactions recorded.</div>
+							) : (
+								<table className="w-full text-left text-xs border-collapse">
+									<thead>
+										<tr className="border-b border-background-secondary bg-background-secondary">
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Tx ID</th>
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Order</th>
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Provider</th>
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Amount</th>
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Status</th>
+											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Date</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-background-secondary text-content-secondary font-mono">
+										{transactions.map((tx) => (
+											<tr key={tx.id} className="hover:bg-background-tertiary">
+												<td className="p-4 font-semibold text-content-primary">{tx.id.substring(0, 12)}</td>
+												<td className="p-4">TRP-{tx.order_id.substring(tx.order_id.length - 4).toUpperCase()}</td>
+												<td className="p-4 font-sans uppercase">{tx.provider_type}</td>
+												<td className="p-4 font-bold text-content-primary">₹{(tx.amount_paise / 100).toFixed(2)}</td>
+												<td className="p-4 font-semibold text-status-online">{tx.payment_status}</td>
+												<td className="p-4 text-content-tertiary">{new Date(tx.created_at).toLocaleString()}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							)}
 						</div>
+						)
 					)}
 
 					{/* WALLET TAB */}
 					{activeTab === 'wallet' && (
+						walletTab.loading ? <TabLoading /> : (
 						<div className="space-y-6">
 							{/* Current Balance */}
 							<div className="bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-center items-center text-center">
 								<span className="text-[10px] uppercase text-content-tertiary tracking-wider font-bold">Rider Wallet Balance</span>
 								<span className="text-3xl font-extrabold text-content-primary font-mono mt-2">
-									₹{(data.wallet.balance_paise / 100).toFixed(2)}
+									₹{((wallet?.balance_paise ?? 0) / 100).toFixed(2)}
 								</span>
 							</div>
 
@@ -739,185 +826,163 @@ export const RiderDetail: React.FC = () => {
 											</tr>
 										</thead>
 										<tbody className="divide-y divide-background-secondary font-mono text-content-secondary">
-											{data.wallet.transactions.map((wt, idx) => (
-												<tr key={idx} className="hover:bg-background-tertiary">
-													<td className="p-3">
-														<span className={`inline-flex items-center font-bold px-2 py-0.5 rounded text-[9px] font-sans ${wt.type === 'TOPUP' || wt.type === 'MANUAL_CREDIT' ? 'bg-background-secondary text-content-primary' : 'bg-content-primary text-gray-0'}`}>
-															{wt.type}
-														</span>
-													</td>
-													<td className={`p-3 font-bold ${wt.type === 'TOPUP' || wt.type === 'MANUAL_CREDIT' ? 'text-content-primary' : 'text-content-secondary'}`}>
-														{wt.type === 'TOPUP' || wt.type === 'MANUAL_CREDIT' ? '+' : '-'} ₹{(wt.amount_paise / 100).toFixed(2)}
-													</td>
-													<td className="p-3 font-sans text-xs text-content-primary">{wt.description}</td>
-													<td className="p-3 text-content-tertiary">{new Date(wt.timestamp).toLocaleString()}</td>
-												</tr>
-											))}
+											{(wallet?.transactions ?? []).map((wt, idx) => {
+												const isCredit = wt.entry_type === 'CREDIT';
+												return (
+													<tr key={idx} className="hover:bg-background-tertiary">
+														<td className="p-3">
+															<span className={`inline-flex items-center font-bold px-2 py-0.5 rounded text-[9px] font-sans ${isCredit ? 'bg-background-secondary text-content-primary' : 'bg-content-primary text-gray-0'}`}>
+																{wt.entry_type}
+															</span>
+														</td>
+														<td className={`p-3 font-bold ${isCredit ? 'text-content-primary' : 'text-content-secondary'}`}>
+															{isCredit ? '+' : '-'} ₹{(Math.abs(wt.amount_paise) / 100).toFixed(2)}
+														</td>
+														<td className="p-3 font-sans text-xs text-content-primary">{wt.description || wt.reason_code}</td>
+														<td className="p-3 text-content-tertiary">{new Date(wt.created_at).toLocaleString()}</td>
+													</tr>
+												);
+											})}
 										</tbody>
 									</table>
 								</div>
 							</div>
 						</div>
+						)
 					)}
 
 					{/* PROMOS TAB */}
 					{activeTab === 'promos' && (
-						<div className="space-y-6">
-							{/* Coupon usage history */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
-								<h3 className="text-sm font-bold text-content-primary">Promo Coupon Usage Log</h3>
+						promosTab.loading ? <TabLoading /> : (
+						<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
+							<h3 className="text-sm font-bold text-content-primary">Promo Coupon Usage Log</h3>
+							{promos.length === 0 ? (
+								<div className="p-8 text-center text-xs text-content-tertiary">No promo redemptions on record.</div>
+							) : (
 								<div className="divide-y divide-background-secondary">
-									{data.promos.applied.map((promo, idx) => (
+									{promos.map((promo, idx) => (
 										<div key={idx} className="py-3 flex justify-between items-center text-xs font-mono">
-											<span className="font-bold text-content-primary bg-background-secondary px-3 py-1 rounded">{promo.promo_code}</span>
-											<span className="text-content-secondary font-sans text-xs">{promo.status}</span>
-											<span className="text-content-tertiary">{new Date(promo.timestamp).toLocaleDateString()}</span>
+											<span className="font-bold text-content-primary bg-background-secondary px-3 py-1 rounded uppercase">{promo.code || promo.promo_code_id.substring(0, 8)}</span>
+											<span className="text-content-secondary font-sans text-xs">
+												Order TRP-{promo.order_id.substring(promo.order_id.length - 4).toUpperCase()}
+											</span>
+											<span className="text-content-primary font-semibold">− ₹{(promo.discount_paise / 100).toFixed(2)}</span>
+											<span className="text-content-tertiary">{new Date(promo.created_at).toLocaleDateString()}</span>
 										</div>
 									))}
 								</div>
-							</div>
-
-							{/* Eligibility criteria flags */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
-								<h3 className="text-sm font-bold text-content-primary">Exclusion & Eligibility Matrix</h3>
-								<div className="space-y-2">
-									{data.promos.eligibility_flags.map((flag, idx) => (
-										<div key={idx} className="bg-background-tertiary p-3 rounded-xl text-xs font-semibold text-content-primary flex items-center">
-											<span className="w-1.5 h-1.5 rounded-full bg-status-online mr-2.5" />
-											{flag}
-										</div>
-									))}
-								</div>
-							</div>
+							)}
 						</div>
-					)}
-
-					{/* SUPPORT TAB */}
-					{activeTab === 'support' && (
-						<div className="space-y-6">
-							{/* Tickets */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-								<h3 className="text-sm font-bold text-content-primary">Support Tickets</h3>
-								<div className="divide-y divide-background-secondary">
-									{data.support.tickets.map((t) => (
-										<div key={t.ticket_id} className="py-3 flex justify-between items-center text-xs">
-											<div>
-												<span className="font-mono text-content-primary font-semibold block">{t.ticket_id}</span>
-												<span className="text-content-secondary">{t.subject}</span>
-											</div>
-											<div className="flex items-center space-x-3">
-												<span className="text-content-tertiary font-mono">{new Date(t.created_at).toLocaleDateString()}</span>
-												<span className="bg-background-secondary text-[10px] font-bold px-2 py-0.5 rounded uppercase">{t.status}</span>
-											</div>
-										</div>
-									))}
-								</div>
-							</div>
-
-							{/* Chats */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-								<h3 className="text-sm font-bold text-content-primary">Live Support Chats</h3>
-								<div className="divide-y divide-background-secondary">
-									{data.support.chats.map((c) => (
-										<div key={c.chat_id} className="py-3 flex justify-between items-start text-xs">
-											<div>
-												<span className="font-mono text-content-primary font-semibold block">{c.chat_id}</span>
-												<p className="text-content-secondary mt-1">{c.subject}</p>
-												<span className="text-[10px] text-content-tertiary block mt-0.5">Last Message: {c.last_message}</span>
-											</div>
-											<span className="text-content-tertiary font-mono">{new Date(c.timestamp).toLocaleDateString()}</span>
-										</div>
-									))}
-								</div>
-							</div>
-
-							{/* Recordings */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-								<h3 className="text-sm font-bold text-content-primary">Call Recordings</h3>
-								<div className="divide-y divide-background-secondary">
-									{data.support.call_recordings.map((rec) => (
-										<div key={rec.call_id} className="py-3 flex justify-between items-center text-xs font-mono">
-											<div>
-												<span className="text-content-primary font-semibold block">{rec.call_id}</span>
-												<span className="text-content-tertiary font-sans text-xs">{new Date(rec.timestamp).toLocaleString()}</span>
-											</div>
-											<span className="text-content-secondary font-semibold">{rec.duration_seconds} seconds</span>
-										</div>
-									))}
-								</div>
-							</div>
-						</div>
+						)
 					)}
 
 					{/* RATINGS TAB */}
 					{activeTab === 'ratings' && (
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-center items-center text-center">
-								<span className="text-[10px] uppercase text-content-tertiary tracking-wider font-bold">Avg Rating Given To Drivers</span>
-								<span className="text-4xl font-extrabold text-content-primary font-mono mt-3">
-									{data.ratings.average_given > 0 ? data.ratings.average_given.toFixed(1) : '—'}
-									<span className="text-lg font-medium text-content-tertiary font-sans ml-1">★</span>
-								</span>
-							</div>
-
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-center items-center text-center">
-								<span className="text-[10px] uppercase text-content-tertiary tracking-wider font-bold">Avg Rating Received From Drivers</span>
-								<span className="text-4xl font-extrabold text-content-primary font-mono mt-3">
-									{data.ratings.average_received > 0 ? data.ratings.average_received.toFixed(1) : '—'}
-									<span className="text-lg font-medium text-content-tertiary font-sans ml-1">★</span>
-								</span>
-							</div>
-						</div>
+						ratingsTab.loading ? <TabLoading /> : (() => {
+							const given = ratings.map((r) => r.rider_rating_for_driver).filter((v): v is number => v != null);
+							const received = ratings.map((r) => r.driver_rating_for_rider).filter((v): v is number => v != null);
+							const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+							const avgGiven = avg(given);
+							const avgReceived = avg(received);
+							return (
+								<div className="space-y-6">
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<div className="bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-center items-center text-center">
+											<span className="text-[10px] uppercase text-content-tertiary tracking-wider font-bold">Avg Rating Given To Drivers</span>
+											<span className="text-4xl font-extrabold text-content-primary font-mono mt-3">
+												{avgGiven > 0 ? avgGiven.toFixed(1) : '—'}
+												<span className="text-lg font-medium text-content-tertiary font-sans ml-1">★</span>
+											</span>
+										</div>
+										<div className="bg-background-primary border border-background-secondary rounded-xl p-6 flex flex-col justify-center items-center text-center">
+											<span className="text-[10px] uppercase text-content-tertiary tracking-wider font-bold">Avg Rating Received From Drivers</span>
+											<span className="text-4xl font-extrabold text-content-primary font-mono mt-3">
+												{avgReceived > 0 ? avgReceived.toFixed(1) : '—'}
+												<span className="text-lg font-medium text-content-tertiary font-sans ml-1">★</span>
+											</span>
+										</div>
+									</div>
+									<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
+										<h3 className="text-sm font-bold text-content-primary">Per-Trip Ratings</h3>
+										{ratings.length === 0 ? (
+											<div className="p-8 text-center text-xs text-content-tertiary">No ratings recorded yet.</div>
+										) : (
+											<div className="divide-y divide-background-secondary">
+												{ratings.map((r) => (
+													<div key={r.order_id} className="py-3 space-y-1">
+														<div className="flex justify-between items-center text-xs">
+															<Link to={`/trips/${r.order_id}`} className="font-mono text-content-primary font-semibold underline hover:text-gray-800">
+																TRP-{r.order_id.substring(r.order_id.length - 8).toUpperCase()}
+															</Link>
+															<span className="font-mono text-content-secondary">
+																Given {r.rider_rating_for_driver ?? '—'}★ · Received {r.driver_rating_for_rider ?? '—'}★
+															</span>
+															<span className="text-content-tertiary font-mono">{new Date(r.created_at).toLocaleDateString()}</span>
+														</div>
+														{(r.rider_review_comment || r.driver_review_comment) && (
+															<p className="text-[10px] text-content-secondary">{r.rider_review_comment || r.driver_review_comment}</p>
+														)}
+													</div>
+												))}
+											</div>
+										)}
+									</div>
+								</div>
+							);
+						})()
 					)}
 
 					{/* RISK TAB */}
 					{activeTab === 'risk' && (
-						<div className="space-y-6">
-							{/* Risk Score */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
-								<h3 className="text-sm font-bold text-content-primary">Fraud & Risk Evaluation</h3>
-								<div className="flex flex-col items-center py-6 text-center border border-background-secondary rounded-xl">
-									<span className="text-[10px] uppercase text-content-tertiary font-bold">Rider Safety Risk Score</span>
-									<span className={`text-5xl font-extrabold font-mono mt-3 ${data.risk.score > 75 ? 'text-status-negative' : data.risk.score > 40 ? 'text-status-pending' : 'text-content-primary'}`}>
-										{data.risk.score}
-									</span>
-									<span className="text-[10px] text-content-tertiary mt-2">Scale ranges from 0 (Safe) to 100 (Suspicious)</span>
-								</div>
-							</div>
-
-							{/* Risk Behavioral Flags */}
-							<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
-								<h4 className="text-xs font-bold text-content-primary">Behavioral Anomaly Flags</h4>
-								<div className="space-y-2">
-									{data.risk.flags.map((flag, idx) => (
-										<div key={idx} className="bg-background-tertiary p-3 rounded-xl text-xs text-content-secondary flex items-center font-medium">
-											<span className="w-1.5 h-1.5 rounded-full bg-status-negative mr-2.5" />
-											{flag}
+						riskTab.loading ? <TabLoading /> : (() => {
+							const peak = riskSignals.reduce((m, s) => Math.max(m, s.score), 0);
+							return (
+								<div className="space-y-6">
+									{/* Peak Risk Score */}
+									<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-4">
+										<h3 className="text-sm font-bold text-content-primary">Fraud & Risk Evaluation</h3>
+										<div className="flex flex-col items-center py-6 text-center border border-background-secondary rounded-xl">
+											<span className="text-[10px] uppercase text-content-tertiary font-bold">Peak Fraud Signal Score</span>
+											<span className={`text-5xl font-extrabold font-mono mt-3 ${peak > 75 ? 'text-status-negative' : peak > 40 ? 'text-status-pending' : 'text-content-primary'}`}>
+												{peak.toFixed(0)}
+											</span>
+											<span className="text-[10px] text-content-tertiary mt-2">Scale ranges from 0 (Safe) to 100 (Suspicious)</span>
 										</div>
-									))}
-								</div>
-							</div>
+									</div>
 
-							{/* Block reasons */}
-							{data.status === 'BLOCKED' && (
-								<div className="bg-status-negative/5 border border-status-negative/25 p-5 rounded-xl space-y-2">
-									<h4 className="text-xs font-bold text-status-negative uppercase">Account Block Lock Reasons</h4>
-									<ul className="list-disc pl-5 text-xs text-status-negative space-y-1.5">
-										{data.risk.blocked_reasons.length > 0 ? (
-											data.risk.blocked_reasons.map((reason, idx) => <li key={idx}>{reason}</li>)
+									{/* Fraud Signals */}
+									<div className="bg-background-primary border border-background-secondary rounded-xl p-5 space-y-3">
+										<h4 className="text-xs font-bold text-content-primary">Recorded Fraud Signals</h4>
+										{riskSignals.length === 0 ? (
+											<div className="p-8 text-center text-xs text-content-tertiary">No fraud or risk signals on file.</div>
 										) : (
-											<li>Manually blocked by Compliance Administrator</li>
+											<div className="space-y-2">
+												{riskSignals.map((s) => (
+													<div key={s.id} className="bg-background-tertiary p-3 rounded-xl text-xs text-content-secondary flex items-center justify-between font-medium">
+														<span className="flex items-center">
+															<span className={`w-1.5 h-1.5 rounded-full mr-2.5 ${s.score > 75 ? 'bg-status-negative' : s.score > 40 ? 'bg-status-pending' : 'bg-status-online'}`} />
+															<span className="text-content-primary font-semibold uppercase">{s.fraud_type}</span>
+														</span>
+														<span className="flex items-center gap-3 font-mono">
+															<span>{s.status}</span>
+															<span className="text-content-primary font-bold">{s.score.toFixed(0)}</span>
+															<span className="text-content-tertiary">{new Date(s.created_at).toLocaleDateString()}</span>
+														</span>
+													</div>
+												))}
+											</div>
 										)}
-									</ul>
+									</div>
 								</div>
-							)}
-						</div>
+							);
+						})()
 					)}
 
 					{/* NOTIFICATIONS TAB */}
 					{activeTab === 'notifications' && (
+						notificationsTab.loading ? <TabLoading /> : (
 						<div className="bg-background-primary border border-background-secondary rounded-xl overflow-hidden">
-							{data.notifications.length === 0 ? (
+							{notifications.length === 0 ? (
 								<div className="p-12 text-center text-xs text-content-tertiary">No communication dispatch log found.</div>
 							) : (
 								<table className="w-full text-left border-collapse">
@@ -929,16 +994,17 @@ export const RiderDetail: React.FC = () => {
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-background-secondary text-xs text-content-secondary">
-										{data.notifications.map((n, idx) => (
-											<tr key={idx} className="hover:bg-background-tertiary">
+										{notifications.map((n) => (
+											<tr key={n.id} className="hover:bg-background-tertiary">
 												<td className="p-4 font-mono font-semibold text-content-primary uppercase">
 													{n.type}
 												</td>
 												<td className="p-4 font-sans text-content-primary">
-													{n.payload}
+													<span className="font-semibold block">{n.title}</span>
+													<span className="text-content-secondary">{n.body}</span>
 												</td>
 												<td className="p-4 font-mono text-content-tertiary">
-													{new Date(n.timestamp).toLocaleString()}
+													{new Date(n.created_at).toLocaleString()}
 												</td>
 											</tr>
 										))}
@@ -946,12 +1012,14 @@ export const RiderDetail: React.FC = () => {
 								</table>
 							)}
 						</div>
+						)
 					)}
 
 					{/* AUDIT LOG TAB */}
 					{activeTab === 'audit' && (
+						auditTab.loading ? <TabLoading /> : (
 						<div className="bg-background-primary border border-background-secondary rounded-xl overflow-hidden">
-							{data.audit_logs.length === 0 ? (
+							{auditLogs.length === 0 ? (
 								<div className="p-12 text-center text-xs text-content-tertiary font-medium">No admin audit log recorded for this customer ID.</div>
 							) : (
 								<table className="w-full text-left border-collapse">
@@ -961,17 +1029,16 @@ export const RiderDetail: React.FC = () => {
 											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Actor</th>
 											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Action</th>
 											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">Details</th>
-											<th className="p-4 text-[10px] font-semibold uppercase text-content-tertiary">IP Address</th>
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-background-secondary text-xs font-mono text-content-secondary">
-										{data.audit_logs.map((log) => (
+										{auditLogs.map((log) => (
 											<tr key={log.id} className="hover:bg-background-tertiary">
 												<td className="p-4 font-semibold text-content-primary">
 													{new Date(log.created_at).toLocaleString()}
 												</td>
 												<td className="p-4 font-sans text-xs">
-													{log.admin_user}
+													{log.admin_email}
 												</td>
 												<td className="p-4">
 													<span className="bg-background-secondary px-2 py-0.5 rounded font-bold text-content-primary">
@@ -981,23 +1048,28 @@ export const RiderDetail: React.FC = () => {
 												<td className="p-4 font-sans text-xs text-content-primary">
 													{log.details}
 												</td>
-												<td className="p-4">
-													{log.ip}
-												</td>
 											</tr>
 										))}
 									</tbody>
 								</table>
 							)}
 						</div>
+						)
 					)}
 
 				</div>
 			</div>
 
 			{/* ========================================================================= */}
+			{/* ---- Toast ---- */}
+			{toast && (
+				<div className="fixed bottom-6 right-6 z-[60] bg-content-primary text-gray-0 text-xs font-semibold rounded-pill px-4 py-2.5 shadow-xl animate-fade-in">
+					{toast}
+				</div>
+			)}
+
 			{/* ---- Action Modals ---- */}
-			
+
 			{/* Edit Profile Modal */}
 			{showEditModal && (
 				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -1111,12 +1183,16 @@ export const RiderDetail: React.FC = () => {
 								Cancel
 							</button>
 							<button
-								onClick={() => {
+								onClick={async () => {
 									const rawAmt = parseFloat(walletForm.amount);
 									if (isNaN(rawAmt) || rawAmt <= 0) return;
 									const multiplier = walletForm.isCredit ? 1 : -1;
 									const paiseAmount = Math.round(rawAmt * 100) * multiplier;
-									handleAction('wallet', { amount_paise: paiseAmount, description: walletForm.description });
+									const ok = await handleAction('wallet/adjust', { amount_paise: paiseAmount, description: walletForm.description });
+									if (ok) {
+										setWalletForm({ amount: '', isCredit: true, description: '' });
+										reloadWallet();
+									}
 								}}
 								className="bg-content-primary text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 hover:bg-gray-800 transition-colors"
 								disabled={actionLoading || !walletForm.amount || !walletForm.description}
@@ -1200,6 +1276,44 @@ export const RiderDetail: React.FC = () => {
 								disabled={actionLoading || !duplicateId}
 							>
 								{actionLoading ? 'Merging...' : 'Merge Records'}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Lifecycle Confirm Modal (Suspend / Block / GDPR Delete) */}
+			{confirmKind && (
+				<div className="fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-50 animate-fade-in">
+					<div className="bg-background-primary rounded-xl border border-background-secondary p-5 max-w-sm w-full space-y-4 shadow-xl">
+						<div>
+							<h3 className={`text-sm font-bold ${confirmCopy[confirmKind].danger ? 'text-status-negative' : 'text-content-primary'}`}>{confirmCopy[confirmKind].title}</h3>
+							<p className="text-[11px] text-content-tertiary mt-1">{confirmCopy[confirmKind].body}</p>
+						</div>
+						<div>
+							<label className="block text-[9px] uppercase tracking-wider text-content-tertiary mb-1 font-semibold">Audit Reason</label>
+							<input
+								type="text"
+								placeholder="Reason for this action…"
+								className="w-full h-9 rounded-md bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary focus:outline-none focus:border-content-primary"
+								value={confirmReason}
+								onChange={(e) => setConfirmReason(e.target.value)}
+							/>
+						</div>
+						<div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
+							<button
+								onClick={() => { setConfirmKind(null); setConfirmReason(''); }}
+								className="text-xs text-content-secondary hover:text-content-primary px-3"
+								disabled={actionLoading}
+							>
+								Cancel
+							</button>
+							<button
+								onClick={runConfirm}
+								className={`text-gray-0 text-xs font-semibold rounded-pill h-8 px-4 transition-colors ${confirmCopy[confirmKind].danger ? 'bg-status-negative hover:bg-status-negative/90' : 'bg-content-primary hover:bg-gray-800'}`}
+								disabled={actionLoading || !confirmReason.trim()}
+							>
+								{actionLoading ? 'Working...' : confirmCopy[confirmKind].cta}
 							</button>
 						</div>
 					</div>

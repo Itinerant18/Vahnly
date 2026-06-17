@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, Suspense } from 'react';
+import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { driverLogin, driverRegister, driverGoogleLogin } from '@/api/client';
+import { driverLogin, driverRegister, driverGoogleLogin, sendDriverOTP, verifyDriverOTP } from '@/api/client';
 import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter } from 'next/navigation';
 import { Input, Button } from '@/components/ds';
@@ -31,6 +31,14 @@ function UnifiedLoginContent() {
     email: '',
     name: '',
   });
+
+  // OTP Verification States
+  const [showOtpVerification, setShowOtpVerification] = useState<boolean>(false);
+  const [otpPurpose, setOtpPurpose] = useState<'registration' | 'google_registration' | 'login_verification' | null>(null);
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpResendTimer, setOtpResendTimer] = useState<number>(30);
+  const [registrationPayload, setRegistrationPayload] = useState<any>(null);
+  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
   
   // Logs state
   const [logs, setLogs] = useState<string[]>([]);
@@ -58,6 +66,185 @@ function UnifiedLoginContent() {
       setPhone(digits);
     }
   };
+
+  // Resend timer countdown logic
+  useEffect(() => {
+    if (!showOtpVerification || otpResendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setOtpResendTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showOtpVerification, otpResendTimer]);
+
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const cleanVal = value.replace(/\D/g, '');
+    if (!cleanVal) {
+      const nextOtp = [...otpDigits];
+      nextOtp[index] = '';
+      setOtpDigits(nextOtp);
+      return;
+    }
+
+    const nextOtp = [...otpDigits];
+    nextOtp[index] = cleanVal.slice(-1);
+    setOtpDigits(nextOtp);
+
+    if (index < 5 && cleanVal) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!otpDigits[index] && index > 0) {
+        const nextOtp = [...otpDigits];
+        nextOtp[index - 1] = '';
+        setOtpDigits(nextOtp);
+        otpInputsRef.current[index - 1]?.focus();
+      } else {
+        const nextOtp = [...otpDigits];
+        nextOtp[index] = '';
+        setOtpDigits(nextOtp);
+      }
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pastedData.length === 6) {
+      const nextOtp = pastedData.split('');
+      setOtpDigits(nextOtp);
+      otpInputsRef.current[5]?.focus();
+    }
+  };
+
+  const startOTPVerification = async (purpose: 'registration' | 'google_registration' | 'login_verification', cleanPhone: string, payload?: any) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      await sendDriverOTP(cleanPhone);
+      setOtpPurpose(purpose);
+      setOtpDigits(['', '', '', '', '', '']);
+      setOtpResendTimer(30);
+      if (payload) {
+        setRegistrationPayload(payload);
+      }
+      setShowOtpVerification(true);
+      addAuditLog('OTP_SENT', { phone: cleanPhone, purpose });
+    } catch (err: any) {
+      setAuthError(err.message || 'Failed to send OTP verification code. Please try again.');
+      addAuditLog('OTP_SEND_FAILED', { phone: cleanPhone, error: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtpSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const otpCode = otpDigits.join('');
+    if (otpCode.length < 6) {
+      setAuthError('Please enter all 6 digits.');
+      return;
+    }
+
+    setLoading(true);
+    setAuthError(null);
+    const cleanPhone = phone.replace(/\s/g, '');
+
+    try {
+      const verifyRes = await verifyDriverOTP(cleanPhone, otpCode);
+      addAuditLog('OTP_VERIFIED', { phone: cleanPhone });
+
+      if (otpPurpose === 'login_verification') {
+        // Existing driver clearing the post-login phone gate: the backend marks the
+        // row phone_verified=true and returns a fresh session token + profile.
+        if (!verifyRes.token || !verifyRes.user) {
+          throw new Error('Verification succeeded but no session was returned.');
+        }
+        login(verifyRes.token, {
+          id: verifyRes.user.id,
+          role: verifyRes.user.role,
+          name: verifyRes.user.name,
+          phone: cleanPhone,
+          phone_verified: true,
+        });
+        void registerDriverPushNotifications(verifyRes.token).catch((pushErr) => {
+          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+        });
+        addAuditLog('LOGIN_VERIFIED', { userId: verifyRes.user.id });
+        router.push('/driver');
+        return;
+      }
+
+      // Registration flows require a signed phone_token to create the account.
+      if (!verifyRes.phone_token) {
+        throw new Error('Verification completed, but no phone token was returned.');
+      }
+
+      if (otpPurpose === 'registration') {
+        // Complete direct registration with verified phone token
+        const regPayload = {
+          ...registrationPayload,
+          phone_token: verifyRes.phone_token,
+        };
+        await driverRegister(regPayload);
+        addAuditLog('REGISTER_SUCCESS', { phone: cleanPhone });
+
+        // Authenticate session after registration
+        const loginRes = await driverLogin(cleanPhone, registrationPayload.password);
+        login(loginRes.token, {
+          id: loginRes.user.id,
+          role: loginRes.user.role,
+          name: loginRes.user.name,
+          phone: cleanPhone,
+          phone_verified: loginRes.phone_verified,
+        });
+
+        addAuditLog('LOGIN_SUCCESS', { userId: loginRes.user.id, role: 'DRIVER' });
+        router.push('/driver-onboarding');
+      } else if (otpPurpose === 'google_registration') {
+        // Complete Google registration with verified phone token
+        const googleRes = await driverGoogleLogin(googleRegInfo.idToken, {
+          phone: cleanPhone,
+          cityPrefix: driverCityPrefix,
+          name: googleRegInfo.name.trim() || undefined,
+          phoneToken: verifyRes.phone_token,
+        });
+
+        if (googleRes.token && googleRes.user) {
+          login(googleRes.token, {
+            id: googleRes.user.id,
+            role: googleRes.user.role,
+            name: googleRes.user.name,
+            phone: cleanPhone,
+            phone_verified: googleRes.phone_verified,
+          });
+
+          void registerDriverPushNotifications(googleRes.token).catch((pushErr) => {
+            console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
+          });
+          addAuditLog('REGISTER_SUCCESS_GOOGLE', { userId: googleRes.user.id });
+          router.push('/driver-onboarding');
+        } else {
+          throw new Error('Google registration failed, session token not received.');
+        }
+      }
+    } catch (err: any) {
+      console.warn('[UnifiedAuth] Verification / Registration failed.', err);
+      setAuthError(err.message || 'Incorrect verification code or registration failed.');
+      addAuditLog('VERIFICATION_FAILED', { phone: cleanPhone, error: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-submit OTP when all digits are entered
+  useEffect(() => {
+    if (otpDigits.join('').length === 6 && showOtpVerification && !loading) {
+      handleVerifyOtpSubmit();
+    }
+  }, [otpDigits]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +282,21 @@ function UnifiedLoginContent() {
 
     try {
       const res = await driverLogin(cleanPhone, password);
+
+      // Deep phone-verification gate: an existing driver whose number is not yet
+      // verified must clear an OTP challenge before reaching the dashboard.
+      if (res.phone_verified === false) {
+        addAuditLog('LOGIN_PHONE_UNVERIFIED', { userId: res.user.id });
+        await startOTPVerification('login_verification', cleanPhone);
+        return;
+      }
+
       login(res.token, {
         id: res.user.id,
         role: res.user.role,
         name: res.user.name,
         phone: cleanPhone,
+        phone_verified: res.phone_verified,
       });
       void registerDriverPushNotifications(res.token).catch((pushErr) => {
         console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
@@ -146,30 +343,7 @@ function UnifiedLoginContent() {
     };
 
     addAuditLog('REGISTER_ATTEMPT', { phone: cleanPhone, city: driverCityPrefix });
-
-    try {
-      // Register new driver account
-      await driverRegister(payload);
-      addAuditLog('REGISTER_SUCCESS', { phone: cleanPhone });
-
-      // Automatically authenticate session following successful registration
-      const res = await driverLogin(cleanPhone, password);
-      login(res.token, {
-        id: res.user.id,
-        role: res.user.role,
-        name: res.user.name,
-        phone: cleanPhone,
-      });
-
-      addAuditLog('LOGIN_SUCCESS', { userId: res.user.id, role: 'DRIVER' });
-      router.push('/driver-onboarding');
-    } catch (err: any) {
-      console.warn('[UnifiedAuth] Driver registration failed.', err);
-      setAuthError(err.message || 'Registration failed. Phone or email may already be registered.');
-      addAuditLog('REGISTER_FAILED', { phone: cleanPhone, error: String(err) });
-    } finally {
-      setLoading(false);
-    }
+    await startOTPVerification('registration', cleanPhone, payload);
   };
 
   const handleGoogleSignIn = async () => {
@@ -177,7 +351,6 @@ function UnifiedLoginContent() {
     setAuthError(null);
     addAuditLog('GOOGLE_SIGN_IN_START', { timestamp: new Date().toISOString() });
     try {
-      // Native (Capacitor) uses the platform Google SDK; web uses the Firebase popup.
       const idToken = await getGoogleIdToken();
 
       // Try to log in with Google ID token
@@ -191,11 +364,20 @@ function UnifiedLoginContent() {
         setIsGoogleRegister(true);
         addAuditLog('GOOGLE_SIGN_IN_PENDING_REGISTRATION', { email: res.email });
       } else if (res.token && res.user) {
+        // Deep phone-verification gate for a returning Google driver.
+        if (res.phone_verified === false) {
+          const gatePhone = (res.user.phone || '').replace(/\s/g, '');
+          handlePhoneChange(gatePhone);
+          addAuditLog('GOOGLE_LOGIN_PHONE_UNVERIFIED', { userId: res.user.id });
+          await startOTPVerification('login_verification', gatePhone);
+          return;
+        }
         login(res.token, {
           id: res.user.id,
           role: res.user.role,
           name: res.user.name,
-          phone: '',
+          phone: res.user.phone || '',
+          phone_verified: res.phone_verified,
         });
         void registerDriverPushNotifications(res.token).catch((pushErr) => {
           console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
@@ -225,36 +407,7 @@ function UnifiedLoginContent() {
     }
 
     addAuditLog('GOOGLE_REGISTER_ATTEMPT', { email: googleRegInfo.email, phone: cleanPhone });
-
-    try {
-      const res = await driverGoogleLogin(googleRegInfo.idToken, {
-        phone: cleanPhone,
-        cityPrefix: driverCityPrefix,
-        name: googleRegInfo.name.trim() || undefined,
-      });
-
-      if (res.token && res.user) {
-        login(res.token, {
-          id: res.user.id,
-          role: res.user.role,
-          name: res.user.name,
-          phone: cleanPhone,
-        });
-        void registerDriverPushNotifications(res.token).catch((pushErr) => {
-          console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
-        });
-        addAuditLog('REGISTER_SUCCESS_GOOGLE', { userId: res.user.id });
-        router.push('/driver-onboarding');
-      } else {
-        throw new Error('Registration failed, no token received.');
-      }
-    } catch (err: any) {
-      console.warn('[UnifiedAuth] Google registration failed.', err);
-      setAuthError(err.message || 'Registration failed. The phone number may already be registered.');
-      addAuditLog('GOOGLE_REGISTER_FAILED', { error: String(err) });
-    } finally {
-      setLoading(false);
-    }
+    await startOTPVerification('google_registration', cleanPhone);
   };
 
   return (
@@ -282,7 +435,73 @@ function UnifiedLoginContent() {
           </div>
         )}
 
-        {isGoogleRegister ? (
+        {showOtpVerification ? (
+          /* OTP VERIFICATION VIEW */
+          <form onSubmit={(e) => handleVerifyOtpSubmit(e)} className="space-y-6 text-left">
+            <div className="mb-2">
+              <p className="text-paragraph-small text-content-secondary">
+                Enter the 6-digit verification code sent to <strong>+91 {phone}</strong>
+              </p>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  aria-label={`OTP digit ${idx + 1}`}
+                  ref={(el) => {
+                    otpInputsRef.current[idx] = el;
+                  }}
+                  onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  onPaste={idx === 0 ? handleOtpPaste : undefined}
+                  disabled={loading}
+                  className="w-12 h-12 text-center text-heading-large font-bold bg-background-primary border border-border-opaque rounded-sm focus:border-border-accent focus:ring-2 focus:ring-accent-400 outline-none transition-base"
+                />
+              ))}
+            </div>
+
+            <div className="pt-2 space-y-3">
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                loading={loading}
+                disabled={otpDigits.join('').length < 6}
+              >
+                {otpPurpose === 'login_verification' ? 'Verify & Continue' : 'Verify & Register'}
+              </Button>
+
+              <div className="flex items-center justify-between text-label-small pt-1">
+                <button
+                  type="button"
+                  onClick={() => startOTPVerification(otpPurpose!, phone.replace(/\s/g, ''))}
+                  disabled={loading || otpResendTimer > 0}
+                  className="text-content-secondary hover:text-white transition disabled:text-content-tertiary cursor-pointer font-medium"
+                >
+                  {otpResendTimer > 0 ? `Resend Code in ${otpResendTimer}s` : 'Resend Code'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpVerification(false);
+                    setOtpPurpose(null);
+                    setAuthError(null);
+                  }}
+                  disabled={loading}
+                  className="text-content-negative hover:underline transition cursor-pointer font-medium"
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : isGoogleRegister ? (
           /* GOOGLE ADDITIONAL DETAILS FORM */
           <form onSubmit={handleGoogleRegisterSubmit} className="space-y-4 text-left">
             <div className="mb-2">
@@ -476,28 +695,28 @@ function UnifiedLoginContent() {
         )}
 
         {/* Federated Social Sign-in blocks */}
-        <div className="pt-6 border-t border-border-opaque mt-6 grid grid-cols-2 gap-3">
-          <Button
-            variant="secondary"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-          >
-            Google Sign-In
-          </Button>
-          
-          <Button
-            variant="secondary"
-            onClick={() => {
-              addAuditLog('OAUTH_APPLE_CLICKED', { timestamp: new Date().toISOString() });
-              alert('Apple Single Sign-On simulation complete.');
-            }}
-            disabled={loading}
-          >
-            Apple Sign-In
-          </Button>
-        </div>
-
-
+        {!showOtpVerification && (
+          <div className="pt-6 border-t border-border-opaque mt-6 grid grid-cols-2 gap-3">
+            <Button
+              variant="secondary"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+            >
+              Google Sign-In
+            </Button>
+            
+            <Button
+              variant="secondary"
+              onClick={() => {
+                addAuditLog('OAUTH_APPLE_CLICKED', { timestamp: new Date().toISOString() });
+                alert('Apple Single Sign-On simulation complete.');
+              }}
+              disabled={loading}
+            >
+              Apple Sign-In
+            </Button>
+          </div>
+        )}
 
       </div>
 

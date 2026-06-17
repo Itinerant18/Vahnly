@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { SvgAreaChart } from '../components/SvgAreaChart';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
+import { exportToCsv, type CsvColumn } from '../lib/tableTools';
 
 type PrebuiltTab = 'operations' | 'growth' | 'finance' | 'driver-supply' | 'marketing' | 'safety';
 type ReportTab = 'prebuilt' | 'custom' | 'exports';
@@ -69,6 +70,14 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
     window.open(`${API_GATEWAY_BASE_URL}/api/v1/admin/analytics/export?report=${report}&${qs}`, '_blank');
   };
 
+  // Export the in-memory chart series of a single chart to CSV.
+  const exportChartCsv = (filename: string, rows: { label: string; value: number }[]) =>
+    exportToCsv<{ label: string; value: number }>(
+      `${filename}_${new Date().toISOString().slice(0, 10)}.csv`,
+      [{ key: 'label', label: 'period' }, { key: 'value', label: 'value' }],
+      rows,
+    );
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -130,7 +139,11 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                   </div>
                   {chartPoints.length >= 2 && (
                     <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
-                      <div className="text-sm font-semibold text-content-primary mb-3">Trips Over Period</div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-content-primary">Trips Over Period</div>
+                        <button onClick={() => exportChartCsv('trips_over_period', chartPoints)}
+                          className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">↓ CSV</button>
+                      </div>
                       <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--accent-400)" fillColor="var(--accent-400)" />
                     </div>
                   )}
@@ -147,7 +160,11 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
                   </div>
                   {chartPoints.length >= 2 && (
                     <div className="bg-background-primary rounded-xl border border-background-secondary p-5">
-                      <div className="text-sm font-semibold text-content-primary mb-3">Trip Volume Trend</div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-content-primary">Trip Volume Trend</div>
+                        <button onClick={() => exportChartCsv('trip_volume_trend', chartPoints)}
+                          className="text-xs border border-background-secondary rounded px-2 py-1 text-content-secondary hover:bg-background-secondary">↓ CSV</button>
+                      </div>
                       <SvgAreaChart data={chartPoints} height={140} strokeColor="var(--positive-400)" fillColor="var(--positive-400)" />
                     </div>
                   )}
@@ -291,7 +308,7 @@ export const AnalyticsExtendedDashboard: React.FC = () => {
 };
 
 // ── Custom Report Builder ────────────────────────────────────────────────────
-const DIMENSIONS = ['city', 'day', 'week', 'status', 'driver_id'] as const;
+const DIMENSIONS = ['city', 'day', 'week', 'hour', 'status', 'driver_id'] as const;
 const METRICS = ['trips', 'completed_trips', 'cancelled_trips', 'revenue_paise', 'unique_riders'] as const;
 
 type Dimension = typeof DIMENSIONS[number];
@@ -314,6 +331,32 @@ const buildColumns = (keys: string[]): ColumnDef<ReportRow>[] =>
       : { key: c, header: c, render: mono }
   ));
 
+// Persisted custom-report configuration (localStorage).
+interface SavedReport {
+  name: string;
+  dims: Dimension[];
+  metrics: Metric[];
+}
+const SAVED_REPORTS_KEY = 'admin_saved_reports';
+
+const loadSavedReports = (): SavedReport[] => {
+  try {
+    const raw = localStorage.getItem(SAVED_REPORTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as SavedReport[]) : [];
+  } catch { return []; }
+};
+
+// Map the chosen dimension + metric to the right analytics endpoint.
+// Precedence: city → top-cities, hour → demand-by-hour, time(day/week) →
+// revenue-over-time when a revenue metric is selected, else trips-over-time.
+const resolveEndpoint = (dims: Dimension[], metrics: Metric[]): string => {
+  if (dims.includes('city')) return 'top-cities';
+  if (dims.includes('hour')) return 'demand-by-hour';
+  const wantsRevenue = metrics.includes('revenue_paise');
+  return wantsRevenue ? 'revenue-over-time' : 'trips-over-time';
+};
+
 const CustomReportBuilder: React.FC<{
   period: Period; headers: Record<string, string>; periodRange: () => string;
 }> = ({ headers, periodRange }) => {
@@ -321,26 +364,40 @@ const CustomReportBuilder: React.FC<{
   const [metrics, setMetrics] = useState<Metric[]>(['trips', 'revenue_paise']);
   const [result, setResult] = useState<ReportRow[] | null>(null);
   const [running, setRunning] = useState(false);
+  const [saved, setSaved] = useState<SavedReport[]>(loadSavedReports);
+  const [reportName, setReportName] = useState('');
 
   const toggle = <T extends string>(arr: T[], val: T, set: (a: T[]) => void) =>
     arr.includes(val) ? set(arr.filter(x => x !== val)) : set([...arr, val]);
 
   const runReport = async () => {
     setRunning(true);
-    // Build query by fetching trips-over-time and top-cities as proxy
     try {
       const base = `${API_GATEWAY_BASE_URL}/api/v1/admin/analytics`;
       const qs = periodRange();
-      let res;
-      if (dims.includes('city')) {
-        res = await fetch(`${base}/top-cities?${qs}`, { headers });
-        if (res.ok) { const d = await res.json(); setResult(d.data || []); }
-      } else {
-        res = await fetch(`${base}/trips-over-time?${qs}`, { headers });
-        if (res.ok) { const d = await res.json(); setResult(d.data || []); }
-      }
+      const endpoint = resolveEndpoint(dims, metrics);
+      const res = await fetch(`${base}/${endpoint}?${qs}`, { headers });
+      if (res.ok) { const d = await res.json(); setResult(d.data || []); }
+      else setResult([]);
     } catch (_) {
     } finally { setRunning(false); }
+  };
+
+  const saveReport = () => {
+    const name = reportName.trim();
+    if (!name) return;
+    const next = [...saved.filter(r => r.name !== name), { name, dims, metrics }];
+    setSaved(next);
+    localStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(next));
+    setReportName('');
+  };
+
+  const loadReport = (r: SavedReport) => { setDims(r.dims); setMetrics(r.metrics); };
+
+  const deleteReport = (name: string) => {
+    const next = saved.filter(r => r.name !== name);
+    setSaved(next);
+    localStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(next));
   };
 
   const reportColumns = result && result.length > 0 ? buildColumns(Object.keys(result[0])) : [];
@@ -371,16 +428,58 @@ const CustomReportBuilder: React.FC<{
           </div>
         </div>
       </div>
-      <button onClick={runReport} disabled={running || dims.length === 0 || metrics.length === 0}
-        className="px-5 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 disabled:opacity-50">
-        {running ? 'Running…' : 'Run Report'}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={runReport} disabled={running || dims.length === 0 || metrics.length === 0}
+          className="px-5 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 disabled:opacity-50">
+          {running ? 'Running…' : 'Run Report'}
+        </button>
+        <input
+          type="text"
+          value={reportName}
+          onChange={e => setReportName(e.target.value)}
+          placeholder="Report name…"
+          className="px-3 py-2 rounded-lg text-sm border border-background-secondary bg-background-primary text-content-primary focus:outline-none focus:ring-1 focus:ring-accent" />
+        <button onClick={saveReport} disabled={!reportName.trim()}
+          className="px-4 py-2 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary disabled:opacity-50">
+          💾 Save report
+        </button>
+      </div>
+
+      {/* Saved reports */}
+      {saved.length > 0 && (
+        <div className="bg-background-primary rounded-xl border border-background-secondary p-4">
+          <div className="text-sm font-semibold text-content-primary mb-3">Saved Reports</div>
+          <div className="flex flex-wrap gap-2">
+            {saved.map(r => (
+              <div key={r.name} className="flex items-center gap-1 border border-background-secondary rounded-lg pl-3 pr-1.5 py-1">
+                <button onClick={() => loadReport(r)} className="text-xs text-content-secondary hover:text-content-primary">
+                  {r.name} <span className="text-content-tertiary font-mono">({r.dims.join('+')} · {r.metrics.length}m)</span>
+                </button>
+                <button onClick={() => deleteReport(r.name)} className="text-content-tertiary hover:text-content-negative text-xs px-1" aria-label={`Delete ${r.name}`}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {result && result.length > 0 && (
-        <DataTable<ReportRow>
-          columns={reportColumns}
-          data={result}
-        />
+        <>
+          <div className="flex justify-end">
+            <button
+              onClick={() => exportToCsv<ReportRow>(
+                `custom_report_${new Date().toISOString().slice(0, 10)}.csv`,
+                Object.keys(result[0]).map(k => ({ key: k, label: k })) as CsvColumn<ReportRow>[],
+                result,
+              )}
+              className="px-4 py-2 border border-background-secondary rounded-lg text-sm text-content-secondary hover:bg-background-secondary">
+              ↓ Export CSV
+            </button>
+          </div>
+          <DataTable<ReportRow>
+            columns={reportColumns}
+            data={result}
+          />
+        </>
       )}
       {result && result.length === 0 && (
         <div className="text-sm text-content-tertiary text-center py-8">No data for the selected configuration.</div>

@@ -95,6 +95,7 @@ export const PromoCodesManager: React.FC = () => {
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const role = getAdminRole();
   const canCreate = role === 'SUPER_ADMIN' || role === 'MARKETING';
@@ -141,9 +142,14 @@ export const PromoCodesManager: React.FC = () => {
           <p className="text-xs text-content-tertiary mt-0.5">Create and manage discount codes</p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowModal(true)} className="h-9 px-4 rounded-pill bg-content-primary text-background-primary text-xs font-semibold">
-            + New Promo
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowBulkModal(true)} className="h-9 px-4 rounded-pill border border-content-primary text-content-primary text-xs font-semibold">
+              Bulk Upload CSV
+            </button>
+            <button onClick={() => setShowModal(true)} className="h-9 px-4 rounded-pill bg-content-primary text-background-primary text-xs font-semibold">
+              + New Promo
+            </button>
+          </div>
         )}
       </div>
 
@@ -176,6 +182,91 @@ export const PromoCodesManager: React.FC = () => {
           }}
         />
       )}
+
+      {showBulkModal && (
+        <BulkUploadModal
+          role={role}
+          onClose={() => setShowBulkModal(false)}
+          onUploaded={() => {
+            setShowBulkModal(false);
+            fetchPromos();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const BulkUploadModal: React.FC<{ role: string; onClose: () => void; onUploaded: () => void }> = ({ role, onClose, onUploaded }) => {
+  const [csvText, setCsvText] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCsvText(String(reader.result ?? ''));
+    reader.readAsText(file);
+  };
+
+  const submit = async () => {
+    if (!csvText.trim()) {
+      setError('Paste CSV rows or choose a file first.');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/promos/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv', 'X-Admin-Role': role },
+        body: csvText,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Imported ${data.uploaded_count ?? 0} promo codes.`);
+        onUploaded();
+      } else {
+        setError((await res.text()) || 'Bulk upload failed');
+      }
+    } catch {
+      setError('Network error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-background-primary rounded-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-base font-bold text-content-primary">Bulk Upload Promo Codes</h2>
+        <p className="text-xs text-content-tertiary">Header row required: <code className="font-mono text-content-primary">code,promotype,value,minfare</code></p>
+
+        <div>
+          <Label>CSV file</Label>
+          <input type="file" accept=".csv,text/csv" onChange={onFile} className="text-xs text-content-secondary" />
+        </div>
+
+        <div>
+          <Label>Or paste CSV</Label>
+          <textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            placeholder={'code,promotype,value,minfare\nWELCOME50,PERCENT,50,5000'}
+            className="w-full min-h-40 rounded-md bg-background-secondary border border-background-secondary p-3 font-mono text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
+          />
+        </div>
+
+        {error && <p className="text-xs text-status-negative">{error}</p>}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={onClose} disabled={uploading} className="flex-1 h-10 rounded-pill bg-background-secondary text-content-primary text-xs font-semibold disabled:opacity-50">Cancel</button>
+          <button onClick={submit} disabled={uploading} className="flex-1 h-10 rounded-pill bg-content-primary text-background-primary text-xs font-semibold disabled:opacity-50">
+            {uploading ? 'Uploading…' : 'Upload'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

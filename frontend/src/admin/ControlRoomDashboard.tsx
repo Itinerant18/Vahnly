@@ -4,12 +4,13 @@ import { DriverVerificationQueue } from './DriverVerificationQueue';
 import { FleetDrillDownDrawer } from './FleetDrillDownDrawer';
 import { VehicleProfilesMatrix } from './VehicleProfilesMatrix';
 
-import { ActiveTripRadar } from './ActiveTripRadar';
+import { ActiveTripRadar, type ActiveOrderRecord } from './ActiveTripRadar';
 import { SurgeControlValve } from './components/SurgeControlValve';
 import { IncidentRecoveryTerminal } from './components/IncidentRecoveryTerminal';
 import { LedgerReconciliation } from './components/LedgerReconciliation';
 import { MarketplaceOrchestrator } from './components/MarketplaceOrchestrator';
 import { VirtualizedLedgerTable } from './components/VirtualizedLedgerTable';
+import { ControlRoomDriverPanel, ControlRoomTripPanel, ManualDispatchForm, type LiveDriverPin } from './components/ControlRoomLivePanels';
 
 
 interface LedgerEntry {
@@ -21,6 +22,33 @@ interface LedgerEntry {
   amount_paise: number;
   description: string;
   created_at: string;
+}
+
+// Maps a driver's live state to a pin fill (green=online, blue=on-trip,
+// yellow=idle, gray=offline). Returned values are hex literals because the
+// Google Maps Symbol API does not resolve CSS custom properties.
+function driverPinColor(status: string): string {
+  const s = status.toUpperCase();
+  if (s.includes('TRIP') || s.includes('EN_ROUTE') || s.includes('BUSY') || s.includes('DELIVER')) return '#2563EB'; // blue — on trip
+  if (s.includes('AVAILABLE') || s === 'ONLINE' || s === 'ACTIVE') return '#16A34A'; // green — online
+  if (s.includes('IDLE')) return '#CA8A04'; // yellow — idle
+  return '#9CA3AF'; // gray — offline
+}
+
+// Parse a raw /admin/drivers record into a map pin, dropping any without coords.
+function toDriverPin(raw: Record<string, unknown>): LiveDriverPin | null {
+  const lat = raw.lat ?? raw.latitude;
+  const lng = raw.lng ?? raw.longitude;
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  return {
+    driverId: String(raw.driver_id ?? raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    status: String(raw.status ?? raw.current_state ?? ''),
+    rating: typeof raw.rating === 'number' ? raw.rating : null,
+    totalTrips: typeof raw.total_trips === 'number' ? raw.total_trips : null,
+    lat,
+    lng,
+  };
 }
 
 function generateH3HexagonVertices(centerLat: number, centerLng: number, radiusMeters: number = 750) {
@@ -83,6 +111,14 @@ export const ControlRoomDashboard: React.FC = () => {
   // Live-heatmap connection health. When the SSE drops, the map keeps its last frame —
   // surface that explicitly so an operator never mistakes stale supply density for live.
   const [heatmapLive, setHeatmapLive] = useState<boolean>(true);
+
+  // Live driver pins (polled ~5s from /admin/drivers) + the right-panel selection.
+  const [liveDrivers, setLiveDrivers] = useState<LiveDriverPin[]>([]);
+  const [activeOrders, setActiveOrders] = useState<ActiveOrderRecord[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<LiveDriverPin | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<ActiveOrderRecord | null>(null);
+  const driverMarkersRef = useRef<google.maps.Marker[]>([]);
+  const tripMarkersRef = useRef<google.maps.Marker[]>([]);
 
   const [bottomTab, setBottomTab] = useState<'orders' | 'drivers' | 'vehicles' | 'incidents' | 'ledger' | 'orchestrator'>('orders');
 
@@ -229,6 +265,135 @@ export const ControlRoomDashboard: React.FC = () => {
       clearInterval(interval);
     };
   }, [isAuthed]);
+
+  // Poll the live driver pool (~5s) for color-coded map pins.
+  useEffect(() => {
+    if (!isAuthed) return;
+    let active = true;
+    const loadDrivers = async () => {
+      try {
+        const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers`, {
+          headers: { 'X-Admin-Role': adminRole },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: unknown[] = Array.isArray(data) ? data : (data.drivers ?? []);
+        const pins = list
+          .map((raw) => toDriverPin(raw as Record<string, unknown>))
+          .filter((p): p is LiveDriverPin => p !== null);
+        if (active) setLiveDrivers(pins);
+      } catch (err) {
+        console.error('Failed fetching live drivers:', err);
+      }
+    };
+    loadDrivers();
+    const interval = setInterval(loadDrivers, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isAuthed, adminRole]);
+
+  // Poll active orders (~5s) so trip pins are clickable on the map.
+  useEffect(() => {
+    if (!isAuthed) return;
+    let active = true;
+    const loadOrders = async () => {
+      try {
+        const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders`, {
+          headers: { 'X-Admin-Role': adminRole },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: ActiveOrderRecord[] = Array.isArray(data) ? data : [];
+        if (active) {
+          setActiveOrders(list.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED'));
+        }
+      } catch (err) {
+        console.error('Failed fetching active orders:', err);
+      }
+    };
+    loadOrders();
+    const interval = setInterval(loadOrders, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isAuthed, adminRole]);
+
+  // Render color-coded driver pins on the map. Re-runs as the pool refreshes;
+  // SOS alerts take over the map, so suppress pins while any are active.
+  useEffect(() => {
+    driverMarkersRef.current.forEach((m) => m.setMap(null));
+    driverMarkersRef.current = [];
+    if (!mapInstanceRef.current || typeof google === 'undefined' || !google?.maps) return;
+    if (activeSOSAlerts.length > 0) return;
+
+    const markers: google.maps.Marker[] = [];
+    liveDrivers.forEach((d) => {
+      const marker = new google.maps.Marker({
+        position: { lat: d.lat, lng: d.lng },
+        map: mapInstanceRef.current!,
+        title: d.name || d.driverId,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: driverPinColor(d.status),
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 1.5,
+          scale: 6,
+        },
+      });
+      marker.addListener('click', () => {
+        setSelectedOrder(null);
+        setSelectedCellToken(null);
+        setSelectedDriver(d);
+      });
+      markers.push(marker);
+    });
+    driverMarkersRef.current = markers;
+
+    return () => {
+      markers.forEach((m) => m.setMap(null));
+    };
+  }, [liveDrivers, activeSOSAlerts.length, isMapSdkLoaded]);
+
+  // Render active-trip pins (pickup position). Click opens the trip panel.
+  useEffect(() => {
+    tripMarkersRef.current.forEach((m) => m.setMap(null));
+    tripMarkersRef.current = [];
+    if (!mapInstanceRef.current || typeof google === 'undefined' || !google?.maps) return;
+    if (activeSOSAlerts.length > 0) return;
+
+    const markers: google.maps.Marker[] = [];
+    activeOrders.forEach((o) => {
+      if (typeof o.pickup_lat !== 'number' || typeof o.pickup_lng !== 'number') return;
+      const marker = new google.maps.Marker({
+        position: { lat: o.pickup_lat, lng: o.pickup_lng },
+        map: mapInstanceRef.current!,
+        title: `Trip ${o.id.slice(0, 8)}`,
+        icon: {
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          fillColor: '#111827',
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 1.5,
+          scale: 4,
+        },
+      });
+      marker.addListener('click', () => {
+        setSelectedDriver(null);
+        setSelectedCellToken(null);
+        setSelectedOrder(o);
+      });
+      markers.push(marker);
+    });
+    tripMarkersRef.current = markers;
+
+    return () => {
+      markers.forEach((m) => m.setMap(null));
+    };
+  }, [activeOrders, activeSOSAlerts.length, isMapSdkLoaded]);
 
   // Manage map markers & pulsing circles for active SOS alerts
   useEffect(() => {
@@ -431,6 +596,26 @@ export const ControlRoomDashboard: React.FC = () => {
                   cityPrefix="KOL"
                   onOverrideExecuted={() => setSelectedCellToken(null)}
                 />
+
+                {/* Driver pin legend */}
+                <div className="card">
+                  <div className="text-label-small text-content-secondary uppercase tracking-wider mb-2">Driver pins</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { c: 'bg-positive-400', l: 'Online' },
+                      { c: 'bg-accent-400', l: 'On trip' },
+                      { c: 'bg-warning-400', l: 'Idle' },
+                      { c: 'bg-background-tertiary', l: 'Offline' },
+                    ].map((x) => (
+                      <span key={x.l} className="inline-flex items-center gap-1.5 text-label-small text-content-secondary">
+                        <span className={`w-2 h-2 rounded-pill ${x.c}`} />
+                        {x.l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <ManualDispatchForm />
               </>
             )}
 
@@ -468,14 +653,32 @@ export const ControlRoomDashboard: React.FC = () => {
         {/* RIGHT DRAWER */}
         {canFleet && (
           <aside className="w-[340px] bg-background-primary border-l border-border-opaque overflow-y-auto flex-shrink-0">
-            {selectedCellToken ? (
+            {selectedDriver ? (
+              <ControlRoomDriverPanel
+                driver={selectedDriver}
+                onClose={() => setSelectedDriver(null)}
+                onForcedOffline={(id) => {
+                  setLiveDrivers((prev) => prev.filter((d) => d.driverId !== id));
+                  setSelectedDriver(null);
+                }}
+              />
+            ) : selectedOrder ? (
+              <ControlRoomTripPanel
+                order={selectedOrder}
+                onClose={() => setSelectedOrder(null)}
+                onResolved={(id) => {
+                  setActiveOrders((prev) => prev.filter((o) => o.id !== id));
+                  setSelectedOrder(null);
+                }}
+              />
+            ) : selectedCellToken ? (
               <FleetDrillDownDrawer
                 cellToken={selectedCellToken}
                 onClose={() => setSelectedCellToken(null)}
               />
             ) : (
               <div className="p-8 text-center">
-                <p className="text-paragraph-small text-content-tertiary">Select a hex cell on the map to inspect local fleet density.</p>
+                <p className="text-paragraph-small text-content-tertiary">Select a driver pin, active trip, or hex cell on the map to inspect details.</p>
               </div>
             )}
           </aside>

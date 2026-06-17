@@ -141,6 +141,13 @@ export const DocumentsVaultDashboard: React.FC = () => {
   // Bulk select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Lightweight inline toast (matches TripDetail/SafetyDashboard — no shared admin toast).
+  const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const showToast = (text: string, kind: 'ok' | 'err' = 'ok') => {
+    setToast({ text, kind });
+    window.setTimeout(() => setToast(null), 3500);
+  };
+
   const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
   const email = localStorage.getItem('admin_email') || '';
   const headers = {
@@ -172,20 +179,27 @@ export const DocumentsVaultDashboard: React.FC = () => {
 
   const saveTags = async () => {
     if (!selected || editingTags === null) return;
-    await fetch(`${base}/${selected.id}/tags`, {
-      method: 'POST', headers,
+    const res = await fetch(`${base}/${selected.id}/tags`, {
+      method: 'PATCH', headers,
       body: JSON.stringify({ tags: editingTags }),
     });
     setEditingTags(null);
-    fetchDocs();
-    // refresh detail
-    openDetail(selected);
+    if (res.ok) { showToast('Tags updated', 'ok'); fetchDocs(); openDetail(selected); }
+    else showToast('Failed to update tags', 'err');
   };
 
   const deleteDoc = async (id: string) => {
     if (!confirm('Soft-delete this document?')) return;
     const res = await fetch(`${base}/${id}`, { method: 'DELETE', headers });
-    if (res.ok) { setSelected(null); fetchDocs(); }
+    if (res.ok) { showToast('Document deleted', 'ok'); setSelected(null); fetchDocs(); }
+    else showToast('Delete failed', 'err');
+  };
+
+  const bulkDownload = () => {
+    const urls = docs.filter(d => selectedIds.has(d.id)).map(d => d.file_url).filter(Boolean);
+    if (urls.length === 0) { showToast('No file URLs to copy', 'err'); return; }
+    navigator.clipboard.writeText(urls.join('\n'));
+    showToast(`Copied ${urls.length} file URL${urls.length > 1 ? 's' : ''}`, 'ok');
   };
 
   const toggleSelect = (id: string) => {
@@ -239,8 +253,8 @@ export const DocumentsVaultDashboard: React.FC = () => {
           <div className="bg-accent/5 border border-accent/20 rounded-lg px-4 py-2.5 flex items-center gap-3 text-sm">
             <span className="font-medium text-accent">{selectedIds.size} selected</span>
             <button onClick={() => setSelectedIds(new Set())} className="text-content-tertiary hover:text-content-secondary">Clear</button>
-            <button className="ml-auto text-content-secondary border border-background-secondary rounded px-3 py-1 hover:bg-background-secondary">
-              ↓ Bulk Download URLs
+            <button onClick={bulkDownload} className="ml-auto text-content-secondary border border-background-secondary rounded px-3 py-1 hover:bg-background-secondary">
+              ↓ Copy file URLs
             </button>
           </div>
         )}
@@ -319,6 +333,19 @@ export const DocumentsVaultDashboard: React.FC = () => {
                 </a>
               </div>
 
+              {/* Version history: docs carry a monotonic version counter; superseded
+                  versions are stored as separate rows (status SUPERSEDED) rather than
+                  an inline array, so we surface the current version + a pointer. */}
+              <div>
+                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Version</div>
+                <div className="text-xs text-content-secondary">
+                  Current: <span className="font-mono">v{selected.version}</span>
+                  {selected.version > 1
+                    ? <span className="text-content-tertiary"> · filter by status “Superseded” to view prior versions of this entity.</span>
+                    : <span className="text-content-tertiary"> · no prior versions.</span>}
+                </div>
+              </div>
+
               {/* Tags */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -380,6 +407,19 @@ export const DocumentsVaultDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-fade-in">
+          <div className={`rounded-pill px-4 py-2.5 text-xs font-semibold shadow-xl border ${
+            toast.kind === 'ok'
+              ? 'bg-surface-positive text-content-positive border-positive-400'
+              : 'bg-surface-negative text-content-negative border-negative-400'
+          }`}>
+            {toast.text}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -115,6 +115,9 @@ const KYCTab: React.FC<{ headers: Record<string, string> }> = ({ headers }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div className="space-y-3">
+        <div className="rounded-lg border border-background-secondary bg-background-secondary/40 px-4 py-2.5 text-xs text-content-tertiary">
+          ℹ️ KYC verification applies to <span className="font-medium text-content-secondary">drivers only</span>. Riders are not subject to a separate KYC review, so the driver onboarding queue (<span className="font-mono">/drivers/pending</span>) is the sole KYC source here.
+        </div>
         {msg && <div className={`rounded-lg px-4 py-2.5 text-sm ${msg.startsWith('Error') ? 'bg-surface-negative text-content-negative' : 'bg-surface-positive text-content-positive'}`}>{msg}</div>}
         <div className="flex gap-1 flex-wrap">
           {['ALL', 'PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].map(s => (

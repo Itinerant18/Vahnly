@@ -52,6 +52,45 @@ function fmtJSON(val: unknown): string {
   try { return JSON.stringify(JSON.parse(String(val)), null, 2); } catch { return String(val); }
 }
 
+// Parse an audit value (may be a JSON string, an object, or null) into a flat
+// record for key-level diffing; returns null when it isn't an object.
+function parseObj(val: unknown): Record<string, unknown> | null {
+  if (val === null || val === undefined || val === 'null') return null;
+  try {
+    const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch { return null; }
+}
+
+type DiffKind = 'added' | 'removed' | 'changed' | 'same';
+interface DiffRow { key: string; kind: DiffKind; before: unknown; after: unknown; }
+
+function diffObjects(before: Record<string, unknown>, after: Record<string, unknown>): DiffRow[] {
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+  return keys.map((key) => {
+    const inB = key in before, inA = key in after;
+    const bv = before[key], av = after[key];
+    let kind: DiffKind = 'same';
+    if (inB && !inA) kind = 'removed';
+    else if (!inB && inA) kind = 'added';
+    else if (JSON.stringify(bv) !== JSON.stringify(av)) kind = 'changed';
+    return { key, kind, before: bv, after: av };
+  });
+}
+
+function cell(v: unknown): string {
+  if (v === undefined) return '—';
+  if (v === null) return 'null';
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+
+const DIFF_ROW_CLS: Record<DiffKind, string> = {
+  added: 'bg-surface-positive',
+  removed: 'bg-surface-negative',
+  changed: 'bg-surface-warning',
+  same: '',
+};
+
 // ── Column definitions (DataTable hero component) ───────────────────────────────
 const AUDIT_COLUMNS: ColumnDef<AuditEntry>[] = [
   {
@@ -239,31 +278,68 @@ export const AuditLogsDashboard: React.FC = () => {
       {expanded && (() => {
         const entry = logs.find(e => e.id === expanded);
         if (!entry) return null;
+        const beforeObj = parseObj(entry.before_value);
+        const afterObj = parseObj(entry.after_value);
+        const diff = beforeObj && afterObj ? diffObjects(beforeObj, afterObj) : null;
         return (
           <div className="bg-background-secondary/20 border border-background-secondary rounded-xl px-6 pb-4 pt-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Details */}
-              <div>
-                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Details</div>
-                <div className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs text-content-secondary font-mono whitespace-pre-wrap break-all">
-                  {entry.details || '—'}
-                </div>
-              </div>
-              {/* Before */}
-              <div>
-                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Before</div>
-                <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                  {fmtJSON(entry.before_value)}
-                </pre>
-              </div>
-              {/* After */}
-              <div>
-                <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">After</div>
-                <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                  {fmtJSON(entry.after_value)}
-                </pre>
+            {/* Details */}
+            <div className="mb-4">
+              <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Details</div>
+              <div className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs text-content-secondary font-mono whitespace-pre-wrap break-all">
+                {entry.details || '—'}
               </div>
             </div>
+
+            {diff ? (
+              /* Key-level diff: added (green), removed (red), changed (amber) keys highlighted. */
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide">Changes</div>
+                  <div className="flex gap-2 text-[10px]">
+                    <span className="px-1.5 py-0.5 rounded bg-surface-warning text-content-warning">changed</span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-positive text-content-positive">added</span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-negative text-content-negative">removed</span>
+                  </div>
+                </div>
+                <div className="bg-background-primary border border-background-secondary rounded-lg overflow-auto max-h-56">
+                  <table className="w-full text-xs font-mono">
+                    <thead className="bg-background-secondary/50 text-content-tertiary">
+                      <tr>
+                        <th className="text-left px-3 py-1.5 font-medium">Key</th>
+                        <th className="text-left px-3 py-1.5 font-medium">Before</th>
+                        <th className="text-left px-3 py-1.5 font-medium">After</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diff.map((r) => (
+                        <tr key={r.key} className={`border-t border-background-secondary/50 ${DIFF_ROW_CLS[r.kind]}`}>
+                          <td className="px-3 py-1.5 text-content-secondary align-top">{r.key}</td>
+                          <td className="px-3 py-1.5 align-top break-all">{r.kind === 'added' ? '—' : <span className={r.kind === 'changed' || r.kind === 'removed' ? 'text-content-negative' : 'text-content-tertiary'}>{cell(r.before)}</span>}</td>
+                          <td className="px-3 py-1.5 align-top break-all">{r.kind === 'removed' ? '—' : <span className={r.kind === 'changed' || r.kind === 'added' ? 'text-content-positive' : 'text-content-tertiary'}>{cell(r.after)}</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              /* Non-object values: fall back to side-by-side raw JSON. */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">Before</div>
+                  <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                    {fmtJSON(entry.before_value)}
+                  </pre>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-content-tertiary uppercase tracking-wide mb-1">After</div>
+                  <pre className="bg-background-primary border border-background-secondary rounded-lg p-3 text-xs font-mono text-content-secondary overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                    {fmtJSON(entry.after_value)}
+                  </pre>
+                </div>
+              </div>
+            )}
             {entry.user_agent && (
               <div className="mt-2 text-[10px] text-content-tertiary font-mono truncate">UA: {entry.user_agent}</div>
             )}
