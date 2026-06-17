@@ -101,6 +101,10 @@ type CustomClaims struct {
 	// The RBAC guards reject it for everything except /auth/change-password, forcing a
 	// first-login password rotation before any protected admin data is reachable.
 	MustChangePassword bool `json:"must_change_password,omitempty"`
+	// PhoneVerified marks a DRIVER token whose phone number has been OTP-verified.
+	// AuthenticateJWT rejects a driver token without it, forcing the client through the
+	// phone-OTP gate before any protected driver route is reachable.
+	PhoneVerified bool `json:"phone_verified,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -185,6 +189,15 @@ func (m *AuthMiddleware) AuthenticateJWT(next http.HandlerFunc) http.HandlerFunc
 		// Server-side session revocation check (e.g. driver suspended by admin).
 		if m.sessionCheck != nil && !m.sessionCheck(r.Context(), claims) {
 			http.Error(w, "session_revoked_or_expired", http.StatusUnauthorized)
+			return
+		}
+
+		// Mobile phone-OTP gate: a DRIVER token minted before the number was verified
+		// carries phone_verified=false. Reject it on every protected route so the client
+		// is forced through the OTP gate. The public /driver/auth/* routes don't use
+		// AuthenticateJWT, so phone verification itself stays reachable.
+		if claims.Role == "DRIVER" && !claims.PhoneVerified {
+			http.Error(w, "phone_verification_required", http.StatusForbidden)
 			return
 		}
 

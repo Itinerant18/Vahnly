@@ -205,6 +205,37 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, otp string) (*domain
 	return rider, token, nil
 }
 
+// LoginByVerifiedPhone resolves (or creates) a rider for an already phone-verified
+// number — used when ownership was proven out-of-band (Firebase Phone Auth) rather
+// than the in-house OTP. Mirrors VerifyOTP's tail: returns (rider, "", ErrNewRider)
+// for a brand-new rider so the handler routes them into onboarding.
+func (s *AuthService) LoginByVerifiedPhone(ctx context.Context, phone string) (*domain.Rider, string, error) {
+	phone = normalizePhone(phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		return nil, "", ErrInvalidPhone
+	}
+	rider, err := s.repo.GetRiderByPhone(ctx, phone)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			created, cErr := s.repo.CreateRider(ctx, phone)
+			if cErr != nil {
+				return nil, "", cErr
+			}
+			return created, "", ErrNewRider
+		}
+		return nil, "", err
+	}
+	if !rider.IsActive {
+		return nil, "", ErrRiderInactive
+	}
+	_ = s.repo.TouchLastLogin(ctx, rider.ID)
+	token, err := s.IssueSession(ctx, rider)
+	if err != nil {
+		return nil, "", err
+	}
+	return rider, token, nil
+}
+
 // IssueSession mints an HS256 rider JWT and records its jti in Redis so the
 // session can be validated (and revoked) server-side. Exported so the handler
 // can issue a token for a freshly-onboarded new rider too.

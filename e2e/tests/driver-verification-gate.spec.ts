@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Driver Phone Verification Gate', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addInitScript(() => {
+      (window as any).__E2E__ = true;
+    });
+  });
+
   test('unverified driver login is gated and can be verified to proceed', async ({ page }) => {
     // 1. Mock Login returning phone_verified: false
     await page.route('**/api/v1/driver/login', (route) =>

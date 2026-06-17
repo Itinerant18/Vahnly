@@ -129,10 +129,23 @@ export default function LoginPage() {
   const [googleOtp, setGoogleOtp] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
 
+  // Firebase Phone Auth sends the real SMS when configured; otherwise the direct
+  // login falls back to the backend log-OTP (LogSMSSender) for local/dev/E2E.
+  const isFirebaseConfigured =
+    typeof window !== "undefined" &&
+    !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+    !(window as { __E2E__?: boolean }).__E2E__;
+
   const onSendOTP = async () => {
     setError("");
     try {
-      await sendOTP(`+91${phone.replace(/\D/g, "")}`);
+      const e164 = `+91${phone.replace(/\D/g, "")}`;
+      if (isFirebaseConfigured) {
+        const conf = await startPhoneVerification(e164);
+        setConfirmation(conf);
+      } else {
+        await sendOTP(e164);
+      }
       setStep("otp");
     } catch {
       setError("Could not send OTP. Check the number and try again.");
@@ -142,12 +155,21 @@ export default function LoginPage() {
   const onVerify = useCallback(async (otp: string) => {
     setError("");
     try {
-      const { isNew } = await verifyOTP(`+91${phone.replace(/\D/g, "")}`, otp, referral || undefined);
+      const e164 = `+91${phone.replace(/\D/g, "")}`;
+      // With Firebase, confirm the SMS code -> the verified phone user's ID token
+      // (phone_number claim) is sent as the otp; the backend's verify-otp Firebase
+      // branch trusts it. Otherwise the plain 6-digit code goes to the log-OTP path.
+      let otpOrToken = otp;
+      if (isFirebaseConfigured && confirmation) {
+        const cred = await confirmation.confirm(otp);
+        otpOrToken = await cred.user.getIdToken();
+      }
+      const { isNew } = await verifyOTP(e164, otpOrToken, referral || undefined);
       router.replace(isNew ? "/onboarding" : "/home");
     } catch {
       setError("Incorrect or expired OTP. Please try again.");
     }
-  }, [phone, referral, verifyOTP, router]);
+  }, [phone, referral, verifyOTP, router, isFirebaseConfigured, confirmation]);
 
   const handleGoogleSignIn = async () => {
     setError("");
@@ -354,7 +376,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <ResendTimer onResend={() => sendOTP(`+91${phone}`).catch(() => {})} />
+            <ResendTimer onResend={() => { void onSendOTP(); }} />
 
             <button
               className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px]

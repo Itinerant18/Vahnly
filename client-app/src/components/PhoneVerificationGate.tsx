@@ -12,11 +12,14 @@ export default function PhoneVerificationGate() {
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(30);
   const [otpSent, setOtpSent] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const rawPhone = user?.phone || '';
   const cleanPhone = rawPhone.replace(/\s/g, '');
+
+  const isFirebaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && !(window as any).__E2E__;
 
   const triggerSendOTP = async () => {
     if (!cleanPhone) {
@@ -26,10 +29,18 @@ export default function PhoneVerificationGate() {
     setError(null);
     setLoading(true);
     try {
-      await sendDriverOTP(cleanPhone);
+      if (isFirebaseConfigured) {
+        // Firebase sends real SMS via reCAPTCHA verification
+        const { startPhoneVerification } = await import('@/lib/phoneAuth');
+        const conf = await startPhoneVerification(`+91${cleanPhone}`);
+        setConfirmationResult(conf);
+      } else {
+        // Fallback log-OTP dev flow
+        await sendDriverOTP(cleanPhone);
+      }
       setOtpSent(true);
       setResendTimer(30);
-      console.log(`[PhoneVerificationGate] OTP sent to ${cleanPhone}`);
+      console.log(`[PhoneVerificationGate] OTP sent to ${cleanPhone} (Firebase: ${isFirebaseConfigured})`);
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code. Please try again.');
     } finally {
@@ -54,7 +65,6 @@ export default function PhoneVerificationGate() {
   }, [resendTimer]);
 
   const handleChange = (index: number, value: string) => {
-    // Only allow numbers
     const cleanVal = value.replace(/\D/g, '');
     if (!cleanVal) {
       const nextOtp = [...otp];
@@ -110,7 +120,13 @@ export default function PhoneVerificationGate() {
     setLoading(true);
 
     try {
-      const res = await verifyDriverOTP(cleanPhone, otpCode);
+      let otpOrToken = otpCode;
+      if (isFirebaseConfigured && confirmationResult) {
+        // Exchange 6-digit code for Firebase ID token (JWT phone proof)
+        otpOrToken = await confirmationResult.confirm(otpCode);
+      }
+
+      const res = await verifyDriverOTP(cleanPhone, otpOrToken);
       if (res.token && res.user) {
         // Successful login, update auth store
         login(res.token, {
@@ -222,6 +238,9 @@ export default function PhoneVerificationGate() {
           </div>
         </form>
       </div>
+
+      {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+      <div id="recaptcha-container" className="hidden" />
 
       <footer className="mt-8 text-center text-label-small text-content-tertiary font-mono select-none">
         VAHNLY Guard • OTP Verification Gate

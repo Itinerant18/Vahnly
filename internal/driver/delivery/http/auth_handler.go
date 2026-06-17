@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/platform/driver-delivery/internal/firebaseauth"
 	"github.com/platform/driver-delivery/internal/gateway/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -126,6 +127,32 @@ func (h *DriverAuthHandler) recordAuditLog(ctx context.Context, driverID string,
 	}
 }
 
+// verifyDriverPhoneToken validates a phone-ownership proof and returns the verified
+// E.164 number. It accepts a Firebase Phone Auth ID token (primary — the number is
+// read from the signed token, never a client field) and falls back to the gateway's
+// own short-lived registration_phone JWT issued by the legacy log-OTP path, so local
+// dev works without a Firebase project configured.
+func (h *DriverAuthHandler) verifyDriverPhoneToken(ctx context.Context, idToken string) (string, error) {
+	if idToken == "" {
+		return "", fmt.Errorf("empty phone token")
+	}
+	// Primary: Firebase Phone Auth ID token.
+	if fc, err := firebaseauth.VerifyIDToken(ctx, idToken, firebaseauth.ProjectID()); err == nil && fc.PhoneNumber != "" {
+		return fc.PhoneNumber, nil
+	}
+	// Fallback: the gateway's own registration_phone JWT (dev / log-OTP path).
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(idToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return h.jwtSecret, nil
+	})
+	if err == nil && token.Valid && claims["purpose"] == "registration_phone" {
+		if sub, ok := claims["sub"].(string); ok && sub != "" {
+			return sub, nil
+		}
+	}
+	return "", fmt.Errorf("invalid phone verification token")
+}
+
 // HandleDriverRegister creates a new driver record with default ONBOARDING status
 func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -147,16 +174,12 @@ func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Verify phone token JWT
-	claims := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(req.PhoneToken, claims, func(t *jwt.Token) (interface{}, error) {
-		return h.jwtSecret, nil
-	})
-	if err != nil || !token.Valid || claims["purpose"] != "registration_phone" {
+	// Verify the phone-ownership proof (Firebase Phone Auth token, or dev fallback JWT).
+	verifiedPhone, err := h.verifyDriverPhoneToken(ctx, req.PhoneToken)
+	if err != nil || verifiedPhone == "" {
 		http.Error(w, "Invalid or expired phone verification token", http.StatusUnauthorized)
 		return
 	}
-	verifiedPhone := claims["sub"].(string)
 
 	if normalizePhone(req.Phone) != normalizePhone(verifiedPhone) {
 		http.Error(w, "Phone number mismatch between verification and registration", http.StatusBadRequest)
@@ -287,9 +310,10 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
 	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
-		UserID:    dbDriverID,
-		Role:      "DRIVER",
-		CityScope: dbCityPrefix,
+		UserID:        dbDriverID,
+		Role:          "DRIVER",
+		CityScope:     dbCityPrefix,
+		PhoneVerified: dbPhoneVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Subject:   dbDriverID,
@@ -448,16 +472,12 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 				return
 			}
 
-			// Verify phone token JWT
-			claims := jwt.MapClaims{}
-			token, err := jwt.ParseWithClaims(req.PhoneToken, claims, func(t *jwt.Token) (interface{}, error) {
-				return h.jwtSecret, nil
-			})
-			if err != nil || !token.Valid || claims["purpose"] != "registration_phone" {
+			// Verify the phone-ownership proof (Firebase Phone Auth token, or dev fallback JWT).
+			verifiedPhone, vErr := h.verifyDriverPhoneToken(ctx, req.PhoneToken)
+			if vErr != nil || verifiedPhone == "" {
 				http.Error(w, "Invalid or expired phone verification token", http.StatusUnauthorized)
 				return
 			}
-			verifiedPhone := claims["sub"].(string)
 
 			if normalizePhone(req.Phone) != normalizePhone(verifiedPhone) {
 				http.Error(w, "Phone number mismatch between verification and registration", http.StatusBadRequest)
@@ -511,9 +531,10 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
 	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
-		UserID:    dbDriverID,
-		Role:      "DRIVER",
-		CityScope: dbCityPrefix,
+		UserID:        dbDriverID,
+		Role:          "DRIVER",
+		CityScope:     dbCityPrefix,
+		PhoneVerified: dbPhoneVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Subject:   dbDriverID,
@@ -669,40 +690,53 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	var sessionID string
-	var otpHash string
-	var attempts int
-	var maxAttempts int
-
-	querySession := `
-		SELECT id, otp_hash, attempts, max_attempts
-		FROM driver_otp_sessions
-		WHERE phone = $1 AND purpose = 'LOGIN' AND used_at IS NULL AND expires_at > now()
-		ORDER BY created_at DESC
-		LIMIT 1
-	`
-	err := h.dbPool.QueryRow(ctx, querySession, phone).Scan(&sessionID, &otpHash, &attempts, &maxAttempts)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "No active OTP session found or OTP expired", http.StatusUnauthorized)
+	isFirebaseToken := strings.HasPrefix(req.OTP, "eyJ")
+	if isFirebaseToken {
+		verifiedPhone, vErr := h.verifyDriverPhoneToken(ctx, req.OTP)
+		if vErr != nil || verifiedPhone == "" {
+			http.Error(w, "Invalid Firebase verification token", http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
+		if normalizePhone(verifiedPhone) != phone {
+			http.Error(w, "Verification phone number mismatch", http.StatusBadRequest)
+			return
+		}
+	} else {
+		var sessionID string
+		var otpHash string
+		var attempts int
+		var maxAttempts int
 
-	if attempts >= maxAttempts {
-		http.Error(w, "Too many verification attempts; request a new OTP", http.StatusUnauthorized)
-		return
-	}
+		querySession := `
+			SELECT id, otp_hash, attempts, max_attempts
+			FROM driver_otp_sessions
+			WHERE phone = $1 AND purpose = 'LOGIN' AND used_at IS NULL AND expires_at > now()
+			ORDER BY created_at DESC
+			LIMIT 1
+		`
+		err := h.dbPool.QueryRow(ctx, querySession, phone).Scan(&sessionID, &otpHash, &attempts, &maxAttempts)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "No active OTP session found or OTP expired", http.StatusUnauthorized)
+				return
+			}
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(otpHash), []byte(req.OTP)); err != nil {
-		_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET attempts = attempts + 1 WHERE id = $1::uuid", sessionID)
-		http.Error(w, "Incorrect OTP", http.StatusUnauthorized)
-		return
-	}
+		if attempts >= maxAttempts {
+			http.Error(w, "Too many verification attempts; request a new OTP", http.StatusUnauthorized)
+			return
+		}
 
-	_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET used_at = now() WHERE id = $1::uuid", sessionID)
+		if err := bcrypt.CompareHashAndPassword([]byte(otpHash), []byte(req.OTP)); err != nil {
+			_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET attempts = attempts + 1 WHERE id = $1::uuid", sessionID)
+			http.Error(w, "Incorrect OTP", http.StatusUnauthorized)
+			return
+		}
+
+		_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET used_at = now() WHERE id = $1::uuid", sessionID)
+	}
 
 	// Check if driver exists
 	var dbDriverID string
@@ -716,7 +750,7 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 		FROM drivers
 		WHERE phone = $1
 	`
-	err = h.dbPool.QueryRow(ctx, queryDriver, phone).Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
+	err := h.dbPool.QueryRow(ctx, queryDriver, phone).Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Driver does not exist yet. Issue a short-lived signed registration phone_token
@@ -751,9 +785,10 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 	expirationTime := time.Now().Add(7 * 24 * time.Hour)
 	jti := uuid.NewString()
 	claims := &middleware.CustomClaims{
-		UserID:    dbDriverID,
-		Role:      "DRIVER",
-		CityScope: dbCityPrefix,
+		UserID:        dbDriverID,
+		Role:          "DRIVER",
+		CityScope:     dbCityPrefix,
+		PhoneVerified: true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Subject:   dbDriverID,
@@ -786,4 +821,3 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 		Phone:              phone,
 	})
 }
-

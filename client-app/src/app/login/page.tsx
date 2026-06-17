@@ -38,10 +38,13 @@ function UnifiedLoginContent() {
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpResendTimer, setOtpResendTimer] = useState<number>(30);
   const [registrationPayload, setRegistrationPayload] = useState<any>(null);
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
   
   // Logs state
   const [logs, setLogs] = useState<string[]>([]);
+
+  const isFirebaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && !(window as any).__E2E__;
 
   // Log audit captures helper
   const addAuditLog = (action: string, metadata: any) => {
@@ -123,7 +126,16 @@ function UnifiedLoginContent() {
     setLoading(true);
     setAuthError(null);
     try {
-      await sendDriverOTP(cleanPhone);
+      if (isFirebaseConfigured) {
+        // Firebase sends real SMS via invisible reCAPTCHA
+        const { startPhoneVerification } = await import('@/lib/phoneAuth');
+        const conf = await startPhoneVerification(`+91${cleanPhone}`);
+        setConfirmationResult(conf);
+      } else {
+        // Fallback custom OTP log flow
+        await sendDriverOTP(cleanPhone);
+      }
+
       setOtpPurpose(purpose);
       setOtpDigits(['', '', '', '', '', '']);
       setOtpResendTimer(30);
@@ -131,7 +143,7 @@ function UnifiedLoginContent() {
         setRegistrationPayload(payload);
       }
       setShowOtpVerification(true);
-      addAuditLog('OTP_SENT', { phone: cleanPhone, purpose });
+      addAuditLog('OTP_SENT', { phone: cleanPhone, purpose, firebase: isFirebaseConfigured });
     } catch (err: any) {
       setAuthError(err.message || 'Failed to send OTP verification code. Please try again.');
       addAuditLog('OTP_SEND_FAILED', { phone: cleanPhone, error: String(err) });
@@ -153,12 +165,18 @@ function UnifiedLoginContent() {
     const cleanPhone = phone.replace(/\s/g, '');
 
     try {
-      const verifyRes = await verifyDriverOTP(cleanPhone, otpCode);
+      let otpOrToken = otpCode;
+      if (isFirebaseConfigured && confirmationResult) {
+        // Exchange 6-digit code for Firebase ID token (JWT phone proof)
+        otpOrToken = await confirmationResult.confirm(otpCode);
+      }
+
+      const verifyRes = await verifyDriverOTP(cleanPhone, otpOrToken);
       addAuditLog('OTP_VERIFIED', { phone: cleanPhone });
 
       if (otpPurpose === 'login_verification') {
-        // Existing driver clearing the post-login phone gate: the backend marks the
-        // row phone_verified=true and returns a fresh session token + profile.
+        // Existing driver clearing the post-login phone gate -> verify-otp returns a
+        // fresh session (the backend marked the row phone_verified=true).
         if (!verifyRes.token || !verifyRes.user) {
           throw new Error('Verification succeeded but no session was returned.');
         }
@@ -177,7 +195,7 @@ function UnifiedLoginContent() {
         return;
       }
 
-      // Registration flows require a signed phone_token to create the account.
+      // Registration flows require a phone_token to create the account.
       if (!verifyRes.phone_token) {
         throw new Error('Verification completed, but no phone token was returned.');
       }
@@ -366,7 +384,7 @@ function UnifiedLoginContent() {
       } else if (res.token && res.user) {
         // Deep phone-verification gate for a returning Google driver.
         if (res.phone_verified === false) {
-          const gatePhone = (res.user.phone || '').replace(/\s/g, '');
+          const gatePhone = (res.user.phone || '').replace(/\D/g, '').slice(-10);
           handlePhoneChange(gatePhone);
           addAuditLog('GOOGLE_LOGIN_PHONE_UNVERIFIED', { userId: res.user.id });
           await startOTPVerification('login_verification', gatePhone);
@@ -719,6 +737,9 @@ function UnifiedLoginContent() {
         )}
 
       </div>
+
+      {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+      <div id="recaptcha-container" className="hidden" />
 
       <footer className="mt-8 text-center text-label-small text-content-tertiary font-mono select-none">
         Secure SHA-256 Token Vault • Active Sandbox Session

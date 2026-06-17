@@ -13,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/platform/driver-delivery/internal/domain"
+	"github.com/platform/driver-delivery/internal/firebaseauth"
 	"github.com/platform/driver-delivery/internal/rider/repository"
 	"github.com/platform/driver-delivery/internal/rider/service"
 )
@@ -138,7 +140,22 @@ func (h *RiderHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rider, token, err := h.auth.VerifyOTP(r.Context(), req.Phone, req.OTP)
+	// The OTP field carries either the 6-digit in-house code OR, when Firebase Phone
+	// Auth is used, a Firebase ID token (JWT, "eyJ..."). On the Firebase path the
+	// trusted phone number is read from the SIGNED token, never req.Phone.
+	var rider *domain.Rider
+	var token string
+	var err error
+	if strings.HasPrefix(req.OTP, "eyJ") {
+		fc, vErr := firebaseauth.VerifyIDToken(r.Context(), req.OTP, firebaseauth.ProjectID())
+		if vErr != nil || fc.PhoneNumber == "" {
+			writeError(w, http.StatusUnauthorized, "Phone verification failed", "ERR_UNAUTHENTICATED")
+			return
+		}
+		rider, token, err = h.auth.LoginByVerifiedPhone(r.Context(), fc.PhoneNumber)
+	} else {
+		rider, token, err = h.auth.VerifyOTP(r.Context(), req.Phone, req.OTP)
+	}
 	if err != nil {
 		if errors.Is(err, service.ErrNewRider) {
 			// Brand-new rider: issue a session token so the client can complete
@@ -282,7 +299,7 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 	// Verify the Firebase Phone Auth token and take the phone number from the SIGNED token,
 	// not from any client field — this both proves ownership and prevents linking the email
 	// onto someone else's number.
-	phoneClaims, perr := verifyFirebaseIDToken(ctx, req.PhoneToken, firebaseProjectID())
+	phoneClaims, perr := firebaseauth.VerifyIDToken(ctx, req.PhoneToken, firebaseauth.ProjectID())
 	if perr != nil || phoneClaims.PhoneNumber == "" {
 		writeError(w, http.StatusUnauthorized, "Phone verification failed", "ERR_UNAUTHENTICATED")
 		return

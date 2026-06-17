@@ -1,4 +1,11 @@
-package http
+// Package firebaseauth verifies Firebase Auth ID tokens (stdlib + golang-jwt).
+//
+// Firebase signs ID tokens with Google's securetoken service keys (RS256). This
+// package verifies the phone-verification proof minted by Firebase Phone Auth on
+// the client — the verified `phone_number` is read from the signed token, never
+// from a client-supplied field, so it cannot be spoofed. Shared by the rider and
+// driver auth handlers.
+package firebaseauth
 
 import (
 	"context"
@@ -15,16 +22,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Firebase Auth ID-token verification (stdlib + golang-jwt). Firebase signs ID tokens with
-// Google's securetoken service keys (RS256). We use this to verify the phone-verification
-// proof minted by Firebase Phone Auth on the client — the verified `phone_number` is read
-// from the signed token, never from a client-supplied field, so it cannot be spoofed.
+const certsURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
 
-const firebaseCertsURL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+// ProjectID returns the Firebase project the gateway verifies tokens against.
+func ProjectID() string { return os.Getenv("FIREBASE_PROJECT_ID") }
 
-func firebaseProjectID() string { return os.Getenv("FIREBASE_PROJECT_ID") }
-
-type firebaseTokenClaims struct {
+// Claims are the subset of Firebase ID-token claims the gateway trusts.
+type Claims struct {
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
 	PhoneNumber   string `json:"phone_number"`
@@ -33,21 +37,21 @@ type firebaseTokenClaims struct {
 }
 
 var (
-	fbCertMu     sync.Mutex
-	fbCerts      map[string]*rsa.PublicKey
-	fbCertExpiry time.Time
+	certMu     sync.Mutex
+	certs      map[string]*rsa.PublicKey
+	certExpiry time.Time
 )
 
-// fetchFirebaseCerts returns Google's current securetoken signing public keys, keyed by kid,
-// with a conservative in-process cache so each verification doesn't hit the network.
-func fetchFirebaseCerts(ctx context.Context) (map[string]*rsa.PublicKey, error) {
-	fbCertMu.Lock()
-	defer fbCertMu.Unlock()
-	if fbCerts != nil && time.Now().Before(fbCertExpiry) {
-		return fbCerts, nil
+// fetchCerts returns Google's current securetoken signing public keys, keyed by
+// kid, with a conservative in-process cache so each verification doesn't hit the network.
+func fetchCerts(ctx context.Context) (map[string]*rsa.PublicKey, error) {
+	certMu.Lock()
+	defer certMu.Unlock()
+	if certs != nil && time.Now().Before(certExpiry) {
+		return certs, nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, firebaseCertsURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, certsURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -81,30 +85,30 @@ func fetchFirebaseCerts(ctx context.Context) (map[string]*rsa.PublicKey, error) 
 	if len(keys) == 0 {
 		return nil, fmt.Errorf("no usable securetoken certs")
 	}
-	fbCerts = keys
-	fbCertExpiry = time.Now().Add(1 * time.Hour)
+	certs = keys
+	certExpiry = time.Now().Add(1 * time.Hour)
 	return keys, nil
 }
 
-// verifyFirebaseIDToken verifies a Firebase Auth ID token for projectID and returns its
-// claims. It checks the RS256 signature against Google's securetoken certs and validates the
-// issuer / audience / expiry per Firebase's documented rules.
-func verifyFirebaseIDToken(ctx context.Context, idToken, projectID string) (*firebaseTokenClaims, error) {
+// VerifyIDToken verifies a Firebase Auth ID token for projectID and returns its
+// claims. It checks the RS256 signature against Google's securetoken certs and
+// validates the issuer / audience / expiry per Firebase's documented rules.
+func VerifyIDToken(ctx context.Context, idToken, projectID string) (*Claims, error) {
 	if projectID == "" {
 		return nil, fmt.Errorf("firebase project id not configured")
 	}
 
-	claims := &firebaseTokenClaims{}
+	claims := &Claims{}
 	keyFunc := func(t *jwt.Token) (interface{}, error) {
 		kid, _ := t.Header["kid"].(string)
 		if kid == "" {
 			return nil, fmt.Errorf("missing kid")
 		}
-		certs, err := fetchFirebaseCerts(ctx)
+		c, err := fetchCerts(ctx)
 		if err != nil {
 			return nil, err
 		}
-		key, ok := certs[kid]
+		key, ok := c[kid]
 		if !ok {
 			return nil, fmt.Errorf("unknown signing key")
 		}

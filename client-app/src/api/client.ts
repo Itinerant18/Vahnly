@@ -193,6 +193,16 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
 
   const bodyText = await response.text();
   if (!response.ok) {
+    // Backend phone-OTP gate: a driver token without a verified number is rejected on
+    // protected routes. Clear the session and bounce to /login so the OTP gate runs.
+    if (response.status === 403 && bodyText.includes('phone_verification_required')) {
+      try {
+        useAuthStore.getState().logout();
+      } catch {
+        /* ignore */
+      }
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
     throw new ApiClientError(
       bodyText || `gateway_request_failed_${response.status}`,
       response.status,
