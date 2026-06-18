@@ -427,7 +427,14 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		deferUntilLead := req.ScheduledAt != nil &&
 			req.ScheduledAt.After(time.Now().Add(dispatchDomain.ScheduledDispatchLead()))
 		if deferUntilLead {
-			_ = s.orders.EnqueueScheduledDispatch(ctx, orderID, *req.ScheduledAt, payloadBytes)
+			if enqErr := s.orders.EnqueueScheduledDispatch(ctx, orderID, *req.ScheduledAt, payloadBytes); enqErr != nil {
+				// The order is already persisted CREATED and counts as the rider's active
+				// booking. If it can't be queued for replay it would never dispatch yet
+				// still block the rider, so compensate: cancel it and surface the failure
+				// for a clean retry (cancelling clears the active-order block).
+				_ = s.orders.CancelOrder(ctx, orderID, riderID, "scheduling_failed", 0)
+				return nil, fmt.Errorf("failed to enqueue scheduled booking: %w", enqErr)
+			}
 		} else if s.publisher != nil {
 			_ = s.publisher.Publish(ctx, "order.created", orderID, payloadBytes)
 		}
