@@ -36,6 +36,7 @@ import {
   sendDriverChat,
   startWait,
   resumeTrip,
+  abandonTrip,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -1172,6 +1173,9 @@ export default function DriverTerminalPage() {
                 onClick={() => {
                   if (!selectedCancelReason) { alert('Please select a reason.'); return; }
                   logAudit('TRIP_CANCELLED_BY_DRIVER', { orderId: activeTrip.order_id, reason: selectedCancelReason });
+                  // Tell the backend so the order re-queues and the no-show penalty applies
+                  // (only meaningful once the driver has accepted, i.e. EN_ROUTE/ARRIVED).
+                  if (token && activeTrip?.order_id) void abandonTrip(token, activeTrip.order_id).catch(() => {});
                   setActiveTrip(null);
                   setDutyState('ONLINE');
                   setShowCancelModal(false);

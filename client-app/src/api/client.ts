@@ -95,6 +95,7 @@ export interface OrderOffer {
   notes?: string;
   carTypeRequested?: string;
   transmissionRequired?: string;
+  ownerNotInCar?: boolean;
   d4mCareOptIn?: boolean;
   distanceKm?: number;
   durationMinutes?: number;
@@ -917,6 +918,10 @@ export async function verifyTripOTP(
       car_plate: carPlate,
     },
   });
+}
+
+export async function abandonTrip(token: string, orderId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/orders/${orderId}/abandon`, { method: 'PATCH', token, body: {} });
 }
 
 export async function startWait(token: string, orderId: string): Promise<{ status: string }> {

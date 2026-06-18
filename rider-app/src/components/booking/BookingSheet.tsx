@@ -211,10 +211,10 @@ export function BookingSheet() {
   const [bookingState, setBookingState] = useState<"idle" | "loading">("idle");
 
   const {
-    pickup, dropoff, tripType, durationHours, personsCount, d4mCare,
+    pickup, dropoff, tripType, durationHours, personsCount, d4mCare, ownerNotInCar,
     promoCode, paymentMethod, fareEstimate, isSearching, scheduledAt,
     setPickup, setDropoff, setTripType, setDurationHours, setPersonsCount,
-    setScheduledAt, setD4mCare, setPromoCode, setPaymentMethod,
+    setScheduledAt, setD4mCare, setOwnerNotInCar, setPromoCode, setPaymentMethod,
     validatePromo, bookDriver, selectedCarId, setSelectedCar,
   } = useBookingStore();
 
@@ -591,6 +591,22 @@ export function BookingSheet() {
                 </button>
               </div>
               <Toggle on={d4mCare} onToggle={() => setD4mCare(!d4mCare)} />
+            </div>
+          </Section>
+
+          {/* [10b] Owner-not-in-car toggle */}
+          <Section>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🚗</span>
+                <div>
+                  <span className="text-label-medium text-content-primary">I won&apos;t be in the car</span>
+                  <p className="text-paragraph-small text-content-secondary">
+                    Driver takes the car without me
+                  </p>
+                </div>
+              </div>
+              <Toggle on={ownerNotInCar} onToggle={() => setOwnerNotInCar(!ownerNotInCar)} />
             </div>
           </Section>
 

@@ -35,6 +35,7 @@ export interface BookingState {
   promoCode: string;
   promoResult: PromoResult | null;
   d4mCare: boolean;
+  ownerNotInCar: boolean;
   paymentMethod: PaymentMethod;
   fareEstimate: FareEstimate | null;
   isSearching: boolean;
@@ -53,6 +54,7 @@ export interface BookingState {
   setPromoCode: (code: string) => void;
   validatePromo: () => Promise<void>;
   setD4mCare: (on: boolean) => void;
+  setOwnerNotInCar: (on: boolean) => void;
   setPaymentMethod: (m: PaymentMethod) => void;
   fetchFareEstimate: () => void;
   bookDriver: () => Promise<{ order: Order; otp: string }>;
@@ -72,6 +74,7 @@ const initial = {
   promoCode: "",
   promoResult: null as PromoResult | null,
   d4mCare: false,
+  ownerNotInCar: false,
   paymentMethod: "CASH" as PaymentMethod,
   fareEstimate: null as FareEstimate | null,
   isSearching: false,
@@ -143,6 +146,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     set({ d4mCare: on });
     get().fetchFareEstimate();
   },
+  setOwnerNotInCar: (on) => set({ ownerNotInCar: on }),
   setPaymentMethod: (m) => set({ paymentMethod: m }),
 
   fetchFareEstimate: () => {
@@ -192,6 +196,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       persons_count: s.personsCount,
       promo_code: s.promoCode || undefined,
       d4m_care_opted: s.d4mCare,
+      owner_not_in_car: s.ownerNotInCar,
       payment_method: s.paymentMethod,
       scheduled_at: s.scheduledAt ?? undefined,
     });

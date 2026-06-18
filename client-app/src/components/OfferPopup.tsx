@@ -237,6 +237,16 @@ export function OfferPopup() {
                     </p>
                   </div>
                 )}
+
+                {/* Owner not riding along */}
+                {currentOffer.ownerNotInCar && (
+                  <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
+                    <span className="text-content-warning text-label-medium">🚗</span>
+                    <p className="text-paragraph-small text-content-warning">
+                      Owner won&apos;t be in the car — you drive it solo.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

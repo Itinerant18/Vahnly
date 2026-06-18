@@ -24,6 +24,7 @@ export interface CreateOrderRequest {
   persons_count?: number;
   promo_code?: string;
   d4m_care_opted: boolean;
+  owner_not_in_car?: boolean;
   payment_method: PaymentMethod;
   scheduled_at?: string | null;
   city?: string;
