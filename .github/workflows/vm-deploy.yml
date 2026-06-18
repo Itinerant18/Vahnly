@@ -76,7 +76,7 @@ jobs:
           set -e
           DIR="__OVERRIDE__"
           if [ -z "$DIR" ]; then
-            matches=$(find /opt /srv /home /root "$HOME" -maxdepth 4 -name 'docker-compose*.y*ml' 2>/dev/null || true)
+            matches=$(find /opt /srv /home /root "$HOME" -maxdepth 4 -name 'docker-compose*.y*ml' 2>/dev/null | sort -u || true)
             n=$(printf '%s\n' "$matches" | grep -c . || true)
             if [ "$n" != "1" ]; then
               echo "Set the VM_COMPOSE_DIR variable — auto-discovery found $n docker-compose files:"
