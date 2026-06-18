@@ -904,6 +904,7 @@ export async function verifyTripOTP(
   otp: string,
   startOdometer: number,
   fuelPercentage: number,
+  carPlate?: string,
 ): Promise<{ success: boolean; status: string }> {
   return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/verify-otp`, {
     method: 'PATCH',
@@ -912,6 +913,7 @@ export async function verifyTripOTP(
       otp,
       start_odometer: startOdometer,
       fuel_percentage: fuelPercentage,
+      car_plate: carPlate,
     },
   });
 }
@@ -949,6 +951,7 @@ export async function driverStartTrip(
       fuel_level: payload.fuelPercentage,
       otp: payload.otp,
       photo_url: payload.photoUrl,
+      car_plate: payload.carPlate,
     },
   });
 }

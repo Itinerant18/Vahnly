@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -392,6 +393,19 @@ type OTPVerifyRequest struct {
 	OTP            string `json:"otp"`
 	StartOdometer  int    `json:"start_odometer"`
 	FuelPercentage int    `json:"fuel_percentage"`
+	CarPlate       string `json:"car_plate"` // plate read off the car (car handshake)
+}
+
+// normalizePlateDuty upper-cases a plate and keeps only A-Z/0-9 so spacing/hyphen variants
+// of the same registration compare equal.
+func normalizePlateDuty(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToUpper(s) {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // HandleVerifyOTPAndStartTrip validates OTP and starts order transition
@@ -507,6 +521,21 @@ func (h *DutyHandler) HandleVerifyOTPAndStartTrip(w http.ResponseWriter, r *http
 			"message": fmt.Sprintf("Incorrect OTP entered. Attempt %d of 3.", otpAttempts+1),
 		})
 		return
+	}
+
+	// 2b. Car handshake — confirm the driver is at the RIGHT car (the rider's registered
+	// vehicle) before driving off. When the order has a garage car with a plate on file, the
+	// driver must enter the matching plate. One-time cars (no plate) skip — nothing to match.
+	var registeredPlate *string
+	_ = tx.QueryRow(ctx, `
+		SELECT g.registration_plate
+		FROM orders o LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		WHERE o.id = $1::uuid`, orderID).Scan(&registeredPlate)
+	if registeredPlate != nil && normalizePlateDuty(*registeredPlate) != "" {
+		if normalizePlateDuty(req.CarPlate) != normalizePlateDuty(*registeredPlate) {
+			http.Error(w, "car_plate_mismatch", http.StatusForbidden)
+			return
+		}
 	}
 
 	// 3. Write START odometer checkpoint

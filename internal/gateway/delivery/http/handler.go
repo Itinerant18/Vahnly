@@ -1186,6 +1186,18 @@ func (h *GatewayHandler) HandleDriverArrived(w http.ResponseWriter, r *http.Requ
 	_, _ = w.Write([]byte(`{"success":true,"status":"ARRIVED_AT_PICKUP"}`))
 }
 
+// normalizePlate upper-cases a registration plate and strips everything but A-Z/0-9 so
+// "WB 02 AK 9988", "wb-02-ak-9988" and "WB02AK9988" all compare equal.
+func normalizePlate(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToUpper(s) {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // HandleDriverStartTrip handles PATCH /api/v1/driver/orders/{id}/start
 func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
@@ -1210,6 +1222,7 @@ func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Re
 		FuelLevel       int    `json:"fuel_level"`
 		OTP             string `json:"otp"`
 		PhotoURL        string `json:"photo_url"`
+		CarPlate        string `json:"car_plate"` // plate the driver reads off the car (car handshake)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
@@ -1307,6 +1320,22 @@ func (h *GatewayHandler) HandleDriverStartTrip(w http.ResponseWriter, r *http.Re
 			"message": fmt.Sprintf("Incorrect OTP entered. Attempt %d of 3.", otpAttempts+1),
 		})
 		return
+	}
+
+	// 2b. Car handshake — the driver owns no vehicle; confirm they're at the RIGHT car (the
+	// rider's registered one) before driving off. When the order has a garage car with a
+	// plate on file, the driver must enter the matching plate. One-time cars (no plate on
+	// file) skip this — there's nothing to verify against.
+	var registeredPlate *string
+	_ = tx.QueryRow(ctx, `
+		SELECT g.registration_plate
+		FROM orders o LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		WHERE o.id = $1::uuid`, orderID).Scan(&registeredPlate)
+	if registeredPlate != nil && normalizePlate(*registeredPlate) != "" {
+		if normalizePlate(req.CarPlate) != normalizePlate(*registeredPlate) {
+			http.Error(w, "car_plate_mismatch", http.StatusForbidden)
+			return
+		}
 	}
 
 	// 3. Write START odometer checkpoint (Odometer Guard)

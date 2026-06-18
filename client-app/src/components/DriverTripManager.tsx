@@ -464,6 +464,8 @@ interface DriverTripManagerProps {
   setStartOdoPhoto: (p: string | null) => void;
   otpVerificationCode: string;
   setOtpVerificationCode: (c: string) => void;
+  carPlate: string;
+  setCarPlate: (p: string) => void;
   setDutyState: (s: DutyState) => void;
   setActiveTrip: (t: any) => void;
   tollCharges: number;
@@ -524,6 +526,8 @@ export const DriverTripManager: React.FC<DriverTripManagerProps> = (props) => {
           setStartOdoPhoto={props.setStartOdoPhoto}
           otpVerificationCode={props.otpVerificationCode}
           setOtpVerificationCode={props.setOtpVerificationCode}
+          carPlate={props.carPlate}
+          setCarPlate={props.setCarPlate}
           logAudit={props.logAudit}
           setDutyState={props.setDutyState}
           setActiveTrip={props.setActiveTrip}

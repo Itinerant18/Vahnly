@@ -177,6 +177,7 @@ export default function DriverTerminalPage() {
   const [startFuel, setStartFuel] = useState(75);
   const [startOdoPhoto, setStartOdoPhoto] = useState<string | null>(null);
   const [otpVerificationCode, setOtpVerificationCode] = useState('');
+  const [carPlate, setCarPlate] = useState('');
   const [otpError, setOtpError] = useState('');
   
   // Delivering states
@@ -733,6 +734,7 @@ export default function DriverTerminalPage() {
           fuelPercentage: startFuel,
           otp: otpVerificationCode,
           photoUrl: startOdoPhoto || '',
+          carPlate: carPlate,
         });
 
         if (res.success) {
@@ -742,14 +744,18 @@ export default function DriverTerminalPage() {
         }
       } catch (err: any) {
         if (err instanceof ApiClientError) {
-          try {
-            const errorJson = JSON.parse(err.body);
-            setOtpError(errorJson.message || errorJson.error || 'OTP verification failed.');
-          } catch {
-            if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
-              setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
-            } else {
-              setOtpError(err.body || 'OTP verification failed.');
+          if (err.body.includes('car_plate_mismatch')) {
+            setOtpError("Wrong car — this plate doesn't match the rider's registered vehicle.");
+          } else {
+            try {
+              const errorJson = JSON.parse(err.body);
+              setOtpError(errorJson.message || errorJson.error || 'OTP verification failed.');
+            } catch {
+              if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
+                setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
+              } else {
+                setOtpError(err.body || 'OTP verification failed.');
+              }
             }
           }
         } else {
@@ -1386,6 +1392,8 @@ export default function DriverTerminalPage() {
             setStartOdoPhoto={setStartOdoPhoto}
             otpVerificationCode={otpVerificationCode}
             setOtpVerificationCode={setOtpVerificationCode}
+            carPlate={carPlate}
+            setCarPlate={setCarPlate}
             setDutyState={setDutyState}
             setActiveTrip={setActiveTrip}
             tollCharges={tollCharges}

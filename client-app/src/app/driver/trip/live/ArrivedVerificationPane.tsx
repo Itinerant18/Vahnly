@@ -21,6 +21,8 @@ interface ArrivedVerificationPaneProps {
   setStartOdoPhoto: (p: string | null) => void;
   otpVerificationCode: string;
   setOtpVerificationCode: (c: string) => void;
+  carPlate: string;
+  setCarPlate: (p: string) => void;
   logAudit: (e: string, m: any) => void;
   setDutyState: (s: DutyState) => void;
   setActiveTrip: (t: any) => void;
@@ -132,6 +134,8 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
   setStartOdoPhoto,
   otpVerificationCode,
   setOtpVerificationCode,
+  carPlate,
+  setCarPlate,
   logAudit,
   setDutyState,
   setActiveTrip,
@@ -213,14 +217,16 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
     setIsSubmitting(true);
 
     try {
-      const res = await verifyTripOTP(token, orderId, otpVerificationCode.replace(/\s/g, ''), odoValue, startFuel);
+      const res = await verifyTripOTP(token, orderId, otpVerificationCode.replace(/\s/g, ''), odoValue, startFuel, carPlate);
       if (res.success) {
         logAudit('TRIP_STARTED', { orderId });
         setDutyState('DELIVERING');
       }
     } catch (err: any) {
       if (err instanceof ApiClientError) {
-        if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
+        if (err.body.includes('car_plate_mismatch')) {
+          setOtpError("Wrong car — this plate doesn't match the rider's registered vehicle.");
+        } else if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
           setFailedAttempts(3);
           setOtpError('OTP locked: too many attempts.');
         } else {
@@ -372,6 +378,26 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
             </p>
           </div>
           <OtpInput value={otpVerificationCode} onChange={setOtpVerificationCode} />
+        </div>
+
+        {/* Car handshake — confirm the right vehicle before driving off */}
+        <div className="card space-y-3">
+          <div>
+            <h4 className="text-heading-small text-content-primary mb-1">Confirm the car</h4>
+            <p className="text-paragraph-small text-content-secondary">
+              Enter the number plate on the car you&apos;re about to drive.
+            </p>
+          </div>
+          <input
+            type="text"
+            value={carPlate}
+            onChange={(e) => setCarPlate(e.target.value.toUpperCase())}
+            placeholder="e.g. WB 02 AK 9988"
+            maxLength={16}
+            className="w-full h-12 px-4 rounded-sm bg-background-secondary border border-border-opaque
+              text-label-large font-mono uppercase text-content-primary tracking-wider
+              focus:outline-none focus:border-2 focus:border-border-accent placeholder:text-content-tertiary"
+          />
         </div>
 
         {/* Verify CTA */}

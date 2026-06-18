@@ -11,4 +11,5 @@ export interface StartTripPayload {
   fuelPercentage: number;
   otp: string;
   photoUrl?: string; // Captured at point of arrival
+  carPlate?: string; // plate read off the car — verified against the rider's registered car
 }
