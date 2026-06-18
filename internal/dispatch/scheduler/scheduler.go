@@ -63,22 +63,15 @@ func (s *Scheduler) dispatchDue(ctx context.Context) {
 	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Atomically claim due, undispatched rows (set dispatched_at) so concurrent pods never
-	// publish the same order. FOR UPDATE SKIP LOCKED keeps ticks lock-free across replicas.
+	// Read due, undispatched rows (no row locks held across the Kafka publish below).
 	leadInterval := fmt.Sprintf("%d seconds", int(domain.ScheduledDispatchLead().Seconds()))
 	rows, err := s.db.Query(cctx, `
-		UPDATE scheduled_dispatch_queue
-		SET dispatched_at = NOW()
-		WHERE order_id IN (
-			SELECT order_id FROM scheduled_dispatch_queue
-			WHERE dispatched_at IS NULL AND scheduled_at <= NOW() + $1::interval
-			ORDER BY scheduled_at
-			FOR UPDATE SKIP LOCKED
-			LIMIT $2
-		)
-		RETURNING order_id::text, payload`, leadInterval, claimBatchSize)
+		SELECT order_id::text, payload FROM scheduled_dispatch_queue
+		WHERE dispatched_at IS NULL AND scheduled_at <= NOW() + $1::interval
+		ORDER BY scheduled_at
+		LIMIT $2`, leadInterval, claimBatchSize)
 	if err != nil {
-		log.Printf("[SCHEDULER] claim query failed: %v", err)
+		log.Printf("[SCHEDULER] due query failed: %v", err)
 		return
 	}
 
@@ -95,11 +88,19 @@ func (s *Scheduler) dispatchDue(ctx context.Context) {
 	}
 
 	for _, d := range batch {
+		// Publish FIRST, then mark dispatched (at-least-once). A crash between the two
+		// re-publishes next tick — the matcher dedupes a duplicate order.created via its
+		// guarded CREATED->ASSIGNED transition, so an extra publish is harmless while a lost
+		// one is not. The guarded mark (dispatched_at IS NULL) keeps concurrent pods from
+		// re-marking; a rare double-publish across pods is likewise absorbed by the matcher.
 		if err := s.writer.WriteMessages(cctx, kafka.Message{Key: []byte(d.id), Value: d.payload}); err != nil {
-			// Publish failed after we claimed the row — unclaim so the next tick retries
-			// rather than dropping the booking.
-			log.Printf("[SCHEDULER] publish failed for %s: %v — unclaiming for retry", d.id, err)
-			_, _ = s.db.Exec(cctx, `UPDATE scheduled_dispatch_queue SET dispatched_at = NULL WHERE order_id = $1::uuid`, d.id)
+			log.Printf("[SCHEDULER] publish failed for %s: %v — retry next tick", d.id, err)
+			continue
+		}
+		if _, mErr := s.db.Exec(cctx, `
+			UPDATE scheduled_dispatch_queue SET dispatched_at = NOW()
+			WHERE order_id = $1::uuid AND dispatched_at IS NULL`, d.id); mErr != nil {
+			log.Printf("[SCHEDULER] mark dispatched failed for %s: %v — will re-publish next tick", d.id, mErr)
 			continue
 		}
 		log.Printf("[SCHEDULER] dispatched scheduled order %s onto order.created", d.id)
