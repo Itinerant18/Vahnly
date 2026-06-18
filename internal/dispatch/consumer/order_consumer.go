@@ -735,6 +735,7 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	payload := map[string]interface{}{
 		"order_id":    match.OrderID,
 		"driver_id":   match.DriverID,
+		"status":      "ASSIGNED",
 		"assigned_at": time.Now().Unix(),
 	}
 

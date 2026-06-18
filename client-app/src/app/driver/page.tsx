@@ -11,6 +11,7 @@ import { DriverTripManager } from '../../components/DriverTripManager';
 import { SentryErrorBoundary } from '../../components/SentryErrorBoundary';
 import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
 import { DriverDrawer } from '../../components/DriverDrawer';
+import { DevLocationSpoof } from '../../components/DevLocationSpoof';
 import { SosModal } from '../../components/SosModal';
 import { useSafetyStore } from '../../store/useSafetyStore';
 import {
@@ -1035,6 +1036,9 @@ export default function DriverTerminalPage() {
 
       {/* 2. SOS EMERGENCY PULSE TRIGGER MODAL */}
       <SosModal />
+
+      {/* DEV-ONLY: GPS location spoof (tree-shaken out of prod) */}
+      <DevLocationSpoof />
 
       {/* MANDATORY BREAK BANNER — fatigue safety gate */}
       {fatigue && (fatigue.must_take_break || fatigue.hours_remaining <= 0) && dutyState !== 'OFFLINE' && (

@@ -17,7 +17,7 @@ const CONFIG: Record<TripStatus, StatusConfig> = {
     cls: "bg-accent-400 text-white",
   },
   EN_ROUTE_TO_PICKUP: {
-    label: "Driver on the way",
+    label: "Driver traveling to your car",
     cls: "bg-accent-400 text-white",
   },
   ARRIVED_AT_PICKUP: {
