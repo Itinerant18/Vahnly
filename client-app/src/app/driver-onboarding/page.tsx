@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDriverOnboardingStore } from '@/store/useDriverOnboardingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { saveOnboardingStep, uploadDocument, validateQuiz, syncOfflineOnboarding } from '@/api/client';
+import { saveOnboardingStep, uploadDocument, validateQuiz, syncOfflineOnboarding, updateDriverProfile } from '@/api/client';
 
 interface QuizQuestion {
   id: number;
@@ -269,6 +269,17 @@ export default function DriverOnboardingWizard() {
 
         await saveOnboardingStep(token, currentStep, stepPayload);
         logEvent('STEP_SYNC_SUCCESS', { step: currentStep });
+
+        // Step 4 captures transmission skill. Persist it to the matchable driver record
+        // (can_drive_manual gates manual-car bookings) — the onboarding JSONB blob the
+        // step save writes is not read by the matcher.
+        if (currentStep === 4) {
+          try {
+            await updateDriverProfile(token, { can_drive_manual: onboardingData.manualExpertise });
+          } catch (err) {
+            logEvent('CAN_DRIVE_MANUAL_SYNC_FAILED', { error: String(err) });
+          }
+        }
       } catch (err) {
         logEvent('STEP_SYNC_FAILED', { step: currentStep, error: String(err) });
       }

@@ -1419,7 +1419,7 @@ export async function getDriverDocuments(token: string): Promise<{ documents: Dr
 
 export async function updateDriverProfile(
   token: string,
-  body: { name?: string; bio?: string },
+  body: { name?: string; bio?: string; can_drive_manual?: boolean },
 ): Promise<{ name?: string; bio?: string; status?: string }> {
   return request("/api/v1/driver/profile", { method: "PATCH", token, body });
 }
