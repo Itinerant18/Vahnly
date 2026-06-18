@@ -347,7 +347,12 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
       onMessage: (msg: RiderWebSocketMessage) => {
         switch (msg.type) {
           case "rider.order.assigned":
-            trip.updateStatus("ASSIGNED");
+            // Offer-accept: the accept payload carries status EN_ROUTE_TO_PICKUP so the
+            // banner flips straight to "Driver traveling to your car". Legacy/no-status
+            // payloads fall back to ASSIGNED.
+            trip.updateStatus(
+              msg.data.status === "EN_ROUTE_TO_PICKUP" ? "EN_ROUTE_TO_PICKUP" : "ASSIGNED",
+            );
             trip.setDriverInfo({
               driverId:       msg.data.driver_id,
               name:           msg.data.driver_name,

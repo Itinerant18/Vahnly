@@ -22,7 +22,6 @@ import (
 	"github.com/platform/driver-delivery/internal/events"
 	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/observability"
-	"github.com/platform/driver-delivery/internal/rider/realtime"
 	"go.opentelemetry.io/otel"
 )
 
@@ -748,9 +747,10 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	carrier := observability.KafkaHeaderCarrier{Headers: &msgHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 
-	// Rider live-trip WS: order assigned. Fire-and-forget so it never adds latency
-	// to the matching/assignment hot path (rule #3).
-	go c.pushRiderAssigned(match.OrderID, match.DriverID, match.EstimatedEtaSeconds)
+	// Cache order->rider for GPS fan-out. Fire-and-forget so it never adds latency
+	// to the matching/assignment hot path (rule #3). The rider-facing "driver
+	// confirmed" push fires later, on driver-accept (gateway HandleAcceptOrder).
+	go c.cacheOrderRiderMapping(match.OrderID)
 
 	return c.kafkaWriter.WriteMessages(ctx, kafka.Message{
 		Key:     []byte(match.OrderID),
@@ -759,70 +759,24 @@ func (c *OrderCreatedConsumer) emitAssignedEvent(ctx context.Context, match *mat
 	})
 }
 
-// pushRiderAssigned enriches the assignment (driver + garage car) and pushes
-// rider.order.assigned to the rider WS, with a notification_outbox FCM backup.
-func (c *OrderCreatedConsumer) pushRiderAssigned(orderID, driverID string, etaSeconds int) {
+// cacheOrderRiderMapping caches order->rider so the telemetry ingestion fork can fan GPS
+// out to the rider's live-trip WS without a per-ping DB lookup (FLOW 2). The rider-facing
+// "driver confirmed" push is deferred to driver-accept (offer-accept model; see gateway
+// HandleAcceptOrder) so a rider is never shown a driver that then declines or times out.
+func (c *OrderCreatedConsumer) cacheOrderRiderMapping(orderID string) {
 	if c.redisClusterClient == nil || c.dbPool == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	var riderID, driverName, carMake, carModel, carTransmission *string
-	var driverRating *float64
-	err := c.dbPool.QueryRow(ctx, `
-		SELECT o.rider_id::text, d.name, d.rating, g.make, g.model, g.transmission
-		FROM orders o
-		LEFT JOIN drivers d ON d.id = o.assigned_driver_id
-		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
-		WHERE o.id = $1::uuid`, orderID).Scan(&riderID, &driverName, &driverRating, &carMake, &carModel, &carTransmission)
+	var riderID *string
+	err := c.dbPool.QueryRow(ctx, `SELECT rider_id::text FROM orders WHERE id = $1::uuid`, orderID).Scan(&riderID)
 	if err != nil || riderID == nil || *riderID == "" {
 		return
 	}
-
-	vehicleContext := ""
-	if carMake != nil && carModel != nil {
-		vehicleContext = fmt.Sprintf("Driving your %s %s", *carMake, *carModel)
-	}
-	data := map[string]interface{}{
-		"order_id":               orderID,
-		"driver_id":              driverID,
-		"driver_name":            derefStr(driverName),
-		"driver_photo":           "",
-		"driver_rating":          derefFloat(driverRating),
-		"driver_trips_count":     0,
-		"transmission_expertise": derefStr(carTransmission),
-		"eta_minutes":            etaSeconds / 60,
-		"eta_km":                 0,
-		"vehicle_context":        vehicleContext,
-	}
-	_ = realtime.Publish(ctx, c.redisClusterClient, *riderID, realtime.MsgOrderAssigned, data)
-
-	// Cache order->rider so the telemetry ingestion fork can fan GPS out to the rider's
-	// live-trip WS without a DB lookup per ping (FLOW 2). Expires with the trip.
+	// Expires with the trip.
 	_ = c.redisClusterClient.Set(ctx, "order:rider:"+orderID, *riderID, 6*time.Hour).Err()
-
-	// FCM backup via the transactional outbox.
-	if payload, mErr := json.Marshal(data); mErr == nil {
-		_, _ = c.dbPool.Exec(ctx, `
-			INSERT INTO notification_outbox (user_id, title, body, payload, status)
-			VALUES ($1::uuid, 'Driver assigned', $2, $3::jsonb, 'PENDING')`,
-			*riderID, vehicleContext, payload)
-	}
-}
-
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func derefFloat(f *float64) float64 {
-	if f == nil {
-		return 0
-	}
-	return *f
 }
 
 func (c *OrderCreatedConsumer) Close() error {

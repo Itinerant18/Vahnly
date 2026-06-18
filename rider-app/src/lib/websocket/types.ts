@@ -17,6 +17,9 @@ export interface RiderOrderAssigned {
     eta_minutes: number;
     eta_km: number;
     vehicle_context: string;
+    // Present when sent on driver-accept (offer-accept model): drives the live banner
+    // straight to EN_ROUTE_TO_PICKUP. Absent on the legacy match-time payload.
+    status?: string;
   };
 }
 

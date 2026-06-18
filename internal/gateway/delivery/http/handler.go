@@ -561,6 +561,10 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 	leaseKey := fmt.Sprintf("offer:lease:%s", req.OrderID)
 	_ = h.clusterClient.Del(ctx, leaseKey)
 
+	// Offer-accept model: this is the authoritative "driver confirmed" signal to the
+	// rider — the matcher only caches order->rider, it never notifies. Fire-and-forget.
+	go h.pushRiderDriverConfirmed(req.OrderID, req.DriverID)
+
 	log.Printf("[STATE_MACHINE] Driver %s successfully accepted trip order %s", req.DriverID, req.OrderID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -1470,6 +1474,70 @@ func (h *GatewayHandler) pushRiderTripEvent(orderID, msgType string, data map[st
 	// On trip completion, let the referral engine reward a first completed trip.
 	if msgType == riderRealtime.MsgTripCompleted && RiderTripCompletedCallback != nil {
 		RiderTripCompletedCallback(orderID, *riderID)
+	}
+}
+
+// pushRiderDriverConfirmed enriches an accepted assignment (driver + the rider's garage
+// car) and pushes rider.order.assigned to the rider WS, with a notification_outbox FCM
+// backup. Fired on driver-accept (offer-accept model) — this is the authoritative
+// "driver confirmed" signal; the matcher only caches order->rider, it does not notify.
+func (h *GatewayHandler) pushRiderDriverConfirmed(orderID, driverID string) {
+	if h.clusterClient == nil || h.dbPool == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var riderID, driverName, carMake, carModel, carTransmission *string
+	var driverRating *float64
+	err := h.dbPool.QueryRow(ctx, `
+		SELECT o.rider_id::text, d.name, d.rating, g.make, g.model, g.transmission
+		FROM orders o
+		LEFT JOIN drivers d ON d.id = o.assigned_driver_id
+		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
+		WHERE o.id = $1::uuid`, orderID).Scan(&riderID, &driverName, &driverRating, &carMake, &carModel, &carTransmission)
+	if err != nil || riderID == nil || *riderID == "" {
+		return
+	}
+
+	vehicleContext := ""
+	if carMake != nil && carModel != nil {
+		vehicleContext = fmt.Sprintf("Driving your %s %s", *carMake, *carModel)
+	}
+	data := map[string]interface{}{
+		"order_id":               orderID,
+		"driver_id":              driverID,
+		"driver_name":            "",
+		"driver_photo":           "",
+		"driver_rating":          0.0,
+		"driver_trips_count":     0,
+		"transmission_expertise": "",
+		"vehicle_context":        vehicleContext,
+		// status drives the rider banner straight to EN_ROUTE ("Driver traveling to
+		// your car"); eta is intentionally omitted so the card reads "On the way"
+		// until live rider.driver.location frames supply a real ETA.
+		"status": "EN_ROUTE_TO_PICKUP",
+	}
+	if driverName != nil {
+		data["driver_name"] = *driverName
+	}
+	if driverRating != nil {
+		data["driver_rating"] = *driverRating
+	}
+	if carTransmission != nil {
+		data["transmission_expertise"] = *carTransmission
+	}
+	_ = riderRealtime.Publish(ctx, h.clusterClient, *riderID, riderRealtime.MsgOrderAssigned, data)
+
+	// Cache order->rider (idempotent with the matcher's write) so GPS fan-out works.
+	_ = h.clusterClient.Set(ctx, "order:rider:"+orderID, *riderID, 6*time.Hour).Err()
+
+	// FCM backup via the transactional outbox.
+	if payload, mErr := json.Marshal(data); mErr == nil {
+		_, _ = h.dbPool.Exec(ctx, `
+			INSERT INTO notification_outbox (user_id, title, body, payload, status)
+			VALUES ($1::uuid, 'Driver confirmed', $2, $3::jsonb, 'PENDING')`,
+			*riderID, vehicleContext, payload)
 	}
 }
 
