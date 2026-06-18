@@ -618,6 +618,8 @@ func main() {
 	// /verify-start. Re-registering it here panicked the ServeMux at startup, so the
 	// duplicate gateway HandleDriverArrived route is intentionally omitted.
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/start", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverStartTrip))))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/wait/start", authGuard.AuthenticateJWT(handler.HandleStartWait))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/wait/resume", authGuard.AuthenticateJWT(handler.HandleResumeTrip))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/events", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverAddOrderEvent))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/end", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverEndTrip))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverConfirmPayment))))

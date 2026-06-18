@@ -294,6 +294,67 @@ func (h *GatewayHandler) HandleDriverCarIssueReport(w http.ResponseWriter, r *ht
 	})
 }
 
+// HandleStartWait pauses an active trip into the mid-trip WAITING state (round-trip wait at
+// the destination). DELIVERING -> WAITING; the wait meter starts.
+func (h *GatewayHandler) HandleStartWait(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+	orderID := r.PathValue("id")
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	tag, err := h.dbPool.Exec(ctx, `
+		UPDATE orders
+		SET status = 'WAITING'::order_status_enum, wait_segment_started_at = NOW()
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'DELIVERING'::order_status_enum`,
+		orderID, driverID)
+	if err != nil {
+		http.Error(w, "wait_start_failed", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "invalid_state: trip is not DELIVERING", http.StatusConflict)
+		return
+	}
+	go h.pushRiderTripEvent(orderID, "rider.trip.waiting", map[string]interface{}{"order_id": orderID})
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"WAITING"}`))
+}
+
+// HandleResumeTrip ends a wait segment and resumes the trip. WAITING -> DELIVERING; the
+// elapsed wait is accumulated for billing at trip end.
+func (h *GatewayHandler) HandleResumeTrip(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+	orderID := r.PathValue("id")
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	tag, err := h.dbPool.Exec(ctx, `
+		UPDATE orders
+		SET status = 'DELIVERING'::order_status_enum,
+		    accumulated_wait_seconds = accumulated_wait_seconds +
+		        GREATEST(0, EXTRACT(EPOCH FROM (NOW() - COALESCE(wait_segment_started_at, NOW())))::int),
+		    wait_segment_started_at = NULL
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid AND status = 'WAITING'::order_status_enum`,
+		orderID, driverID)
+	if err != nil {
+		http.Error(w, "wait_resume_failed", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "invalid_state: trip is not WAITING", http.StatusConflict)
+		return
+	}
+	go h.pushRiderTripEvent(orderID, "rider.trip.resumed", map[string]interface{}{"order_id": orderID})
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"DELIVERING"}`))
+}
+
 // HandleDriverEndTrip handles PATCH /api/v1/driver/orders/{id}/end
 func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
@@ -348,14 +409,16 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 	var baseFarePaise int64
 	var waitingStartedAt *time.Time
 	var pickedUpAt *time.Time
+	var accumulatedWaitSeconds int
 	query := `
-		SELECT status::text, assigned_driver_id::text, city_prefix, base_fare_paise, waiting_started_at, picked_up_at
-		FROM orders 
-		WHERE id = $1::uuid 
+		SELECT status::text, assigned_driver_id::text, city_prefix, base_fare_paise, waiting_started_at, picked_up_at,
+		       COALESCE(accumulated_wait_seconds, 0)
+		FROM orders
+		WHERE id = $1::uuid
 		FOR UPDATE
 	`
 	err = tx.QueryRow(ctx, query, orderID).Scan(
-		&currentStatus, &assignedDriverID, &cityPrefix, &baseFarePaise, &waitingStartedAt, &pickedUpAt,
+		&currentStatus, &assignedDriverID, &cityPrefix, &baseFarePaise, &waitingStartedAt, &pickedUpAt, &accumulatedWaitSeconds,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -462,6 +525,9 @@ func (h *GatewayHandler) HandleDriverEndTrip(w http.ResponseWriter, r *http.Requ
 	if waitMinutes > 5 {
 		waitChargePaise = int64(waitMinutes-5) * 200 // ₹2/min after 5 mins
 	}
+	// B5: mid-trip (round-trip destination) wait, billed from the first minute at ₹2/min.
+	midTripWaitMinutes := accumulatedWaitSeconds / 60
+	waitChargePaise += int64(midTripWaitMinutes) * 200
 
 	var startTripTime time.Time
 	if pickedUpAt != nil {
