@@ -10,6 +10,7 @@ import { isBiometricAvailable, enrollBiometric } from '@/lib/biometric';
 import { useToastStore } from '@/store/useToastStore';
 import {
   updateLanguage, updateNotificationPrefs, changeDriverPassword, deleteDriverAccount,
+  getDriverProfile, updateDriverProfile,
   type NotificationPrefs,
 } from '@/api/client';
 
@@ -40,14 +41,30 @@ export default function DriverSettingsPage() {
   const [pwdMsg, setPwdMsg] = useState<string | null>(null);
   const [deleteText, setDeleteText] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
+  const [canDriveManual, setCanDriveManual] = useState(true);
 
   useEffect(() => {
     void getPref(NAV_KEY).then((v) => { if (v) setNavApp(v as NavApp); });
     void getPref(BIO_KEY).then((v) => setBioEnabled(v === 'true'));
     void isBiometricAvailable().then(setBioAvailable);
-  }, []);
+    if (token) {
+      void getDriverProfile(token)
+        .then((p) => setCanDriveManual(p.can_drive_manual ?? true))
+        .catch(() => { /* keep default */ });
+    }
+  }, [token]);
 
   const flash = () => { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500); };
+
+  // Transmission skill gates manual-car bookings in the matcher; takes effect next go-online.
+  const onCanDriveManual = async () => {
+    const next = !canDriveManual;
+    setCanDriveManual(next);
+    if (token) {
+      try { await updateDriverProfile(token, { can_drive_manual: next }); flash(); }
+      catch { setCanDriveManual(!next); showToast('Could not update transmission skill.', 'error'); }
+    }
+  };
 
   const onLanguage = async (l: Locale) => {
     setLocale(l); // persists + re-renders immediately
@@ -146,6 +163,15 @@ export default function DriverSettingsPage() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Transmission skill */}
+      <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 flex justify-between items-center gap-4">
+        <div>
+          <span className="text-xs font-mono text-content-secondary block">Can drive manual gearbox</span>
+          <span className="text-[9px] font-mono text-content-tertiary">Off = only automatic cars are offered to you.</span>
+        </div>
+        <Toggle on={canDriveManual} onClick={onCanDriveManual} />
       </section>
 
       {/* Biometric */}

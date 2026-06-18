@@ -1914,19 +1914,21 @@ func (h *GatewayHandler) HandleDriverGetProfile(w http.ResponseWriter, r *http.R
 		createdAt          time.Time
 		onboardingStep     int
 		verificationStatus string
+		canDriveManual     bool
 	)
 
 	query := `
 		SELECT id::text, name, phone, current_state::text, acceptance_rate::float8,
 		       cancellation_rate::float8, is_verified, city_prefix, created_at,
-		       COALESCE(onboarding_step, 1), COALESCE(verification_status::text, 'ONBOARDING')
+		       COALESCE(onboarding_step, 1), COALESCE(verification_status::text, 'ONBOARDING'),
+		       COALESCE(can_drive_manual, true)
 		FROM drivers
 		WHERE id = $1::uuid;
 	`
 	if err := h.dbPool.QueryRow(ctx, query, driverID).Scan(
 		&id, &name, &phone, &currentState, &acceptanceRate,
 		&cancellationRate, &isVerified, &cityPrefix, &createdAt,
-		&onboardingStep, &verificationStatus,
+		&onboardingStep, &verificationStatus, &canDriveManual,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "driver_not_found", http.StatusNotFound)
@@ -1962,6 +1964,7 @@ func (h *GatewayHandler) HandleDriverGetProfile(w http.ResponseWriter, r *http.R
 		"total_trips":         totalTrips,
 		"onboarding_step":     onboardingStep,
 		"verification_status": verificationStatus,
+		"can_drive_manual":    canDriveManual,
 	})
 }
 

@@ -67,6 +67,7 @@ export interface DriverProfile {
   total_trips: number;
   onboarding_step?: number;
   verification_status?: string;
+  can_drive_manual?: boolean;
 }
 
 export interface DriverStatusResponse {
