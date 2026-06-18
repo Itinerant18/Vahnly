@@ -22,6 +22,7 @@ import (
 	"github.com/platform/driver-delivery/internal/events"
 	"github.com/platform/driver-delivery/internal/messaging/kafkacfg"
 	"github.com/platform/driver-delivery/internal/observability"
+	"github.com/platform/driver-delivery/internal/rider/realtime"
 	"go.opentelemetry.io/otel"
 )
 
@@ -572,6 +573,8 @@ func (c *OrderCreatedConsumer) requeueUnmatchedOrder(ctx context.Context, o doma
 	if o.RetryCount >= maxMarketplaceRetries {
 		log.Printf("[DLQ_EXPIRED] Order %s crossed max execution threshold (%d). Discarding booking request permanently.", o.OrderID, maxMarketplaceRetries)
 		observability.OrdersUnmatchedTotal.WithLabelValues("dlq_expired").Inc()
+		// Tell the rider instead of leaving them on an indefinite "finding your driver".
+		c.failOrderNoDrivers(o.OrderID)
 		return
 	}
 
@@ -777,6 +780,46 @@ func (c *OrderCreatedConsumer) cacheOrderRiderMapping(orderID string) {
 	}
 	// Expires with the trip.
 	_ = c.redisClusterClient.Set(ctx, "order:rider:"+orderID, *riderID, 6*time.Hour).Err()
+}
+
+// failOrderNoDrivers terminates an order that exhausted all match retries and tells the
+// rider, so they aren't stranded on an indefinite "finding your driver" screen.
+// ponytail: reuse the CANCELLED status + rider.trip.cancelled event (cancelled_by SYSTEM);
+// a dedicated NO_DRIVERS enum is the upgrade path if riders must distinguish "no supply"
+// from a real cancellation.
+func (c *OrderCreatedConsumer) failOrderNoDrivers(orderID string) {
+	if c.dbPool == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Only fail an order still waiting (CREATED) — never clobber one a concurrent batch
+	// just assigned.
+	var riderID *string
+	err := c.dbPool.QueryRow(ctx, `
+		UPDATE orders SET status = 'CANCELLED'::order_status_enum
+		WHERE id = $1::uuid AND status = 'CREATED'::order_status_enum
+		RETURNING rider_id::text`, orderID).Scan(&riderID)
+	if err != nil || riderID == nil || *riderID == "" {
+		return
+	}
+
+	data := map[string]any{
+		"order_id":               orderID,
+		"cancelled_by":           "SYSTEM",
+		"reason":                 "No drivers available right now. Please try again.",
+		"cancellation_fee_paise": 0,
+	}
+	if c.redisClusterClient != nil {
+		_ = realtime.Publish(ctx, c.redisClusterClient, *riderID, realtime.MsgTripCancelled, data)
+	}
+	if payload, mErr := json.Marshal(data); mErr == nil {
+		_, _ = c.dbPool.Exec(ctx, `
+			INSERT INTO notification_outbox (user_id, title, body, payload, status)
+			VALUES ($1::uuid, 'No drivers available', $2, $3::jsonb, 'PENDING')`,
+			*riderID, "We couldn't find a driver. Please try again.", payload)
+	}
 }
 
 func (c *OrderCreatedConsumer) Close() error {
