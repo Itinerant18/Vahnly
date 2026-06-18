@@ -39,6 +39,7 @@ var (
 	ErrAlreadyRated        = errors.New("order is not ratable (not completed, not owned, or already rated)")
 	ErrTripNotActive       = errors.New("order is not an active (DELIVERING) trip")
 	ErrTooManyStops        = errors.New("maximum of 3 stops already added")
+	ErrMonthlyNotBookable  = errors.New("monthly package estimate only; recurring billing not yet available")
 )
 
 // Fare engine constants — mirror internal/pricing OrderPricingService. The
@@ -101,6 +102,7 @@ type FareEstimateRequest struct {
 	DropoffLat    *float64   `json:"dropoff_lat"`
 	DropoffLng    *float64   `json:"dropoff_lng"`
 	TripType      string     `json:"trip_type"`
+	PackageType   string     `json:"package_type"` // HOURLY|MINI_OUTSTATION|OUTSTATION|MONTHLY; empty = distance-priced
 	DurationHours int        `json:"duration_hours"`
 	CarType       string     `json:"car_type"`
 	Transmission  string     `json:"transmission"`
@@ -144,6 +146,47 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	city := strings.ToUpper(strings.TrimSpace(req.City))
 	if city == "" {
 		city = "KOL"
+	}
+
+	// Package (duration-based) pricing: flat rate card, NO surge, NO distance metering.
+	// The "no surge pricing" differentiator falls out naturally — this path never calls the
+	// surge quoter. Promo + D4M Care still apply; night charge does not (the block rate covers
+	// the time).
+	if pkgFare, ok := packageFarePaise(req.PackageType, req.DurationHours); ok {
+		cell := h3CellRes8(req.PickupLat, req.PickupLng)
+		d4m := int64(0)
+		if req.D4MCare {
+			d4m = d4mCarePaise
+		}
+		var promoDiscount int64
+		var promoCodeID string
+		if res, _ := s.promo.Validate(ctx, req.PromoCode, pkgFare, city); res != nil {
+			promoDiscount = res.DiscountPaise
+			promoCodeID = res.PromoCodeID
+		}
+		total := pkgFare + d4m - promoDiscount
+		if total < 0 {
+			total = 0
+		}
+		availability, _ := s.driverAvailability(ctx, city, req.PickupLat, req.PickupLng)
+		return &FareEstimate{
+			FareBreakdown: FareBreakdown{
+				BaseFarePaise:       pkgFare,
+				DistanceChargePaise: 0,
+				NightChargePaise:    0,
+				D4MCarePaise:        d4m,
+				SurgeMultiplier:     1.0, // packages are never surged
+				PromoDiscountPaise:  promoDiscount,
+				EstimatedTotalPaise: total,
+				EstimatedTotalINR:   fmt.Sprintf("₹%.2f", float64(total)/100),
+			},
+			EstimatedPickupETAMin: pickupETA(availability),
+			DriverAvailability:    availability,
+			SurgeActive:           false,
+			H3Cell:                cell,
+			dispatchFarePaise:     pkgFare,
+			promoCodeID:           promoCodeID,
+		}, nil
 	}
 
 	straight := 0.0
@@ -237,6 +280,7 @@ type CreateOrderRequest struct {
 	DropoffAddress string         `json:"dropoff_address"`
 	Stops          []StopDTO      `json:"stops"`
 	TripType       string         `json:"trip_type"`
+	PackageType    string         `json:"package_type"` // HOURLY|MINI_OUTSTATION|OUTSTATION|MONTHLY; empty = distance-priced
 	DurationHours  int            `json:"duration_hours"`
 	GarageCarID    string         `json:"garage_car_id"`
 	OneTimeCar     *OneTimeCarDTO `json:"one_time_car"`
@@ -260,6 +304,12 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		return nil, ErrActiveOrderExists
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
+	}
+
+	// Monthly/permanent packages are a recurring engagement — the estimate is supported but
+	// booking needs the recurring-billing subsystem (not in this slice).
+	if strings.EqualFold(strings.TrimSpace(req.PackageType), PackageMonthly) {
+		return nil, ErrMonthlyNotBookable
 	}
 
 	if !inIndiaBBox(req.PickupLat, req.PickupLng) {
@@ -316,7 +366,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 	est, err := s.EstimateFare(ctx, FareEstimateRequest{
 		PickupLat: req.PickupLat, PickupLng: req.PickupLng,
 		DropoffLat: req.DropoffLat, DropoffLng: req.DropoffLng,
-		TripType: req.TripType, DurationHours: req.DurationHours,
+		TripType: req.TripType, PackageType: req.PackageType, DurationHours: req.DurationHours,
 		CarType: carType, Transmission: transmission,
 		ScheduledAt: req.ScheduledAt, PromoCode: req.PromoCode,
 		D4MCare: req.D4MCareOpted, PaymentMethod: req.PaymentMethod, City: city,
@@ -362,10 +412,11 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 	if req.PersonsCount > 0 {
 		personsCount = &req.PersonsCount
 	}
-	// Duration is only meaningful (and extendable) for round-trip / outstation rides.
+	// Duration is meaningful for round-trip / outstation rides and for every package tier
+	// (the package fare is computed from it).
 	var bookedDuration *int
 	tt := strings.ToUpper(req.TripType)
-	if (strings.Contains(tt, "ROUND") || strings.Contains(tt, "OUTSTATION")) && req.DurationHours > 0 {
+	if (strings.Contains(tt, "ROUND") || strings.Contains(tt, "OUTSTATION") || isPackageBooking(req.PackageType)) && req.DurationHours > 0 {
 		bookedDuration = &req.DurationHours
 	}
 	paymentMethod := strings.ToUpper(strings.TrimSpace(req.PaymentMethod))
@@ -401,6 +452,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		ScheduledAt:            req.ScheduledAt,
 		WaypointsJSON:          waypoints,
 		BookedDurationHours:    bookedDuration,
+		PackageType:            req.PackageType,
 	})
 	if err != nil {
 		return nil, err
