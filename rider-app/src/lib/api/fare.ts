@@ -7,6 +7,7 @@ export interface FareEstimateRequest {
   dropoff_lat?: number;
   dropoff_lng?: number;
   trip_type: TripType;
+  package_type?: string;
   duration_hours?: number;
   car_type?: string;
   transmission?: string;

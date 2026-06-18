@@ -4,8 +4,15 @@
 export type TripType =
   | "IN_CITY_ROUND"
   | "IN_CITY_ONE_WAY"
+  | "IN_CITY_HOURLY"
   | "MINI_OUTSTATION"
-  | "OUTSTATION";
+  | "OUTSTATION"
+  | "MONTHLY";
+
+// Package (duration-based) pricing tier sent to the backend. Derived from TripType:
+// IN_CITY_HOURLY→HOURLY, MINI_OUTSTATION/OUTSTATION/MONTHLY map 1:1; the IN_CITY_*
+// point-to-point types send no package_type (distance-priced).
+export type PackageType = "HOURLY" | "MINI_OUTSTATION" | "OUTSTATION" | "MONTHLY";
 
 export type CarType = "HATCHBACK" | "SEDAN" | "SUV" | "PREMIUM";
 export type Transmission = "MANUAL" | "AUTOMATIC";

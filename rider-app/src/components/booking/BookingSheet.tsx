@@ -10,10 +10,12 @@ import { FareDisplay } from "@/components/ds/FareDisplay";
 import type { GarageCar, LocationPoint, PaymentMethod, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
-  { value: "IN_CITY_ROUND",    label: "Round Trip" },
   { value: "IN_CITY_ONE_WAY",  label: "One-Way" },
+  { value: "IN_CITY_ROUND",    label: "Round Trip" },
+  { value: "IN_CITY_HOURLY",   label: "Hourly" },
   { value: "MINI_OUTSTATION",  label: "Mini Out." },
   { value: "OUTSTATION",       label: "Outstation" },
+  { value: "MONTHLY",          label: "Monthly" },
 ];
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
@@ -226,8 +228,14 @@ export function BookingSheet() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedCar = cars.find((c) => c.id === selectedCarId);
-  const needsDuration = tripType === "IN_CITY_ROUND" || tripType === "OUTSTATION" || tripType === "MINI_OUTSTATION";
-  const needsDrop = tripType !== "IN_CITY_ROUND";
+  const needsDuration =
+    tripType === "IN_CITY_ROUND" || tripType === "OUTSTATION" ||
+    tripType === "MINI_OUTSTATION" || tripType === "IN_CITY_HOURLY";
+  // Time-based tiers (round trip, hourly, monthly) don't take a destination.
+  const needsDrop =
+    tripType === "IN_CITY_ONE_WAY" || tripType === "MINI_OUTSTATION" || tripType === "OUTSTATION";
+  // Monthly/permanent is estimate-only until recurring billing lands (backend blocks it).
+  const isMonthly = tripType === "MONTHLY";
 
   // ── Drag/snap logic (3 snaps: peek ~120px, half ~55%, full ~92%) ─────────────
   // Values are "px from the top of the viewport" where the sheet's top edge sits.
@@ -643,7 +651,7 @@ export function BookingSheet() {
           <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
             <button
               type="button"
-              disabled={!pickup || bookingState === "loading"}
+              disabled={!pickup || isMonthly || bookingState === "loading"}
               onClick={onBook}
               className="relative flex h-14 w-full items-center justify-center overflow-hidden
                 rounded-sm bg-interactive-primary text-interactive-primary-text
@@ -664,6 +672,8 @@ export function BookingSheet() {
                   </svg>
                   Finding drivers…
                 </span>
+              ) : isMonthly ? (
+                "Monthly — coming soon"
               ) : (
                 "Book Driver"
               )}

@@ -17,6 +17,7 @@ export interface CreateOrderRequest {
   dropoff_address?: string;
   stops?: LocationPoint[];
   trip_type: TripType;
+  package_type?: string;
   duration_hours?: number;
   garage_car_id?: string;
   one_time_car?: OneTimeCar;

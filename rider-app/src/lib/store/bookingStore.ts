@@ -13,6 +13,16 @@ import type {
 
 let fareDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Trip types that price as a flat package (no surge) rather than by distance. The
+// IN_CITY_ONE_WAY / IN_CITY_ROUND point-to-point types map to nothing (distance-priced).
+const TRIP_TO_PACKAGE: Partial<Record<TripType, string>> = {
+  IN_CITY_HOURLY: "HOURLY",
+  MINI_OUTSTATION: "MINI_OUTSTATION",
+  OUTSTATION: "OUTSTATION",
+  MONTHLY: "MONTHLY",
+};
+const packageTypeFor = (t: TripType): string | undefined => TRIP_TO_PACKAGE[t];
+
 export interface BookingState {
   pickup: LocationPoint | null;
   dropoff: LocationPoint | null;
@@ -111,6 +121,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
         dropoff_lat: s.dropoff?.lat,
         dropoff_lng: s.dropoff?.lng,
         trip_type: s.tripType,
+        package_type: packageTypeFor(s.tripType),
         duration_hours: s.durationHours,
         promo_code: s.promoCode,
         d4m_care: s.d4mCare,
@@ -149,6 +160,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           dropoff_lat: s.dropoff?.lat,
           dropoff_lng: s.dropoff?.lng,
           trip_type: s.tripType,
+          package_type: packageTypeFor(s.tripType),
           duration_hours: s.durationHours,
           promo_code: s.promoCode || undefined,
           d4m_care: s.d4mCare,
@@ -173,6 +185,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       dropoff_address: s.dropoff?.address,
       stops: s.stops,
       trip_type: s.tripType,
+      package_type: packageTypeFor(s.tripType),
       duration_hours: s.durationHours,
       garage_car_id: s.selectedCarId ?? undefined,
       one_time_car: s.oneTimeCar ?? undefined,
