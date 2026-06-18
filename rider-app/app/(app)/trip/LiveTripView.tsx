@@ -440,6 +440,25 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
     return () => manager.disconnect();
   }, [tripId, router]);
 
+  // First-mile: share the rider's live location with the driver so they can find the exact
+  // car/pickup spot. Only while the driver is approaching; throttled to ~10s.
+  useEffect(() => {
+    const prePickup = !!tripStatus && ["ASSIGNED", "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP"].includes(tripStatus);
+    if (!prePickup || typeof navigator === "undefined" || !navigator.geolocation) return;
+    let last = 0;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (now - last < 10_000) return;
+        last = now;
+        void ordersApi.shareLocation(tripId, pos.coords.latitude, pos.coords.longitude).catch(() => {});
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 8_000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [tripStatus, tripId]);
+
   const handleCancel = useCallback(async () => {
     setShowCancel(false);
     try {

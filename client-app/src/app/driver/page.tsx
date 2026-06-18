@@ -220,6 +220,9 @@ export default function DriverTerminalPage() {
   const [isWaiting, setIsWaiting] = useState(false);
   const [waitSeconds, setWaitSeconds] = useState(0);
 
+  // Rider's live pin during first-mile (two-way location)
+  const [riderPin, setRiderPin] = useState<{ lat: number; lng: number } | null>(null);
+
   // Core structural pointers
   const telemetryStopRef = useRef<TelemetryStreamHandle | null>(null);
   const streamRef = useRef<(() => void) | null>(null);
@@ -520,6 +523,9 @@ export default function DriverTerminalPage() {
           onChat: (m) => {
             setChat((c) => [...c, m]);
             setChatOpen(true);
+          },
+          onRiderLocation: (loc) => {
+            if (loc.lat !== 0 || loc.lng !== 0) setRiderPin(loc);
           },
           onClose: () => {
             logAudit('WS_CONNECTION_STATE', { status: 'DISCONNECTED' });
@@ -1271,7 +1277,11 @@ export default function DriverTerminalPage() {
             <div className="w-full h-full">
               <MapInterpolated
                 drivers={mapDrivers}
-                pickup={activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : null}
+                pickup={
+                  (dutyState === 'EN_ROUTE' || dutyState === 'ARRIVED') && riderPin
+                    ? riderPin
+                    : activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : null
+                }
                 destination={activeTrip ? { lat: activeTrip.dropoff_lat, lng: activeTrip.dropoff_lng } : null}
                 center={activeTrip ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng } : { lat: 22.5726, lng: 88.3639 }}
                 theme="dark"

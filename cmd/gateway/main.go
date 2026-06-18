@@ -732,6 +732,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleOrderHistory))
 	mux.HandleFunc("DELETE /api/v1/rider/orders/{orderId}/cancel", riderAuthMW.Require(riderBookingHandler.HandleCancelOrder))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/chat", riderAuthMW.Require(riderBookingHandler.HandleSendChat))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/location", riderAuthMW.Require(riderBookingHandler.HandleShareLocation))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/rate", riderAuthMW.Require(riderBookingHandler.HandleRateDriver))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", riderAuthMW.Require(riderBookingHandler.HandleSOS))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/stops", riderAuthMW.Require(riderBookingHandler.HandleAddStop))

@@ -284,6 +284,27 @@ func (s *BookingService) SendChatToDriver(ctx context.Context, riderID, orderID,
 	return s.cache.Publish(ctx, driverAssignmentsChannel, string(payload)).Err()
 }
 
+// SendRiderLocation pushes the rider's live pin to the assigned driver during first-mile, so
+// the driver can find the exact car/pickup spot. Ephemeral, same backplane as chat.
+func (s *BookingService) SendRiderLocation(ctx context.Context, riderID, orderID string, lat, lng float64) error {
+	if lat == 0 && lng == 0 {
+		return ErrInvalidBooking
+	}
+	driverID, err := s.orders.GetAssignedDriver(ctx, orderID, riderID)
+	if err != nil {
+		return err
+	}
+	if s.cache == nil {
+		return nil
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"driver_id":      driverID,
+		"order_id":       orderID,
+		"rider_location": map[string]any{"lat": lat, "lng": lng},
+	})
+	return s.cache.Publish(ctx, driverAssignmentsChannel, string(payload)).Err()
+}
+
 // ---- create order ----
 
 type StopDTO struct {

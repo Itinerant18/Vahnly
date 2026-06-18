@@ -134,6 +134,27 @@ func (h *BookingHandler) HandleSendChat(w http.ResponseWriter, r *http.Request) 
 	writeData(w, http.StatusOK, map[string]string{"status": "sent"})
 }
 
+// HandleShareLocation pushes the rider's live location to the assigned driver (first-mile).
+func (h *BookingHandler) HandleShareLocation(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Lat float64 `json:"lat"`
+		Lng float64 `json:"lng"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	if err := h.booking.SendRiderLocation(r.Context(), id, r.PathValue("orderId"), req.Lat, req.Lng); err != nil {
+		h.writeBookingError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func (h *BookingHandler) HandleOrderHistory(w http.ResponseWriter, r *http.Request) {
 	id, ok := h.riderID(w, r)
 	if !ok {

@@ -88,6 +88,9 @@ export const ordersApi = {
   sendChat: (orderId: string, text: string) =>
     apiClient.post<{ status: string }>(`/api/v1/rider/orders/${orderId}/chat`, { text }),
 
+  shareLocation: (orderId: string, lat: number, lng: number) =>
+    apiClient.post<{ status: string }>(`/api/v1/rider/orders/${orderId}/location`, { lat, lng }),
+
   sos: (orderId: string) =>
     apiClient.post<{ triggered: boolean; contacts_notified: number }>(
       `/api/v1/rider/orders/${orderId}/sos`,

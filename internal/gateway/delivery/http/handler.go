@@ -393,6 +393,16 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 						continue
 					}
 
+					// Rider->driver live location (first-mile): forwarded verbatim; the driver
+					// app parses {rider_location:{lat,lng}} off the socket.
+					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"rider_location"`) {
+						select {
+						case session.MessageChan <- []byte(msg.Payload):
+						default:
+						}
+						continue
+					}
+
 					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
 					var binaryBuffer []byte
 					var marshalErr error
