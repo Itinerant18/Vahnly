@@ -208,15 +208,22 @@ function DispatchContent() {
     pollRef.current = setInterval(async () => {
       try {
         const res = await ordersApi.active();
-        if (res.order.id === oid && res.order.status !== "CREATED") {
+        if (res.order.id !== oid) return;
+        // Offer-accept: a bare ASSIGNED means an offer is out but the driver hasn't
+        // accepted yet (they may still decline), so keep searching rather than stranding
+        // the rider on the live screen with an empty driver card. Only advance once the
+        // driver accepts (EN_ROUTE_TO_PICKUP); the WS rider.order.assigned push normally
+        // beats this poll to it (and is what carries force-matched assignments).
+        if (res.order.status === "EN_ROUTE_TO_PICKUP") {
           stopTimers();
           clearInterval(countInterval);
           setActiveOrder(res.order);
-          if (res.order.status === "ASSIGNED" || res.order.status === "EN_ROUTE_TO_PICKUP") {
-            router.replace("/trip/live");
-          } else if (res.order.status === "CANCELLED") {
-            setState("TIMEOUT");
-          }
+          router.replace("/trip/live");
+        } else if (res.order.status === "CANCELLED") {
+          stopTimers();
+          clearInterval(countInterval);
+          setActiveOrder(res.order);
+          setState("TIMEOUT");
         }
       } catch {
         // ignore poll errors
