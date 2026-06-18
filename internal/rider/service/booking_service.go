@@ -406,7 +406,10 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		return nil, err
 	}
 
-	// 8. publish to the SAME order.created topic dispatch consumes, with rider fields.
+	// 8. Build the dispatch payload (same shape dispatch consumes). Instant bookings — and
+	// any scheduled within the lead window — publish to order.created now. A far-future
+	// booking is stored verbatim instead; the dispatch scheduler replays it ~lead before
+	// pickup (store-and-replay), so the up-front quote is honoured and never re-priced.
 	payload := dispatchDomain.OrderCreatedPayload{
 		OrderID:       orderID,
 		CityPrefix:    city,
@@ -420,8 +423,14 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		CarType:       carType,
 		Transmission:  transmission,
 	}
-	if payloadBytes, mErr := json.Marshal(payload); mErr == nil && s.publisher != nil {
-		_ = s.publisher.Publish(ctx, "order.created", orderID, payloadBytes)
+	if payloadBytes, mErr := json.Marshal(payload); mErr == nil {
+		deferUntilLead := req.ScheduledAt != nil &&
+			req.ScheduledAt.After(time.Now().Add(dispatchDomain.ScheduledDispatchLead()))
+		if deferUntilLead {
+			_ = s.orders.EnqueueScheduledDispatch(ctx, orderID, *req.ScheduledAt, payloadBytes)
+		} else if s.publisher != nil {
+			_ = s.publisher.Publish(ctx, "order.created", orderID, payloadBytes)
+		}
 	}
 
 	// 9. mark the active order in Redis (4h TTL).

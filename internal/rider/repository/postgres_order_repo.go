@@ -26,6 +26,7 @@ var (
 type RiderOrderRepository interface {
 	GetActiveOrderID(ctx context.Context, riderID string) (string, error)
 	InsertRiderOrder(ctx context.Context, p InsertOrderParams) (string, error)
+	EnqueueScheduledDispatch(ctx context.Context, orderID string, scheduledAt time.Time, payload []byte) error
 	GetOrderForRider(ctx context.Context, orderID, riderID string) (*domain.RiderOrder, error)
 	GetOrderByID(ctx context.Context, orderID string) (*domain.RiderOrder, error)
 	GetOrderByShareToken(ctx context.Context, token string) (*domain.RiderOrder, error)
@@ -110,6 +111,16 @@ func (r *postgresOrderRepo) GetActiveOrderID(ctx context.Context, riderID string
 		return "", err
 	}
 	return id, nil
+}
+
+// EnqueueScheduledDispatch stores a future-dated order's dispatch payload verbatim so the
+// scheduler can replay it onto order.created near pickup. ON CONFLICT keeps it idempotent.
+func (r *postgresOrderRepo) EnqueueScheduledDispatch(ctx context.Context, orderID string, scheduledAt time.Time, payload []byte) error {
+	_, err := r.dbPool.Exec(ctx, `
+		INSERT INTO scheduled_dispatch_queue (order_id, scheduled_at, payload)
+		VALUES ($1::uuid, $2, $3::jsonb)
+		ON CONFLICT (order_id) DO NOTHING`, orderID, scheduledAt, payload)
+	return err
 }
 
 func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderParams) (string, error) {

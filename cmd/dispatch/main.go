@@ -15,6 +15,7 @@ import (
 
 	"github.com/platform/driver-delivery/internal/dispatch/consumer"
 	dispatchRepo "github.com/platform/driver-delivery/internal/dispatch/repository"
+	"github.com/platform/driver-delivery/internal/dispatch/scheduler"
 	"github.com/platform/driver-delivery/internal/intelligence/client"
 	"github.com/platform/driver-delivery/internal/intelligence/usecase"
 	"github.com/platform/driver-delivery/internal/observability"
@@ -185,6 +186,9 @@ func main() {
 	go handoffConsumer.Start(ctx)
 
 	go orderConsumer.StartExecutionPipeline(ctx)
+
+	// Scheduled-booking sweeper: replays future-dated orders onto order.created near pickup.
+	go scheduler.New(dbPool, brokersList).Run(ctx)
 
 	// 8. Start HTTP Observability Server (Prometheus + Health + Stats)
 	metricsPort := getEnv("METRICS_PORT", "8080")
