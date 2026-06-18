@@ -1,0 +1,88 @@
+name: VM Deploy
+
+# Ships the GHCR images Backend CI just built to the production VM (dfu-stack), which serves
+# api.aniket.site behind Caddy. Runs ONLY after Backend CI succeeds on main, so a push that
+# fails to build images never deploys. Replaces the k8s "Deploy" workflow's no-op for the
+# VM-hosted backend.
+#
+# ── One-time setup (in repo Settings) ───────────────────────────────────────────────────
+#   1. Secret  GCP_SA_KEY        — JSON key of a service account that can SSH the VM. Grant it:
+#                                   roles/compute.instanceAdmin.v1  (manage SSH keys on the VM)
+#                                   roles/iam.serviceAccountUser    (act as the VM's SA)
+#   2. Variable VM_COMPOSE_DIR   — absolute path on the VM holding docker-compose*.yml
+#                                   (the dir where you run `docker compose up -d`).
+#   3. Variable VM_HEALTH_URL    — (optional) health URL to smoke-test; defaults to
+#                                   https://api.aniket.site/api/v1/config/flags
+# Until the secret + VM_COMPOSE_DIR are set, the job skips cleanly (green, never red).
+
+on:
+  workflow_run:
+    workflows: ["Backend CI"]
+    types: [completed]
+  workflow_dispatch: {}
+
+concurrency:
+  group: vm-deploy
+  cancel-in-progress: false
+
+env:
+  VM_NAME: dfu-stack
+  VM_ZONE: asia-south1-c
+  VM_PROJECT: vahnly-platform
+
+jobs:
+  deploy:
+    # Deploy on a manual run, or when Backend CI completed successfully on main.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.head_branch == 'main') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve config (skip cleanly if unset)
+        id: guard
+        # Evaluate presence in the expression context — never interpolate the secret value
+        # into the shell (the JSON key has quotes/newlines that would break parsing).
+        env:
+          HAS_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+          HAS_DIR: ${{ vars.VM_COMPOSE_DIR != '' }}
+        run: |
+          if [ "$HAS_KEY" = "true" ] && [ "$HAS_DIR" = "true" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VM deploy skipped — set the GCP_SA_KEY secret and VM_COMPOSE_DIR variable to enable it."
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: steps.guard.outputs.ready == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        if: steps.guard.outputs.ready == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Pull images + restart on the VM
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          gcloud compute ssh "$VM_NAME" \
+            --zone="$VM_ZONE" --project="$VM_PROJECT" --quiet \
+            --command="set -e
+              cd '${{ vars.VM_COMPOSE_DIR }}'
+              docker compose pull
+              docker compose up -d --remove-orphans
+              docker image prune -f || true"
+
+      - name: Smoke test
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          URL='${{ vars.VM_HEALTH_URL }}'
+          [ -z "$URL" ] && URL='https://api.aniket.site/api/v1/config/flags'
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$URL" || true)
+            if [ "$code" = "200" ]; then echo "gateway healthy ($URL)"; exit 0; fi
+            echo "attempt $i: $code — retrying"; sleep 6
+          done
+          echo "gateway did not return 200 at $URL after deploy"; exit 1
