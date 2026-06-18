@@ -221,7 +221,10 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => alert(`Dialing ${activeTrip.customer_phone || 'Protected'}`)}
+                  onClick={() => {
+                    const p = activeTrip.customer_phone;
+                    if (p && p !== 'Unavailable') window.location.href = `tel:${p}`;
+                  }}
                   aria-label="Call rider"
                   className="h-9 px-3 rounded-sm bg-background-secondary border border-border-opaque
                     text-label-small text-content-primary cursor-pointer

@@ -10,6 +10,7 @@ const OTP_STORAGE_KEY = "dfu_active_otp";
 export interface DriverInfo {
   driverId: string;
   name: string;
+  phone?: string;
   photo: string;
   rating: number;
   tripsCount: number;

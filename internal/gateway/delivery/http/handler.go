@@ -1581,14 +1581,14 @@ func (h *GatewayHandler) pushRiderDriverConfirmed(orderID, driverID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	var riderID, driverName, carMake, carModel, carTransmission *string
+	var riderID, driverName, driverPhone, carMake, carModel, carTransmission *string
 	var driverRating *float64
 	err := h.dbPool.QueryRow(ctx, `
-		SELECT o.rider_id::text, d.name, d.rating, g.make, g.model, g.transmission
+		SELECT o.rider_id::text, d.name, d.phone, d.rating, g.make, g.model, g.transmission
 		FROM orders o
 		LEFT JOIN drivers d ON d.id = o.assigned_driver_id
 		LEFT JOIN rider_garage g ON g.id = o.garage_car_id
-		WHERE o.id = $1::uuid`, orderID).Scan(&riderID, &driverName, &driverRating, &carMake, &carModel, &carTransmission)
+		WHERE o.id = $1::uuid`, orderID).Scan(&riderID, &driverName, &driverPhone, &driverRating, &carMake, &carModel, &carTransmission)
 	if err != nil || riderID == nil || *riderID == "" {
 		return
 	}
@@ -1601,6 +1601,7 @@ func (h *GatewayHandler) pushRiderDriverConfirmed(orderID, driverID string) {
 		"order_id":               orderID,
 		"driver_id":              driverID,
 		"driver_name":            "",
+		"driver_phone":           "",
 		"driver_photo":           "",
 		"driver_rating":          0.0,
 		"driver_trips_count":     0,
@@ -1613,6 +1614,9 @@ func (h *GatewayHandler) pushRiderDriverConfirmed(orderID, driverID string) {
 	}
 	if driverName != nil {
 		data["driver_name"] = *driverName
+	}
+	if driverPhone != nil {
+		data["driver_phone"] = *driverPhone
 	}
 	if driverRating != nil {
 		data["driver_rating"] = *driverRating
@@ -2142,6 +2146,7 @@ type LocationDetails struct {
 type OrderOffer struct {
 	OrderID              string          `json:"orderId"`
 	RiderName            string          `json:"riderName"`
+	RiderPhone           string          `json:"riderPhone,omitempty"` // surfaced post-accept for a direct tel: call
 	RiderRating          float64         `json:"riderRating"`
 	Pickup               LocationDetails `json:"pickup"`
 	Drop                 LocationDetails `json:"drop"`
@@ -2184,6 +2189,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		baseFarePaise   int64
 		surgeMultiplier float64
 		riderName       string
+		riderPhone      string
 		carMake         string
 		carModel        string
 		carType         string
@@ -2203,6 +2209,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		       ST_Y(o.dropoff_location::geometry), ST_X(o.dropoff_location::geometry),
 		       o.base_fare_paise, o.surge_multiplier::float8,
 		       COALESCE(r.name, ''),
+		       COALESCE(r.phone, ''),
 		       COALESCE(g.make, o.one_time_car_make, ''),
 		       COALESCE(g.model, o.one_time_car_model, ''),
 		       COALESCE(g.car_type, o.one_time_car_type, ''),
@@ -2223,7 +2230,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 	err := h.dbPool.QueryRow(ctx, query, driverID).Scan(
 		&orderID, &cityPrefix, &pickupH3Cell, &pickupLat, &pickupLng,
 		&dropoffLat, &dropoffLng, &baseFarePaise, &surgeMultiplier,
-		&riderName, &carMake, &carModel, &carType, &carTransmission, &carColor,
+		&riderName, &riderPhone, &carMake, &carModel, &carType, &carTransmission, &carColor,
 		&d4mCareOpted, &drvManual, &drvAutomatic,
 	)
 	if err != nil {
@@ -2274,6 +2281,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 	offer := OrderOffer{
 		OrderID:     orderID,
 		RiderName:   firstName,
+		RiderPhone:  riderPhone,
 		RiderRating: riderRating,
 		Pickup: LocationDetails{
 			Address: fmt.Sprintf("Pickup Near Cell %s (%f, %f)", pickupH3Cell, pickupLat, pickupLng),

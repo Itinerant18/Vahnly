@@ -656,7 +656,7 @@ export default function DriverTerminalPage() {
       setActiveTrip({
         order_id: currentOffer.orderId,
         customer_name: currentOffer.riderName,
-        customer_phone: 'Unavailable',
+        customer_phone: currentOffer.riderPhone || 'Unavailable',
         customer_rating: currentOffer.riderRating,
         pickup_address: currentOffer.pickup.address,
         pickup_lat: currentOffer.pickup.lat,

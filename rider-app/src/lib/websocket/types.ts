@@ -10,6 +10,7 @@ export interface RiderOrderAssigned {
     order_id: string;
     driver_id: string;
     driver_name: string;
+    driver_phone?: string;
     driver_photo: string;
     driver_rating: number;
     driver_trips_count: number;

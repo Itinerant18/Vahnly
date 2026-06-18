@@ -232,7 +232,10 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
       {/* ── Action row ── */}
       <div className="grid grid-cols-3 gap-2">
         <button
-          onClick={() => alert(`Dialing ${activeTrip.customer_phone}`)}
+          onClick={() => {
+            const p = activeTrip.customer_phone;
+            if (p && p !== 'Unavailable') window.location.href = `tel:${p}`;
+          }}
           className="flex flex-col items-center justify-center gap-1 h-16 bg-background-secondary rounded-sm border border-border-opaque
             text-label-small text-content-primary cursor-pointer transition-base
             hover:bg-background-tertiary active:scale-95

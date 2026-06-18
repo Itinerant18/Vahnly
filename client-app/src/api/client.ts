@@ -85,6 +85,7 @@ export interface PricingQuote {
 export interface OrderOffer {
   orderId: string;
   riderName: string;
+  riderPhone?: string;
   riderRating: number;
   pickup: { address: string; lat: number; lng: number };
   drop: { address: string; lat: number; lng: number };

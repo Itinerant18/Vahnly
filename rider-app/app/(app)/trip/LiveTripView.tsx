@@ -367,6 +367,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             trip.setDriverInfo({
               driverId:       msg.data.driver_id,
               name:           msg.data.driver_name,
+              phone:          msg.data.driver_phone,
               photo:          msg.data.driver_photo,
               rating:         msg.data.driver_rating,
               tripsCount:     msg.data.driver_trips_count,
@@ -556,7 +557,8 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
         {/* Driver card */}
         <DriverCard
           onCall={() => {
-            if (typeof window !== "undefined") window.open("tel:", "_self");
+            const phone = useTripStore.getState().driverInfo?.phone;
+            if (typeof window !== "undefined" && phone) window.open(`tel:${phone}`, "_self");
           }}
           onShare={() => setShowShare(true)}
           onCancel={() => setShowCancel(true)}
