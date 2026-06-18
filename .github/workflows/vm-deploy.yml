@@ -5,15 +5,19 @@ name: VM Deploy
 # fails to build images never deploys. Replaces the k8s "Deploy" workflow's no-op for the
 # VM-hosted backend.
 #
-# ── One-time setup (in repo Settings) ───────────────────────────────────────────────────
-#   1. Secret  GCP_SA_KEY        — JSON key of a service account that can SSH the VM. Grant it:
-#                                   roles/compute.instanceAdmin.v1  (manage SSH keys on the VM)
-#                                   roles/iam.serviceAccountUser    (act as the VM's SA)
-#   2. Variable VM_COMPOSE_DIR   — absolute path on the VM holding docker-compose*.yml
-#                                   (the dir where you run `docker compose up -d`).
-#   3. Variable VM_HEALTH_URL    — (optional) health URL to smoke-test; defaults to
-#                                   https://api.aniket.site/api/v1/config/flags
-# Until the secret + VM_COMPOSE_DIR are set, the job skips cleanly (green, never red).
+# ── One-time setup ──────────────────────────────────────────────────────────────────────
+#   Required: Secret  GCP_SA_KEY — JSON key of a service account that can SSH the VM. Grant:
+#                                  roles/compute.instanceAdmin.v1  +  roles/iam.serviceAccountUser
+#       gcloud iam service-accounts create github-vm-deploy --project=vahnly-platform
+#       EMAIL=github-vm-deploy@vahnly-platform.iam.gserviceaccount.com
+#       gcloud projects add-iam-policy-binding vahnly-platform --member="serviceAccount:$EMAIL" --role=roles/compute.instanceAdmin.v1
+#       gcloud projects add-iam-policy-binding vahnly-platform --member="serviceAccount:$EMAIL" --role=roles/iam.serviceAccountUser
+#       gcloud iam service-accounts keys create key.json --iam-account=$EMAIL
+#       gh secret set GCP_SA_KEY --repo Itinerant18/Vahnly < key.json && rm key.json
+#   Optional: Variable VM_COMPOSE_DIR — absolute dir holding docker-compose*.yml. If unset,
+#             the job auto-discovers it on the VM (and fails clearly if there's more than one).
+#   Optional: Variable VM_HEALTH_URL  — health URL to smoke-test (default below).
+# Until GCP_SA_KEY exists, the job skips cleanly (green, never red).
 
 on:
   workflow_run:
@@ -39,19 +43,18 @@ jobs:
            github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve config (skip cleanly if unset)
+      - name: Resolve config (skip cleanly if the deploy key is unset)
         id: guard
         # Evaluate presence in the expression context — never interpolate the secret value
         # into the shell (the JSON key has quotes/newlines that would break parsing).
         env:
           HAS_KEY: ${{ secrets.GCP_SA_KEY != '' }}
-          HAS_DIR: ${{ vars.VM_COMPOSE_DIR != '' }}
         run: |
-          if [ "$HAS_KEY" = "true" ] && [ "$HAS_DIR" = "true" ]; then
+          if [ "$HAS_KEY" = "true" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::VM deploy skipped — set the GCP_SA_KEY secret and VM_COMPOSE_DIR variable to enable it."
+            echo "::notice::VM deploy skipped — add the GCP_SA_KEY secret to enable it."
           fi
 
       - name: Authenticate to Google Cloud
@@ -64,16 +67,38 @@ jobs:
         if: steps.guard.outputs.ready == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Build remote deploy script
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          # Single-quoted heredoc keeps the script literal; the optional VM_COMPOSE_DIR
+          # override is injected by sed so paths with spaces survive.
+          cat > remote-deploy.sh <<'REMOTE'
+          set -e
+          DIR="__OVERRIDE__"
+          if [ -z "$DIR" ]; then
+            matches=$(find /opt /srv /home /root "$HOME" -maxdepth 4 -name 'docker-compose*.y*ml' 2>/dev/null || true)
+            n=$(printf '%s\n' "$matches" | grep -c . || true)
+            if [ "$n" != "1" ]; then
+              echo "Set the VM_COMPOSE_DIR variable — auto-discovery found $n docker-compose files:"
+              printf '%s\n' "$matches"
+              exit 1
+            fi
+            DIR=$(dirname "$matches")
+          fi
+          echo "Deploying from: $DIR"
+          cd "$DIR"
+          docker compose pull
+          docker compose up -d --remove-orphans
+          docker image prune -f || true
+          REMOTE
+          sed -i "s|__OVERRIDE__|${{ vars.VM_COMPOSE_DIR }}|" remote-deploy.sh
+
       - name: Pull images + restart on the VM
         if: steps.guard.outputs.ready == 'true'
         run: |
           gcloud compute ssh "$VM_NAME" \
             --zone="$VM_ZONE" --project="$VM_PROJECT" --quiet \
-            --command="set -e
-              cd '${{ vars.VM_COMPOSE_DIR }}'
-              docker compose pull
-              docker compose up -d --remove-orphans
-              docker image prune -f || true"
+            --command="$(cat remote-deploy.sh)"
 
       - name: Smoke test
         if: steps.guard.outputs.ready == 'true'
