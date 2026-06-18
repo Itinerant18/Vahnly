@@ -620,6 +620,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/start", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverStartTrip))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/wait/start", authGuard.AuthenticateJWT(handler.HandleStartWait))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/wait/resume", authGuard.AuthenticateJWT(handler.HandleResumeTrip))
+	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/abandon", authGuard.AuthenticateJWT(handler.HandleDriverAbandonTrip))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/events", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverAddOrderEvent))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/end", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverEndTrip))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverConfirmPayment))))

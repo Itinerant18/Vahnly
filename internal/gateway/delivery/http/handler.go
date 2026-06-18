@@ -663,6 +663,74 @@ func (h *GatewayHandler) HandleDeclineOrder(w http.ResponseWriter, r *http.Reque
 	_, _ = w.Write([]byte(`{"status":"RE_QUEUED"}`))
 }
 
+// HandleDriverAbandonTrip handles a driver abandoning a trip they ALREADY accepted
+// (EN_ROUTE/ARRIVED) — distinct from declining the 15s offer. The order is re-queued and the
+// driver takes a reliability penalty (the no-show deterrent; applies to scheduled bookings
+// too once they reach a driver). Declining the offer is free; ghosting a commitment is not.
+func (h *GatewayHandler) HandleDriverAbandonTrip(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+	orderID := r.PathValue("id")
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	tx, err := h.dbPool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "transaction_failed", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Revert the order (must be this driver's accepted trip), capturing the dispatch payload.
+	var p dispatchDomain.OrderCreatedPayload
+	err = tx.QueryRow(ctx, `
+		UPDATE orders
+		SET status = 'CREATED'::order_status_enum, assigned_driver_id = NULL, assigned_at = NULL
+		WHERE id = $1::uuid AND assigned_driver_id = $2::uuid
+		  AND status IN ('EN_ROUTE_TO_PICKUP'::order_status_enum, 'ARRIVED_AT_PICKUP'::order_status_enum)
+		RETURNING city_prefix, customer_id, pickup_h3_cell, pickup_osm_node_id,
+		          ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry), base_fare_paise`,
+		orderID, driverID).Scan(&p.CityPrefix, &p.CustomerID, &p.PickupH3Cell, &p.PickupOSMNodeID, &p.PickupLat, &p.PickupLng, &p.BaseFarePaise)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "invalid_state: not your accepted trip", http.StatusConflict)
+		return
+	}
+	if err != nil {
+		http.Error(w, "abandon_failed", http.StatusInternalServerError)
+		return
+	}
+	p.OrderID = orderID
+
+	// No-show penalty + free the driver back to the pool.
+	_, _ = tx.Exec(ctx, `
+		UPDATE drivers
+		SET cancellation_rate = LEAST(1.0, COALESCE(cancellation_rate, 0) + 0.05),
+		    current_state = 'ONLINE_AVAILABLE'::driver_state_enum,
+		    duty_state = 'ONLINE'::driver_duty_state, updated_at = NOW()
+		WHERE id = $1::uuid`, driverID)
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "commit_failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Re-queue onto order.created so the matcher finds another driver.
+	if payloadBytes, mErr := json.Marshal(p); mErr == nil {
+		_ = h.kafkaWriter.WriteMessages(ctx, kafka.Message{Key: []byte(orderID), Value: payloadBytes})
+	}
+	_ = h.clusterClient.Del(ctx, fmt.Sprintf("driver:active:trip:%s", driverID))
+	go h.pushRiderTripEvent(orderID, riderRealtime.MsgNotification, map[string]interface{}{
+		"type":  "driver_abandoned",
+		"title": "Finding a new driver",
+		"body":  "Your driver had to cancel — we're matching you with another.",
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"RE_QUEUED"}`))
+}
+
 // HandleOfferResponse processes the driver's response (Accept/Decline) to a pending order offer.
 func (h *GatewayHandler) HandleOfferResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
@@ -2167,6 +2235,7 @@ type OrderOffer struct {
 	CarColor          string `json:"carColor,omitempty"`
 	CarTransmission   string `json:"carTransmission,omitempty"` // "Manual" | "Automatic"
 	TransmissionMatch bool   `json:"transmissionMatch"`         // driver expertise covers the car's transmission
+	OwnerNotInCar     bool   `json:"ownerNotInCar,omitempty"`   // rider won't ride along
 }
 
 func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Request) {
@@ -2196,6 +2265,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		carTransmission string
 		carColor        string
 		d4mCareOpted    bool
+		ownerNotInCar   bool
 		drvManual       bool
 		drvAutomatic    bool
 	)
@@ -2216,6 +2286,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		       COALESCE(g.transmission, o.one_time_car_transmission, ''),
 		       COALESCE(g.color, ''),
 		       COALESCE(o.d4m_care_opted, false),
+		       COALESCE(o.owner_not_in_car, false),
 		       COALESCE(d.transmission_manual, true),
 		       COALESCE(d.transmission_automatic, true)
 		FROM orders o
@@ -2231,7 +2302,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		&orderID, &cityPrefix, &pickupH3Cell, &pickupLat, &pickupLng,
 		&dropoffLat, &dropoffLng, &baseFarePaise, &surgeMultiplier,
 		&riderName, &riderPhone, &carMake, &carModel, &carType, &carTransmission, &carColor,
-		&d4mCareOpted, &drvManual, &drvAutomatic,
+		&d4mCareOpted, &ownerNotInCar, &drvManual, &drvAutomatic,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -2308,6 +2379,7 @@ func (h *GatewayHandler) HandleDriverGetOffer(w http.ResponseWriter, r *http.Req
 		CarColor:             carColor,
 		CarTransmission:      transmissionDisplay,
 		TransmissionMatch:    transmissionMatch,
+		OwnerNotInCar:        ownerNotInCar,
 	}
 
 	writeJSONResponse(w, http.StatusOK, map[string]interface{}{

@@ -336,6 +336,7 @@ type CreateOrderRequest struct {
 	PersonsCount   int            `json:"persons_count"`
 	PromoCode      string         `json:"promo_code"`
 	D4MCareOpted   bool           `json:"d4m_care_opted"`
+	OwnerNotInCar  bool           `json:"owner_not_in_car"` // rider sends the car without riding along
 	PaymentMethod  string         `json:"payment_method"`
 	ScheduledAt    *time.Time     `json:"scheduled_at"`
 	City           string         `json:"city"`
@@ -502,6 +503,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		WaypointsJSON:          waypoints,
 		BookedDurationHours:    bookedDuration,
 		PackageType:            req.PackageType,
+		OwnerNotInCar:          req.OwnerNotInCar,
 	})
 	if err != nil {
 		return nil, err
@@ -635,18 +637,23 @@ func (s *BookingService) CancelOrder(ctx context.Context, riderID, orderID, reas
 	}
 
 	switch order.Status {
-	case "CREATED", "ASSIGNED", "EN_ROUTE_TO_PICKUP":
+	case "CREATED", "ASSIGNED", "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP":
 		// cancellable
 	default:
 		return nil, ErrOrderNotCancellable
 	}
 
-	// Cancellation policy. Live ETA is not computed here; time-since-assignment is
-	// used as the proxy the spec describes.
+	// Cancel-after-travel fee (reach compensation for the driver). Tiered by how far the
+	// driver got; env-configurable. Live ETA isn't computed here, so time-since-assignment
+	// is the proxy for EN_ROUTE. The fee is recorded on the order and goes to the driver.
 	fee := int64(0)
-	if order.Status == "EN_ROUTE_TO_PICKUP" && order.AssignedAt != nil {
-		if time.Since(*order.AssignedAt) > 3*time.Minute {
-			fee = 3000 // ₹30
+	switch order.Status {
+	case "ARRIVED_AT_PICKUP":
+		// Driver already reached the car — full reach compensation.
+		fee = envPaise("CANCEL_FEE_ARRIVED_PAISE", 5000) // ₹50
+	case "EN_ROUTE_TO_PICKUP":
+		if order.AssignedAt != nil && time.Since(*order.AssignedAt) > 3*time.Minute {
+			fee = envPaise("CANCEL_FEE_ENROUTE_PAISE", 3000) // ₹30
 		}
 	}
 

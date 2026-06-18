@@ -73,6 +73,7 @@ type InsertOrderParams struct {
 	WaypointsJSON          []byte // pickup/dropoff/stop addresses, stored in rider_stops JSONB
 	BookedDurationHours    *int
 	PackageType            string // HOURLY|MINI_OUTSTATION|OUTSTATION|MONTHLY; "" = distance-priced
+	OwnerNotInCar          bool   // rider sends the car without riding along
 }
 
 type OrderFilter struct {
@@ -163,7 +164,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 			garage_car_id, one_time_car_make, one_time_car_model, one_time_car_type, one_time_car_transmission,
 			payment_method, promo_code, promo_discount_paise, d4m_care_opted,
 			trip_share_token, trip_share_expires_at, persons_count, scheduled_at, rider_stops,
-			booked_duration_hours, package_type
+			booked_duration_hours, package_type, owner_not_in_car
 		) VALUES (
 			$1, $2::uuid, $3::uuid, 'CREATED'::order_status_enum,
 			ST_GeographyFromText($4), ST_GeographyFromText($5), $6, 0,
@@ -171,7 +172,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 			$11::uuid, $12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24,
-			$25, NULLIF($26, '')
+			$25, NULLIF($26, ''), $27
 		) RETURNING id::text`,
 		p.CityPrefix, p.RiderID, p.RiderID,
 		pickupGeom, dropoffGeom, p.PickupH3Cell,
@@ -179,7 +180,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 		p.GarageCarID, p.OneTimeCarMake, p.OneTimeCarModel, p.OneTimeCarType, p.OneTimeCarTransmission,
 		p.PaymentMethod, p.PromoCode, p.PromoDiscountPaise, p.D4MCareOpted,
 		p.TripShareToken, p.TripShareExpiresAt, p.PersonsCount, p.ScheduledAt, p.WaypointsJSON,
-		p.BookedDurationHours, p.PackageType,
+		p.BookedDurationHours, p.PackageType, p.OwnerNotInCar,
 	).Scan(&orderID)
 	if err != nil {
 		return "", err
