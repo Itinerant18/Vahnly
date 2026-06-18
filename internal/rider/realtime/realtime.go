@@ -25,6 +25,7 @@ const (
 	MsgTripCancelled  = "rider.trip.cancelled"
 	MsgNotification   = "rider.notification"
 	MsgRideCheck      = "rider.ride_check"
+	MsgChat           = "rider.chat"
 )
 
 // Envelope is the backplane wire format: rider_id routes the message, type +

@@ -27,6 +27,7 @@ type RiderOrderRepository interface {
 	GetActiveOrderID(ctx context.Context, riderID string) (string, error)
 	InsertRiderOrder(ctx context.Context, p InsertOrderParams) (string, error)
 	EnqueueScheduledDispatch(ctx context.Context, orderID string, scheduledAt time.Time, payload []byte) error
+	GetAssignedDriver(ctx context.Context, orderID, riderID string) (string, error)
 	GetOrderForRider(ctx context.Context, orderID, riderID string) (*domain.RiderOrder, error)
 	GetOrderByID(ctx context.Context, orderID string) (*domain.RiderOrder, error)
 	GetOrderByShareToken(ctx context.Context, token string) (*domain.RiderOrder, error)
@@ -112,6 +113,25 @@ func (r *postgresOrderRepo) GetActiveOrderID(ctx context.Context, riderID string
 		return "", err
 	}
 	return id, nil
+}
+
+// GetAssignedDriver returns the driver assigned to an order the rider owns, or ErrOrderNotFound
+// if the order isn't theirs or has no driver yet. Used to route rider->driver chat.
+func (r *postgresOrderRepo) GetAssignedDriver(ctx context.Context, orderID, riderID string) (string, error) {
+	var driverID *string
+	err := r.dbPool.QueryRow(ctx, `
+		SELECT assigned_driver_id::text FROM orders
+		WHERE id = $1::uuid AND rider_id = $2::uuid`, orderID, riderID).Scan(&driverID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrOrderNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if driverID == nil || *driverID == "" {
+		return "", ErrOrderNotFound
+	}
+	return *driverID, nil
 }
 
 // EnqueueScheduledDispatch stores a future-dated order's dispatch payload verbatim so the

@@ -383,6 +383,16 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 						continue
 					}
 
+					// Rider->driver chat lines are forwarded verbatim as JSON; the driver app
+					// parses {chat_message:{from,text,ts}} directly off the socket.
+					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"chat_message"`) {
+						select {
+						case session.MessageChan <- []byte(msg.Payload):
+						default:
+						}
+						continue
+					}
+
 					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
 					var binaryBuffer []byte
 					var marshalErr error
@@ -569,6 +579,50 @@ func (h *GatewayHandler) HandleAcceptOrder(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"EN_ROUTE_TO_PICKUP"}`))
+}
+
+// HandleDriverSendChat delivers a driver's chat line to the rider's live-trip WS for an order
+// the driver is assigned to. Ephemeral pickup coordination, mirrors the rider->driver path.
+func (h *GatewayHandler) HandleDriverSendChat(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
+		return
+	}
+	text := strings.TrimSpace(req.Text)
+	if text == "" || len(text) > 500 {
+		http.Error(w, "invalid_message", http.StatusBadRequest)
+		return
+	}
+	orderID := r.PathValue("id")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	var riderID *string
+	err := h.dbPool.QueryRow(ctx,
+		`SELECT rider_id::text FROM orders WHERE id = $1::uuid AND assigned_driver_id = $2::uuid`,
+		orderID, driverID).Scan(&riderID)
+	if err != nil || riderID == nil || *riderID == "" {
+		http.Error(w, "order_not_found_or_not_assigned", http.StatusNotFound)
+		return
+	}
+
+	_ = riderRealtime.Publish(ctx, h.clusterClient, *riderID, riderRealtime.MsgChat, map[string]interface{}{
+		"order_id": orderID,
+		"from":     "DRIVER",
+		"text":     text,
+		"ts":       time.Now().Unix(),
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"sent"}`))
 }
 
 // HandleDeclineOrder processes manual rejections, freeing the driver and re-injecting the booking request to Kafka

@@ -612,6 +612,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/status", authGuard.AuthenticateJWT(handler.HandleDriverSetStatus))
 	mux.HandleFunc("GET /api/v1/driver/offer", authGuard.AuthenticateJWT(handler.HandleDriverGetOffer))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/offer-response", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleOfferResponse))))
+	mux.HandleFunc("POST /api/v1/driver/orders/{id}/chat", authGuard.AuthenticateJWT(handler.HandleDriverSendChat))
 	// NOTE: PATCH /api/v1/driver/orders/{id}/arrived is registered above (line ~359) via
 	// driverTripHandler.MarkArrived — the handler the client (useTripStore) pairs with
 	// /verify-start. Re-registering it here panicked the ServeMux at startup, so the
@@ -728,6 +729,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/rider/orders/active", riderAuthMW.Require(riderBookingHandler.HandleGetActiveOrder))
 	mux.HandleFunc("GET /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleOrderHistory))
 	mux.HandleFunc("DELETE /api/v1/rider/orders/{orderId}/cancel", riderAuthMW.Require(riderBookingHandler.HandleCancelOrder))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/chat", riderAuthMW.Require(riderBookingHandler.HandleSendChat))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/rate", riderAuthMW.Require(riderBookingHandler.HandleRateDriver))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", riderAuthMW.Require(riderBookingHandler.HandleSOS))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/stops", riderAuthMW.Require(riderBookingHandler.HandleAddStop))

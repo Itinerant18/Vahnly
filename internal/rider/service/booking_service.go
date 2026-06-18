@@ -256,6 +256,34 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	}, nil
 }
 
+// SendChatToDriver pushes a rider's chat line to the assigned driver's WS for an order the
+// rider owns. Ephemeral (no persistence) — pickup coordination ("I'm at the gate"), not a
+// durable thread. Published on the driver assignments backplane; the gateway forwards any
+// payload carrying "chat_message" verbatim to the driver's socket.
+func (s *BookingService) SendChatToDriver(ctx context.Context, riderID, orderID, text string) error {
+	text = strings.TrimSpace(text)
+	if text == "" || len(text) > 500 {
+		return ErrInvalidBooking
+	}
+	driverID, err := s.orders.GetAssignedDriver(ctx, orderID, riderID)
+	if err != nil {
+		return err
+	}
+	if s.cache == nil {
+		return nil
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"driver_id": driverID,
+		"order_id":  orderID,
+		"chat_message": map[string]any{
+			"from": "RIDER",
+			"text": text,
+			"ts":   time.Now().Unix(),
+		},
+	})
+	return s.cache.Publish(ctx, driverAssignmentsChannel, string(payload)).Err()
+}
+
 // ---- create order ----
 
 type StopDTO struct {

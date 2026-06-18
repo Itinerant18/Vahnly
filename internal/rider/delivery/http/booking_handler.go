@@ -114,6 +114,26 @@ func (h *BookingHandler) HandleCancelOrder(w http.ResponseWriter, r *http.Reques
 	writeData(w, http.StatusOK, res)
 }
 
+// HandleSendChat delivers a rider's chat line to the assigned driver's live-trip WS.
+func (h *BookingHandler) HandleSendChat(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	if err := h.booking.SendChatToDriver(r.Context(), id, r.PathValue("orderId"), req.Text); err != nil {
+		h.writeBookingError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
 func (h *BookingHandler) HandleOrderHistory(w http.ResponseWriter, r *http.Request) {
 	id, ok := h.riderID(w, r)
 	if !ok {
