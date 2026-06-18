@@ -112,7 +112,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		profileKey := fmt.Sprintf("driver:{%s:%s}:profile", cityPrefix, driverID)
 
 		// Queue HMGET to extract live metrics from the active caching layer
-		cmdMap[driverID] = pipe.HMGet(ctx, profileKey, "osm_node_id", "acceptance_rate", "cancellation_probability", "is_inside_surge_zone", "idle_seconds")
+		cmdMap[driverID] = pipe.HMGet(ctx, profileKey, "osm_node_id", "acceptance_rate", "cancellation_probability", "is_inside_surge_zone", "idle_seconds", "can_drive_manual")
 	}
 
 	// Execute pipelined reads concurrently across cluster shards
@@ -127,19 +127,29 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 		fields, err := cmd.Result()
 		driverCell := discoveredDriverCells[driverID]
 
-		// Guard every field individually — a partial HASH write (e.g. crash mid-pipeline)
-		// leaves some slots nil, causing a type-assertion panic if only fields[0] is checked.
-		anyNil := len(fields) != 5
-		if !anyNil {
-			for _, f := range fields {
-				if f == nil {
-					anyNil = true
+		// can_drive_manual (field[5]) defaults to true when absent — most drivers are
+		// manual-capable; only an explicit "0"/"false" excludes them from manual cars. Kept
+		// lenient so its absence never forces a candidate onto the metric fallback path.
+		canDriveManual := true
+		if len(fields) == 6 {
+			if s, ok := fields[5].(string); ok && (s == "0" || s == "false") {
+				canDriveManual = false
+			}
+		}
+
+		// Guard the five core metric fields individually — a partial HASH write (e.g. crash
+		// mid-pipeline) leaves some slots nil, causing a type-assertion panic.
+		metricsNil := len(fields) < 5
+		if !metricsNil {
+			for i := 0; i < 5; i++ {
+				if fields[i] == nil {
+					metricsNil = true
 					break
 				}
 			}
 		}
 
-		if err != nil || anyNil {
+		if err != nil || metricsNil {
 			// Fallback configuration if a driver's ephemeral profile metadata cache expires
 			candidates = append(candidates, matcher.CandidateDriver{
 				DriverID:                driverID,
@@ -152,6 +162,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 				DistanceMeters:          1500,
 				LocalDemandCount:        cellDemandCount[driverCell],
 				LocalSupplyCount:        cellSupplyCount[driverCell],
+				CanDriveManual:          canDriveManual,
 			})
 			continue
 		}
@@ -174,6 +185,7 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			DistanceMeters:          1000, // Replaced dynamically by Phase 2 graph weights
 			LocalDemandCount:        cellDemandCount[driverCell],
 			LocalSupplyCount:        cellSupplyCount[driverCell],
+			CanDriveManual:          canDriveManual,
 		})
 	}
 

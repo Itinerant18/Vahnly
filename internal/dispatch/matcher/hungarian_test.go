@@ -394,3 +394,24 @@ func TestComputeSingleEdgeCost_HighCancellationRiskPruning(t *testing.T) {
 		t.Errorf("Expected driver to be pruned (cost 1e7) under high cancellation risk (80%%), but got cost: %f", cost)
 	}
 }
+
+func TestComputeSingleEdgeCost_TransmissionGate(t *testing.T) {
+	corrector := &riskTestingCorrector{riskProb: 0.10}
+	manualOrder := domain.OrderCreatedPayload{OrderID: "o-manual", PickupOSMNodeID: 100, Transmission: "MANUAL"}
+	autoOrder := domain.OrderCreatedPayload{OrderID: "o-auto", PickupOSMNodeID: 100, Transmission: "AUTOMATIC"}
+	manualDriver := CandidateDriver{DriverID: "d-manual", DistanceMeters: 1000, CanDriveManual: true}
+	autoOnlyDriver := CandidateDriver{DriverID: "d-auto", DistanceMeters: 1000, CanDriveManual: false}
+
+	// Manual car + automatic-only driver -> fenced (excluded).
+	if cost, _ := ComputeSingleEdgeCost(context.Background(), manualOrder, autoOnlyDriver, corrector); cost != 1e7 {
+		t.Errorf("manual car / automatic-only driver: expected fence 1e7, got %f", cost)
+	}
+	// Manual car + manual-capable driver -> eligible.
+	if cost, _ := ComputeSingleEdgeCost(context.Background(), manualOrder, manualDriver, corrector); cost >= 1e6 {
+		t.Errorf("manual car / manual-capable driver: expected eligible (<1e6), got %f", cost)
+	}
+	// Automatic car + automatic-only driver -> eligible (anyone can drive automatic).
+	if cost, _ := ComputeSingleEdgeCost(context.Background(), autoOrder, autoOnlyDriver, corrector); cost >= 1e6 {
+		t.Errorf("automatic car / automatic-only driver: expected eligible (<1e6), got %f", cost)
+	}
+}

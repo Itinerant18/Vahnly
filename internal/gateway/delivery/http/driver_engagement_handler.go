@@ -315,8 +315,9 @@ func (h *DriverEngagementHandler) UpdateProfile(w http.ResponseWriter, r *http.R
 		return
 	}
 	var req struct {
-		Bio  *string `json:"bio"`
-		Name *string `json:"name"`
+		Bio            *string `json:"bio"`
+		Name           *string `json:"name"`
+		CanDriveManual *bool   `json:"can_drive_manual"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
@@ -334,15 +335,19 @@ func (h *DriverEngagementHandler) UpdateProfile(w http.ResponseWriter, r *http.R
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
+	// can_drive_manual is the driver's transmission skill; it gates manual-car bookings in
+	// the matcher (picked up on the driver's next go-online, which writes it to the profile
+	// hash the scanner reads).
 	var p driverProfile
 	err := h.dbPool.QueryRow(ctx, `
 		UPDATE drivers
 		SET name = COALESCE($1, name),
 		    bio  = COALESCE($2, bio),
+		    can_drive_manual = COALESCE($3, can_drive_manual),
 		    updated_at = NOW()
-		WHERE id = $3::uuid
+		WHERE id = $4::uuid
 		RETURNING id::text, name, bio, phone, email
-	`, req.Name, req.Bio, driverID).Scan(&p.ID, &p.Name, &p.Bio, &p.Phone, &p.Email)
+	`, req.Name, req.Bio, req.CanDriveManual, driverID).Scan(&p.ID, &p.Name, &p.Bio, &p.Phone, &p.Email)
 	if err == pgx.ErrNoRows {
 		http.Error(w, "driver_not_found", http.StatusNotFound)
 		return

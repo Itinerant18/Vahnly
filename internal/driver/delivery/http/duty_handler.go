@@ -84,8 +84,9 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 	// 1. Validate KYC Status & City Prefix
 	var verificationStatus string
 	var cityPrefix string
-	kycQuery := `SELECT COALESCE(verification_status::text, 'ONBOARDING'), COALESCE(city_prefix, 'KOL') FROM drivers WHERE id = $1`
-	err := h.dbPool.QueryRow(ctx, kycQuery, driverID).Scan(&verificationStatus, &cityPrefix)
+	var canDriveManual bool
+	kycQuery := `SELECT COALESCE(verification_status::text, 'ONBOARDING'), COALESCE(city_prefix, 'KOL'), COALESCE(can_drive_manual, true) FROM drivers WHERE id = $1`
+	err := h.dbPool.QueryRow(ctx, kycQuery, driverID).Scan(&verificationStatus, &cityPrefix, &canDriveManual)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Driver profile not found", http.StatusNotFound)
@@ -183,11 +184,17 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
 				pipe.Set(ctx, trackerKey, h3CellStr, 24*time.Hour)
 				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 24*time.Hour)
-				// Pre-warm the profile hash for Hungarian matcher
+				// Pre-warm the profile hash for Hungarian matcher. can_drive_manual gates
+				// manual-car bookings ("1"/"0"); the scanner defaults absent to capable.
+				canManualFlag := "1"
+				if !canDriveManual {
+					canManualFlag = "0"
+				}
 				pipe.HSet(ctx, profileKey,
 					"osm_node_id",              "1001",
 					"acceptance_rate",          "0.95",
 					"cancellation_probability", "0.05",
+					"can_drive_manual",         canManualFlag,
 				)
 				pipe.Expire(ctx, profileKey, 24*time.Hour)
 				_, _ = pipe.Exec(ctx)

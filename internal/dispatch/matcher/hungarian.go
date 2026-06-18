@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ type CandidateDriver struct {
 	IdleSeconds             float64
 	LocalDemandCount        int64 // MILESTONE 2: Real-time demand counter from surge:demand:* ZSet
 	LocalSupplyCount        int64 // MILESTONE 2: Real-time supply counter from surge:supply:* ZSet
+	CanDriveManual          bool  // driver skill: gates manual-transmission bookings
 }
 
 type MatchResult struct {
@@ -55,6 +57,14 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 		epsilon = 0.05 // Weight for Driver Idle Time
 		zeta    = 0.10 // Weight for Live ML Cancellation Risk Score (NEW)
 	)
+
+	// Transmission gate: the rider owns the car, so a manual car can only go to a driver who
+	// can drive manual. Excluded edges get the prohibitive fence cost — the matcher's <1e6
+	// acceptance gate then rejects them, so a manual order with no capable driver falls
+	// through to requeue (and ultimately "no drivers available") rather than a bad match.
+	if strings.EqualFold(order.Transmission, "MANUAL") && !driver.CanDriveManual {
+		return 1e7, 0
+	}
 
 	var estimatedEtaSeconds float64
 	var err error
@@ -90,12 +100,12 @@ func ComputeSingleEdgeCost(ctx context.Context, order domain.OrderCreatedPayload
 			supplyDensity,
 			float32(driver.IdleSeconds),
 		}
-		
+
 		// Query the secondary classification tree model on Triton
 		riskProb, riskErr := etaCorrector.ComputeCancellationRisk(routingCtx, riskFeatures)
 		if riskErr == nil {
 			cancellationRiskScore = riskProb
-			
+
 			// FENCE VALUE EXCLUSION: Prune high-risk drivers from matching eligibility entirely
 			if cancellationRiskScore >= 0.75 {
 				return 1e7, estimatedEtaSeconds
