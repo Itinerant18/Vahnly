@@ -87,8 +87,11 @@ jobs:
           fi
           echo "Deploying from: $DIR"
           cd "$DIR"
-          docker compose pull
-          docker compose up -d --remove-orphans
+          # The compose builds the app services from source (build: context: .), so the
+          # deploy updates the checkout and rebuilds — pulling GHCR images would be a no-op.
+          git pull --ff-only origin main
+          docker compose pull            # refresh third-party images (postgres/redis/kafka)
+          docker compose up -d --build --remove-orphans
           docker image prune -f || true
           REMOTE
           sed -i "s|__OVERRIDE__|${{ vars.VM_COMPOSE_DIR }}|" remote-deploy.sh
