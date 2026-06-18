@@ -318,6 +318,17 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
   const [addStopInput, setAddStopInput] = useState(false);
   const [changeDropInput, setChangeDropInput] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
+  const [chat, setChat] = useState<{ from: string; text: string; ts: number }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const sendChat = useCallback(async (text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    setChat((c) => [...c, { from: "RIDER", text: t, ts: Date.now() / 1000 }]);
+    setChatInput("");
+    try { await ordersApi.sendChat(tripId, t); } catch { /* best-effort */ }
+  }, [tripId]);
 
   const pickup  = activeOrder ? { lat: activeOrder.pickup_lat,  lng: activeOrder.pickup_lng  } : null;
   const dropoff = activeOrder?.dropoff_lat && activeOrder?.dropoff_lng
@@ -408,6 +419,10 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             break;
           case "rider.ride_check":
             setRideCheckMsg(msg.data.message);
+            break;
+          case "rider.chat":
+            setChat((c) => [...c, { from: msg.data.from, text: msg.data.text, ts: msg.data.ts }]);
+            setChatOpen(true);
             break;
           case "rider.fare.updated":
             trip.updateFareEstimate(msg.data.new_estimate_paise);
@@ -521,6 +536,64 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           onShare={() => setShowShare(true)}
           onCancel={() => setShowCancel(true)}
         />
+
+        {/* In-app chat with the driver (pickup coordination) */}
+        {tripStatus && ["ASSIGNED", "EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP", "DELIVERING"].includes(tripStatus) && (
+          <div className="rounded-md border border-border-opaque bg-background-secondary overflow-hidden">
+            <button
+              onClick={() => setChatOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 text-label-medium font-semibold text-content-primary"
+            >
+              <span>💬 Message driver{chat.length > 0 ? ` (${chat.length})` : ""}</span>
+              <span className="text-content-tertiary">{chatOpen ? "▾" : "▸"}</span>
+            </button>
+            {chatOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {chat.length === 0 && (
+                    <p className="text-paragraph-small text-content-tertiary text-center py-2">
+                      Coordinate your pickup — e.g. exactly where the car is parked.
+                    </p>
+                  )}
+                  {chat.map((m, i) => (
+                    <div key={i} className={`flex ${m.from === "RIDER" ? "justify-end" : "justify-start"}`}>
+                      <span className={`inline-block max-w-[80%] rounded-md px-3 py-1.5 text-paragraph-small ${
+                        m.from === "RIDER" ? "bg-accent-400 text-white" : "bg-background-primary text-content-primary border border-border-opaque"
+                      }`}>{m.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {["I'm at the gate", "Where are you?", "Coming in 5 min"].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => sendChat(q)}
+                      className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); sendChat(chatInput); }} className="flex gap-2">
+                  <input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Type a message…"
+                    maxLength={500}
+                    className="flex-1 h-10 px-3 rounded-sm bg-background-primary border border-border-opaque text-label-medium text-content-primary focus:outline-none focus:border-border-accent"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim()}
+                    className="h-10 px-4 rounded-sm bg-background-inverse text-content-inverse text-label-medium font-medium disabled:opacity-50"
+                  >
+                    Send
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Add Stop input */}

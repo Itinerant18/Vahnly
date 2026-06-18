@@ -85,6 +85,9 @@ export const ordersApi = {
   rate: (orderId: string, req: RateRequest) =>
     apiClient.post<{ message: string }>(`/api/v1/rider/orders/${orderId}/rate`, req),
 
+  sendChat: (orderId: string, text: string) =>
+    apiClient.post<{ status: string }>(`/api/v1/rider/orders/${orderId}/chat`, { text }),
+
   sos: (orderId: string) =>
     apiClient.post<{ triggered: boolean; contacts_notified: number }>(
       `/api/v1/rider/orders/${orderId}/sos`,

@@ -10,6 +10,8 @@ export interface DispatchStreamCallbacks {
   onAssignment: (frame: AssignmentFrame) => void;
   onTelemetry: (frame: TelemetryFrame) => void;
   onClose: () => void;
+  /** Rider->driver chat line (forwarded verbatim as JSON, not a protobuf frame). */
+  onChat?: (msg: { from: string; text: string; ts: number }) => void;
 }
 
 // Mint a single-use WebSocket ticket. The long-lived JWT is sent in the
@@ -66,6 +68,21 @@ export function connectDispatchStream(
     ws.binaryType = 'arraybuffer';
 
     ws.onmessage = (event: MessageEvent) => {
+      // Chat lines arrive as raw JSON strings ({chat_message:{from,text,ts}}); binary
+      // frames are protobuf assignment/telemetry envelopes.
+      if (typeof event.data === 'string') {
+        try {
+          const obj = JSON.parse(event.data) as { chat_message?: { from?: string; text?: string; ts?: number } };
+          if (obj?.chat_message && callbacks.onChat) {
+            callbacks.onChat({
+              from: String(obj.chat_message.from ?? 'DRIVER'),
+              text: String(obj.chat_message.text ?? ''),
+              ts: Number(obj.chat_message.ts ?? 0),
+            });
+          }
+        } catch { /* ignore non-JSON frames */ }
+        return;
+      }
       if (!(event.data instanceof ArrayBuffer)) {
         return;
       }

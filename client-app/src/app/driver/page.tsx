@@ -33,6 +33,7 @@ import {
   getDriverOrder,
   getFatigueCheck,
   FatigueCheckResponse,
+  sendDriverChat,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -206,6 +207,11 @@ export default function DriverTerminalPage() {
   // Live Audit Telemetry Log Vault
   const [auditLogs, setAuditLogs] = useState<string[]>([]);
   const [mapDrivers, setMapDrivers] = useState<MapDriver[]>([]);
+
+  // In-app chat with the rider (pickup coordination)
+  const [chat, setChat] = useState<{ from: string; text: string; ts: number }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Core structural pointers
   const telemetryStopRef = useRef<TelemetryStreamHandle | null>(null);
@@ -496,6 +502,10 @@ export default function DriverTerminalPage() {
               bearing: frame.bearing || 0,
               speed: frame.speed_kms || 0
             }]);
+          },
+          onChat: (m) => {
+            setChat((c) => [...c, m]);
+            setChatOpen(true);
           },
           onClose: () => {
             logAudit('WS_CONNECTION_STATE', { status: 'DISCONNECTED' });
@@ -1020,6 +1030,14 @@ export default function DriverTerminalPage() {
     logAudit('SOS_CRITICAL_TRIGGERED', { driverID, time: new Date().toISOString() });
   };
 
+  const handleSendChat = async (text: string) => {
+    const t = text.trim();
+    if (!t || !activeTrip?.order_id || !token) return;
+    setChat((c) => [...c, { from: 'DRIVER', text: t, ts: Date.now() / 1000 }]);
+    setChatInput('');
+    try { await sendDriverChat(token, activeTrip.order_id, t); } catch { /* best-effort */ }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-x-hidden relative">
       
@@ -1283,6 +1301,63 @@ export default function DriverTerminalPage() {
 
         {/* BOTTOM CONTROL SHEET */}
         <div className="mt-auto w-full z-10 bg-background-primary/95 border-t border-border-opaque p-4 sm:p-6 space-y-4 max-w-xl mx-auto rounded-t-lg shadow-elevation-3 backdrop-blur-sm">
+          {/* In-app chat with the rider (pickup coordination) */}
+          {activeTrip && (
+            <div className="rounded-md border border-border-opaque bg-background-secondary overflow-hidden">
+              <button
+                onClick={() => setChatOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-label-medium font-semibold text-content-primary"
+              >
+                <span>💬 Message rider{chat.length > 0 ? ` (${chat.length})` : ''}</span>
+                <span className="text-content-tertiary">{chatOpen ? '▾' : '▸'}</span>
+              </button>
+              {chatOpen && (
+                <div className="px-4 pb-3 space-y-2.5">
+                  <div className="max-h-32 overflow-y-auto space-y-1.5">
+                    {chat.length === 0 && (
+                      <p className="text-label-small text-content-tertiary text-center py-1.5">
+                        Coordinate pickup — confirm where the car is parked.
+                      </p>
+                    )}
+                    {chat.map((m, i) => (
+                      <div key={i} className={`flex ${m.from === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
+                        <span className={`inline-block max-w-[80%] rounded-md px-3 py-1.5 text-label-small ${
+                          m.from === 'DRIVER' ? 'bg-background-inverse text-content-inverse' : 'bg-background-primary text-content-primary border border-border-opaque'
+                        }`}>{m.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['On my way', 'Reached the car', 'Where is the car?'].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => handleSendChat(q)}
+                        className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                  <form onSubmit={(e) => { e.preventDefault(); handleSendChat(chatInput); }} className="flex gap-2">
+                    <input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Type a message…"
+                      maxLength={500}
+                      className="flex-1 h-10 px-3 rounded-sm bg-background-primary border border-border-opaque text-label-small text-content-primary focus:outline-none focus:border-border-accent"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="h-10 px-4 rounded-sm bg-background-inverse text-content-inverse text-label-small font-medium disabled:opacity-50"
+                    >
+                      Send
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
           <SentryErrorBoundary name="driver-trip-manager">
           <DriverTripManager
             activeTrip={activeTrip}

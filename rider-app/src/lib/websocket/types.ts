@@ -83,6 +83,11 @@ export interface RiderRideCheck {
   data: { order_id: string; message: string };
 }
 
+export interface RiderChat {
+  type: "rider.chat";
+  data: { order_id: string; from: "RIDER" | "DRIVER"; text: string; ts: number };
+}
+
 export interface RiderFareUpdated {
   type: "rider.fare.updated";
   data: {
@@ -102,6 +107,7 @@ export type RiderWebSocketMessage =
   | RiderTripCancelled
   | RiderNotificationMessage
   | RiderRideCheck
+  | RiderChat
   | RiderFareUpdated;
 
 export type RiderWebSocketMessageType = RiderWebSocketMessage["type"];
@@ -115,6 +121,7 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set<RiderWebSocketMessageType>([
   "rider.trip.cancelled",
   "rider.notification",
   "rider.ride_check",
+  "rider.chat",
   "rider.fare.updated",
 ]);
 

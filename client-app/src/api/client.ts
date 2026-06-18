@@ -1425,6 +1425,10 @@ export async function updateDriverProfile(
   return request("/api/v1/driver/profile", { method: "PATCH", token, body });
 }
 
+export async function sendDriverChat(token: string, orderId: string, text: string): Promise<{ status: string }> {
+  return request(`/api/v1/driver/orders/${orderId}/chat`, { method: "POST", token, body: { text } });
+}
+
 export async function markNotificationRead(token: string, id: string): Promise<{ status: string }> {
   return request<{ status: string }>(`/api/v1/driver/notifications/${id}/read`, { method: "PATCH", token });
 }
