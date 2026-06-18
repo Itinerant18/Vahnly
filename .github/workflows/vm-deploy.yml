@@ -100,8 +100,12 @@ jobs:
 
       - name: Pull images + restart on the VM
         if: steps.guard.outputs.ready == 'true'
+        # SSH as the checkout owner (VM_SSH_USER, default 'itine') so git pull + the
+        # source rebuild have write access to the repo. The SA needs compute.instanceAdmin
+        # to push its key to that user.
         run: |
-          gcloud compute ssh "$VM_NAME" \
+          USER='${{ vars.VM_SSH_USER }}'; [ -z "$USER" ] && USER='itine'
+          gcloud compute ssh "$USER@$VM_NAME" \
             --zone="$VM_ZONE" --project="$VM_PROJECT" --quiet \
             --command="$(cat remote-deploy.sh)"
 
