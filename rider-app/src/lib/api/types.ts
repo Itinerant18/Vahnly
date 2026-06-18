@@ -24,6 +24,7 @@ export type TripStatus =
   | "EN_ROUTE_TO_PICKUP"
   | "ARRIVED_AT_PICKUP"
   | "DELIVERING"
+  | "WAITING"
   | "COMPLETED"
   | "CANCELLED";
 

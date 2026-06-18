@@ -918,6 +918,14 @@ export async function verifyTripOTP(
   });
 }
 
+export async function startWait(token: string, orderId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/orders/${orderId}/wait/start`, { method: 'PATCH', token, body: {} });
+}
+
+export async function resumeTrip(token: string, orderId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/driver/orders/${orderId}/wait/resume`, { method: 'PATCH', token, body: {} });
+}
+
 export async function driverArriveAtPickup(token: string, orderId: string): Promise<{ success: boolean; status: string }> {
   return request<{ success: boolean; status: string }>(`/api/v1/driver/orders/${orderId}/arrived`, {
     method: 'PATCH',

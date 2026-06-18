@@ -34,6 +34,8 @@ import {
   getFatigueCheck,
   FatigueCheckResponse,
   sendDriverChat,
+  startWait,
+  resumeTrip,
 } from '@/api/client';
 import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
@@ -214,6 +216,10 @@ export default function DriverTerminalPage() {
   const [chatInput, setChatInput] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
 
+  // Mid-trip WAITING (round-trip destination wait, billed)
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [waitSeconds, setWaitSeconds] = useState(0);
+
   // Core structural pointers
   const telemetryStopRef = useRef<TelemetryStreamHandle | null>(null);
   const streamRef = useRef<(() => void) | null>(null);
@@ -322,6 +328,13 @@ export default function DriverTerminalPage() {
       if (waitTimerRef.current) clearInterval(waitTimerRef.current);
     };
   }, [dutyState, arrivedTime]);
+
+  // Mid-trip wait meter — ticks every second while waiting at the destination.
+  useEffect(() => {
+    if (!isWaiting) return;
+    const t = setInterval(() => setWaitSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [isWaiting]);
 
   // Poll stats every 30 seconds when not offline
   useEffect(() => {
@@ -1044,6 +1057,17 @@ export default function DriverTerminalPage() {
     try { await sendDriverChat(token, activeTrip.order_id, t); } catch { /* best-effort */ }
   };
 
+  const handleToggleWait = async () => {
+    if (!activeTrip?.order_id || !token) return;
+    if (!isWaiting) {
+      try { await startWait(token, activeTrip.order_id); setIsWaiting(true); setWaitSeconds(0); logAudit('WAIT_STARTED', { orderId: activeTrip.order_id }); }
+      catch { /* ignore */ }
+    } else {
+      try { await resumeTrip(token, activeTrip.order_id); setIsWaiting(false); logAudit('WAIT_RESUMED', { orderId: activeTrip.order_id }); }
+      catch { /* ignore */ }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-0 font-sans flex flex-col justify-between selection:bg-white selection:text-black overflow-x-hidden relative">
       
@@ -1307,6 +1331,20 @@ export default function DriverTerminalPage() {
 
         {/* BOTTOM CONTROL SHEET */}
         <div className="mt-auto w-full z-10 bg-background-primary/95 border-t border-border-opaque p-4 sm:p-6 space-y-4 max-w-xl mx-auto rounded-t-lg shadow-elevation-3 backdrop-blur-sm">
+          {/* Mid-trip wait toggle (round-trip destination wait, billed) */}
+          {dutyState === 'DELIVERING' && activeTrip && (
+            <button
+              onClick={handleToggleWait}
+              className={`w-full h-12 rounded-md text-label-medium font-semibold transition-base ${
+                isWaiting ? 'bg-white text-black' : 'bg-background-secondary border border-border-opaque text-content-primary'
+              }`}
+            >
+              {isWaiting
+                ? `⏸ Waiting ${String(Math.floor(waitSeconds / 60)).padStart(2, '0')}:${String(waitSeconds % 60).padStart(2, '0')} — tap to resume`
+                : '⏸ Start waiting (round-trip)'}
+            </button>
+          )}
+
           {/* In-app chat with the rider (pickup coordination) */}
           {activeTrip && (
             <div className="rounded-md border border-border-opaque bg-background-secondary overflow-hidden">

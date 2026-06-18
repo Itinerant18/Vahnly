@@ -388,6 +388,12 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           case "rider.trip.started":
             trip.updateStatus("DELIVERING");
             break;
+          case "rider.trip.waiting":
+            trip.updateStatus("WAITING");
+            break;
+          case "rider.trip.resumed":
+            trip.updateStatus("DELIVERING");
+            break;
           case "rider.trip.completed":
             trip.updateStatus("COMPLETED");
             trip.clearPickupOtp();

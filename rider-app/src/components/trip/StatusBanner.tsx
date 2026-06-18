@@ -28,6 +28,10 @@ const CONFIG: Record<TripStatus, StatusConfig> = {
     label: "Trip in progress",
     cls: "bg-background-inverse text-content-inverse",
   },
+  WAITING: {
+    label: "Driver waiting — meter running",
+    cls: "bg-accent-400 text-white",
+  },
   COMPLETED: {
     label: "Trip complete ✓",
     cls: "bg-positive-400 text-white",
