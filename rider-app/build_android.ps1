@@ -1,3 +1,31 @@
+# build_android.ps1
+
+Write-Host "Starting Rider App Android Build Process..." -ForegroundColor Cyan
+
+# 1. Install packages
+Write-Host "Step 1: Installing dependencies..." -ForegroundColor Yellow
+npm install
+
+# 2. Build Web Assets
+Write-Host "Step 2: Building Next.js web assets..." -ForegroundColor Yellow
+npm run build
+
+# 3. Add Android Platform if missing
+if (-not (Test-Path "android")) {
+    Write-Host "Step 3: Adding Android Platform..." -ForegroundColor Yellow
+    npx cap add android
+} else {
+    Write-Host "Step 3: Android Platform already added." -ForegroundColor Green
+}
+
+# 4. Write local.properties
+Write-Host "Step 4: Writing local.properties configuration..." -ForegroundColor Yellow
+$sdkDir = "sdk.dir=C\:\\Users\\itine\\AppData\\Local\\Android\\Sdk"
+$sdkDir | Out-File -FilePath "android\local.properties" -Encoding utf8 -NoNewline
+
+# 5. Write google-services.json
+Write-Host "Step 5: Writing google-services.json config..." -ForegroundColor Yellow
+$jsonConfig = @"
 {
   "project_info": {
     "project_number": "1016868477506",
@@ -96,3 +124,16 @@
   ],
   "configuration_version": "1"
 }
+"@
+$jsonConfig | Out-File -FilePath "android\app\google-services.json" -Encoding utf8
+
+# 6. Sync Capacitor
+Write-Host "Step 6: Syncing assets with Android platform..." -ForegroundColor Yellow
+npx cap sync android
+
+# 7. Compile APK
+Write-Host "Step 7: Compiling APK using Gradle..." -ForegroundColor Yellow
+cd android
+./gradlew clean assembleDebug
+
+Write-Host "Build Finished! Check android\app\build\outputs\apk\debug\ for app-debug.apk" -ForegroundColor Green
