@@ -83,6 +83,10 @@ jobs:
       - name: Run Playwright (admin)
         run: npm test -- --project=admin
         working-directory: e2e
+        env:
+          # The Vite dev server (frontend/vite.config) binds :5000; the Playwright
+          # admin project otherwise defaults to :5173 -> ERR_CONNECTION_REFUSED.
+          ADMIN_URL: http://localhost:5000
 
       - name: Upload Playwright report
         if: failure()
