@@ -1,15 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { fulfillJson, seedRiderAuth } from './helpers';
 
-// SCAFFOLD: grounded where verified (auth seed, geolocation, mono ETA), but the
-// /home booking DOM + estimate/order endpoints should be confirmed against the
-// running app. API + realtime are fully mocked — no backend required.
+// SKIPPED — unvalidated scaffold. The /home booking DOM + estimate/order endpoints
+// are guesses not confirmed against the running app, and the flow depends on an
+// authenticated session (same Firebase-auth concern as rider-auth). Un-skip once the
+// booking selectors + mocked endpoint shapes are confirmed against the real /home and a
+// CI auth path exists (see rider-auth's Firebase emulator note).
 test.use({
   geolocation: { latitude: 22.5726, longitude: 88.3639 }, // Kolkata
   permissions: ['geolocation'],
 });
 
-test.describe('rider booking flow', () => {
+test.describe.skip('rider booking flow', () => {
   test.beforeEach(async ({ context }) => {
     await seedRiderAuth(context);
     // Broad stubs so no request escapes to a backend.

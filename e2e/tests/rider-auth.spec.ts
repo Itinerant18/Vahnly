@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { fulfillJson } from './helpers';
 
-// Grounded in rider-app/app/(auth)/login/page.tsx + lib/api/auth.ts:
-//   - phone input placeholder "98765 43210", "Send OTP" button
-//   - 6 OTP boxes labelled "OTP digit N", auto-verify on completion
-//   - verify-otp success → router.replace('/home')
-test.describe('rider OTP login', () => {
+// SKIPPED — un-CI-able as written. The login phone flow uses Firebase phone auth
+// (PhoneVerifyScreen: signInWithPhoneNumber + invisible reCAPTCHA + signInWithCredential,
+// then POST /api/v1/auth/firebase/verify), not the REST send-otp/verify-otp endpoints
+// this spec mocks. Firebase SDK calls + reCAPTCHA can't be satisfied by Playwright route
+// mocks. Un-skip once the Firebase Auth Emulator (test phone numbers / fixed OTP) is wired
+// into CI + the app's test config; then rewrite against PhoneVerifyScreen's real DOM.
+test.describe.skip('rider OTP login', () => {
   test('rider can log in with OTP and land on /home', async ({ page }) => {
     await page.route('**/api/v1/rider/auth/send-otp', (r) =>
       fulfillJson(r, { message: 'sent', expires_in_seconds: 300 }),
