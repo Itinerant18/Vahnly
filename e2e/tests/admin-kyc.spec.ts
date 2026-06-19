@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { fulfillJson, seedAdminAuth } from './helpers';
 
-// SCAFFOLD: the admin app (Vite SPA) routes + token key + KYC DOM should be
-// confirmed against frontend/src/admin. API is mocked; selectors use resilient
-// role/text queries so they survive styling changes.
-test.describe('admin KYC approval', () => {
+// SCAFFOLD — SKIPPED until written against the real admin app. This was never
+// exercised (the Admin CI test job blocked it). Its mocked endpoint
+// (/api/v1/admin/drivers/onboarding) doesn't match the app's actual calls
+// (/api/v1/admin/drivers/pending, /drivers), and seedAdminAuth seeds a placeholder
+// localStorage token while the admin app authenticates via cookie (see
+// frontend/src/config.ts). Un-skip once the route, API endpoints/shapes, cookie
+// auth, and KYC DOM selectors are confirmed against frontend/src/admin
+// (DriverOnboardingQueue / ComplianceDashboard).
+test.describe.skip('admin KYC approval', () => {
   test.beforeEach(async ({ context }) => {
     await seedAdminAuth(context);
     await context.route('**/api/v1/admin/drivers/onboarding**', (r) =>
