@@ -258,7 +258,7 @@ export default function OnboardingPage() {
   };
 
   // ── Step 3: save home & work ────────────────────────────────────────────────
-  const useCurrentLocation = (set: (p: PlaceForm) => void, current: PlaceForm) => {
+  const fillCurrentLocation = (set: (p: PlaceForm) => void, current: PlaceForm) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => set({ ...current, lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -593,7 +593,7 @@ export default function OnboardingPage() {
               />
               <button
                 className="mt-2 text-xs font-medium text-content-accent"
-                onClick={() => useCurrentLocation(setHome, home)}
+                onClick={() => fillCurrentLocation(setHome, home)}
               >
                 {home.lat != null
                   ? `📍 ${home.lat.toFixed(4)}, ${home.lng?.toFixed(4)}`
@@ -611,7 +611,7 @@ export default function OnboardingPage() {
               />
               <button
                 className="mt-2 text-xs font-medium text-content-accent"
-                onClick={() => useCurrentLocation(setWork, work)}
+                onClick={() => fillCurrentLocation(setWork, work)}
               >
                 {work.lat != null
                   ? `📍 ${work.lat.toFixed(4)}, ${work.lng?.toFixed(4)}`

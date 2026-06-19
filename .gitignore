@@ -64,6 +64,9 @@ aws-credentials
 .cache/
 .gocache/
 
+# Firebase Hosting deploy caches (per-app build artifacts)
+**/.firebase/
+
 # ----------------------------------------------------------------------------
 # 3. bin/ — runtime artifacts (binaries, logs, generated wrappers)
 # ----------------------------------------------------------------------------

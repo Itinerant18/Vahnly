@@ -308,7 +308,7 @@ export default function RiderDispatchPage() {
     canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
     canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
 
-    let waves = [
+    const waves = [
       { r: 20, maxR: 180, alpha: 1, speed: 1.2 },
       { r: 60, maxR: 180, alpha: 0.7, speed: 1.2 },
       { r: 110, maxR: 180, alpha: 0.4, speed: 1.2 }
