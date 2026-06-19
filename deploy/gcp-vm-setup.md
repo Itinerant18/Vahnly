@@ -190,12 +190,12 @@ Write `/etc/caddy/Caddyfile` (replace the domain):
 
 ```caddyfile
 api.example.com {
-	encode zstd gzip
-	# All API + WebSocket (/ws/*, /api/v1/dispatch/stream) + the admin heatmap SSE
-	# (/api/v1/analytics/heatmap, proxied by the gateway) go to the gateway.
-	reverse_proxy localhost:8085 {
-		flush_interval -1          # don't buffer SSE/streaming responses
-	}
+ encode zstd gzip
+ # All API + WebSocket (/ws/*, /api/v1/dispatch/stream) + the admin heatmap SSE
+ # (/api/v1/analytics/heatmap, proxied by the gateway) go to the gateway.
+ reverse_proxy localhost:8085 {
+  flush_interval -1          # don't buffer SSE/streaming responses
+ }
 }
 ```
 

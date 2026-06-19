@@ -105,7 +105,6 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	})
 	warmupRedisCancel()
 
-
 	consumerCtx, cancelConsumer := context.WithCancel(ctx)
 	defer cancelConsumer()
 
@@ -179,7 +178,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	// 5. Spin up Telemetry Ingestion gRPC stream node
 	telemetryRedis := telemetryRepo.NewRedisRepository(redisClient)
 	telemetryKafka := telemetryRepo.NewKafkaProducer(strings.Split(kafkaBrokers, ","))
-	
+
 	// Injecting Redis cluster client reference to support high-velocity telemetry forking checks
 	telemetryUC := telemetryUsecase.NewTelemetryUseCase(telemetryRedis, telemetryKafka, nil, redisClient)
 
@@ -193,7 +192,9 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	defer handoffWriter.Close()
 
 	regionRouter := telemetryUsecase.NewRegionRouter(redisClient, handoffWriter, "kolkata")
-	if setter, ok := telemetryUC.(interface{ SetRegionRouter(router *telemetryUsecase.RegionRouter) }); ok {
+	if setter, ok := telemetryUC.(interface {
+		SetRegionRouter(router *telemetryUsecase.RegionRouter)
+	}); ok {
 		setter.SetRegionRouter(regionRouter)
 	}
 
@@ -232,7 +233,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	// 7. Initialize Public API Gateway with Edge Multi-Region Router Middleware
 	brokersList := strings.Split(kafkaBrokers, ",")
 	pricingService := pricingSvc.NewOrderPricingService(brokersList, "integration-pricing-group", redisClient)
-	
+
 	kafkaWriter := &kafka.Writer{
 		Addr:         kafka.TCP(brokersList...),
 		Topic:        "order.created",
@@ -243,7 +244,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 
 	gatewayHandler := gatewayHttp.NewGatewayHandler(dbPool, kafkaWriter, pricingService, redisClient)
 	go gatewayHandler.InternalBackplaneMultiplexer(consumerCtx)
-	
+
 	regionRouterMiddleware := middleware.NewRegionRouterMiddleware([]string{"KOL", "BLR"})
 
 	mux := http.NewServeMux()
@@ -255,7 +256,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	mux.HandleFunc("/api/v1/trip/complete", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleCompleteTrip))
 	mux.HandleFunc("/api/v1/pricing/quote", regionRouterMiddleware.RouteRegionalTraffic(gatewayHandler.HandleGetPricingQuote))
 	mux.HandleFunc("/api/v1/payments/webhook", gatewayHandler.HandlePaymentWebhook)
-	
+
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
@@ -319,7 +320,7 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 		"base_fare_paise":    35000,
 	}
 	bodyBytes, _ := json.Marshal(orderPayload)
-	
+
 	reqHTTP, _ := http.NewRequest("POST", server.URL+"/api/v1/orders", bytes.NewBuffer(bodyBytes))
 	reqHTTP.Header.Set("Content-Type", "application/json")
 	reqHTTP.Header.Set("X-Region-Prefix", "KOL") // Required header evaluated by Milestone 22 Router
@@ -573,8 +574,8 @@ func TestE2E_CompleteGatewayAndMatrixOptimizationPipeline(t *testing.T) {
 	reqCrossing := &pb.IngestionRequest{
 		DriverId:     targetDriverID,
 		CityPrefix:   "KOL",
-		Latitude:     22.6,  // Lies inside Howrah bounding box
-		Longitude:    88.1,  // Lies inside Howrah bounding box
+		Latitude:     22.6, // Lies inside Howrah bounding box
+		Longitude:    88.1, // Lies inside Howrah bounding box
 		Bearing:      270.0,
 		SpeedKms:     45.0,
 		TimestampUtc: time.Now().Unix(),

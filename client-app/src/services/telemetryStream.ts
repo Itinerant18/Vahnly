@@ -19,7 +19,7 @@ export interface TelemetryStreamHandle {
 export function startTelemetryStream(options: TelemetryStreamOptions): TelemetryStreamHandle {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     console.error('[TELEMETRY_STREAM] Browser geolocation is unavailable.');
-    return { stop: () => {}, flush: () => {} };
+    return { stop: () => { }, flush: () => { } };
   }
 
   let isVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
