@@ -108,9 +108,11 @@ export const useThemeStore = create<ThemeState>()((set, get) => {
     },
 
     initTheme: async () => {
-      // 1. Read persisted preference
+      // 1. Read persisted preference.
+      //    Driver app defaults to DARK when nothing is saved — night-driving
+      //    ergonomics. Users can still pick "light" or "system" from settings.
       const { value } = await Preferences.get({ key: PREFS_KEY });
-      const saved = (value as Theme | null) ?? 'system';
+      const saved = (value as Theme | null) ?? 'dark';
 
       // 2. Resolve and apply
       const resolved = resolveTheme(saved);

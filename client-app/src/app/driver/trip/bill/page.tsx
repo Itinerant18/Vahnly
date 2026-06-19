@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { FinalBill, reportCarIssue, CarIssueType } from '@/api/client';
-import { FareDisplay } from '@/components/ds';
+import { FareDisplay, ClockIcon, WrenchIcon, CheckIcon, PhoneIcon, CashIcon } from '@/components/ds';
 
 const CAR_ISSUE_TYPES: { value: CarIssueType; label: string }[] = [
   { value: 'FUEL_LOW', label: 'Fuel Low' },
@@ -90,7 +90,7 @@ export default function FinalBillPage() {
     return (
       <div className="min-h-screen bg-black text-white p-6 font-mono flex items-center justify-center">
         <div className="text-center space-y-2">
-          <span className="text-2xl animate-spin block">⏳</span>
+          <span className="flex justify-center animate-spin text-content-tertiary"><ClockIcon size={24} /></span>
           <p className="text-xs text-content-tertiary">HYDRATING TRANSIT RECEIPT...</p>
         </div>
       </div>
@@ -187,12 +187,12 @@ export default function FinalBillPage() {
               onClick={() => setShowIssueForm(true)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-warning-400/40 bg-surface-warning/20 text-[10px] font-bold uppercase tracking-wider text-content-warning hover:bg-surface-warning/40 transition cursor-pointer"
             >
-              🔧 Report Car Issue
+              <WrenchIcon size={14} /> Report Car Issue
             </button>
           )}
           {issueDone && (
-            <p className="text-center text-[10px] font-bold uppercase tracking-wider text-content-positive">
-              ✓ Car issue reported — admin notified
+            <p className="flex items-center justify-center gap-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-content-positive">
+              <CheckIcon size={14} /> Car issue reported — admin notified
             </p>
           )}
           {showIssueForm && (
@@ -255,7 +255,7 @@ export default function FinalBillPage() {
                   : 'bg-black border-border-opaque text-content-tertiary hover:text-content-secondary'
               }`}
             >
-              <span className="text-base">📱</span>
+              <PhoneIcon size={18} />
               <span>UPI / QR Code</span>
             </button>
             <button
@@ -266,7 +266,7 @@ export default function FinalBillPage() {
                   : 'bg-black border-border-opaque text-content-tertiary hover:text-content-secondary'
               }`}
             >
-              <span className="text-base">💵</span>
+              <CashIcon size={18} />
               <span>Cash Payment</span>
             </button>
           </div>

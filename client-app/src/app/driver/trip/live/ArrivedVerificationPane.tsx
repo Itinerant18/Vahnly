@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore, DutyState } from '@/store/useDriverDutyStore';
 import { verifyTripOTP, addOrderEvent, ApiClientError } from '@/api/client';
 import { useToastStore } from '@/store/useToastStore';
-import { FareDisplay } from '@/components/ds';
+import { FareDisplay, CheckIcon, SirenIcon, ClockIcon, CrossIcon, CameraIcon } from '@/components/ds';
 
 interface ArrivedVerificationPaneProps {
   activeTrip: any;
@@ -283,7 +283,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
 
       {/* ── Arrived status banner ── */}
       <div role="status" aria-live="polite" className="flex items-center gap-3 bg-surface-positive border border-positive-200 rounded-sm px-4 py-3">
-        <span className="text-content-positive text-heading-medium">✓</span>
+        <span className="flex items-center text-content-positive"><CheckIcon size={22} /></span>
         <div>
           <p className="text-label-medium text-content-positive">You&apos;ve arrived at pickup</p>
           <p className="text-paragraph-small text-content-positive opacity-80">{activeTrip.customer_name}</p>
@@ -295,7 +295,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
         <div className="flex items-center gap-3">
           {isChargingWait ? (
             <>
-              <span className="text-xl animate-pulse">🚨</span>
+              <span className="flex items-center animate-pulse text-content-warning"><SirenIcon size={20} /></span>
               <div>
                 <span className="text-label-small text-content-warning block">Waiting charge active</span>
                 <span className="font-mono text-mono-large text-content-warning tabular-nums">
@@ -305,7 +305,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
             </>
           ) : (
             <>
-              <span className="text-xl">⏳</span>
+              <span className="flex items-center text-content-secondary"><ClockIcon size={20} /></span>
               <div>
                 <span className="text-label-small text-content-secondary block">Free wait remaining</span>
                 <span className="font-mono text-mono-large text-content-primary tabular-nums">
@@ -323,8 +323,8 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
         {/* Error banners */}
         {(otpError || validationError) && (
           <div className="bg-surface-negative border border-negative-200 rounded-sm p-3">
-            <p className="text-label-medium text-content-negative">
-              ❌ {otpError || validationError}
+            <p className="text-label-medium text-content-negative inline-flex items-center gap-1.5">
+              <CrossIcon size={16} /> {otpError || validationError}
             </p>
           </div>
         )}
@@ -365,7 +365,9 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
               cursor-pointer hover:bg-background-tertiary transition-base
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
           >
-            {startOdoPhoto ? '✔ Photo captured' : '📷 Take dashboard photo'}
+            <span className="inline-flex items-center justify-center gap-1.5">
+              {startOdoPhoto ? <><CheckIcon size={16} /> Photo captured</> : <><CameraIcon size={16} /> Take dashboard photo</>}
+            </span>
           </button>
         </div>
 

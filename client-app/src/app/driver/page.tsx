@@ -43,6 +43,7 @@ import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
 import { startTelemetryStream, TelemetryStreamHandle } from '@/services/telemetryStream';
 import { OfferPopup } from '@/components/OfferPopup';
+import { RefreshIcon, MenuIcon, SirenIcon, NavigateIcon, SignalIcon, FlameIcon, PauseIcon, ChatIcon, OctagonAlertIcon, ClockIcon } from '@/components/ds';
 import { useOfferStore } from '@/store/useOfferStore';
 import { cellToBoundary } from 'h3-js';
 
@@ -991,8 +992,8 @@ export default function DriverTerminalPage() {
         </header>
 
         <main className="flex-grow flex flex-col items-center justify-center max-w-md mx-auto text-center space-y-6">
-          <div className="h-16 w-16 rounded-pill bg-background-secondary border border-border-opaque flex items-center justify-center text-2xl animate-pulse">
-            ⏳
+          <div className="h-16 w-16 rounded-pill bg-background-secondary border border-border-opaque flex items-center justify-center text-content-secondary animate-pulse">
+            <ClockIcon size={28} />
           </div>
           <div className="space-y-3">
             <span className="badge badge-neutral">
@@ -1025,7 +1026,7 @@ export default function DriverTerminalPage() {
                 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              🔄 Refresh Status
+              <span className="inline-flex items-center justify-center gap-2"><RefreshIcon size={18} /> Refresh Status</span>
             </button>
             <button
               onClick={() => {
@@ -1098,7 +1099,7 @@ export default function DriverTerminalPage() {
       {/* MANDATORY BREAK BANNER — fatigue safety gate */}
       {fatigue && (fatigue.must_take_break || fatigue.hours_remaining <= 0) && dutyState !== 'OFFLINE' && (
         <div className="fixed top-0 inset-x-0 z-[100002] bg-negative-400 px-4 py-3 flex items-center justify-center gap-2 font-mono text-label-small text-white shadow-elevation-2 text-center">
-          <span className="animate-pulse text-base">🛑</span>
+          <span className="flex items-center animate-pulse"><OctagonAlertIcon size={18} /></span>
           <span className="font-bold uppercase tracking-wider">
             Mandatory rest break required — {fatigue.message || 'you have reached the daily driving limit. Please go offline and rest.'}
           </span>
@@ -1202,7 +1203,7 @@ export default function DriverTerminalPage() {
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             aria-label="Open Navigation Drawer"
           >
-            ☰
+            <MenuIcon size={20} />
           </button>
           <div>
             <h1 className="text-label-large font-mono tracking-tight uppercase text-content-primary">VAHNLY</h1>
@@ -1257,7 +1258,7 @@ export default function DriverTerminalPage() {
             {sosHolding && (
               <span className="absolute inset-0 bg-negative-600 transition-none" style={{ width: `${sosProgress}%` }} />
             )}
-            <span className="relative z-10">🚨 SOS {sosHolding ? `${Math.round(sosProgress)}%` : '(Hold)'}</span>
+            <span className="relative z-10 inline-flex items-center justify-center gap-1.5"><SirenIcon size={15} /> SOS {sosHolding ? `${Math.round(sosProgress)}%` : '(Hold)'}</span>
           </button>
         </div>
       </header>
@@ -1298,7 +1299,7 @@ export default function DriverTerminalPage() {
             <div className="absolute top-4 left-4 z-20 bg-background-primary/90 border border-border-opaque p-3 rounded-md font-mono text-label-small space-y-1 max-w-xs shadow-elevation-2 text-left animate-enter">
               <span className="text-label-small text-content-tertiary uppercase tracking-wider block">Navigation</span>
               <div className="text-content-primary font-medium flex items-center gap-1.5">
-                <span>🛞</span>
+                <NavigateIcon size={16} />
                 <span>{dutyState === 'EN_ROUTE' ? 'Drive to Pickup' : 'Drive to Dropoff'}</span>
               </div>
               <div className="text-content-secondary">
@@ -1313,7 +1314,7 @@ export default function DriverTerminalPage() {
           {dutyState === 'OFFLINE' && (
             <div className="absolute inset-0 bg-black/60 z-10 flex items-center justify-center p-6">
               <div className="text-center space-y-3">
-                <span className="text-4xl block">📡</span>
+                <span className="flex justify-center text-content-secondary"><SignalIcon size={40} /></span>
                 <h3 className="text-heading-small text-content-secondary">Terminal Offline</h3>
                 <p className="text-paragraph-small text-content-tertiary max-w-xs">
                   Go Online to connect to dispatch and start receiving trip offers.
@@ -1332,7 +1333,7 @@ export default function DriverTerminalPage() {
                   py-1.5 px-3 rounded-pill hover:bg-background-secondary transition-base flex items-center gap-1.5
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                🔥 {showHeatmap ? 'Heatmap ON' : 'Heatmap OFF'}
+                <FlameIcon size={14} /> {showHeatmap ? 'Heatmap ON' : 'Heatmap OFF'}
               </button>
               {heatmapData && (
                 <div className="bg-background-primary/90 border border-border-opaque text-label-small text-content-tertiary py-1.5 px-3 rounded-pill">
@@ -1353,9 +1354,12 @@ export default function DriverTerminalPage() {
                 isWaiting ? 'bg-white text-black' : 'bg-background-secondary border border-border-opaque text-content-primary'
               }`}
             >
-              {isWaiting
-                ? `⏸ Waiting ${String(Math.floor(waitSeconds / 60)).padStart(2, '0')}:${String(waitSeconds % 60).padStart(2, '0')} — tap to resume`
-                : '⏸ Start waiting (round-trip)'}
+              <span className="inline-flex items-center justify-center gap-2">
+                <PauseIcon size={16} />
+                {isWaiting
+                  ? `Waiting ${String(Math.floor(waitSeconds / 60)).padStart(2, '0')}:${String(waitSeconds % 60).padStart(2, '0')} — tap to resume`
+                  : 'Start waiting (round-trip)'}
+              </span>
             </button>
           )}
 
@@ -1366,7 +1370,7 @@ export default function DriverTerminalPage() {
                 onClick={() => setChatOpen((o) => !o)}
                 className="w-full flex items-center justify-between px-4 py-2.5 text-label-medium font-semibold text-content-primary"
               >
-                <span>💬 Message rider{chat.length > 0 ? ` (${chat.length})` : ''}</span>
+                <span className="flex items-center gap-2"><ChatIcon size={18} /> Message rider{chat.length > 0 ? ` (${chat.length})` : ''}</span>
                 <span className="text-content-tertiary">{chatOpen ? '▾' : '▸'}</span>
               </button>
               {chatOpen && (

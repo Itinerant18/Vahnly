@@ -1,320 +1,207 @@
-# Client App Design System
+# Driver App Design System
 
-**Platforms:** Web (PWA), iOS (Capacitor), Android (Capacitor)  
-**Tech Stack:** Next.js 15 + App Router + TailwindCSS v4 + Shadcn UI + Framer Motion + Mapbox GL  
-**Design System:** Mobile-first, state-driven, WebSocket-driven, real-time GPS interpolation
+**Platforms:** Web (PWA), iOS (Capacitor), Android (Capacitor)
+**Tech Stack:** Next.js 16 (App Router) + React 19 + TailwindCSS v4 (CSS-first `@theme`) + Framer Motion + Leaflet / react-leaflet + Zustand + next-intl + Capacitor + Sentry
+**Design System:** Mobile-first, token-driven, state-driven, WebSocket-driven, real-time GPS interpolation
+
+> **The model.** Vahnly is not a ride-hail. The rider **owns the car**. The platform dispatches a
+> **person to drive that car**. There is no platform "vehicle" entity; the asset is driver
+> availability and skill (manual/automatic, outstation). This flips the borrowed instant-hail
+> assumptions: the driver **travels to the owner's car** (a first-mile leg), pricing is by
+> **duration/package** rather than point-to-point, and a large share of bookings are **scheduled**.
+
+---
+
+## Canonical Design Language
+
+The single source of truth for tokens, type, and primitives is the **rider-app `ds/` system**,
+mirrored byte-for-byte into the driver app:
+
+- **Tokens:** `src/styles/tokens.css` (Uber Base-modeled). Primitive ramps + semantic aliases as
+  CSS custom properties. Light is the default; dark flips automatically via `[data-theme="dark"]`
+  on `<html>`. **Never hardcode hex in components** — use the semantic Tailwind classes
+  (`bg-background-primary`, `text-content-secondary`, `border-border-opaque`, etc.).
+- **Tailwind v4 bridge:** `src/app/globals.css` `@theme` block maps every `--color-*` utility to a
+  token variable. No `tailwind.config.js` for the driver app (CSS-first).
+- **Primitives (`src/components/ds/`):** `Button`, `Input`, `BottomSheet`, `StatusBadge`,
+  `FareDisplay`, `ETADisplay`, `Avatar`, `DriverCard`, `Divider`, `Skeleton`, and the shared
+  inline-SVG `Icon` set (`PhoneIcon`, `ChatIcon`, `CashIcon`, `SirenIcon`, …). No Shadcn, no
+  emoji glyphs in UI.
 
 ---
 
 ## Core Principles (MANDATORY)
 
-### 1. State-Driven (WebSocket-First)
-- **Every screen transition is event-driven via WebSocket**, NOT page reloads.
-- Backend order state: `CREATED` → `ASSIGNED` → `ARRIVED_AT_PICKUP` → `IN_TRIP` → `COMPLETED`.
-- Frontend subscribes and re-renders in real-time. **No polling. No refresh buttons.**
+### 1. State-Driven (WebSocket-First, offer-accept)
 
-### 2. 4-Second GPS Interpolation
-- Driver GPS coordinates batch every 4 seconds from backend.
-- Client receives updates via WebSocket `driver.location.updated`.
-- **Vehicle pins must glide smoothly** using linear interpolation (4s duration).
-- **Never teleport vehicle pins.** Always animate.
-- Use Framer Motion or Mapbox `easeTo()` for smooth transitions.
+- Every screen transition is event-driven via WebSocket, not page reloads.
+- Dispatch is **offer-accept**: the matcher offers a job; the rider is told a driver is confirmed
+  only on the driver's **accept**, not at match time.
+- Order lifecycle: `CREATED → ASSIGNED → EN_ROUTE_TO_PICKUP → ARRIVED_AT_PICKUP → WAITING →
+  DELIVERING → COMPLETED`, plus terminal `CANCELLED`. Frontend subscribes and re-renders in
+  real time. No polling.
+
+### 2. Real-time GPS Interpolation
+
+- Driver GPS batches from the backend; the client receives updates over WebSocket.
+- **Vehicle pins glide smoothly** (`MapInterpolated.tsx`, `requestAnimationFrame` lerp) — never
+  teleport. Coordinates live in refs, not React state, to avoid re-render jank.
+- The glide **snaps instead of tweening under `prefers-reduced-motion`**.
 
 ### 3. Connection Resilience
-- When backend pod terminates, send WebSocket `CloseGoingAway` (1001) signal.
-- **UI detects silently** and shows subtle "Acquiring GPS Signal..." overlay (glassmorphism).
-- Auto-reconnect with exponential backoff (1s → 30s, max 10 retries).
-- **No error messages.** No frozen interface. Just brief loading state.
-- After reconnect, state syncs automatically via outbox notification pattern.
 
-### 4. Gesture-First UX (Neo-Brutalism for Driver)
-- **Critical actions use swipe gestures**, not button taps.
-- `SlideToConfirm` component for trip start/complete (80% track drag required).
-- Haptic feedback (Capacitor vibration API) on confirm/error.
-- Prevents accidental high-impact operations.
+- WebSocket reconnect with exponential backoff. Pod failover (`CloseGoingAway`, 1001) is handled
+  silently with a brief "Reconnecting" badge, not an error modal. State re-syncs via the outbox
+  notification pattern.
 
----
+### 4. Gesture + Accessible Fallback
 
-## Design Tokens
-
-### Color Palette (Tailwind)
-```
-Primary:      #1F2937 (Dark Slate)  — Main actions, active states
-Success:      #10B981 (Emerald)     — Accept, complete trip
-Danger:       #EF4444 (Red)          — Decline, cancel
-Warning:      #F59E0B (Amber)        — Surge pricing, caution
-Info:         #3B82F6 (Blue)         — Neutral info badges
-Neutral:      #F3F4F6 (Light Gray)   — Backgrounds
-Text Dark:    #111827                — Body text
-Text Light:   #FFFFFF                — On dark backgrounds
-Map Tint:     #E5E7EB (Subtle Gray)  — Map overlay
-```
-
-### Spacing (Tailwind)
-- xs: 4px | sm: 8px | md: 16px | lg: 24px | xl: 32px | 2xl: 48px
-
-### Typography
-- **Headings:** Inter Bold, 24px–32px, line height 1.3
-- **Body:** Inter Regular, 16px, line height 1.5
-- **Labels:** Inter Medium, 12px–14px, uppercase tracking 0.05em
+- High-impact driver actions (start/complete trip) use `SlideToConfirm` (drag the thumb past the
+  threshold) with Capacitor haptics.
+- **Every swipe has a non-swipe path:** `SlideToConfirm` is focusable, exposes a button role with
+  an `aria-label`, and confirms on Enter/Space for keyboard and assistive-tech users.
 
 ---
 
-## Reusable Components
+## Theming & Dark Mode
 
-### SlideToConfirm (Framer Motion Drag)
-```tsx
-<SlideToConfirm 
-  label="SLIDE TO START TRIP" 
-  onConfirm={handleStart}
-  color="emerald"
-/>
-```
-- Horizontal slider track (user swipes right).
-- Requires 80% track width drag to trigger.
-- Haptic feedback on confirm/error.
-- Loading state prevents double-swipes.
-
-### RadialCountdown (SVG Timer)
-```tsx
-<RadialCountdown 
-  duration={15} 
-  onExpire={handleExpire}
-/>
-```
-- SVG circular progress bar.
-- Color gradient: Green (15s) → Amber (10s) → Red (5s).
-- Calculates remaining time from backend `expiresAt` (prevents clock drift).
-- Used for 15-second ride offer acceptance.
-
-### ReconnectingOverlay (Glassmorphism)
-```tsx
-<ReconnectingOverlay isVisible={isReconnecting} />
-```
-- Subtle "Acquiring GPS Signal..." overlay with pulsing dots.
-- Subscribes to Zustand `isReconnecting` state.
-- Non-intrusive connection resilience feedback.
-- Shows only briefly; no error messages.
-
-### DriverProfileCard
-```tsx
-<DriverProfileCard 
-  photo={driverPhoto}
-  name="Alex"
-  rating={4.8}
-  vehicle="Toyota Prius"
-  eta="8 min"
-/>
-```
-- 48px circular avatar, name + rating, vehicle details, live ETA.
-- Renders on rider tracking screen and driver home dashboard.
+- Theme state lives in `useThemeStore` (driver: persisted via `@capacitor/preferences`; rider:
+  `localStorage`). `ThemeProvider` applies it on mount.
+- Modes: `light | dark | system`. `system` tracks `matchMedia('(prefers-color-scheme: dark)')`
+  with a live change listener.
+- **The driver app defaults to dark** (night-driving ergonomics) when no preference is saved;
+  the rider app defaults to `system`. Users can switch either at any time.
 
 ---
 
-## Rider App Screens
+## Accessibility Baseline
 
-### Screen 1: Home & Fare Preview (`/rider/home`)
-**Trigger:** App launch or "Order Now" tap
+- **Focus:** `focus-visible` accent ring on every interactive control (`.focus-ring`, DS Button).
+- **Touch targets:** primary/interactive controls are ≥ 44×44px.
+- **Safe area:** bottom-pinned CTAs use `env(safe-area-inset-bottom)`.
+- **Reduced motion:** `globals.css` `@media (prefers-reduced-motion: reduce)` neutralises CSS
+  animation; `<MotionConfig reducedMotion="user">` at the app root makes **all Framer Motion**
+  honour the OS setting; the map glide snaps.
+- **Non-color redundancy:** the offer countdown shows the **seconds number** (not color alone);
+  surge and fare signals are always **labelled with the multiplier/amount**, never color-only.
+- **Names:** icon-only controls (call, chat, SOS, close) carry an `aria-label`. Status regions use
+  `role="status"`/`aria-live`.
 
-- **Map:** Full-bleed Mapbox GL, user centered.
-- **Driver Pins:** 24px circles, available drivers nearby.
-- **Bottom Sheet:** Pickup (read-only, auto-filled) → Dropoff (input + autocomplete).
-- **Surge Badge:** If `surge_multiplier > 1.0`, show Amber badge: "High Demand Surge: x1.4"
-- **GET FARE ESTIMATE:** Primary Emerald button.
+---
 
-### Screen 2: Booking Acceptance (`/rider/matching`)
-**Trigger:** Fare estimate confirmed; matching begins.
+## Design Tokens (semantic, via `tokens.css`)
 
-- **Map:** Same, inputs now disabled (grayscale, `pointer-events: none`).
-- **Radar Animation:** 60px SVG radar pulsing outward every 1.5s (Framer Motion).
-- **Status:** "⏳ Searching for drivers..." badge (top-center).
-- **CANCEL SEARCH:** Secondary button.
+| Concept | Token | Light | Dark |
+|---|---|---|---|
+| Primary surface | `--background-primary` | `#FFFFFF` | `#000000` |
+| Accent (info/active) | `--accent-400` | `#276EF1` | `#7AA3F6` |
+| Positive (accept/online) | `--positive-400` | `#3AA76D` | `#5AB285` |
+| Warning (surge/caution) | `--warning-400/600` | `#FFC043 / #B38200` | `#FFCC66` |
+| Negative (decline/SOS) | `--negative-400` | `#D44333` | `#E36161` |
+| Body text | `--content-primary` | `#000000` | `#FFFFFF` |
 
-### Screen 3: Match Confirmation (`/rider/tracking/{orderId}`)
-**Trigger:** `order.assigned` event published.
-
-- **Map:** Zoom to bbox containing driver + pickup marker.
-- **Driver Vehicle:** Animated glide with 4-second interpolation.
-- **Pickup Marker:** Static blue pin.
-- **Profile Card:** Driver photo, name, rating, vehicle, live ETA, share trip code button.
-
-### Screen 4a: Driver Arrived (`/rider/tracking/{orderId}` state change)
-**Trigger:** `order.arrived_at_pickup` event.
-
-- **Pickup Marker:** Pulsing ring animation (scale 1.0 → 1.2, 1.5s repeat).
-- **Modal Alert:** Non-dismissible. "🚗 Driver Arrived! Alex is here. Please come out now." + "OK, I'm coming out" button.
-
-### Screen 4b: Active Trip (`/rider/tracking/{orderId}` in-trip phase)
-**Trigger:** `order.in_trip` event.
-
-- **Map:** Route line (Emerald, 3px) from driver to dropoff (red pin).
-- **Navigation:** "Continue for 1.2 miles, then turn right..." (top text).
-- **Minimized Card:** 60px height showing ETA countdown.
-- **Listen:** `order.completed` event to transition to Screen 5.
-
-### Screen 5: Trip Completed (`/rider/feedback/{orderId}`)
-**Trigger:** `order.completed` event.
-
-- **Success Checkmark:** Large centered SVG/Lottie animation.
-- **Trip Summary:** Distance, fare, duration, trip time.
-- **Buttons:** "RATE DRIVER" (optional modal) + "DONE" (back to `/rider/home`).
+**Spacing:** 8px grid (`--space-100`…`--space-1200`). **Radius:** `sm 8 / md 12 / lg 16 / pill`.
+**Type:** Inter (display/body/labels) + JetBrains Mono (**fares, ETAs, distances, IDs only**).
+**Currency:** ₹ (rupees; backend stores paise, `formatCurrency`). **Distance:** km.
 
 ---
 
 ## Driver App Screens
 
-### Screen 6: Online Duty Dashboard (`/driver/home`)
-**Trigger:** App launch; driver authenticated.
+### Duty Dashboard (`/driver`)
 
-- **Map:** Full-bleed, driver's current region.
-- **H3 Hexagon Grid:** 15×15 km cells, color-coded surge: light yellow (1.0x) → dark red (2.0x+).
-- **Tap Cell:** Modal with local demand, avg ETA, est. earnings.
-- **Greeting Badge:** "☀️ Good Morning, Alex!" (time-aware).
-- **Status Badge:** "🎯 Currently Online" / "Offline".
-- **Online/Offline Toggle:** Massive Shadcn Switch (48px), Emerald if online, Gray if offline.
-- **Earnings Card:** "💰 Earnings Today: $156.50" + "✅ 12 trips completed".
+- Full-bleed Leaflet map (`MapInterpolated`) of the driver's H3 region; online drivers glide.
+- Go-Online / Go-Offline toggle; today's stats; connection badge; SOS (2-second hold).
+- Heatmap toggle surfaces demand density (region + cell count). Time-billed **wait toggle**
+  appears mid-trip (round-trip destination wait, ₹2/min).
+- In-app **chat with the rider** (pickup coordination, quick replies).
 
-**On Toggle:**
-- Send WebSocket `driver.state.changed` with `{ state: "ONLINE_AVAILABLE" | "OFFLINE" }`.
-- Store in Redis `ws:presence:{driver_id}`.
+### Incoming Offer (`OfferPopup`, modal)
 
-### Screen 7: High-Priority Offer Flash Card (MODAL)
-**Trigger:** Backend publishes `order.created` + matching selects this driver.
+- Map blurred behind a non-dismissible card. Rider name + rating, trip type, car make/model/
+  transmission, **first-mile reach ETA**, fare.
+- **Transmission-mismatch** and **owner-not-in-car** warnings render with an icon + label.
+- `CountdownRing`: 15s, color shifts pending → negative, **always showing the seconds number**.
+- Slide to accept; auto-decline on expiry with a cooldown.
 
-- **Background:** Map blurred (`backdrop-blur-sm`).
-- **Card:** Center overlay, full-screen, non-dismissible.
-- **Content:**
-  - 📍 Pickup: 123 Main St
-  - 📍 Dropoff: 567 Park Ave
-  - 💰 Fare: $12.50
-  - 📏 Distance: 2.5 miles
-  - **RadialCountdown:** 15 seconds (Green → Amber → Red)
-- **Buttons:** Red "❌ DECLINE" + Green "✅ ACCEPT" (full width, 24px font).
-- **Haptic:** Vibrate on tap.
+### Navigation to the Car (`EN_ROUTE_TO_PICKUP`)
 
-**Auto-Decline:** If no response after 15s, decline with reason "No response" + 30s cooldown banner.
+- Route to the owner's car (the first-mile leg). Rider mini-card with call/chat (`tel:` direct
+  dial — no telephony provider). Two-way live location: the rider's pin is shared to the driver.
+- "I've Arrived" advances to verification.
 
-**On Accept:** Send `order.accepted` → transitions to Screen 8.
+### Pickup Verification (`ArrivedVerificationPane`, `ARRIVED_AT_PICKUP`)
 
-### Screen 8: Navigation & Passenger Verification (`/driver/navigation/{orderId}`)
-**Trigger:** Order accepted.
+- **Car-plate handshake:** the driver enters the car's registration plate; it is verified against
+  the rider's registered vehicle (`normalizePlate`) — confirms *right driver + right car* before
+  the car moves. OTP is the second factor.
+- Start odometer + fuel capture (photo), then `SlideToConfirm` to start the trip.
 
-- **Map:** Route from driver to pickup (Emerald polyline).
-- **Top Panel:**
-  - "🚗 Navigating to Pickup"
-  - "➡️ Turn right on Main St (500 ft)"
-  - "Duration: 3 min 45 sec"
-  - "✓ ARRIVED AT PICKUP" button (disabled until within 50m).
+### In-Trip (`TripInProgressPane`, `DELIVERING` / `WAITING`)
 
-**On "Arrived":**
-- Show swipe verification modal: "🎫 Verify Passenger. Confirm code: GK7P9"
-- `<SlideToConfirm label="SLIDE TO START TRIP" color="emerald" />`
-- Send `order.started` → transitions to Screen 9.
+- Turn-by-turn to the drop. Toll / parking / issue charge actions. **Waiting meter** (driver
+  toggles wait at the destination for round-trips; billed ₹2/min).
+- End odometer + fuel, then `SlideToConfirm` to complete.
 
-### Screen 9: Active Trip & Completion (`/driver/navigation/{orderId}` in-trip)
-**Trigger:** `order.in_trip` event.
+### Settlement (`/driver/trip/bill`) & Rate (`/driver/trip/rate`)
 
-- **Map:** Route to dropoff (Emerald polyline, red pin).
-- **Top Panel:** Turn-by-turn (same as Screen 8).
-- **Bottom Swipe Panel:**
-  - "🏁 Approaching Destination"
-  - "➡️ Turn left on Park Ave (250 ft)"
-  - "ETA: 1 min 30 sec"
-  - `<SlideToConfirm label="SLIDE TO COMPLETE TRIP" color="emerald" />`
-- **On Swipe:** Send `order.completed` → transitions to Screen 5 (completion feedback).
+- Receipt: base package, extra mileage, waiting, tolls, parking, night/surge, D4M Care.
+- Payment: Cash / UPI. Report-car-issue affordance. Rate the rider (1–5 + tags).
+
+### Account (`/driver-account/*`)
+
+- Earnings, payouts, performance, trip history, vehicles, profile, settings, support.
+
+---
+
+## Pricing Model
+
+- **Package / duration tiers**, no surge on packages: One-Way, Round Trip, Hourly,
+  Mini-Outstation, Outstation, Monthly (estimate-only until recurring billing lands).
+- Distance-based fares retain a surge multiplier; **surge is always shown with its numeric
+  multiplier**, never color alone.
+- **Cancel-after-travel fees** (tiered by how far the driver got: en-route vs arrived) and a
+  **no-show penalty** (re-queue + cancellation-rate bump).
+- Owner's fuel; tolls/parking itemised on the settlement.
 
 ---
 
 ## State Management
 
-### Zustand Stores
-
-**useAppState.ts:** App metadata only (NOT coordinates)
-```ts
-{
-  orderStatus: "CREATED" | "ASSIGNED" | "IN_TRIP" | "COMPLETED",
-  driverState: "ONLINE_AVAILABLE" | "OFFLINE",
-  surgeMultiplier: number,
-  isConnected: boolean,
-  isReconnecting: boolean,
-  // Actions: setOrderStatus, setDriverState, etc.
-}
-```
-
-**useAuthStore.ts:** Authentication state
-```ts
-{
-  token: string,
-  userRole: "rider" | "driver",
-  // Actions: login, logout
-}
-```
-
-### VehicleTracker (Mutable Refs, No React Re-renders)
-- Manages coordinate queue with 4-second delay.
-- `requestAnimationFrame` loop for 60 FPS smooth gliding.
-- Linear lerp between current and target position.
-- `onUpdate` callback fires every frame (updates Mapbox directly, bypasses React).
-- **Critical:** No React re-renders. Coordinates stored in refs.
-
-### ResilientWebSocketProvider
-- WebSocket manager with exponential backoff (1s → 30s, max 10 retries).
-- Handles `CloseGoingAway` (1001) gracefully.
-- Routes events: `driver.location.updated` → VehicleTracker, `order.*` → Zustand.
-- `sendMessage` utility for dispatching WebSocket events.
-
----
-
-## Asset Library
-
-**Path:** `client-app/src/components/`
-
-- `SlideToConfirm.tsx` — Framer Motion drag gesture
-- `RadialCountdown.tsx` — SVG circular timer
-- `ReconnectingOverlay.tsx` — Glassmorphism connection feedback
-- `AuthGuard.tsx` — Route protection
-- `DriverProfileCard.tsx` — Avatar + metadata
-- All using Shadcn UI primitives + TailwindCSS
-
-**Path:** `client-app/src/lib/`
-
-- `VehicleTracker.ts` — GPS interpolation engine
-- `providers/ResilientWebSocketProvider.tsx` — WebSocket resilience
-
-**Path:** `client-app/src/store/`
-
-- `useAppState.ts` — Zustand app metadata store
-- `useAuthStore.ts` — Zustand authentication store
+- **Zustand stores (`src/store/`):** `useAuthStore`, `useDriverDutyStore`, `useOfferStore`,
+  `useSafetyStore`, `useThemeStore`, `useToastStore`.
+- **GPS interpolation:** `MapInterpolated.tsx` manages the coordinate queue and `rAF` lerp in
+  refs (no React re-renders); honours reduced motion.
+- **WebSocket:** `services/telemetryStream.ts` (driver presence/location) and the dispatch stream
+  route `order.*` → stores, `driver.location.updated` → the map. Reconnect with backoff.
 
 ---
 
 ## Do's & Don'ts
 
-✅ **DO:**
-- Subscribe to WebSocket events; let state drive UI.
-- Use `requestAnimationFrame` for high-frequency GPS updates (bypass React).
-- Show glassmorphism overlays for transient states (reconnecting, loading).
-- Use swipe gestures for critical driver actions.
-- Animate vehicle pins smoothly; never teleport.
+✅ **DO**
+- Let WebSocket events drive UI; interpolate pins in refs.
+- Use semantic tokens; support light **and** dark.
+- Give every swipe gesture a keyboard/AT fallback and every icon button an `aria-label`.
+- Show numbers/labels alongside color for surge, fares, and the countdown.
+- Frame the journey as "the driver travels to the owner's car."
 
-❌ **DON'T:**
-- Poll the API; use WebSocket only.
-- Store coordinates in React state (will cause jank).
-- Use standard button taps for trip start/complete.
-- Show error modals for pod failover; reconnect silently.
-- Block the UI during reconnection.
+❌ **DON'T**
+- Poll the API; hardcode hex; use Mapbox or Shadcn (this app uses Leaflet + the `ds/` system).
+- Call the trip a "vehicle handover" or use a "passenger code" — it is a **car-plate handshake**.
+- Rely on color alone, or on swipe-only confirmation.
+- Animate without honouring `prefers-reduced-motion`.
 
 ---
 
 ## Deployment Targets
 
-- **Web:** Next.js dev server on `:3000` (Vite proxy) or production build.
-- **iOS:** Capacitor wrapper, deployed to App Store.
-- **Android:** Capacitor wrapper, deployed to Google Play Store.
-
-**Same codebase.** Platform-specific code guarded by `Capacitor.isNativePlatform()` checks.
+- **Web:** Next.js build, served on Firebase Hosting (`vahnly-driver`).
+- **iOS / Android:** Capacitor wrapper. Platform-specific code guarded by
+  `Capacitor.isNativePlatform()`.
 
 ---
 
-**Last Updated:** 2026-06-01  
-**Source of Truth:** `DOC/UBER_LIKE_UI_UX_DESIGN_GUIDE.md`
+**Last Updated:** 2026-06-19
+**Source of Truth:** the shipped code in `client-app/` and the canonical `ds/` token system
+(mirrored from `rider-app/src/components/ds` + `src/styles/tokens.css`).

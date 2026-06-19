@@ -30,35 +30,65 @@ export function SlideToConfirm({
     blue: 'bg-accent-400 hover:bg-accent-400',
   };
 
-  const handleDragEnd = async () => {
-    if (dragX >= threshold * 0.8) {
-      // Confirm action
-      setIsLoading(true);
-
-      try {
-        // Haptic feedback on confirm (fail-safe for desktop tests)
-        await Haptics.impact({ style: 'Medium' as any }).catch(() => {});
-
-        // Call the async action
-        await onConfirm();
-
-        // Success feedback
-        await Haptics.notification({ type: 'Success' as any }).catch(() => {});
-        setDragX(0);
-      } catch (error) {
-        console.error('Action failed:', error);
-        await Haptics.notification({ type: 'Error' as any }).catch(() => {});
-        setDragX(0);
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      // Snap back
+  // Single confirm path shared by drag, keyboard, and the tap fallback.
+  const confirm = async () => {
+    if (isLoading || disabled) return;
+    setIsLoading(true);
+    try {
+      // Haptic feedback on confirm (fail-safe for desktop/tests)
+      await Haptics.impact({ style: 'Medium' as any }).catch(() => {});
+      await onConfirm();
+      await Haptics.notification({ type: 'Success' as any }).catch(() => {});
       setDragX(0);
+    } catch (error) {
+      console.error('Action failed:', error);
+      await Haptics.notification({ type: 'Error' as any }).catch(() => {});
+      setDragX(0);
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleDragEnd = () => {
+    if (dragX >= threshold * 0.8) confirm();
+    else setDragX(0); // Snap back
+  };
+
   const progress = dragX / (threshold * 0.8);
+  const pct = Math.round(Math.min(1, Math.max(0, progress)) * 100);
+
+  // Keyboard + AT path: the thumb is an ARIA slider. Arrow keys nudge it,
+  // Enter/Space/End confirm immediately. Mobile screen-reader adjust gestures
+  // map to the same Arrow handlers.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled || isLoading) return;
+    const step = threshold * 0.2;
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+      case 'End':
+        e.preventDefault();
+        confirm();
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp': {
+        e.preventDefault();
+        const next = Math.min(threshold, dragX + step);
+        setDragX(next);
+        if (next >= threshold * 0.8) confirm();
+        break;
+      }
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        e.preventDefault();
+        setDragX((x) => Math.max(0, x - step));
+        break;
+      case 'Home':
+        e.preventDefault();
+        setDragX(0);
+        break;
+    }
+  };
 
   return (
     <div ref={trackRef} className="w-full">
@@ -82,13 +112,22 @@ export function SlideToConfirm({
           {isLoading ? 'Processing...' : label}
         </span>
 
-        {/* Draggable thumb */}
+        {/* Draggable thumb — also an accessible slider */}
         <motion.div
           drag="x"
           dragConstraints={{ left: 0, right: threshold }}
           onDrag={(_, info) => setDragX(info.point.x - (trackRef.current?.getBoundingClientRect().left ?? 0) - 30)}
           onDragEnd={handleDragEnd}
-          className={`absolute left-2 w-12 h-12 bg-white rounded-lg z-20 ${
+          role="slider"
+          tabIndex={disabled ? -1 : 0}
+          aria-label={label}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-valuetext={`${pct}% — slide or press Enter to confirm`}
+          aria-disabled={disabled || undefined}
+          onKeyDown={onKeyDown}
+          className={`absolute left-2 w-12 h-12 bg-white rounded-lg z-20 outline-none focus-visible:ring-2 focus-visible:ring-content-primary focus-visible:ring-offset-2 ${
             isLoading ? 'opacity-50' : 'cursor-grab active:cursor-grabbing'
           }`}
           animate={{
@@ -99,17 +138,29 @@ export function SlideToConfirm({
         >
           {/* Inner indicator */}
           <div className="absolute inset-2 flex items-center justify-center">
-            <div className="text-sm font-bold text-content-secondary">{'→'}</div>
+            <div className="text-sm font-bold text-content-secondary" aria-hidden="true">{'→'}</div>
           </div>
         </motion.div>
       </motion.div>
 
       {/* Progress indicator text */}
       {dragX > 0 && (
-        <p className="text-xs text-content-secondary mt-2">
-          {Math.round(progress * 100)}% — {Math.round(Math.max(0, threshold * 0.8 - dragX))}px to go
+        <p className="text-xs text-content-secondary mt-2" aria-hidden="true">
+          {pct}% — {Math.round(Math.max(0, threshold * 0.8 - dragX))}px to go
         </p>
       )}
+
+      {/* Non-swipe fallback — keyboard/motor users confirm without dragging */}
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={disabled || isLoading}
+        className="mt-2 w-full min-h-[44px] rounded-sm text-label-small text-content-secondary
+          hover:text-content-primary disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 transition-base"
+      >
+        {isLoading ? 'Processing…' : `Can't slide? Tap to confirm`}
+      </button>
     </div>
   );
 }

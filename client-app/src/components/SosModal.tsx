@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSafetyStore } from "@/store/useSafetyStore";
+import { SirenIcon } from "@/components/ds";
 
 export const SosModal: React.FC = () => {
   const { isEmergencyActive, shareLink, cancelSOS } = useSafetyStore();
@@ -30,8 +31,8 @@ export const SosModal: React.FC = () => {
   return (
     <div role="alert" aria-live="assertive" className="fixed inset-0 z-[1000000] flex items-center justify-center bg-surface-negative/90 backdrop-blur-md p-6 text-white text-center font-mono">
       <div className="max-w-sm w-full bg-background-primary border border-negative-400 rounded-2xl p-6 shadow-2xl space-y-6">
-        <div className="h-20 w-20 bg-surface-negative/40 border border-negative-400 rounded-full flex items-center justify-center text-4xl font-black mx-auto animate-pulse shadow-lg">
-          🚨
+        <div className="h-20 w-20 bg-surface-negative/40 border border-negative-400 rounded-full flex items-center justify-center text-content-negative mx-auto animate-pulse shadow-lg">
+          <SirenIcon size={40} />
         </div>
 
         <div className="space-y-2">

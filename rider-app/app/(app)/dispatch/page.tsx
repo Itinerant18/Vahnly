@@ -107,8 +107,11 @@ function DriverAssignedModal({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={driver.photo} alt={driver.name} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-2xl text-content-secondary select-none">
-                👤
+              <div className="flex h-full w-full items-center justify-center text-content-secondary select-none">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5z" />
+                </svg>
               </div>
             )}
           </div>

@@ -33,9 +33,19 @@ function bucket(status: TripStatus): Tab {
   return "Upcoming";
 }
 
-function TripCard({ order, onRebook }: { order: Order; onRebook: () => void }) {
+function TripCard({ order, onRebook, onCancel }: { order: Order; onRebook: () => void; onCancel?: () => void }) {
   const router = useRouter();
-  const date = new Date(order.created_at);
+  const [confirming, setConfirming] = useState(false);
+  const isScheduled = !!order.scheduled_at;
+  const terminal = order.status === "COMPLETED" || order.status === "CANCELLED";
+  // Scheduled bookings show their real future pickup time; past trips show the
+  // trip date; live instant trips show no time. Never use created_at as a stand-in
+  // for a scheduled time.
+  const when = isScheduled
+    ? new Date(order.scheduled_at as string)
+    : terminal
+      ? new Date(order.created_at)
+      : null;
   return (
     <div className="rounded-2xl bg-background-secondary p-4">
       <button
@@ -43,15 +53,20 @@ function TripCard({ order, onRebook }: { order: Order; onRebook: () => void }) {
         className="block w-full text-left"
       >
         <div className="mb-2 flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-positive-400" />
-            <span className="text-xs text-content-secondary">
-              {date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} ·{" "}
-              {date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-          <span className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold ${STATUS_CHIP[order.status] ?? "bg-surface-neutral text-content-secondary"}`}>
-            {order.status}
+          {when ? (
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-positive-400" />
+              <span className="text-xs text-content-secondary">
+                {isScheduled ? "Pickup " : ""}
+                {when.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })} ·{" "}
+                {when.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          ) : (
+            <span />
+          )}
+          <span className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold ${isScheduled ? "bg-surface-accent text-content-accent" : STATUS_CHIP[order.status] ?? "bg-surface-neutral text-content-secondary"}`}>
+            {isScheduled ? "Scheduled" : order.status}
           </span>
         </div>
         <p className="text-sm text-content-primary">
@@ -63,22 +78,61 @@ function TripCard({ order, onRebook }: { order: Order; onRebook: () => void }) {
             </span>
           )}
         </p>
-        <FareDisplay amount={order.base_fare_paise} size="md" className="mt-2 block font-bold text-content-accent" />
+        <div className="mt-2 flex items-center gap-2">
+          <FareDisplay amount={order.base_fare_paise} size="md" className="font-bold text-content-accent" />
+          {order.trip_type && (
+            <span className="rounded-pill bg-surface-neutral px-2 py-0.5 text-[10px] font-medium text-content-secondary">
+              {order.trip_type}
+            </span>
+          )}
+        </div>
       </button>
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={onRebook}
-          className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent"
-        >
-          Rebook
-        </button>
-        <button
-          onClick={() => router.push(`/account/bookings/detail?orderId=${order.id}`)}
-          className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary"
-        >
-          Details
-        </button>
-      </div>
+
+      {confirming ? (
+        <div className="mt-3 rounded-xl bg-surface-negative p-3" role="alertdialog" aria-label="Confirm cancel booking">
+          <p className="text-xs text-content-negative">
+            Cancel this booking? No fee applies before a driver is dispatched.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => setConfirming(false)}
+              className="flex-1 rounded-xl bg-background-tertiary py-2 text-xs font-semibold text-content-primary min-h-[44px]"
+            >
+              Keep booking
+            </button>
+            <button
+              onClick={() => { setConfirming(false); onCancel?.(); }}
+              className="flex-1 rounded-xl bg-negative-400 py-2 text-xs font-semibold text-white min-h-[44px]"
+            >
+              Cancel booking
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={onRebook}
+            className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent min-h-[44px]"
+          >
+            Rebook
+          </button>
+          {onCancel ? (
+            <button
+              onClick={() => setConfirming(true)}
+              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-negative min-h-[44px]"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push(`/account/bookings/detail?orderId=${order.id}`)}
+              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary min-h-[44px]"
+            >
+              Details
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -102,10 +156,25 @@ export default function BookingsPage() {
 
   useEffect(load, [load]);
 
-  const filtered = useMemo(
-    () => (orders ?? []).filter((o) => bucket(o.status) === tab),
-    [orders, tab],
-  );
+  const filtered = useMemo(() => {
+    const list = (orders ?? []).filter((o) => bucket(o.status) === tab);
+    if (tab === "Upcoming") {
+      // Soonest first — scheduled pickup time when present, else creation time.
+      return [...list].sort(
+        (a, b) =>
+          new Date(a.scheduled_at ?? a.created_at).getTime() -
+          new Date(b.scheduled_at ?? b.created_at).getTime(),
+      );
+    }
+    return list;
+  }, [orders, tab]);
+
+  const cancelBooking = (order: Order) => {
+    ordersApi
+      .cancel(order.id, "RIDER_CANCELLED_SCHEDULED")
+      .then(load)
+      .catch(() => setError(true));
+  };
 
   const rebook = (order: Order) => {
     setPickup({ lat: order.pickup_lat, lng: order.pickup_lng, address: "Previous pickup" });
@@ -141,7 +210,16 @@ export default function BookingsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((o) => (
-            <TripCard key={o.id} order={o} onRebook={() => rebook(o)} />
+            <TripCard
+              key={o.id}
+              order={o}
+              onRebook={() => rebook(o)}
+              onCancel={
+                tab === "Upcoming" && (o.status === "CREATED" || o.status === "ASSIGNED")
+                  ? () => cancelBooking(o)
+                  : undefined
+              }
+            />
           ))}
         </div>
       )}

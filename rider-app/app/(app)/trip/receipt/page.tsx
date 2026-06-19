@@ -172,7 +172,12 @@ function ReceiptContent() {
             onClick={handleDownloadPDF}
             className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary"
           >
-            <span className="text-xl">📄</span>
+            <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+            </span>
             <div>
               <p className="text-sm font-semibold text-content-primary">Download PDF</p>
               <p className="text-xs text-content-secondary">Print or save receipt to device</p>
@@ -183,7 +188,12 @@ function ReceiptContent() {
             disabled
             className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque opacity-50"
           >
-            <span className="text-xl">📧</span>
+            <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+            </span>
             <div className="flex-1">
               <p className="text-sm font-semibold text-content-primary">Email Receipt</p>
               <p className="text-xs text-content-secondary">Send to registered email</p>
@@ -195,7 +205,11 @@ function ReceiptContent() {
             onClick={handleReportProblem}
             className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-negative-400 active:bg-background-tertiary"
           >
-            <span className="text-xl">🚩</span>
+            <span className="flex h-5 w-5 items-center justify-center text-content-negative">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 21V4M5 4h11l-2 4 2 4H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
             <div>
               <p className="text-sm font-semibold text-content-negative">Report a Problem</p>
               <p className="text-xs text-content-secondary">Something went wrong with this trip</p>

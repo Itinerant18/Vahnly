@@ -135,6 +135,10 @@ export interface Order {
   cancelled_by?: string;
   cancellation_reason?: string;
   created_at: string;
+  /** Set when the rider booked for a future time (deferred dispatch). */
+  scheduled_at?: string;
+  /** Tier for non-point-to-point bookings (IN_CITY_ROUND, OUTSTATION, …); null until persisted (migration 000118). */
+  trip_type?: TripType;
 }
 
 export interface Wallet {

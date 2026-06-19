@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
@@ -8,10 +8,39 @@ import { FareDisplay } from "@/components/ds";
 import type { PaymentMethod } from "@/lib/api/types";
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
-  CASH: "💵 Cash",
-  UPI: "📱 UPI",
-  CARD: "💳 Card",
-  WALLET: "👛 Wallet",
+  CASH: "Cash",
+  UPI: "UPI",
+  CARD: "Card",
+  WALLET: "Wallet",
+};
+
+const WalletIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1h1a1 1 0 011 1v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <circle cx="17" cy="13" r="1.2" fill="currentColor" />
+  </svg>
+);
+
+const PAYMENT_ICONS: Record<PaymentMethod, ReactNode> = {
+  CASH: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+  UPI: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="6" y="3" width="12" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M11 18h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  CARD: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2 10h20" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+  WALLET: WalletIcon,
 };
 
 function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
@@ -181,7 +210,10 @@ export default function BillPage() {
                     : "bg-background-tertiary text-content-secondary ring-1 ring-border-opaque"
                 }`}
               >
-                {PAYMENT_LABELS[m]}
+                <span className="flex items-center gap-2">
+                  {PAYMENT_ICONS[m]}
+                  {PAYMENT_LABELS[m]}
+                </span>
               </button>
             ))}
           </div>
@@ -189,7 +221,12 @@ export default function BillPage() {
 
         {walletAnim && (
           <div className="mb-4 flex items-center justify-center gap-3 rounded-2xl bg-background-secondary p-6">
-            <span className="animate-bounce text-3xl">👛</span>
+            <span className="flex animate-bounce text-content-secondary">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1h1a1 1 0 011 1v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <circle cx="17" cy="13" r="1.4" fill="currentColor" />
+              </svg>
+            </span>
             <span className="text-sm font-medium text-content-secondary">Processing wallet payment…</span>
           </div>
         )}

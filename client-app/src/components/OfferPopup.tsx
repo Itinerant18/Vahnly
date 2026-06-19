@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useOfferStore } from '@/store/useOfferStore';
-import { FareDisplay } from '@/components/ds';
+import { FareDisplay, ShieldIcon, AlertIcon, CarIcon } from '@/components/ds';
 
 // ── Slide-to-Accept ───────────────────────────────────────────────────────────
 // Uses DS tokens only — no hardcoded hex values.
@@ -208,8 +208,8 @@ export function OfferPopup() {
                     {currentOffer.tripType}
                   </span>
                   {currentOffer.d4mCareOptIn && (
-                    <span className="badge badge-accent text-label-small">
-                      🛡 Insured Trip
+                    <span className="badge badge-accent text-label-small inline-flex items-center gap-1">
+                      <ShieldIcon size={12} /> Insured Trip
                     </span>
                   )}
                 </div>
@@ -231,7 +231,7 @@ export function OfferPopup() {
                 {/* Transmission mismatch warning */}
                 {currentOffer.transmissionMatch === false && (
                   <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
-                    <span className="text-content-warning text-label-medium">⚠</span>
+                    <span className="flex items-center text-content-warning"><AlertIcon size={16} /></span>
                     <p className="text-paragraph-small text-content-warning">
                       Car needs {currentOffer.carTransmission || 'Manual'} — check your expertise match
                     </p>
@@ -241,7 +241,7 @@ export function OfferPopup() {
                 {/* Owner not riding along */}
                 {currentOffer.ownerNotInCar && (
                   <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
-                    <span className="text-content-warning text-label-medium">🚗</span>
+                    <span className="flex items-center text-content-warning"><CarIcon size={16} /></span>
                     <p className="text-paragraph-small text-content-warning">
                       Owner won&apos;t be in the car — you drive it solo.
                     </p>

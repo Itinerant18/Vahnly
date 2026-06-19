@@ -9,3 +9,10 @@ export { Avatar } from './Avatar';
 export { DriverCard } from './DriverCard';
 export { Divider } from './Divider';
 export { Skeleton } from './Skeleton';
+export {
+  PhoneIcon, ChatIcon, NavigateIcon, CashIcon, CardIcon, ShieldIcon, CarIcon,
+  AlertIcon, CheckIcon, BellIcon, PlusIcon, ParkingIcon, SirenIcon, CameraIcon,
+  CrossIcon, RefreshIcon, MenuIcon, SignalIcon, RouteIcon, ClockIcon,
+  OctagonAlertIcon, FlameIcon, PauseIcon, WrenchIcon,
+} from './Icon';
+export type { IconProps } from './Icon';

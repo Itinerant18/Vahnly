@@ -85,7 +85,7 @@ describe('BookingSheet', () => {
     render(<BookingSheet />);
     await userEvent.type(screen.getByPlaceholderText('Enter promo code'), 'TESTCODE');
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByText('✓')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Promo applied')).toBeInTheDocument();
     expect(validatePromo).toHaveBeenCalled();
   });
 });

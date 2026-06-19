@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { garageApi } from "@/lib/api/garage";
+import { cityConfigApi } from "@/lib/api/cityConfig";
 import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
@@ -24,6 +25,47 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CARD",   label: "Card" },
   { value: "WALLET", label: "Wallet" },
 ];
+
+// ── Scheduling bounds ─────────────────────────────────────────────────────────
+// Min lead matches the dispatch sweeper (~40 min); max look-ahead 7 days; 30-min
+// slots; any hour of day (24/7).
+const SCHEDULE_LEAD_MIN = 40;
+const SCHEDULE_MAX_DAYS = 7;
+const SLOT_STEP_SEC = 1800; // 30 min
+
+// Operating hours come from city config (GET /api/v1/rider/city-config). These are
+// only the fallback defaults when the endpoint or a field is unset.
+const DEFAULT_OPEN_HOUR = 6;
+const DEFAULT_CLOSE_HOUR = 23;
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Keep a chosen time inside operating hours (last start slot 30 min before close). */
+function clampToHours(d: Date, openH: number, closeH: number) {
+  const h = d.getHours();
+  if (h < openH) d.setHours(openH, 0, 0, 0);
+  else if (h >= closeH) d.setHours(closeH - 1, 30, 0, 0);
+  return d;
+}
+
+function fmtHour(h: number) {
+  const ap = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12} ${ap}`;
+}
+
+/** Format a Date as a `datetime-local` value (local time, no zone suffix). */
+function toLocalInput(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** First bookable slot: now + lead, rounded up to the next 30-min boundary. */
+function defaultSlot(openH: number, closeH: number) {
+  const d = new Date(Date.now() + SCHEDULE_LEAD_MIN * 60_000);
+  d.setSeconds(0, 0);
+  d.setMinutes(Math.ceil(d.getMinutes() / 30) * 30); // setMinutes(60) rolls the hour
+  return clampToHours(d, openH, closeH);
+}
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
 function Section({ children }: { children: React.ReactNode }) {
@@ -160,10 +202,12 @@ function PlaceInput({
           <button
             type="button"
             onClick={() => { onClear(); setQuery(""); setResults([]); setOpen(false); }}
-            className="text-content-tertiary hover:text-content-primary text-label-small min-w-[24px] text-center"
+            className="flex min-w-[24px] items-center justify-center text-content-tertiary hover:text-content-primary"
             aria-label="Clear location"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
         )}
       </div>
@@ -209,6 +253,13 @@ export function BookingSheet() {
   const [promoInput, setPromoInput] = useState("");
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "err">("idle");
   const [bookingState, setBookingState] = useState<"idle" | "loading">("idle");
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // City config drives the picker's hours + which tiers are offered. Defaults hold
+  // until the fetch resolves, and on any failure.
+  const [openH, setOpenH] = useState(DEFAULT_OPEN_HOUR);
+  const [closeH, setCloseH] = useState(DEFAULT_CLOSE_HOUR);
+  const [allowedTiers, setAllowedTiers] = useState<string[]>([]);
 
   const {
     pickup, dropoff, tripType, durationHours, personsCount, d4mCare, ownerNotInCar,
@@ -226,6 +277,22 @@ export function BookingSheet() {
       if (def && !selectedCarId) setSelectedCar(def.id);
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // City config (operating hours + supported tiers). Falls back to defaults on error.
+  useEffect(() => {
+    cityConfigApi.get().then((c) => {
+      const oh = parseInt((c.operating_hours_start ?? "").split(":")[0], 10);
+      const ch = parseInt((c.operating_hours_end ?? "").split(":")[0], 10);
+      if (Number.isFinite(oh)) setOpenH(oh);
+      if (Number.isFinite(ch)) setCloseH(ch);
+      setAllowedTiers(c.supported_trip_types ?? []);
+    }).catch(() => { /* keep defaults */ });
+  }, []);
+
+  // Only offer tiers the city supports; empty list = all tiers.
+  const tripTypes = allowedTiers.length
+    ? TRIP_TYPES.filter((t) => allowedTiers.includes(t.value))
+    : TRIP_TYPES;
 
   const selectedCar = cars.find((c) => c.id === selectedCarId);
   const needsDuration =
@@ -303,11 +370,13 @@ export function BookingSheet() {
   // ── Book ───────────────────────────────────────────────────────────────────
   const onBook = async () => {
     if (!pickup) return;
+    setBookingError(null);
     setBookingState("loading");
     try {
       const { order } = await bookDriver();
       router.push(`/dispatch?orderId=${order.id}`);
-    } catch {
+    } catch (e) {
+      setBookingError(e instanceof Error ? e.message : "Booking failed. Please try again.");
       setBookingState("idle");
     }
   };
@@ -348,7 +417,7 @@ export function BookingSheet() {
           {/* [1] Trip Type Selector */}
           <Section>
             <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-              {TRIP_TYPES.map((t) => (
+              {tripTypes.map((t) => (
                 <Chip key={t.value} active={tripType === t.value} onClick={() => setTripType(t.value)}>
                   {t.label}
                 </Chip>
@@ -404,13 +473,40 @@ export function BookingSheet() {
               <Chip active={!scheduledAt} onClick={() => setScheduledAt(null)}>Now</Chip>
               <Chip
                 active={!!scheduledAt}
-                onClick={() => setScheduledAt(new Date(Date.now() + 3600000).toISOString())}
+                onClick={() => setScheduledAt(defaultSlot(openH, closeH).toISOString())}
               >
-                {scheduledAt
-                  ? new Date(scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
-                  : "Schedule"}
+                Schedule
               </Chip>
             </div>
+            {scheduledAt && (
+              <div className="mt-3">
+                <label htmlFor="schedule-at" className="mb-1 block text-label-small text-content-secondary">
+                  Pickup date &amp; time
+                </label>
+                <input
+                  id="schedule-at"
+                  type="datetime-local"
+                  step={SLOT_STEP_SEC}
+                  min={toLocalInput(new Date(Date.now() + SCHEDULE_LEAD_MIN * 60_000))}
+                  max={toLocalInput(new Date(Date.now() + SCHEDULE_MAX_DAYS * 86_400_000))}
+                  value={toLocalInput(new Date(scheduledAt))}
+                  onChange={(e) => { if (e.target.value) setScheduledAt(clampToHours(new Date(e.target.value), openH, closeH).toISOString()); }}
+                  className="w-full h-11 rounded-sm border border-border-opaque bg-background-secondary
+                    px-3 text-paragraph-medium text-content-primary outline-none transition-base
+                    focus:border-border-accent focus:ring-2 focus:ring-accent-400"
+                />
+                <p className="mt-1 text-label-small text-content-secondary">
+                  Driver arrives for{" "}
+                  <span className="text-content-primary">
+                    {new Date(scheduledAt).toLocaleString("en-IN", {
+                      weekday: "short", day: "numeric", month: "short",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </span>
+                  . Bookable {fmtHour(openH)} to {fmtHour(closeH)}, from 40 min ahead up to 7 days.
+                </p>
+              </div>
+            )}
           </Section>
 
           {/* [6] Duration slider */}
@@ -532,12 +628,19 @@ export function BookingSheet() {
                     <div className="flex items-center gap-2">
                       <FareDisplay amount={fareBreakdown?.estimated_total_paise ?? 0} size="lg" />
                       {fareEstimate.surge_active && (
-                        <span className="rounded-sm bg-surface-negative px-2 py-0.5 text-label-small text-content-negative">
-                          🔥 {fareBreakdown?.surge_multiplier?.toFixed(1)}× surge
+                        <span className="inline-flex items-center gap-1 rounded-sm bg-surface-negative px-2 py-0.5 text-label-small text-content-negative">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 3c2 3 5 5 5 9a5 5 0 11-10 0c0-2 1-3 2-4 .5 1 1.5 1.5 2 1 .5-1.5-1-3.5 1-6z" />
+                          </svg>
+                          {fareBreakdown?.surge_multiplier?.toFixed(1)}× surge
                         </span>
                       )}
                       {(fareBreakdown?.night_charge_paise ?? 0) > 0 && (
-                        <span className="text-sm">🌙</span>
+                        <span title="Night charge" className="inline-flex text-content-tertiary">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                          </svg>
+                        </span>
                       )}
                     </div>
                     <p className="text-paragraph-small text-content-secondary mt-0.5">
@@ -570,7 +673,12 @@ export function BookingSheet() {
           <Section>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🛡️</span>
+                <span className="flex h-5 w-5 items-center justify-center text-content-accent">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3l7 3v5c0 4.4-3 7.4-7 8.5-4-1.1-7-4.1-7-8.5V6l7-3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
                 <div>
                   <span className="text-label-medium text-content-primary">D4M Care</span>
                   <p className="text-paragraph-small text-content-secondary">
@@ -598,7 +706,13 @@ export function BookingSheet() {
           <Section>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🚗</span>
+                <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 17l1.5-4.5L7 8h10l2.5 4.5L21 17H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                    <circle cx="7.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
+                    <circle cx="16.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                </span>
                 <div>
                   <span className="text-label-medium text-content-primary">I won&apos;t be in the car</span>
                   <p className="text-paragraph-small text-content-secondary">
@@ -624,7 +738,11 @@ export function BookingSheet() {
                 onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoStatus("idle"); }}
               />
               {promoStatus === "ok" && (
-                <span className="text-content-positive text-label-medium">✓</span>
+                <span className="flex items-center text-content-positive" aria-label="Promo applied">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
               )}
               {promoStatus === "err" && (
                 <span className="text-content-negative text-label-small">Invalid</span>
@@ -665,6 +783,11 @@ export function BookingSheet() {
 
           {/* [13] Book Driver CTA */}
           <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
+            {bookingError && (
+              <p role="alert" className="mb-2 text-label-small text-content-negative">
+                {bookingError}
+              </p>
+            )}
             <button
               type="button"
               disabled={!pickup || isMonthly || bookingState === "loading"}

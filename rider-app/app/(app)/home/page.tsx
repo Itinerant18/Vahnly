@@ -61,7 +61,7 @@ export default function HomePage() {
   }, [userLocation]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background-secondary">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary">
       {/* Map — full screen behind everything */}
       <div className="absolute inset-0 z-0">
         <RiderMap

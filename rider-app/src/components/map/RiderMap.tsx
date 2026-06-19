@@ -141,7 +141,12 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
 
   return (
     <div className="relative h-full w-full">
-      <div ref={mapRef} className="h-full w-full" />
+      <div
+        ref={mapRef}
+        role="region"
+        aria-label="Map of nearby drivers"
+        className="h-full w-full"
+      />
 
       {/* Driver-count halo — hidden when no drivers are nearby */}
       {nearbyDrivers.length > 0 && (

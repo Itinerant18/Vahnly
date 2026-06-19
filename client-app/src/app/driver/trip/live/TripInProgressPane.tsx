@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SlideToConfirm } from '../../../../components/SlideToConfirm';
 import { addOrderEvent } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
-import { FareDisplay, StatusBadge } from '../../../../components/ds';
+import { FareDisplay, StatusBadge, PhoneIcon, ChatIcon, PlusIcon, ParkingIcon, SirenIcon, RouteIcon } from '../../../../components/ds';
 
 interface TripInProgressPaneProps {
   activeTrip: any;
@@ -229,9 +229,10 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                   className="h-9 px-3 rounded-sm bg-background-secondary border border-border-opaque
                     text-label-small text-content-primary cursor-pointer
                     hover:bg-background-tertiary transition-base min-w-[44px]
+                    flex items-center justify-center
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
                 >
-                  📞
+                  <PhoneIcon size={18} />
                 </button>
                 <button
                   onClick={() => alert('Opening chat')}
@@ -239,9 +240,10 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                   className="h-9 px-3 rounded-sm bg-background-secondary border border-border-opaque
                     text-label-small text-content-primary cursor-pointer
                     hover:bg-background-tertiary transition-base min-w-[44px]
+                    flex items-center justify-center
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
                 >
-                  💬
+                  <ChatIcon size={18} />
                 </button>
               </div>
             </div>
@@ -324,7 +326,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                   cursor-pointer hover:bg-background-tertiary transition-base
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                ➕ Toll
+                <span className="inline-flex items-center justify-center gap-1.5"><PlusIcon size={16} /> Toll</span>
               </button>
               <button
                 onClick={handleParkingAddition}
@@ -333,7 +335,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                   cursor-pointer hover:bg-background-tertiary transition-base
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                🅿 Park
+                <span className="inline-flex items-center justify-center gap-1.5"><ParkingIcon size={16} /> Park</span>
               </button>
               <button
                 onClick={() => setIsReportingIssue(!isReportingIssue)}
@@ -342,7 +344,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                   cursor-pointer hover:opacity-80 transition-base
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
               >
-                🚨 Issue
+                <span className="inline-flex items-center justify-center gap-1.5"><SirenIcon size={16} /> Issue</span>
               </button>
             </div>
 
@@ -353,7 +355,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                 cursor-pointer hover:bg-background-tertiary transition-base
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
-              ➕ Add Custom Toll / Parking
+              <span className="inline-flex items-center justify-center gap-1.5"><PlusIcon size={16} /> Add Custom Toll / Parking</span>
             </button>
 
             {/* Report issue expandable */}
@@ -424,8 +426,8 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                     style={{ width: `${sosProgress}%` }}
                   />
                 )}
-                <span className="relative z-10">
-                  🚨 SOS {isHoldingSos ? `(${Math.round(sosProgress)}%)` : '(Hold)'}
+                <span className="relative z-10 inline-flex items-center justify-center gap-1.5">
+                  <SirenIcon size={16} /> SOS {isHoldingSos ? `(${Math.round(sosProgress)}%)` : '(Hold)'}
                 </span>
               </button>
             </div>
@@ -502,7 +504,9 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                       : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-content-primary',
                   ].join(' ')}
                 >
-                  {t === 'toll_added' ? '🛣️ Toll' : '🅿️ Parking'}
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    {t === 'toll_added' ? <><RouteIcon size={16} /> Toll</> : <><ParkingIcon size={16} /> Parking</>}
+                  </span>
                 </button>
               ))}
             </div>

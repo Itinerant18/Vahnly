@@ -1,10 +1,19 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { TripStatus } from "@/lib/api/types";
+
+const CheckCircle = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M8.5 12.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 type StatusConfig = {
   label: string;
   cls: string; // full className string for the banner
+  icon?: ReactNode;
 };
 
 const CONFIG: Record<TripStatus, StatusConfig> = {
@@ -21,8 +30,9 @@ const CONFIG: Record<TripStatus, StatusConfig> = {
     cls: "bg-accent-400 text-white",
   },
   ARRIVED_AT_PICKUP: {
-    label: "Driver has arrived! 🎉",
+    label: "Driver has arrived",
     cls: "bg-positive-400 text-white",
+    icon: CheckCircle,
   },
   DELIVERING: {
     label: "Trip in progress",
@@ -33,8 +43,9 @@ const CONFIG: Record<TripStatus, StatusConfig> = {
     cls: "bg-accent-400 text-white",
   },
   COMPLETED: {
-    label: "Trip complete ✓",
+    label: "Trip complete",
     cls: "bg-positive-400 text-white",
+    icon: CheckCircle,
   },
   CANCELLED: {
     label: "Trip cancelled",
@@ -49,6 +60,7 @@ export function StatusBanner({ status }: { status: TripStatus | null }) {
 
   return (
     <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 ${cfg.cls}`}>
+      {cfg.icon}
       <span className="text-label-medium font-semibold">{cfg.label}</span>
     </div>
   );

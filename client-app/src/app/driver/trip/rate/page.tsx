@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { rateRider } from '@/api/client';
+import { CheckIcon } from '@/components/ds';
 
 export default function RateRiderPage() {
   const t = useTranslations('driverTripRate');
@@ -80,7 +81,7 @@ export default function RateRiderPage() {
       <div className="min-h-screen bg-black text-white p-4 sm:p-6 font-mono flex flex-col justify-center selection:bg-white selection:text-black">
         <main className="max-w-md mx-auto w-full space-y-6 text-center">
           <div className="space-y-2">
-            <span className="text-4xl block">✅</span>
+            <span className="flex justify-center text-content-positive"><CheckIcon size={40} /></span>
             <h1 className="text-sm font-bold text-white uppercase tracking-wider">{t('thanksTitle')}</h1>
             <p className="text-[10px] text-content-tertiary">{t('nextPrompt')}</p>
           </div>

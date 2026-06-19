@@ -184,7 +184,7 @@ export default function RatePage() {
       {/* Toast */}
       {toast && (
         <div className="fixed inset-x-4 top-16 z-50 rounded-2xl bg-positive-400 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg">
-          Thanks for your feedback! 🙏
+          Thanks for your feedback!
         </div>
       )}
     </div>

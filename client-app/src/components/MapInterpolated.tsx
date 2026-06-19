@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 
 export interface MapDriver {
   id: string;
@@ -54,6 +55,10 @@ export default function MapInterpolated({
   const [zoomLevel, setZoomLevel] = useState(15);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+
+  // When the OS asks for reduced motion, snap vehicle pins to their target
+  // instead of gliding the 4s tween.
+  const prefersReducedMotion = useReducedMotion();
 
   // Update center when prop changes
   useEffect(() => {
@@ -271,7 +276,7 @@ export default function MapInterpolated({
       Object.values(driverStateRef.current).forEach((state) => {
         const elapsed = now - state.startTime;
         const duration = 4000;
-        const progress = Math.min(1.0, elapsed / duration);
+        const progress = prefersReducedMotion ? 1 : Math.min(1.0, elapsed / duration);
 
         state.currentLat = state.startLat + (state.targetLat - state.startLat) * progress;
         state.currentLng = state.startLng + (state.targetLng - state.startLng) * progress;
@@ -317,7 +322,7 @@ export default function MapInterpolated({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination, theme]);
+  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination, theme, prefersReducedMotion]);
 
   // Handle Dragging / Map Panning
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -353,6 +358,8 @@ export default function MapInterpolated({
         ref={canvasRef}
         width={750}
         height={450}
+        role="img"
+        aria-label="Live map of nearby drivers and the trip route. Use the zoom buttons to change view."
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}

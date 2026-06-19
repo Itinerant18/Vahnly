@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { RiderStreamManager } from "@/lib/websocket/RiderStreamManager";
 import type { RiderWebSocketMessage } from "@/lib/websocket/types";
 import { useTripStore } from "@/lib/store/tripStore";
+import type { TripStatus } from "@/lib/api/types";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { ordersApi } from "@/lib/api/orders";
 import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
@@ -30,7 +31,7 @@ function FAB({
   onClick,
   danger = false,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
@@ -47,7 +48,7 @@ function FAB({
           : "bg-background-primary/90 border border-border-opaque backdrop-blur-sm",
       ].join(" ")}
     >
-      <span className="text-xl leading-none">{icon}</span>
+      <span className="flex h-5 w-5 items-center justify-center leading-none">{icon}</span>
       <span className={`text-label-small ${danger ? "text-white" : "text-content-secondary"}`}>
         {label}
       </span>
@@ -55,14 +56,68 @@ function FAB({
   );
 }
 
+// ── Cancellation fees (display only; backend enforces) ────────────────────────
+// Mirrors backend env defaults: free before the driver sets off, ₹30 once
+// EN_ROUTE, ₹50 once the driver has travelled to / reached the car.
+const CANCEL_FEE_ENROUTE_PAISE = 3000;
+const CANCEL_FEE_ARRIVED_PAISE = 5000;
+
+function cancelFeePaise(status: TripStatus | null): number {
+  switch (status) {
+    case "EN_ROUTE_TO_PICKUP":
+      return CANCEL_FEE_ENROUTE_PAISE;
+    case "ARRIVED_AT_PICKUP":
+    case "WAITING":
+    case "DELIVERING":
+      return CANCEL_FEE_ARRIVED_PAISE;
+    default:
+      return 0; // CREATED, ASSIGNED, terminal
+  }
+}
+
+// ── Waiting meter (rider-facing running estimate) ─────────────────────────────
+// The WS "waiting" event carries no amount, so estimate client-side at the known
+// ₹2/min rate. Backend is the source of truth on the final bill.
+const WAIT_RATE_PAISE_PER_MIN = 200;
+
+function WaitingMeter() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  const chargePaise = Math.ceil(seconds / 60) * WAIT_RATE_PAISE_PER_MIN;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mt-2 flex items-center justify-between gap-3 rounded-md bg-surface-warning px-4 py-2.5 backdrop-blur-sm"
+    >
+      <span className="font-mono text-mono-small text-content-warning tabular-nums">
+        Driver waiting · {mm}:{ss}
+      </span>
+      <span className="text-label-small text-content-warning">
+        ≈ <FareDisplay amount={chargePaise} size="sm" className="text-content-warning" /> so far
+      </span>
+    </div>
+  );
+}
+
 // ── Cancel confirm sheet ──────────────────────────────────────────────────────
 function CancelConfirmSheet({
+  status,
   onCancel,
   onClose,
 }: {
+  status: TripStatus | null;
   onCancel: () => void;
   onClose: () => void;
 }) {
+  const fee = cancelFeePaise(status);
+  const reached = status === "ARRIVED_AT_PICKUP" || status === "WAITING" || status === "DELIVERING";
   return (
     <div
       className="fixed inset-0 z-50 flex items-end bg-black/60"
@@ -73,16 +128,29 @@ function CancelConfirmSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
-        <h3 className="text-heading-small text-content-primary">Cancel Trip?</h3>
-        <p className="mt-2 text-paragraph-medium text-content-secondary">
-          Cancellations within 3 minutes of assignment are free. After that, a ₹50 fee may apply.
-        </p>
+        <h3 className="text-heading-small text-content-primary">Cancel trip?</h3>
+        {fee > 0 ? (
+          <div className="mt-2 space-y-2">
+            <p className="text-paragraph-medium text-content-secondary">
+              Your driver is already {reached ? "at your car" : "on the way to your car"}, so a
+              cancellation fee applies. It will be charged to your selected payment method.
+            </p>
+            <div className="flex items-center justify-between rounded-sm bg-surface-negative px-3 py-2">
+              <span className="text-label-medium text-content-negative">Cancellation fee</span>
+              <FareDisplay amount={fee} size="md" className="text-content-negative" />
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-paragraph-medium text-content-secondary">
+            No fee applies yet. You can cancel this trip free of charge.
+          </p>
+        )}
         <div className="mt-5 flex gap-3">
           <button
             type="button"
             onClick={onClose}
             className="flex-1 rounded-sm bg-background-secondary border border-border-opaque
-              py-3 text-label-medium text-content-secondary cursor-pointer
+              py-3 text-label-medium text-content-secondary cursor-pointer min-h-[44px]
               hover:bg-background-tertiary transition-base
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
           >
@@ -91,12 +159,12 @@ function CancelConfirmSheet({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-sm bg-surface-negative border border-negative-200
-              py-3 text-label-medium text-content-negative font-semibold cursor-pointer
-              hover:opacity-80 transition-base
+            className="flex-1 rounded-sm bg-negative-400 border border-negative-400
+              py-3 text-label-medium text-white font-semibold cursor-pointer min-h-[44px]
+              hover:opacity-90 transition-base
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
           >
-            Cancel trip
+            {fee > 0 ? `Cancel & pay ₹${Math.round(fee / 100)}` : "Cancel trip"}
           </button>
         </div>
         <div className="h-4" />
@@ -270,9 +338,11 @@ function ChangeDropSheet({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
+            className="flex items-center px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
         {(searching || results.length > 0) && (
@@ -506,7 +576,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
   const inTrip = tripStatus === "DELIVERING";
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background-secondary">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary">
       {/* Full-screen map */}
       <div className="absolute inset-0 z-0">
         <TripMap
@@ -523,18 +593,31 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
       {/* Status banner — top */}
       <div className="absolute inset-x-4 top-4 z-20">
         <StatusBanner status={tripStatus} />
+        {tripStatus === "WAITING" && <WaitingMeter />}
       </div>
 
       {/* Right-side FABs */}
       <div className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2">
         {inTrip && (
           <>
-            <FAB icon="+" label="Stop"   onClick={() => setAddStopInput(true)} />
-            <FAB icon="📍" label="Drop"   onClick={() => setChangeDropInput(true)} />
-            <FAB icon="⏱" label="Extend" onClick={() => setShowExtend(true)} />
+            <FAB
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>}
+              label="Stop" onClick={() => setAddStopInput(true)}
+            />
+            <FAB
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" /></svg>}
+              label="Drop" onClick={() => setChangeDropInput(true)}
+            />
+            <FAB
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" /><path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              label="Extend" onClick={() => setShowExtend(true)}
+            />
           </>
         )}
-        <FAB icon="🆘" label="SOS" onClick={() => setShowSOS(true)} danger />
+        <FAB
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l9 16H3L12 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><path d="M12 10v4M12 17h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>}
+          label="SOS" onClick={() => setShowSOS(true)} danger
+        />
       </div>
 
       {/* Bottom panel */}
@@ -571,7 +654,12 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
               onClick={() => setChatOpen((o) => !o)}
               className="w-full flex items-center justify-between px-4 py-3 text-label-medium font-semibold text-content-primary"
             >
-              <span>💬 Message driver{chat.length > 0 ? ` (${chat.length})` : ""}</span>
+              <span className="flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M21 12a8 8 0 01-11.5 7.2L4 20l1.2-4.2A8 8 0 1121 12z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+                Message driver{chat.length > 0 ? ` (${chat.length})` : ""}
+              </span>
               <span className="text-content-tertiary">{chatOpen ? "▾" : "▸"}</span>
             </button>
             {chatOpen && (
@@ -641,9 +729,11 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
               type="button"
               aria-label="Close"
               onClick={() => setAddStopInput(false)}
-              className="px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
+              className="flex items-center px-3 text-content-tertiary hover:text-content-primary transition-base cursor-pointer"
             >
-              ✕
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </button>
           </div>
         </div>
@@ -657,7 +747,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
       {showExtend  && <ExtendSheet onExtend={handleExtend} onClose={() => setShowExtend(false)} />}
       {showSOS     && <SOSModal onClose={() => setShowSOS(false)} />}
       {showShare   && <ShareTripSheet onClose={() => setShowShare(false)} />}
-      {showCancel  && <CancelConfirmSheet onCancel={handleCancel} onClose={() => setShowCancel(false)} />}
+      {showCancel  && <CancelConfirmSheet status={tripStatus} onCancel={handleCancel} onClose={() => setShowCancel(false)} />}
       {rideCheckMsg && (
         <RideCheckModal
           message={rideCheckMsg}

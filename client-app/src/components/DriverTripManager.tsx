@@ -4,7 +4,7 @@ import { OfferPopup } from './OfferPopup';
 import { FinalBill } from '../api/client';
 import { ArrivedVerificationPane } from '../app/driver/trip/live/ArrivedVerificationPane';
 import { TripInProgressPane } from '../app/driver/trip/live/TripInProgressPane';
-import { FareDisplay, ETADisplay, StatusBadge } from './ds';
+import { FareDisplay, ETADisplay, StatusBadge, BellIcon, PhoneIcon, ChatIcon, NavigateIcon, CheckIcon, CashIcon, CardIcon } from './ds';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardHome — Duty toggle + stats
@@ -162,7 +162,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         }}
         className="w-full bg-surface-warning border border-border-opaque rounded-sm py-3 text-label-medium text-content-warning cursor-pointer transition-base hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
       >
-        🔔 Simulate Incoming Booking (Demo)
+        <span className="inline-flex items-center justify-center gap-2">
+          <BellIcon size={16} /> Simulate Incoming Booking (Demo)
+        </span>
       </button>
     </div>
   );
@@ -241,7 +243,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
             hover:bg-background-tertiary active:scale-95
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
         >
-          <span className="text-xl">📞</span>
+          <PhoneIcon size={20} />
           <span>Call</span>
         </button>
         <button
@@ -251,7 +253,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
             hover:bg-background-tertiary active:scale-95
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
         >
-          <span className="text-xl">💬</span>
+          <ChatIcon size={20} />
           <span>Chat</span>
         </button>
         <button
@@ -261,7 +263,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
             hover:bg-accent-500 active:scale-95
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
         >
-          <span className="text-xl">🗺️</span>
+          <NavigateIcon size={20} />
           <span>Navigate</span>
         </button>
       </div>
@@ -274,7 +276,9 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
-        ✔ I&apos;ve Arrived
+        <span className="inline-flex items-center justify-center gap-2">
+          <CheckIcon size={18} /> I&apos;ve Arrived
+        </span>
       </button>
 
       <button
@@ -421,7 +425,9 @@ export const CompletedPane: React.FC<CompletedPaneProps> = ({
             cursor-pointer transition-base hover:bg-background-tertiary active:scale-95
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
         >
-          💵 Cash
+          <span className="inline-flex items-center justify-center gap-2">
+            <CashIcon size={18} /> Cash
+          </span>
         </button>
         <button
           onClick={() => handlePaymentConfirmationSubmit('UPI')}
@@ -430,7 +436,9 @@ export const CompletedPane: React.FC<CompletedPaneProps> = ({
             cursor-pointer transition-base hover:opacity-90 active:scale-95
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
         >
-          💳 UPI
+          <span className="inline-flex items-center justify-center gap-2">
+            <CardIcon size={18} /> UPI
+          </span>
         </button>
       </div>
     </div>
