@@ -38,6 +38,7 @@ type RiderOrder struct {
 	PersonsCount *int            `json:"persons_count,omitempty"`
 	RiderStops   json.RawMessage `json:"stops,omitempty"`
 	ScheduledAt  *time.Time      `json:"scheduled_at,omitempty"`
+	TripType     *string         `json:"trip_type,omitempty"`
 
 	TripShareToken     *string    `json:"trip_share_token,omitempty"`
 	TripShareExpiresAt *time.Time `json:"trip_share_expires_at,omitempty"`

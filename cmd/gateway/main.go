@@ -205,6 +205,7 @@ func main() {
 	riderSupportHandler := riderHttp.NewSupportHandler(dbPool, riderAppLogger)
 	riderNotifPrefsHandler := riderHttp.NewNotifPrefsHandler(dbPool, riderAppLogger)
 	riderNearbyHandler := riderHttp.NewNearbyHandler(dbPool, riderAppLogger)
+	riderCityConfigHandler := riderHttp.NewCityConfigHandler(dbPool, riderAppLogger)
 	riderCMSHandler := riderHttp.NewCMSHandler(dbPool, riderAppLogger)
 	riderPhotoHandler := riderHttp.NewPhotoHandler(objStore, riderAppLogger)
 
@@ -766,6 +767,9 @@ func main() {
 
 	// Rider App: nearby-driver markers for the map idle state (deterministic stub).
 	mux.HandleFunc("GET /api/v1/rider/nearby-drivers", riderAuthMW.Require(riderNearbyHandler.HandleNearbyDrivers))
+
+	// Rider App: city config (operating hours + supported tiers) for the scheduler/booking sheet.
+	mux.HandleFunc("GET /api/v1/rider/city-config", riderAuthMW.Require(riderCityConfigHandler.HandleGetCityConfig))
 
 	// Public CMS legal/policy documents (no auth — rendered on unauthenticated screens).
 	mux.HandleFunc("GET /api/v1/cms/document", riderCMSHandler.HandleGetDocument)

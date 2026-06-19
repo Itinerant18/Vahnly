@@ -22,7 +22,8 @@ func NewBookingHandler(booking *service.BookingService, logger *log.Logger) *Boo
 
 func (h *BookingHandler) writeBookingError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, service.ErrInvalidBooking), errors.Is(err, service.ErrCarNotFound):
+	case errors.Is(err, service.ErrInvalidBooking), errors.Is(err, service.ErrCarNotFound),
+		errors.Is(err, service.ErrOutsideServiceArea):
 		writeError(w, http.StatusBadRequest, err.Error(), "ERR_VALIDATION")
 	case errors.Is(err, service.ErrActiveOrderExists), errors.Is(err, service.ErrOrderNotCancellable),
 		errors.Is(err, service.ErrAlreadyRated), errors.Is(err, service.ErrTripNotActive),

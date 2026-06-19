@@ -42,6 +42,10 @@ type RiderOrderRepository interface {
 	UpdateOrderStops(ctx context.Context, orderID, riderID string, stopsJSON []byte, newBaseFare int64, newSurge float64) error
 	UpdateBookedDuration(ctx context.Context, orderID, riderID string, hours int, newBaseFare int64) error
 	UpdateOrderDropoff(ctx context.Context, orderID, riderID string, lat, lng float64, address string, newBaseFare int64, newSurge float64) error
+
+	// InServiceArea reports whether a pickup point falls inside the city's active
+	// geofence. Returns true when there is no geofence to enforce (fail-open).
+	InServiceArea(ctx context.Context, city string, lat, lng float64) (bool, error)
 }
 
 type InsertOrderParams struct {
@@ -74,6 +78,7 @@ type InsertOrderParams struct {
 	BookedDurationHours    *int
 	PackageType            string // HOURLY|MINI_OUTSTATION|OUTSTATION|MONTHLY; "" = distance-priced
 	OwnerNotInCar          bool   // rider sends the car without riding along
+	TripType               string // booking tier (IN_CITY_ROUND|OUTSTATION|…); "" = unset
 }
 
 type OrderFilter struct {
@@ -164,7 +169,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 			garage_car_id, one_time_car_make, one_time_car_model, one_time_car_type, one_time_car_transmission,
 			payment_method, promo_code, promo_discount_paise, d4m_care_opted,
 			trip_share_token, trip_share_expires_at, persons_count, scheduled_at, rider_stops,
-			booked_duration_hours, package_type, owner_not_in_car
+			booked_duration_hours, package_type, owner_not_in_car, trip_type
 		) VALUES (
 			$1, $2::uuid, $3::uuid, 'CREATED'::order_status_enum,
 			ST_GeographyFromText($4), ST_GeographyFromText($5), $6, 0,
@@ -172,7 +177,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 			$11::uuid, $12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24,
-			$25, NULLIF($26, ''), $27
+			$25, NULLIF($26, ''), $27, NULLIF($28, '')
 		) RETURNING id::text`,
 		p.CityPrefix, p.RiderID, p.RiderID,
 		pickupGeom, dropoffGeom, p.PickupH3Cell,
@@ -180,7 +185,7 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 		p.GarageCarID, p.OneTimeCarMake, p.OneTimeCarModel, p.OneTimeCarType, p.OneTimeCarTransmission,
 		p.PaymentMethod, p.PromoCode, p.PromoDiscountPaise, p.D4MCareOpted,
 		p.TripShareToken, p.TripShareExpiresAt, p.PersonsCount, p.ScheduledAt, p.WaypointsJSON,
-		p.BookedDurationHours, p.PackageType, p.OwnerNotInCar,
+		p.BookedDurationHours, p.PackageType, p.OwnerNotInCar, p.TripType,
 	).Scan(&orderID)
 	if err != nil {
 		return "", err
@@ -207,6 +212,26 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 	return orderID, nil
 }
 
+// InServiceArea reports whether (lat,lng) is covered by the city's active
+// geofence. Fail-open: when no active geofenced row exists, returns true so a
+// missing/unset geofence never blocks bookings.
+func (r *postgresOrderRepo) InServiceArea(ctx context.Context, city string, lat, lng float64) (bool, error) {
+	var covered bool
+	err := r.dbPool.QueryRow(ctx, `
+		SELECT ST_Covers(geofence, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography)
+		FROM regional_cities
+		WHERE city_prefix = $1 AND is_active AND geofence IS NOT NULL`,
+		city, lng, lat,
+	).Scan(&covered)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil // nothing to enforce
+	}
+	if err != nil {
+		return true, err // fail-open on transient errors; caller may log
+	}
+	return covered, nil
+}
+
 const orderSelect = `
 	id::text, status::text, city_prefix, rider_id::text, assigned_driver_id::text,
 	ST_Y(pickup_location::geometry), ST_X(pickup_location::geometry),
@@ -214,7 +239,7 @@ const orderSelect = `
 	pickup_h3_cell,
 	garage_car_id::text, one_time_car_make, one_time_car_model, one_time_car_type, one_time_car_transmission,
 	base_fare_paise, surge_multiplier, promo_code, promo_discount_paise, d4m_care_opted, payment_method,
-	persons_count, rider_stops, scheduled_at,
+	persons_count, rider_stops, scheduled_at, trip_type,
 	trip_share_token, trip_share_expires_at,
 	rider_rating_for_driver, rider_tip_paise, rider_review_tags, rider_review_comment,
 	cancelled_by, cancellation_reason,
@@ -231,7 +256,7 @@ func scanRiderOrder(row rowScanner) (*domain.RiderOrder, error) {
 		&o.PickupH3Cell,
 		&o.GarageCarID, &o.OneTimeCarMake, &o.OneTimeCarModel, &o.OneTimeCarType, &o.OneTimeCarTransmission,
 		&o.BaseFarePaise, &surge, &o.PromoCode, &o.PromoDiscountPaise, &o.D4MCareOpted, &o.PaymentMethod,
-		&o.PersonsCount, &o.RiderStops, &o.ScheduledAt,
+		&o.PersonsCount, &o.RiderStops, &o.ScheduledAt, &o.TripType,
 		&o.TripShareToken, &o.TripShareExpiresAt,
 		&o.RiderRatingForDriver, &o.RiderTipPaise, &o.RiderReviewTags, &o.RiderReviewComment,
 		&o.CancelledBy, &o.CancellationReason,

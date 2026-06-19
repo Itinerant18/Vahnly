@@ -40,6 +40,7 @@ var (
 	ErrTripNotActive       = errors.New("order is not an active (DELIVERING) trip")
 	ErrTooManyStops        = errors.New("maximum of 3 stops already added")
 	ErrMonthlyNotBookable  = errors.New("monthly package estimate only; recurring billing not yet available")
+	ErrOutsideServiceArea  = errors.New("pickup is outside our service area; Vahnly operates in Kolkata only for now")
 )
 
 // Fare engine constants — mirror internal/pricing OrderPricingService. The
@@ -375,6 +376,11 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 	if city == "" {
 		city = "KOL"
 	}
+	// Geofence gate: reject pickups outside the city's service area. Fail-open if
+	// the check itself errors — a transient DB issue must not block all bookings.
+	if ok, err := s.orders.InServiceArea(ctx, city, req.PickupLat, req.PickupLng); err == nil && !ok {
+		return nil, ErrOutsideServiceArea
+	}
 
 	// 2. resolve the car (garage car / one-time / default).
 	var garageCarID *string
@@ -504,6 +510,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		BookedDurationHours:    bookedDuration,
 		PackageType:            req.PackageType,
 		OwnerNotInCar:          req.OwnerNotInCar,
+		TripType:               req.TripType,
 	})
 	if err != nil {
 		return nil, err
