@@ -9,7 +9,13 @@ import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
 import { SlideToConfirm } from '../../components/SlideToConfirm';
 import { DriverTripManager } from '../../components/DriverTripManager';
 import { SentryErrorBoundary } from '../../components/SentryErrorBoundary';
-import MapInterpolated, { MapDriver } from '../../components/MapInterpolated';
+import dynamic from 'next/dynamic';
+import type { MapDriver } from '@/components/map/DriverMap';
+
+const DriverMap = dynamic(() => import('@/components/map/DriverMap'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-background-secondary" />,
+});
 import { DriverDrawer } from '../../components/DriverDrawer';
 import { DevLocationSpoof } from '../../components/DevLocationSpoof';
 import { SosModal } from '../../components/SosModal';
@@ -1280,8 +1286,17 @@ export default function DriverTerminalPage() {
             </svg>
           ) : (
             <div className="w-full h-full">
-              <MapInterpolated
+              <DriverMap
                 drivers={mapDrivers}
+                h3Hexagons={
+                  heatmapData
+                    ? Object.entries(heatmapData.cell_data).map(([index, intensity]) => ({
+                        index,
+                        intensity,
+                        color: `rgba(239, 68, 68, ${0.1 + intensity * 0.4})`,
+                      }))
+                    : []
+                }
                 pickup={
                   (dutyState === 'EN_ROUTE' || dutyState === 'ARRIVED') && riderPin
                     ? riderPin
@@ -1424,6 +1439,7 @@ export default function DriverTerminalPage() {
           <DriverTripManager
             activeTrip={activeTrip}
             stats={stats}
+            profile={profile}
             activeVehicle={activeVehicle}
             setActiveVehicle={setActiveVehicle}
             preferredTripFilter={preferredTripFilter}

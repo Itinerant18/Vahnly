@@ -1,7 +1,7 @@
 import React from 'react';
 import { DutyState, useDriverDutyStore } from '../store/useDriverDutyStore';
 import { OfferPopup } from './OfferPopup';
-import { FinalBill } from '../api/client';
+import { FinalBill, DriverProfile } from '../api/client';
 import { ArrivedVerificationPane } from '../app/driver/trip/live/ArrivedVerificationPane';
 import { TripInProgressPane } from '../app/driver/trip/live/TripInProgressPane';
 import { FareDisplay, ETADisplay, StatusBadge, BellIcon, PhoneIcon, ChatIcon, NavigateIcon, CheckIcon, CashIcon, CardIcon } from './ds';
@@ -12,6 +12,7 @@ import { FareDisplay, ETADisplay, StatusBadge, BellIcon, PhoneIcon, ChatIcon, Na
 
 interface DashboardHomeProps {
   dutyState: DutyState;
+  profile?: DriverProfile | null;
   activeVehicle: string;
   setActiveVehicle: (v: string) => void;
   preferredTripFilter: 'ALL' | 'CITY' | 'OUTSTATION';
@@ -30,6 +31,7 @@ interface DashboardHomeProps {
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
   dutyState,
+  profile,
   activeVehicle,
   setActiveVehicle,
   preferredTripFilter,
@@ -43,20 +45,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-4 text-left">
 
-      {/* ── Vehicle + trip-type filter row ── */}
+      {/* ── Driver Capability + trip-type filter row ── */}
       <div className="flex justify-between items-start bg-background-secondary rounded-md p-4 border border-border-opaque">
         <div className="min-w-0 flex-1">
           <span className="text-label-small text-content-tertiary uppercase tracking-wider block mb-1">
-            Vehicle
+            Allowed Cars
           </span>
-          <select
-            value={activeVehicle}
-            onChange={(e) => setActiveVehicle(e.target.value)}
-            className="bg-transparent text-label-large text-content-primary outline-none cursor-pointer w-full max-w-[180px]"
-          >
-            <option>WB-02-AK-9988 (Premium SUV)</option>
-            <option>KA-03-MD-4561 (Hatchback Core)</option>
-          </select>
+          <span className="text-label-large text-content-primary font-medium">
+            {profile?.can_drive_manual ? 'Manual & Automatic' : 'Automatic Only'}
+          </span>
         </div>
         <div className="text-right flex-shrink-0">
           <span className="text-label-small text-content-tertiary uppercase tracking-wider block mb-1">
@@ -450,6 +447,7 @@ export const CompletedPane: React.FC<CompletedPaneProps> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface DriverTripManagerProps {
+  profile?: DriverProfile | null;
   activeTrip: any;
   stats: any;
   activeVehicle: string;

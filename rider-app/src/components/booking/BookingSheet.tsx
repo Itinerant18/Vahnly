@@ -412,7 +412,7 @@ export function BookingSheet() {
         </div>
 
         {/* Scrollable booking form */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-44">
 
           {/* [1] Trip Type Selector */}
           <Section>
