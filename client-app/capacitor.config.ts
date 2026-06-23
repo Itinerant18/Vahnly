@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
     // each platform needs its OAuth client config (google-services.json / GoogleService-Info.plist).
     FirebaseAuthentication: {
       skipNativeAuth: false,
-      providers: ['google.com'],
+      providers: ['google.com', 'phone'],
     },
     BackgroundRunner: {
       label: 'com.vahnly.background.worker',
