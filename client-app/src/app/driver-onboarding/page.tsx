@@ -4,13 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDriverOnboardingStore } from '@/store/useDriverOnboardingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { saveOnboardingStep, uploadDocument, validateQuiz, syncOfflineOnboarding, updateDriverProfile } from '@/api/client';
-
-interface QuizQuestion {
-  id: number;
-  text: string;
-  options: string[];
-}
+import { saveOnboardingStep, uploadDocument, syncOfflineOnboarding, updateDriverProfile } from '@/api/client';
 
 export default function DriverOnboardingWizard() {
   const router = useRouter();
@@ -19,8 +13,6 @@ export default function DriverOnboardingWizard() {
   
   const [logs, setLogs] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [showScore, setShowScore] = useState(false);
-  const [quizScore, setQuizScore] = useState(0);
   const [termsScrolledToBottom, setTermsScrolledToBottom] = useState(false);
 
   // IFSC resolution (Razorpay free public lookup). 'verified' shows BANK — BRANCH,
@@ -84,7 +76,6 @@ export default function DriverOnboardingWizard() {
     emergencyPhone: '',
     signatureName: '',
     agreedToTerms: false,
-    quizAnswers: {} as Record<number, number>
   };
 
   const onboardingData = { ...defaultData, ...onboardingStoreData };
@@ -107,61 +98,6 @@ export default function DriverOnboardingWizard() {
     // Attempt to sync any cached offline payloads
     void syncOfflineOnboarding();
   }, [token, router]);
-
-  // Safety Etiquette quiz data bank
-  // Answer keys are NOT shipped to the client — grading is server-side (validateQuiz).
-  const quizQuestions: QuizQuestion[] = [
-    {
-      id: 1,
-      text: "What is the mandatory action upon arriving at a customer's vehicle location?",
-      options: [
-        "Immediately start the engine and drive off",
-        "Verify the customer's identity, input the start Odometer reading, and verify the 4-digit OTP",
-        "Wait inside the car and listen to music",
-        "Ask the customer to transfer funds to your personal account first"
-      ]
-    },
-    {
-      id: 2,
-      text: "How should you respond to unexpected heavy route congestion or delays during Outstation journeys?",
-      options: [
-        "Take high-speed risky shortcuts without checking safety conditions",
-        "Politely explain the situation to the customer, navigate via standard safe routes, and update ETA",
-        "Cancel the trip immediately and drop the customer off on the highway",
-        "Speed up past local speed limit thresholds to make up for lost time"
-      ]
-    },
-    {
-      id: 3,
-      text: "If a rider has activated 'D4M Care' protection, this implies:",
-      options: [
-        "The driver receives a higher incentive bonus for zero-incident safety ratings",
-        "Rider has premium support coverage, and driver must follow priority safety protocols",
-        "The driver is allowed to drive faster than usual",
-        "Both A and B are correct"
-      ]
-    },
-    {
-      id: 4,
-      text: "What is the daily fatigue threshold limit in our platform before a mandatory rest break is triggered?",
-      options: [
-        "6 continuous duty hours",
-        "10 continuous duty hours",
-        "16 continuous duty hours",
-        "24 continuous duty hours"
-      ]
-    },
-    {
-      id: 5,
-      text: "What action should you take if an emergency situation arises during the trip?",
-      options: [
-        "Tap the red SOS safety trigger on the screen to alert emergency nodes & call local hotline authorities",
-        "Try to resolve the dispute yourself on the road",
-        "Continue driving to the destination ignoring the issue",
-        "Turn off your phone to avoid distractions"
-      ]
-    }
-  ];
 
   // Helper log function
   const logEvent = (action: string, meta: any) => {
@@ -321,12 +257,6 @@ export default function DriverOnboardingWizard() {
     logEvent('LANGUAGE_PREFERENCE_UPDATED', { languages: current });
   };
 
-  const handleQuizAnswer = (qId: number, optionIdx: number) => {
-    const currentAnswers = { ...onboardingData.quizAnswers, [qId]: optionIdx };
-    setOnboardingData({ quizAnswers: currentAnswers });
-    logEvent('QUIZ_ANSWER_SELECT', { questionId: qId, selectedOption: optionIdx });
-  };
-
   const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 2;
@@ -335,41 +265,29 @@ export default function DriverOnboardingWizard() {
     }
   };
 
-  const evaluateQuizAndSubmit = async () => {
+  const submitOnboarding = async () => {
     if (!token) return;
 
-    // Format quizAnswers keys as strings for backend map matching
-    const formattedAnswers: Record<string, number> = {};
-    Object.entries(onboardingData.quizAnswers).forEach(([qId, val]) => {
-      formattedAnswers[qId] = val as number;
-    });
-
-    logEvent('QUIZ_SUBMIT_START', { answers: formattedAnswers });
+    logEvent('ONBOARDING_SUBMIT_START', { driverName: onboardingData.fullName });
 
     try {
-      const res = await validateQuiz(token, formattedAnswers);
-      setQuizScore(res.score);
-      setShowScore(true);
+      await saveOnboardingStep(token, 7, {
+        signatureName: onboardingData.signatureName,
+        agreedToTerms: onboardingData.agreedToTerms,
+      });
+      logEvent('ONBOARDING_COMPLETED', {
+        driverName: onboardingData.fullName,
+        timestamp: new Date().toISOString()
+      });
+      alert('Verification Completed! Welcome to Vahnly Fleet Engine. Your application has been submitted for administrative KYC approval.');
 
-      logEvent('QUIZ_SUBMIT_RESPONSE', { passed: res.passed, score: res.score });
+      // Clear wizard store
+      clearStore();
 
-      if (res.passed) {
-        logEvent('ONBOARDING_COMPLETED', {
-          driverName: onboardingData.fullName,
-          timestamp: new Date().toISOString()
-        });
-        alert('Verification Completed! Welcome to Vahnly Fleet Engine. Your application has been submitted for administrative KYC approval.');
-        
-        // Clear wizard store
-        clearStore();
-
-        router.push('/driver');
-      } else {
-        alert('Safety & Etiquette Quiz score below standard thresholds (requires 4/5 correct answers). Please review safety details and retry the quiz.');
-      }
+      router.push('/driver');
     } catch (err) {
-      logEvent('QUIZ_SUBMIT_ERROR', { error: String(err) });
-      alert("Failed to submit quiz results. Please check network connection.");
+      logEvent('ONBOARDING_SUBMIT_ERROR', { error: String(err) });
+      alert("Failed to submit application. Please check network connection.");
     }
   };
 
@@ -388,7 +306,7 @@ export default function DriverOnboardingWizard() {
       <header className="border-b border-border-opaque pb-4 flex justify-between items-center w-full max-w-4xl mx-auto text-left">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-white font-move">Driver Partner Registration</h1>
-          <p className="text-content-tertiary text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">8-Step Safety & KYC Compliance Wizard</p>
+          <p className="text-content-tertiary text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">7-Step Safety & KYC Compliance Wizard</p>
         </div>
         
         <div className="flex gap-2">
@@ -404,11 +322,11 @@ export default function DriverOnboardingWizard() {
       {/* Progress Stepper Bar */}
       <div className="w-full max-w-4xl mx-auto my-6">
         <div className="flex justify-between items-center text-xs font-mono mb-2 text-content-tertiary">
-          <span>Progress: Step {currentStep} of 8</span>
-          <span>{Math.round((currentStep / 8) * 100)}% Complete</span>
+          <span>Progress: Step {currentStep} of 7</span>
+          <span>{Math.round((currentStep / 7) * 100)}% Complete</span>
         </div>
         <div className="h-1.5 bg-background-secondary rounded-full w-full overflow-hidden flex">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 7 }).map((_, i) => (
             <div 
               key={i} 
               className={`flex-1 border-r border-black h-full transition-all duration-300 ${
@@ -788,41 +706,6 @@ export default function DriverOnboardingWizard() {
             </div>
           )}
 
-          {/* STEP 8: TRAINING QUIZ */}
-          {currentStep === 8 && (
-            <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 8 — Safety & Etiquette Certification Quiz</h2>
-              <p className="text-[10px] text-content-tertiary font-mono leading-relaxed">
-                Passing Score requirement: 80% (at least 4/5 answers correct). Review the safety and etiquette questions below.
-              </p>
-              
-              <div className="space-y-6 pt-2">
-                {quizQuestions.map((q, idx) => (
-                  <div key={q.id} className="space-y-2 border-b border-border-opaque pb-4">
-                    <span className="block text-xs font-bold text-white">{idx + 1}. {q.text}</span>
-                    <div className="flex flex-col gap-2 pt-1">
-                      {q.options.map((opt, optIdx) => (
-                        <button
-                          key={optIdx}
-                          type="button"
-                          onClick={() => handleQuizAnswer(q.id, optIdx)}
-                          className={`w-full text-left p-3 text-xs rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                            onboardingData.quizAnswers[q.id] === optIdx
-                              ? 'bg-white border-white text-black font-semibold'
-                              : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
-                          }`}
-                        >
-                          <span>{opt}</span>
-                          {onboardingData.quizAnswers[q.id] === optIdx && <span className="text-[10px]">✔️</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Stepper Navigation Buttons */}
           <div className="flex justify-between items-center border-t border-border-opaque pt-6">
             <button
@@ -834,22 +717,22 @@ export default function DriverOnboardingWizard() {
               Back
             </button>
 
-            {currentStep < 8 ? (
+            {currentStep < 7 ? (
               <button
                 onClick={nextStep}
-                disabled={currentStep === 7 && (!termsScrolledToBottom || !onboardingData.agreedToTerms || !onboardingData.signatureName.trim())}
                 type="button"
                 className="bg-white hover:bg-background-tertiary text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
-                {currentStep === 7 ? 'I Agree and Digitally Sign' : 'Next'}
+                Next
               </button>
             ) : (
               <button
-                onClick={evaluateQuizAndSubmit}
+                onClick={submitOnboarding}
+                disabled={!termsScrolledToBottom || !onboardingData.agreedToTerms || !onboardingData.signatureName.trim()}
                 type="button"
-                className="bg-positive-400 hover:bg-positive-400 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono"
+                className="bg-positive-400 hover:bg-positive-400 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 font-mono"
               >
-                Submit for Verification
+                I Agree and Submit Application
               </button>
             )}
           </div>
