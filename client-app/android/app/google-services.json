@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1016868477506-lfikcr6di75vv09r3gdfq3s6bos1vgc0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vahnly.driver",
+            "certificate_hash": "570081d4441b55e68914191b901fe2b76b685716"
+          }
+        },
+        {
           "client_id": "1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -63,6 +71,14 @@
           "android_info": {
             "package_name": "com.vahnly.rider",
             "certificate_hash": "84140cd2bc41eefc805e9ae14f44e36c9934ff1b"
+          }
+        },
+        {
+          "client_id": "1016868477506-sd3071t2uigkiqif4pml8mlot4glpd05.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vahnly.rider",
+            "certificate_hash": "570081d4441b55e68914191b901fe2b76b685716"
           }
         },
         {
