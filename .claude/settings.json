@@ -11,5 +11,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "data-agent-kit-starter-pack@data-agent-kit-starter-pack-marketplace": true
   }
 }
