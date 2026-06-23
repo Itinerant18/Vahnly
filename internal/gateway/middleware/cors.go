@@ -26,6 +26,7 @@ func (c *CORSMiddleware) Handler(next http.Handler) http.Handler {
 		"http://localhost:3050": true, // rider app dev
 		"capacitor://localhost": true, // native Capacitor (iOS) WebView origin
 		"http://localhost":      true, // native Capacitor (Android) WebView origin
+		"https://localhost":     true, // native Capacitor (Android) WebView origin (default in Capacitor 5+)
 		"ionic://localhost":     true, // legacy Ionic/Capacitor origin
 	}
 	if admin := strings.TrimRight(os.Getenv("ADMIN_FRONTEND_URL"), "/"); admin != "" {
