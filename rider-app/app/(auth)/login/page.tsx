@@ -83,7 +83,7 @@ export default function LoginPage() {
   const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string } | null>(null);
   const [googlePhone, setGooglePhone] = useState("");
   const [googleOtpSent, setGoogleOtpSent] = useState(false);
-  const [googleConfirmation, setGoogleConfirmation] = useState<import("firebase/auth").ConfirmationResult | null>(null);
+  const [googleConfirmation, setGoogleConfirmation] = useState<import("@/lib/phoneAuth").PhoneConfirmation | null>(null);
   const [googleOtp, setGoogleOtp] = useState("");
 
   // ── Phone OTP (primary) ──────────────────────────────────────────────────
@@ -117,8 +117,7 @@ export default function LoginPage() {
     try {
       const { startPhoneVerification } = await import("@/lib/phoneAuth");
       const conf = await startPhoneVerification(`+91${googlePhone.replace(/\D/g, "")}`);
-      // conf is a PhoneConfirmation (custom interface) — wrap to get ConfirmationResult-like
-      setGoogleConfirmation(conf as unknown as import("firebase/auth").ConfirmationResult);
+      setGoogleConfirmation(conf);
       setGoogleOtpSent(true);
     } catch {
       setError("Could not send OTP. Check the number and try again.");
@@ -129,7 +128,7 @@ export default function LoginPage() {
     if (!googleRegInfo || !googleConfirmation) return;
     setError("");
     try {
-      const phoneToken = await (googleConfirmation as unknown as { confirm: (c: string) => Promise<string> }).confirm(googleOtp);
+      const phoneToken = await googleConfirmation.confirm(googleOtp);
       const res = await googleLogin(googleRegInfo.idToken, {
         phone_token: phoneToken,
         name: googleRegInfo.name,

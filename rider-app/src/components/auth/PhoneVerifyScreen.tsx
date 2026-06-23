@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import { auth } from "@/lib/firebase";
 import {
   RecaptchaVerifier,
@@ -78,26 +79,46 @@ export default function PhoneVerifyScreen({
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
-    if (!auth) {
-      setError("Firebase not initialized.");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(
+      if (Capacitor.isNativePlatform()) {
+        // Native path: use @capacitor-firebase/authentication (no reCAPTCHA needed).
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        const vId = await new Promise<string>((resolve, reject) => {
+          FirebaseAuthentication.addListener("phoneCodeSent", (event: { verificationId: string }) => {
+            resolve(event.verificationId);
+          })
+            .then((handle) => {
+              FirebaseAuthentication.signInWithPhoneNumber({ phoneNumber: formatE164(phone) }).catch((err) => {
+                void handle.remove();
+                reject(err);
+              });
+            })
+            .catch(reject);
+        });
+        setVerificationId(vId);
+      } else {
+        // Web path: invisible reCAPTCHA + Firebase JS SDK.
+        if (!auth) {
+          setError("Firebase not initialized.");
+          setLoading(false);
+          return;
+        }
+        if (!recaptchaVerifierRef.current) {
+          recaptchaVerifierRef.current = new RecaptchaVerifier(
+            auth,
+            recaptchaContainerRef.current!,
+            { size: "invisible", callback: () => {} },
+          );
+        }
+        const result: ConfirmationResult = await signInWithPhoneNumber(
           auth,
-          recaptchaContainerRef.current!,
-          { size: "invisible", callback: () => {} },
+          formatE164(phone),
+          recaptchaVerifierRef.current,
         );
+        setVerificationId(result.verificationId);
       }
-      const result: ConfirmationResult = await signInWithPhoneNumber(
-        auth,
-        formatE164(phone),
-        recaptchaVerifierRef.current,
-      );
-      setVerificationId(result.verificationId);
       setStep("otp");
       setOtp(["", "", "", "", "", ""]);
       setCountdown(30);
@@ -106,7 +127,7 @@ export default function PhoneVerifyScreen({
       if (code === "auth/invalid-phone-number") setError("Invalid phone number.");
       else if (code === "auth/too-many-requests") setError("Too many attempts. Try later.");
       else setError("Failed to send OTP. Try again.");
-      // Reset verifier for next attempt.
+      // Reset verifier for next attempt (web only).
       try { recaptchaVerifierRef.current?.clear(); } catch { /* ignore */ }
       recaptchaVerifierRef.current = null;
     } finally {
@@ -120,16 +141,28 @@ export default function PhoneVerifyScreen({
     setLoading(true);
     setError("");
     try {
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-
       let firebaseIdToken: string;
-      if (existingFirebaseUser) {
-        const uc = await linkWithCredential(existingFirebaseUser, credential);
-        firebaseIdToken = await uc.user.getIdToken(true);
+
+      if (Capacitor.isNativePlatform()) {
+        // Native path: confirm via @capacitor-firebase/authentication.
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        await FirebaseAuthentication.confirmVerificationCode({
+          verificationId,
+          verificationCode: code,
+        });
+        const { token } = await FirebaseAuthentication.getIdToken();
+        firebaseIdToken = token;
       } else {
-        if (!auth) throw new Error("Firebase not initialized.");
-        const uc = await signInWithCredential(auth, credential);
-        firebaseIdToken = await uc.user.getIdToken();
+        // Web path: use credential from verificationId.
+        const credential = PhoneAuthProvider.credential(verificationId, code);
+        if (existingFirebaseUser) {
+          const uc = await linkWithCredential(existingFirebaseUser, credential);
+          firebaseIdToken = await uc.user.getIdToken(true);
+        } else {
+          if (!auth) throw new Error("Firebase not initialized.");
+          const uc = await signInWithCredential(auth, credential);
+          firebaseIdToken = await uc.user.getIdToken();
+        }
       }
 
       const res = await fetch(`${API_URL}/api/v1/auth/firebase/verify`, {
