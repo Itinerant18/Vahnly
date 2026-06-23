@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appName: 'Vahnly',
   webDir: 'out',
   plugins: {
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
+    },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },

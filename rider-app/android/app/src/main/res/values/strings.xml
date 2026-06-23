@@ -4,4 +4,5 @@
     <string name="title_activity_main">Vahnly</string>
     <string name="package_name">com.vahnly.rider</string>
     <string name="custom_url_scheme">com.vahnly.rider</string>
+    <string name="default_web_client_id">1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com</string>
 </resources>

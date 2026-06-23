@@ -12,7 +12,7 @@ import {
   type User,
 } from 'firebase/auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+const API_URL = process.env.NEXT_PUBLIC_API_GATEWAY || process.env.NEXT_PUBLIC_API_URL || '';
 
 interface PhoneVerifyScreenProps {
   onVerified: (jwt: string, isNewUser: boolean) => void;

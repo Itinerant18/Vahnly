@@ -4,4 +4,5 @@
     <string name="title_activity_main">Vahnly Driver</string>
     <string name="package_name">com.vahnly.driver</string>
     <string name="custom_url_scheme">com.vahnly.driver</string>
+    <string name="default_web_client_id">1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com</string>
 </resources>
