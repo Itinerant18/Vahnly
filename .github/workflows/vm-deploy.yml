@@ -91,7 +91,12 @@ jobs:
           # deploy updates the checkout and rebuilds — pulling GHCR images would be a no-op.
           # The SSH deploy user isn't the repo owner, so mark the checkout a safe directory.
           git config --global --add safe.directory "$DIR"
-          git pull --ff-only origin main
+          # The VM is a deploy target, not a dev box: it must match origin/main exactly.
+          # reset --hard (not pull --ff-only) so a stray uncommitted edit to a tracked file
+          # on the VM can't abort the deploy. Gitignored files (.env, local.properties) are
+          # untracked, so they're untouched.
+          git fetch origin main
+          git reset --hard origin/main
           docker compose pull            # refresh third-party images (postgres/redis/kafka)
           docker compose up -d --build --remove-orphans
           docker image prune -f || true
