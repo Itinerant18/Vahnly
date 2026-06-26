@@ -72,7 +72,7 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
         }
 
         L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
           { subdomains: "abcd", maxZoom: 19 }
         ).addTo(map);
 
@@ -150,7 +150,7 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
 
       {/* Driver-count halo — hidden when no drivers are nearby */}
       {nearbyDrivers.length > 0 && (
-        <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
+        <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-full bg-background-secondary/80 border border-border-opaque px-4 py-1.5 text-xs font-medium text-content-primary backdrop-blur-sm">
           {nearbyDrivers.length} {nearbyDrivers.length === 1 ? "driver" : "drivers"} nearby
         </div>
       )}

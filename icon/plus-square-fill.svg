@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/general/24x24/fill/plus-square-fill">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor" fill-rule="evenodd" clip-rule="evenodd" d="M6 3H18C19.654 3 21 4.346 21 6V18C21 19.654 19.654 21 18 21H6C4.346 21 3 19.654 3 18V6C3 4.346 4.346 3 6 3ZM13 13H15C15.55 13 16 12.55 16 12C16 11.45 15.55 11 15 11H13V9C13 8.45 12.55 8 12 8C11.45 8 11 8.45 11 9V11H9C8.45 11 8 11.45 8 12C8 12.55 8.45 13 9 13H11V15C11 15.55 11.45 16 12 16C12.55 16 13 15.55 13 15V13Z" fill="#383B46"/>
+<mask id="mask0_11506_96307" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="3" y="3" width="18" height="18">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor_2" fill-rule="evenodd" clip-rule="evenodd" d="M6 3H18C19.654 3 21 4.346 21 6V18C21 19.654 19.654 21 18 21H6C4.346 21 3 19.654 3 18V6C3 4.346 4.346 3 6 3ZM13 13H15C15.55 13 16 12.55 16 12C16 11.45 15.55 11 15 11H13V9C13 8.45 12.55 8 12 8C11.45 8 11 8.45 11 9V11H9C8.45 11 8 11.45 8 12C8 12.55 8.45 13 9 13H11V15C11 15.55 11.45 16 12 16C12.55 16 13 15.55 13 15V13Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_11506_96307)">
+</g>
+</g>
+</svg>

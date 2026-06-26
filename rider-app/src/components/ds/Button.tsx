@@ -28,9 +28,9 @@ const variantClasses: Record<Variant, string> = {
   tertiary:
     'bg-transparent text-content-primary hover:bg-background-secondary active:bg-background-tertiary disabled:opacity-40',
   destructive:
-    'bg-negative-400 text-white hover:bg-negative-500 active:bg-negative-600 disabled:opacity-40',
+    'bg-negative-400 text-gray-0 hover:bg-negative-500 active:bg-negative-600 disabled:opacity-40',
   accent:
-    'bg-accent-400 text-white hover:bg-accent-500 active:bg-accent-600 disabled:opacity-40',
+    'bg-accent-400 text-gray-0 hover:bg-accent-500 active:bg-accent-600 disabled:opacity-40',
 };
 
 const sizeClasses: Record<Size, string> = {

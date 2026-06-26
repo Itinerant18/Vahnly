@@ -169,12 +169,12 @@ export default function RiderOnboardingWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-white selection:text-black">
+    <div className="min-h-screen bg-background-primary text-content-primary p-4 sm:p-8 font-sans flex flex-col justify-between selection:bg-gray-1000 selection:text-gray-0">
       
       {/* Header */}
       <header className="border-b border-border-opaque pb-4 flex justify-between items-center w-full max-w-2xl mx-auto text-left">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white font-move font-extrabold uppercase">Rider Onboarding</h1>
+          <h1 className="text-xl font-bold tracking-tight text-content-primary font-move font-extrabold uppercase">Rider Onboarding</h1>
           <p className="text-content-tertiary text-[10px] font-mono uppercase font-bold tracking-wider mt-0.5">Step {currentStep} of 6 Setup Wizard</p>
         </div>
       </header>
@@ -185,8 +185,8 @@ export default function RiderOnboardingWizard() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div 
               key={i} 
-              className={`flex-1 border-r border-black h-full transition-all duration-300 ${
-                i + 1 <= currentStep ? 'bg-white' : 'bg-background-tertiary'
+              className={`flex-1 border-r border-border-opaque h-full transition-all duration-300 ${
+                i + 1 <= currentStep ? 'bg-gray-1000' : 'bg-background-tertiary'
               }`}
             />
           ))}
@@ -206,7 +206,7 @@ export default function RiderOnboardingWizard() {
           {/* STEP 1: PROFILE MATRIX */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 1 — Profile Matrix</h2>
+              <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 1 — Profile Matrix</h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -265,8 +265,8 @@ export default function RiderOnboardingWizard() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleSimulatedUpload('profilePhoto', 'RiderProfilePic')}
-                    className="bg-background-tertiary hover:bg-background-tertiary border border-border-opaque text-white rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                    onClick={() => triggerUploadClick('avatarUrl')}
+                    className="bg-background-tertiary hover:opacity-90 border border-border-opaque text-content-primary rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
                   >
                     {uploadProgress.profilePhoto ? `Uploading ${uploadProgress.profilePhoto}%` : 'Upload Picture'}
                   </button>
@@ -279,10 +279,10 @@ export default function RiderOnboardingWizard() {
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex justify-between items-center border-b border-border-opaque pb-2">
-                <h2 className="text-lg font-bold font-move text-white">Step 2 — Mechanical Garage Ledger</h2>
-                <button
-                  onClick={skipStep}
-                  className="text-content-tertiary hover:text-white font-mono text-[9px] uppercase font-bold tracking-wider"
+                <h2 className="text-lg font-bold font-move text-content-primary">Step 2 — Mechanical Garage Ledger</h2>
+                <button 
+                  onClick={toggleDemoVehicle} 
+                  className="text-content-tertiary hover:text-content-primary font-mono text-[9px] uppercase font-bold tracking-wider"
                 >
                   Skip Step ➔
                 </button>
@@ -327,7 +327,7 @@ export default function RiderOnboardingWizard() {
                   <select
                     value={riderData.carType}
                     onChange={(e) => setOnboardingData({ ...riderData, carType: e.target.value })}
-                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-content-primary"
                   >
                     <option value="Hatchback">Hatchback</option>
                     <option value="Sedan">Sedan</option>
@@ -340,7 +340,7 @@ export default function RiderOnboardingWizard() {
                   <select
                     value={riderData.carTransmission}
                     onChange={(e) => setOnboardingData({ ...riderData, carTransmission: e.target.value })}
-                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-content-primary"
                   >
                     <option value="AUTOMATIC">AUTOMATIC</option>
                     <option value="MANUAL">MANUAL</option>
@@ -351,7 +351,7 @@ export default function RiderOnboardingWizard() {
                   <select
                     value={riderData.carFuel}
                     onChange={(e) => setOnboardingData({ ...riderData, carFuel: e.target.value })}
-                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-content-primary"
                   >
                     <option value="Petrol">Petrol</option>
                     <option value="Diesel">Diesel</option>
@@ -365,7 +365,7 @@ export default function RiderOnboardingWizard() {
                     type="text"
                     value={riderData.carColor}
                     onChange={(e) => setOnboardingData({ ...riderData, carColor: e.target.value })}
-                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-white"
+                    className="w-full bg-background-secondary border border-border-opaque rounded-lg p-2 text-xs text-content-primary"
                     placeholder="e.g. Silver"
                   />
                 </div>
@@ -376,7 +376,7 @@ export default function RiderOnboardingWizard() {
           {/* STEP 3: SAVED LOCATIONS */}
           {currentStep === 3 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 3 — Saved Locations</h2>
+              <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 3 — Saved Locations</h2>
               
               <div className="space-y-4">
                 <div>
@@ -406,7 +406,7 @@ export default function RiderOnboardingWizard() {
           {/* STEP 4: EMERGENCY RING CONFIGURATION */}
           {currentStep === 4 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 4 — Emergency Ring Configurations (Up to 3)</h2>
+              <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 4 — Emergency Ring Configurations (Up to 3)</h2>
               <p className="text-[10px] text-content-tertiary font-mono leading-relaxed">
                 Provide up to 3 contacts. They will receive automated notifications when the SOS emergency alarm triggers.
               </p>
@@ -419,7 +419,7 @@ export default function RiderOnboardingWizard() {
                       <select
                         value={contact.label}
                         onChange={(e) => handleEmergencyContactChange(idx, 'label', e.target.value)}
-                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2 text-xs focus:outline-none text-white font-mono"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2 text-xs focus:outline-none text-content-primary font-mono"
                       >
                         <option value="Family">Family</option>
                         <option value="Spouse">Spouse</option>
@@ -433,7 +433,7 @@ export default function RiderOnboardingWizard() {
                         type="text"
                         value={contact.name}
                         onChange={(e) => handleEmergencyContactChange(idx, 'name', e.target.value)}
-                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-xs focus:outline-none text-white"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-xs focus:outline-none text-content-primary"
                         placeholder="Sarah Connor"
                       />
                     </div>
@@ -443,7 +443,7 @@ export default function RiderOnboardingWizard() {
                         type="tel"
                         value={contact.phone}
                         onChange={(e) => handleEmergencyContactChange(idx, 'phone', e.target.value)}
-                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-xs focus:outline-none text-white font-mono"
+                        className="w-full bg-background-primary border border-border-opaque rounded-lg p-2.5 text-xs focus:outline-none text-content-primary font-mono"
                         placeholder="+91 99999 88888"
                       />
                     </div>
@@ -456,39 +456,39 @@ export default function RiderOnboardingWizard() {
           {/* STEP 5: PREFERENCES */}
           {currentStep === 5 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 5 — Communication Preferences</h2>
+              <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 5 — Communication Preferences</h2>
               
               <div className="space-y-4 font-mono text-xs text-content-secondary">
                 <div className="flex justify-between items-center border-b border-border-opaque pb-2">
-                  <span className="text-white font-sans font-medium">Push Notification Dispatch Alerts</span>
+                  <span className="text-content-primary font-sans font-medium">Push Notification Dispatch Alerts</span>
                   <button
                     type="button"
                     onClick={() => setOnboardingData({ ...riderData, pushEnabled: !riderData.pushEnabled })}
-                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.pushEnabled ? 'bg-white' : 'bg-background-tertiary'}`}
+                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.pushEnabled ? 'bg-gray-1000' : 'bg-background-tertiary'}`}
                   >
-                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.pushEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
+                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.pushEnabled ? 'translate-x-5 bg-gray-0' : 'translate-x-0 bg-gray-500'}`} />
                   </button>
                 </div>
 
                 <div className="flex justify-between items-center border-b border-border-opaque pb-2">
-                  <span className="text-white font-sans font-medium">Critical Status SMS Updates</span>
+                  <span className="text-content-primary font-sans font-medium">Critical Status SMS Updates</span>
                   <button
                     type="button"
                     onClick={() => setOnboardingData({ ...riderData, smsEnabled: !riderData.smsEnabled })}
-                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.smsEnabled ? 'bg-white' : 'bg-background-tertiary'}`}
+                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.smsEnabled ? 'bg-gray-1000' : 'bg-background-tertiary'}`}
                   >
-                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.smsEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
+                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.smsEnabled ? 'translate-x-5 bg-gray-0' : 'translate-x-0 bg-gray-500'}`} />
                   </button>
                 </div>
 
                 <div className="flex justify-between items-center border-b border-border-opaque pb-2">
-                  <span className="text-white font-sans font-medium">Weekly Promotion & Offer Emails</span>
+                  <span className="text-content-primary font-sans font-medium">Weekly Promotion & Offer Emails</span>
                   <button
                     type="button"
                     onClick={() => setOnboardingData({ ...riderData, emailEnabled: !riderData.emailEnabled })}
-                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.emailEnabled ? 'bg-white' : 'bg-background-tertiary'}`}
+                    className={`h-5 w-10 rounded-full transition relative p-0.5 ${riderData.emailEnabled ? 'bg-gray-1000' : 'bg-background-tertiary'}`}
                   >
-                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.emailEnabled ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
+                    <div className={`h-4 w-4 rounded-full shadow transition-transform ${riderData.emailEnabled ? 'translate-x-5 bg-gray-0' : 'translate-x-0 bg-gray-500'}`} />
                   </button>
                 </div>
               </div>
@@ -498,7 +498,7 @@ export default function RiderOnboardingWizard() {
           {/* STEP 6: LOCATION ACCESS */}
           {currentStep === 6 && (
             <div className="space-y-4 animate-fadeIn">
-              <h2 className="text-lg font-bold font-move text-white border-b border-border-opaque pb-2">Step 6 — Platform Location Permissions</h2>
+              <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 6 — Platform Location Permissions</h2>
               
               <div className="space-y-4 text-center py-6 font-sans">
                 <span className="text-4xl block">📍</span>
@@ -516,8 +516,8 @@ export default function RiderOnboardingWizard() {
                     }}
                     className={`py-3 text-xs font-bold uppercase rounded-xl border transition cursor-pointer ${
                       riderData.locationPermission === 'ALWAYS' 
-                        ? 'bg-white text-black border-white' 
-                        : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
+                        ? 'bg-interactive-primary text-interactive-primary-text border-border-selected' 
+                        : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-content-primary'
                     }`}
                   >
                     Always Allow (Recommended)
@@ -530,10 +530,10 @@ export default function RiderOnboardingWizard() {
                       logEvent('LOCATION_PERMISSION_GRANTED', { scope: 'WHILE_USING_APP' });
                       alert('Location permission set: WHILE USING APP.');
                     }}
-                    className={`py-2.5 text-xs font-bold uppercase rounded-xl border transition cursor-pointer ${
+                    className={`py-3 text-xs font-bold uppercase rounded-xl border transition cursor-pointer ${
                       riderData.locationPermission === 'WHILE_USING_APP' 
-                        ? 'bg-white text-black border-white' 
-                        : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
+                        ? 'bg-interactive-primary text-interactive-primary-text border-border-selected' 
+                        : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-content-primary'
                     }`}
                   >
                     While Using App
@@ -558,7 +558,7 @@ export default function RiderOnboardingWizard() {
               <button
                 onClick={nextStep}
                 type="button"
-                className="bg-white hover:bg-background-tertiary text-black rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer"
+                className="bg-interactive-primary hover:opacity-90 text-interactive-primary-text rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer"
               >
                 Next
               </button>
@@ -566,7 +566,7 @@ export default function RiderOnboardingWizard() {
               <button
                 onClick={handleOnboardingFinish}
                 type="button"
-                className="bg-positive-400 hover:bg-positive-400 text-white rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono cursor-pointer"
+                className="bg-positive-400 hover:opacity-90 text-gray-0 rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-95 font-mono cursor-pointer"
               >
                 Complete Setup
               </button>

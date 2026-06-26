@@ -29,7 +29,7 @@ export const SosModal: React.FC = () => {
   if (!isEmergencyActive) return null;
 
   return (
-    <div role="alert" aria-live="assertive" className="fixed inset-0 z-[1000000] flex items-center justify-center bg-surface-negative/90 backdrop-blur-md p-6 text-white text-center font-mono">
+    <div role="alert" aria-live="assertive" className="fixed inset-0 z-[1000000] flex items-center justify-center bg-surface-negative/90 backdrop-blur-md p-6 text-gray-0 text-center font-mono">
       <div className="max-w-sm w-full bg-background-primary border border-negative-400 rounded-2xl p-6 shadow-2xl space-y-6">
         <div className="h-20 w-20 bg-surface-negative/40 border border-negative-400 rounded-full flex items-center justify-center text-content-negative mx-auto animate-pulse shadow-lg">
           <SirenIcon size={40} />
@@ -47,14 +47,14 @@ export const SosModal: React.FC = () => {
         {isConfirmed && shareLink && (
           <div className="bg-background-secondary/40 p-3 rounded-lg border border-negative-400 text-left space-y-1">
             <span className="text-[8px] uppercase font-bold text-content-negative">Live Tracking Link</span>
-            <p className="text-[10px] font-mono select-all truncate bg-black p-2 rounded border border-border-opaque">{shareLink}</p>
+            <p className="text-[10px] font-mono select-all truncate bg-gray-1000 p-2 rounded border border-border-opaque">{shareLink}</p>
           </div>
         )}
 
         <div className="flex flex-col gap-2">
           <button
             onClick={cancelSOS}
-            className="w-full bg-white text-black py-3 rounded-xl font-bold text-[10px] tracking-wider uppercase shadow hover:bg-background-tertiary active:scale-95 transition-all cursor-pointer"
+            className="w-full bg-gray-0 text-gray-1000 py-3 rounded-xl font-bold text-[10px] tracking-wider uppercase shadow hover:bg-background-tertiary active:scale-95 transition-all cursor-pointer"
           >
             {!isConfirmed ? "CANCEL DISPATCH" : "FALSE ALARM (RESOLVE)"}
           </button>

@@ -5,7 +5,6 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { useAuthStore } from "@/lib/store/authStore";
 import { authApi } from "@/lib/api/auth";
 import { accountApi } from "@/lib/api/account";
-import { useThemeStore } from "@/lib/store/themeStore";
 import type { NotificationPreferences, NotifChannelPrefs } from "@/lib/api/types";
 import { Capacitor } from "@capacitor/core";
 
@@ -63,12 +62,7 @@ export default function SettingsPage() {
   const logout = useAuthStore((s) => s.logout);
 
   const [lang, setLang] = useState("en");
-  // Theme is owned by the shared themeStore (applies [data-theme] to <html>,
-  // initialised in ThemeProvider). Settings only reads/writes through it.
-  const storeTheme = useThemeStore((s) => s.theme);
-  const setStoreTheme = useThemeStore((s) => s.setTheme);
-  const theme: Theme =
-    storeTheme === "dark" ? "Dark" : storeTheme === "light" ? "Light" : "System";
+
   const [unit, setUnit] = useState<(typeof UNITS)[number]>("km");
   const [prefs, setPrefs] = useState<NotificationPreferences>(defaultPrefs);
   const [locationPerm, setLocationPerm] = useState<PermState>("ask");
@@ -122,10 +116,7 @@ export default function SettingsPage() {
     })();
   };
 
-  // ── Theme ─────────────────────────────────────────────────────────────────
-  const selectTheme = (t: Theme) => {
-    setStoreTheme(t === "Dark" ? "dark" : t === "Light" ? "light" : "system");
-  };
+
 
   // ── Notification prefs ──────────────────────────────────────────────────────
   const togglePref = (cat: NotifCategory, ch: Channel) => {
@@ -259,22 +250,7 @@ export default function SettingsPage() {
         </div>
       </Group>
 
-      {/* Theme */}
-      <Group title="Theme">
-        <div className="flex gap-2">
-          {THEMES.map((t) => (
-            <button
-              key={t}
-              onClick={() => selectTheme(t)}
-              className={`flex-1 rounded-xl py-2.5 text-sm ${
-                theme === t ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </Group>
+
 
       {/* Distance */}
       <Group title="Distance Unit">

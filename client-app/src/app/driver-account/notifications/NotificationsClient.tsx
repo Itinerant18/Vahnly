@@ -93,13 +93,13 @@ export default function NotificationsClient() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black max-w-md mx-auto rounded-2xl border border-border-opaque overflow-hidden font-mono text-left select-none">
+    <div className="flex flex-col h-full bg-background-primary max-w-md mx-auto rounded-2xl border border-border-opaque overflow-hidden font-mono text-left select-none">
       {/* Header Context Bar */}
       <div className="bg-background-primary px-5 py-5 border-b border-border-opaque flex justify-between items-center">
-        <h1 className="text-xs font-bold text-white uppercase tracking-wider">Notifications</h1>
+        <h1 className="text-xs font-bold text-content-primary uppercase tracking-wider">Notifications</h1>
         <button 
           onClick={handleMarkAllRead}
-          className="text-[9px] text-content-secondary hover:text-white font-bold uppercase tracking-wider transition cursor-pointer"
+          className="text-[9px] text-content-secondary hover:text-content-primary font-bold uppercase tracking-wider transition cursor-pointer"
         >
           Mark all read
         </button>
@@ -112,7 +112,7 @@ export default function NotificationsClient() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`flex-1 min-w-[70px] py-3.5 transition-all cursor-pointer ${
-              activeTab === tab ? "bg-white text-black font-extrabold" : "text-content-tertiary bg-black hover:text-content-secondary hover:bg-background-secondary"
+              activeTab === tab ? "bg-interactive-primary text-interactive-primary-text font-extrabold" : "text-content-tertiary bg-background-primary hover:text-content-secondary hover:bg-background-secondary"
             }`}
           >
             {tab}
@@ -121,7 +121,7 @@ export default function NotificationsClient() {
       </div>
 
       {/* Notifications Render List */}
-      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-black min-h-[400px]">
+      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-background-secondary min-h-[400px]">
         {loading ? (
           <div className="text-center text-[10px] text-content-tertiary py-12 uppercase tracking-widest animate-pulse">
             Syncing inbox alerts...
@@ -136,11 +136,11 @@ export default function NotificationsClient() {
               key={notification.id}
               onClick={() => toggleReadStatus(notification.id)}
               className={`p-5 bg-background-primary rounded-2xl border border-border-opaque relative shadow-xl cursor-pointer transition-all hover:scale-[1.01] hover:border-border-opaque ${
-                !notification.is_read ? "border-l-2 border-l-white font-medium" : "opacity-60"
+                !notification.is_read ? "border-l-2 border-l-interactive-primary font-medium" : "opacity-60"
               }`}
             >
               <div className="flex justify-between items-start mb-2 gap-3">
-                <h4 className="text-[11px] font-bold text-white uppercase tracking-tight leading-snug">{notification.title}</h4>
+                <h4 className="text-[11px] font-bold text-content-primary uppercase tracking-tight leading-snug">{notification.title}</h4>
                 <span className="text-[7px] bg-background-secondary text-content-tertiary font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
                   {notification.category}
                 </span>

@@ -214,8 +214,8 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
   };
 
   return (
-    <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center p-6 font-sans selection:bg-black selection:text-white">
-      <div className="w-full max-w-md bg-background-primary rounded-xl p-8 border border-background-secondary shadow-[rgba(0,0,0,0.12)_0px_4px_16px_0px] relative overflow-hidden">
+    <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center p-6 font-sans selection:bg-gray-1000 selection:text-gray-0">
+      <div className="w-full max-w-md bg-background-primary rounded-xl p-8 border border-background-secondary shadow-elevation-2 relative overflow-hidden">
 
         {/* Brand Header */}
         <div className="text-center mb-6">
@@ -274,7 +274,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-content-primary hover:bg-gray-800 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:opacity-90 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 {isLoading ? 'Verifying...' : 'Authenticate'}
               </button>
@@ -318,7 +318,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-content-primary hover:bg-gray-200 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
+                className="w-full bg-content-primary hover:opacity-90 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-2"
               >
                 {isLoading ? 'Verifying Credentials...' : 'Unlock Dashboard'}
               </button>
@@ -493,7 +493,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-content-primary hover:bg-gray-200 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
+              className="w-full bg-content-primary hover:opacity-90 disabled:opacity-50 text-background-primary font-bold py-3.5 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer mt-3"
             >
               {isLoading ? 'Provisioning…' : 'Create Account (SUPER_ADMIN)'}
             </button>
@@ -526,7 +526,7 @@ export const AdminAuthGateway: React.FC<AdminAuthGatewayProps> = ({ onAuthSucces
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-content-primary hover:bg-gray-200 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-content-primary hover:opacity-90 text-background-primary font-medium py-3 px-4 rounded-pill transition text-xs uppercase tracking-wider active:scale-[0.98] cursor-pointer"
               >
                 How to reset
               </button>

@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/general/24x24/fill/book-fill">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor" fill-rule="evenodd" clip-rule="evenodd" d="M7 3H19C19.552 3 20 3.448 20 4V17V19V20C20 20.552 19.552 21 19 21H18H7C5.346 21 4 19.654 4 18V6C4 4.346 5.346 3 7 3ZM6 18C6 18.551 6.449 19 7 19H18V17H7C6.449 17 6 17.449 6 18Z" fill="#383B46"/>
+<mask id="mask0_11506_96474" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="4" y="3" width="16" height="18">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor_2" fill-rule="evenodd" clip-rule="evenodd" d="M7 3H19C19.552 3 20 3.448 20 4V17V19V20C20 20.552 19.552 21 19 21H18H7C5.346 21 4 19.654 4 18V6C4 4.346 5.346 3 7 3ZM6 18C6 18.551 6.449 19 7 19H18V17H7C6.449 17 6 17.449 6 18Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_11506_96474)">
+</g>
+</g>
+</svg>

@@ -20,8 +20,8 @@ type NavApp = 'GOOGLE' | 'MAPS' | 'WAZE';
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`h-5 w-10 rounded-full transition relative p-0.5 ${on ? 'bg-white' : 'bg-background-tertiary'}`}>
-      <div className={`h-4 w-4 rounded-full transition-transform ${on ? 'translate-x-5 bg-black' : 'translate-x-0 bg-background-tertiary'}`} />
+    <button onClick={onClick} className={`h-5 w-10 rounded-full transition relative p-0.5 ${on ? 'bg-gray-1000' : 'bg-background-tertiary'}`}>
+      <div className={`h-4 w-4 rounded-full transition-transform ${on ? 'translate-x-5 bg-gray-0' : 'translate-x-0 bg-gray-500'}`} />
     </button>
   );
 }
@@ -124,17 +124,17 @@ export default function DriverSettingsPage() {
   return (
     <div className="space-y-6 text-left pb-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight text-white font-move">{t('title')}</h2>
+        <h2 className="text-xl font-bold tracking-tight text-content-primary font-move">{t('title')}</h2>
         {savedFlash && <span className="text-[10px] font-mono text-content-positive">{t('saved')}</span>}
       </div>
 
       {/* Language */}
       <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('language')}</h4>
+        <h4 className="text-xs font-bold text-content-primary font-mono uppercase tracking-wider">{t('language')}</h4>
         <div className="flex gap-2">
           {SUPPORTED_LOCALES.map((l) => (
             <button key={l.code} onClick={() => onLanguage(l.code)}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono ${locale === l.code ? 'bg-white text-black font-bold' : 'bg-background-secondary text-content-secondary'}`}>
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${locale === l.code ? 'bg-interactive-primary text-interactive-primary-text font-bold' : 'bg-background-secondary text-content-secondary'}`}>
               {l.label}
             </button>
           ))}
@@ -143,7 +143,7 @@ export default function DriverSettingsPage() {
 
       {/* Notification preferences */}
       <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('notifications')}</h4>
+        <h4 className="text-xs font-bold text-content-primary font-mono uppercase tracking-wider">{t('notifications')}</h4>
         {([['trip_offers', t('tripOffers')], ['earnings', t('earnings')], ['promotions', t('promotions')], ['safety', t('safety')]] as const).map(([key, label]) => (
           <div key={key} className="flex justify-between items-center">
             <span className="text-xs font-mono text-content-secondary">{label}</span>
@@ -154,11 +154,11 @@ export default function DriverSettingsPage() {
 
       {/* Navigation app */}
       <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('navApp')}</h4>
+        <h4 className="text-xs font-bold text-content-primary font-mono uppercase tracking-wider">{t('navApp')}</h4>
         <div className="flex gap-2">
           {navOptions.map((app) => (
             <button key={app} onClick={() => onNav(app)}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono ${navApp === app ? 'bg-white text-black font-bold' : 'bg-background-secondary text-content-secondary'}`}>
+              className={`flex-1 py-2 rounded-lg text-xs font-mono ${navApp === app ? 'bg-interactive-primary text-interactive-primary-text font-bold' : 'bg-background-secondary text-content-secondary'}`}>
               {app}
             </button>
           ))}
@@ -185,14 +185,14 @@ export default function DriverSettingsPage() {
 
       {/* Change password */}
       <section className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-3">
-        <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">{t('changePassword')}</h4>
+        <h4 className="text-xs font-bold text-content-primary font-mono uppercase tracking-wider">{t('changePassword')}</h4>
         <form onSubmit={onChangePassword} className="space-y-3">
           <input type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} placeholder={t('currentPassword')} required
-            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-content-primary font-mono" />
           <input type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} placeholder={t('newPassword')} required minLength={8}
-            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
+            className="w-full bg-background-secondary border border-border-opaque rounded-xl p-3 text-xs text-content-primary font-mono" />
           {pwdMsg && <p className="text-[10px] font-mono text-content-secondary">{pwdMsg}</p>}
-          <button type="submit" className="w-full bg-white text-black rounded-xl py-2.5 text-[10px] font-bold uppercase">{t('save')}</button>
+          <button type="submit" className="w-full bg-interactive-primary text-interactive-primary-text hover:opacity-90 rounded-xl py-2.5 text-[10px] font-bold uppercase">{t('save')}</button>
         </form>
       </section>
 
@@ -201,7 +201,7 @@ export default function DriverSettingsPage() {
         <h4 className="text-xs font-bold text-content-negative font-mono uppercase tracking-wider">{t('dangerZone')}</h4>
         <p className="text-[10px] font-mono text-content-secondary leading-relaxed">{t('deleteWarning')}</p>
         <input value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder={t('typeDelete')}
-          className="w-full bg-background-primary border border-border-opaque rounded-xl p-3 text-xs text-white font-mono" />
+          className="w-full bg-background-primary border border-border-opaque rounded-xl p-3 text-xs text-content-primary font-mono" />
         <button onClick={onDelete} disabled={deleteText !== 'DELETE'}
           className="w-full bg-negative-400/20 text-content-negative border border-negative-400/40 rounded-xl py-2.5 text-[10px] font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed">
           {t('confirmDelete')}

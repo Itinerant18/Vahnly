@@ -6,7 +6,6 @@ import { getCityFilter, setCityFilter } from './auth';
 import { AdminAuthGateway } from './components/AdminAuthGateway';
 import { AdminChangePassword } from './components/AdminChangePassword';
 import { SsoCallback } from './components/SsoCallback';
-import { themeStore } from './lib/useThemeStore';
 import {
   IconDashboard, IconMap, IconTrips, IconRiders, IconDrivers,
   IconVehicles, IconDispatch, IconPricing, IconPromotions,
@@ -53,48 +52,7 @@ const quickActions = [
 // ─── City options ───────────────────────────────────────────────────────
 const cityOptions = ['KOL', 'DEL', 'MUM', 'BLR', 'CHN', 'HYD'];
 
-// ─── DS5 Theme Toggle ────────────────────────────────────────────────────
-function ThemeToggle() {
-  const [dark, setDark] = useState(false);
 
-  useEffect(() => {
-    setDark(document.documentElement.getAttribute('data-theme') === 'dark');
-  }, []);
-
-  function toggle() {
-    const next = !dark;
-    setDark(next);
-    if (next) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('dfu-theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('dfu-theme', 'light');
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="touch-target focus-ring w-8 h-8 flex items-center justify-center rounded-pill text-content-secondary hover:text-content-primary hover:bg-background-secondary transition-base cursor-pointer"
-    >
-      {dark ? (
-        /* Sun icon */
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/>
-          <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-      ) : (
-        /* Moon icon */
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      )}
-    </button>
-  );
-}
 
 export const AdminShell: React.FC = () => {
   const [sessionState, setSessionState] = useState<'LOADING' | 'AUTHED' | 'ANON'>('LOADING');
@@ -128,8 +86,7 @@ export const AdminShell: React.FC = () => {
   const searchRef  = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Apply persisted theme preference on mount
-  useEffect(() => { themeStore.initTheme(); }, []);
+
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -527,8 +484,7 @@ export const AdminShell: React.FC = () => {
             )}
           </div>
 
-          {/* Theme Toggle */}
-          <ThemeToggle />
+
 
           {/* Quick Actions */}
           <div className="relative" ref={quickRef}>

@@ -18,8 +18,8 @@ The single source of truth for tokens, type, and primitives is the **rider-app `
 mirrored byte-for-byte into the driver app:
 
 - **Tokens:** `src/styles/tokens.css` (Uber Base-modeled). Primitive ramps + semantic aliases as
-  CSS custom properties. Light is the default; dark flips automatically via `[data-theme="dark"]`
-  on `<html>`. **Never hardcode hex in components** — use the semantic Tailwind classes
+  CSS custom properties. Single minimalist theme (warm off-white canvas with charcoal text).
+  No dark mode. **Never hardcode hex in components** — use the semantic Tailwind classes
   (`bg-background-primary`, `text-content-secondary`, `border-border-opaque`, etc.).
 - **Tailwind v4 bridge:** `src/app/globals.css` `@theme` block maps every `--color-*` utility to a
   token variable. No `tailwind.config.js` for the driver app (CSS-first).
@@ -63,14 +63,11 @@ mirrored byte-for-byte into the driver app:
 
 ---
 
-## Theming & Dark Mode
+## Theming & Minimalist UI
 
-- Theme state lives in `useThemeStore` (driver: persisted via `@capacitor/preferences`; rider:
-  `localStorage`). `ThemeProvider` applies it on mount.
-- Modes: `light | dark | system`. `system` tracks `matchMedia('(prefers-color-scheme: dark)')`
-  with a live change listener.
-- **The driver app defaults to dark** (night-driving ergonomics) when no preference is saved;
-  the rider app defaults to `system`. Users can switch either at any time.
+- Consolidated into a single minimalist theme (warm off-white canvas with deep charcoal text).
+- No theme switching store, no dark mode, and no theme toggle UI elements.
+- Clean vector layout built around readability and flat structural aesthetic.
 
 ---
 
@@ -91,14 +88,14 @@ mirrored byte-for-byte into the driver app:
 
 ## Design Tokens (semantic, via `tokens.css`)
 
-| Concept | Token | Light | Dark |
-|---|---|---|---|
-| Primary surface | `--background-primary` | `#FFFFFF` | `#000000` |
-| Accent (info/active) | `--accent-400` | `#276EF1` | `#7AA3F6` |
-| Positive (accept/online) | `--positive-400` | `#3AA76D` | `#5AB285` |
-| Warning (surge/caution) | `--warning-400/600` | `#FFC043 / #B38200` | `#FFCC66` |
-| Negative (decline/SOS) | `--negative-400` | `#D44333` | `#E36161` |
-| Body text | `--content-primary` | `#000000` | `#FFFFFF` |
+| Concept | Token | Minimalist Value |
+|---|---|---|
+| Primary surface | `--background-primary` | `#FAFAFA` (warm canvas) |
+| Accent (info/active) | `--accent-400` | `#4A6FA5` (muted steel-blue) |
+| Positive (accept/online) | `--positive-400` | `#3A9D68` (softer green) |
+| Warning (surge/caution) | `--warning-400/600` | `#F0B840 / #A0740A` |
+| Negative (decline/SOS) | `--negative-400` | `#C94030` (softer red) |
+| Body text | `--content-primary` | `#1A1A1A` (charcoal ink) |
 
 **Spacing:** 8px grid (`--space-100`…`--space-1200`). **Radius:** `sm 8 / md 12 / lg 16 / pill`.
 **Type:** Inter (display/body/labels) + JetBrains Mono (**fares, ETAs, distances, IDs only**).
@@ -181,7 +178,7 @@ mirrored byte-for-byte into the driver app:
 
 ✅ **DO**
 - Let WebSocket events drive UI; interpolate pins in refs.
-- Use semantic tokens; support light **and** dark.
+- Use semantic tokens; enforce the single warm off-white minimalist theme.
 - Give every swipe gesture a keyboard/AT fallback and every icon button an `aria-label`.
 - Show numbers/labels alongside color for surge, fares, and the countdown.
 - Frame the journey as "the driver travels to the owner's car."

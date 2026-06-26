@@ -29,9 +29,9 @@ interface LedgerEntry {
 // Google Maps Symbol API does not resolve CSS custom properties.
 function driverPinColor(status: string): string {
   const s = status.toUpperCase();
-  if (s.includes('TRIP') || s.includes('EN_ROUTE') || s.includes('BUSY') || s.includes('DELIVER')) return '#2563EB'; // blue — on trip
-  if (s.includes('AVAILABLE') || s === 'ONLINE' || s === 'ACTIVE') return '#16A34A'; // green — online
-  if (s.includes('IDLE')) return '#CA8A04'; // yellow — idle
+  if (s.includes('TRIP') || s.includes('EN_ROUTE') || s.includes('BUSY') || s.includes('DELIVER')) return '#4A6FA5'; // muted steel-blue
+  if (s.includes('AVAILABLE') || s === 'ONLINE' || s === 'ACTIVE') return '#3A9D68'; // softer green
+  if (s.includes('IDLE')) return '#F0B840'; // softer yellow
   return '#9CA3AF'; // gray — offline
 }
 
@@ -201,12 +201,12 @@ export const ControlRoomDashboard: React.FC = () => {
 
     // Minimalist light map — black/white/grayscale only, no accent leakage
     const minimalMapStyles: google.maps.MapTypeStyle[] = [
-      { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ color: '#7c7c7c' }] },
+      { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ color: '#1A1A1A' }] },
       { featureType: 'all', elementType: 'labels.text.stroke', stylers: [{ visibility: 'off' }] },
-      { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#f5f5f5' }] },
-      { featureType: 'road', elementType: 'all', stylers: [{ color: '#ffffff' }] },
+      { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#FAFAFA' }] },
+      { featureType: 'road', elementType: 'all', stylers: [{ color: '#FFFFFF' }] },
       { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-      { featureType: 'water', elementType: 'all', stylers: [{ color: '#e9e9e9' }] },
+      { featureType: 'water', elementType: 'all', stylers: [{ color: '#E0E0DD' }] },
     ];
 
     mapInstanceRef.current = new google.maps.Map(mapContainerRef.current, {
@@ -339,7 +339,7 @@ export const ControlRoomDashboard: React.FC = () => {
           path: google.maps.SymbolPath.CIRCLE,
           fillColor: driverPinColor(d.status),
           fillOpacity: 1,
-          strokeColor: '#FFFFFF',
+          strokeColor: '#FAFAFA',
           strokeWeight: 1.5,
           scale: 6,
         },
@@ -374,9 +374,9 @@ export const ControlRoomDashboard: React.FC = () => {
         title: `Trip ${o.id.slice(0, 8)}`,
         icon: {
           path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          fillColor: '#111827',
+          fillColor: '#1A1A1A',
           fillOpacity: 1,
-          strokeColor: '#FFFFFF',
+          strokeColor: '#FAFAFA',
           strokeWeight: 1.5,
           scale: 4,
         },

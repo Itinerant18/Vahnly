@@ -61,7 +61,7 @@ export const AdminChangePassword: React.FC<AdminChangePasswordProps> = ({ onChan
 
   return (
     <div className="min-h-screen bg-background-primary text-content-primary flex items-center justify-center p-6 font-sans">
-      <div className="w-full max-w-md bg-background-primary rounded-xl p-8 border border-background-secondary shadow-[rgba(0,0,0,0.12)_0px_4px_16px_0px]">
+      <div className="w-full max-w-md bg-background-primary rounded-xl p-8 border border-background-secondary shadow-elevation-2">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold tracking-tight text-content-primary">Set a new password</h1>
           <p className="text-content-secondary text-xs mt-1.5 font-medium">

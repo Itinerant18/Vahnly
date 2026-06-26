@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/general/24x24/outline/layout">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor" fill-rule="evenodd" clip-rule="evenodd" d="M6 3H18C19.654 3 21 4.346 21 6V8.818V9.182V18C21 19.654 19.654 21 18 21H6C4.346 21 3 19.654 3 18V9.182V8.818V6C3 4.346 4.346 3 6 3ZM6 5H18C18.551 5 19 5.448 19 6V8H5V6C5 5.448 5.449 5 6 5ZM5 10V18C5 18.552 5.449 19 6 19H11V10H5ZM13 19H18C18.551 19 19 18.552 19 18V10H13V19Z" fill="#383B46"/>
+<mask id="mask0_11506_94641" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="3" y="3" width="18" height="18">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor_2" fill-rule="evenodd" clip-rule="evenodd" d="M6 3H18C19.654 3 21 4.346 21 6V8.818V9.182V18C21 19.654 19.654 21 18 21H6C4.346 21 3 19.654 3 18V9.182V8.818V6C3 4.346 4.346 3 6 3ZM6 5H18C18.551 5 19 5.448 19 6V8H5V6C5 5.448 5.449 5 6 5ZM5 10V18C5 18.552 5.449 19 6 19H11V10H5ZM13 19H18C18.551 19 19 18.552 19 18V10H13V19Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_11506_94641)">
+</g>
+</g>
+</svg>

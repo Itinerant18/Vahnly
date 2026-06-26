@@ -30,14 +30,14 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
 
   return (
     <AuthGuard allowedRole="DRIVER">
-      <div className="min-h-screen bg-black text-white font-sans flex flex-col md:flex-row relative">
+      <div className="min-h-screen bg-background-primary text-content-primary font-sans flex flex-col md:flex-row relative">
         
         {/* 1. LEFT SIDEBAR FOR DESKTOP SCREEN RESOLUTIONS */}
         <aside className="hidden md:flex md:w-72 bg-background-primary border-r border-border-opaque flex-col justify-between p-6 shrink-0 text-left h-screen sticky top-0">
           <div className="overflow-y-auto space-y-6 scrollbar-thin pr-1">
             {/* Logo */}
             <div className="pb-4 border-b border-border-opaque">
-              <h2 className="text-sm font-extrabold tracking-widest font-mono text-white">VAHNLY</h2>
+              <h2 className="text-sm font-extrabold tracking-widest font-mono text-content-primary">VAHNLY</h2>
               <span className="text-[8px] font-mono text-content-tertiary uppercase tracking-widest">Core Account Hub</span>
             </div>
 
@@ -47,7 +47,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
                 👤
               </div>
               <div className="truncate">
-                <h4 className="text-xs font-bold text-white truncate">{driverName}</h4>
+                <h4 className="text-xs font-bold text-content-primary truncate">{driverName}</h4>
                 <span className="text-[9px] font-mono text-content-tertiary block truncate">{driverID.toUpperCase()}</span>
               </div>
             </div>
@@ -58,7 +58,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-white hover:bg-background-secondary border border-transparent hover:border-border-opaque transition-all font-mono uppercase tracking-wider"
+                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-content-primary hover:bg-background-secondary border border-transparent hover:border-border-opaque transition-all font-mono uppercase tracking-wider"
                 >
                   <span>{item.icon}</span>
                   <span>{item.label}</span>
@@ -73,7 +73,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
                 useAuthStore.getState().logout();
                 window.location.href = '/login';
               }}
-              className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-border-opaque cursor-pointer"
+              className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-content-primary rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-border-opaque cursor-pointer"
             >
               🚪 Terminate Session
             </button>
@@ -90,7 +90,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
             >
               ☰
             </button>
-            <h2 className="text-xs font-bold font-mono tracking-widest text-white">CORE ACCT HUB</h2>
+            <h2 className="text-xs font-bold font-mono tracking-widest text-content-primary">CORE ACCT HUB</h2>
           </div>
 
           <Link href="/driver" className="text-[9px] font-mono font-bold uppercase tracking-wider border border-border-opaque px-3 py-1.5 rounded-full hover:bg-background-secondary transition">
@@ -104,7 +104,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
             <div className="w-72 bg-background-primary border-r border-border-opaque h-full flex flex-col justify-between p-6 animate-slideInLeft text-left">
               <div className="overflow-y-auto space-y-6">
                 <div className="flex justify-between items-center pb-4 border-b border-border-opaque">
-                  <h2 className="text-xs font-bold font-mono text-white">ACCOUNTS</h2>
+                  <h2 className="text-xs font-bold font-mono text-content-primary">ACCOUNTS</h2>
                   <button 
                     onClick={() => setMobileMenuOpen(false)}
                     className="text-xs text-content-tertiary font-bold font-mono"
@@ -119,7 +119,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
                       key={item.label}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-white hover:bg-background-secondary transition-all font-mono uppercase tracking-wider"
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg text-[10px] font-bold text-content-secondary hover:text-content-primary hover:bg-background-secondary transition-all font-mono uppercase tracking-wider"
                     >
                       <span>{item.icon}</span>
                       <span>{item.label}</span>
@@ -134,7 +134,7 @@ export default function DriverAccountLayout({ children }: { children: React.Reac
                     useAuthStore.getState().logout();
                     window.location.href = '/login';
                   }}
-                  className="w-full bg-background-secondary hover:bg-background-tertiary text-content-tertiary hover:text-white border border-border-opaque rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
+                  className="w-full bg-background-secondary hover:bg-background-tertiary text-content-tertiary hover:text-content-primary border border-border-opaque rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
                 >
                   🚪 Logout
                 </button>

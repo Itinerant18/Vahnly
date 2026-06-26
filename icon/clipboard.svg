@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/general/24x24/outline/clipboard">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor" fill-rule="evenodd" clip-rule="evenodd" d="M18 4V5C19.654 5 21 6.346 21 8V19C21 20.654 19.654 22 18 22H6C4.346 22 3 20.654 3 19V8C3 6.346 4.346 5 6 5V4C6 2.897 6.897 2 8 2H16C17.103 2 18 2.897 18 4ZM8 4L16 4.003V5V8H8V5V4ZM19 19C19 19.552 18.551 20 18 20H6C5.449 20 5 19.552 5 19V8C5 7.448 5.449 7 6 7V8C6 9.103 6.897 10 8 10H16C17.103 10 18 9.103 18 8V7C18.551 7 19 7.448 19 8V19Z" fill="#383B46"/>
+<mask id="mask0_11506_93808" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="3" y="2" width="18" height="20">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor_2" fill-rule="evenodd" clip-rule="evenodd" d="M18 4V5C19.654 5 21 6.346 21 8V19C21 20.654 19.654 22 18 22H6C4.346 22 3 20.654 3 19V8C3 6.346 4.346 5 6 5V4C6 2.897 6.897 2 8 2H16C17.103 2 18 2.897 18 4ZM8 4L16 4.003V5V8H8V5V4ZM19 19C19 19.552 18.551 20 18 20H6C5.449 20 5 19.552 5 19V8C5 7.448 5.449 7 6 7V8C6 9.103 6.897 10 8 10H16C17.103 10 18 9.103 18 8V7C18.551 7 19 7.448 19 8V19Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_11506_93808)">
+</g>
+</g>
+</svg>

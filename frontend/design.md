@@ -1,17 +1,17 @@
-# Frontend Dashboard Design System — Authentic Uber
+# Frontend Dashboard Design System — Minimalist Warm UI
 
 **Name:** Operations Control Room (OCR)
 **Purpose:** Real-time operations monitoring for ride-dispatch platform
 **Tech Stack:** Next.js / React + TailwindCSS + Google Maps JS
 **Target:** Web only (`:3000` dev, production SPA)
 **Audience:** Operations teams, fleet managers, dispatchers
-**Aesthetic:** Authentic Uber brand — black-and-white duet, pill geometry, Geist typography
+**Aesthetic:** Warm off-white minimalist canvas, deep charcoal text, pill geometry, Geist typography
 
 ---
 
 ## Core Brand Rules (NON-NEGOTIABLE)
 
-1. **Black-and-white duet. NO third color.** Black (`#000000`) is the only conversion color; white (`#ffffff`) carries everything else; grayscale fills the gaps. No blue, green, orange, purple accent. Introducing an accent flattens the brand.
+1. **Warm off-white minimalist canvas. NO dark mode.** Deep charcoal (`#1A1A1A`) is the primary ink/text color; warm off-white (`#FAFAFA`) is the page background/canvas; grayscale fills the gaps.
 2. **The pill is the signature shape.** Every interactive element rounds to `rounded-pill` (999px) — buttons, chips, badges, region tags. Cards round to `rounded-xl` (16px). Inputs round to `rounded-md` (8px).
 3. **Sentence-case headlines, weight 700.** No all-caps display. Uppercase only on rare small eyebrow labels.
 4. **Geist for everything.** Geist Sans (display + body), Geist Mono (numbers, IDs, coordinates, timestamps). No serif.
@@ -23,24 +23,24 @@
 
 ### Color
 ```
-primary / ink:      #000000   — conversion CTAs, footer, dark bands, text
-canvas:             #ffffff   — page background
-canvas-soft:        #efefef   — chips, input rows, subtle pills, hairline borders
-canvas-softer:      #f3f3f3   — sidebar, nested fills
-surface-pressed:    #e2e2e2   — pressed-state on white pills
-black-elevated:     #282828   — hover on black pills
-body:               #5e5e5e   — secondary text
-mute:               #afafaf   — placeholders, fine print
-on-dark:            #ffffff   — text on black surfaces
+primary / ink:      #1A1A1A   — conversion CTAs, footer, text
+canvas:             #FAFAFA   — page background
+canvas-soft:        #E0E0DD   — chips, input rows, subtle border
+canvas-softer:      #F5F5F2   — sidebar, nested fills
+surface-pressed:    #E2E2DF   — pressed-state on white pills
+black-elevated:     #333333   — hover on black/charcoal pills
+body:               #555552   — secondary text
+mute:               #8B8B88   — placeholders, fine print
+on-dark:            #FAFAFA   — text on dark/charcoal surfaces
 ```
 
 ### Operational status (dots/badges ONLY — never as brand accent)
 ```
-status-online:  #138000   — driver online, success
-status-warn:    #a06000   — reconnecting, caution
-status-alert:   #b00020   — offline, failure, critical
+status-online:  #3A9D68   — driver online, success
+status-warn:    #F0B840   — reconnecting, caution
+status-alert:   #C94030   — offline, failure, critical
 ```
-These are muted, desaturated, and appear only as 8px dots or small badge text. They never fill a button or large surface.
+These appear as 8px dots or small badge text, keeping to the updated softer status scale.
 
 ### Radius
 ```
@@ -141,14 +141,14 @@ system.alert             → status dot + event row
 ## Do / Don't
 
 ✅ **DO**
-- Keep the page black-and-white-and-gray. One black pill per visible region carries conversion.
+- Keep the page warm off-white and charcoal-and-gray. One charcoal pill per visible region carries conversion.
 - Use pills on every interactive element, `rounded-xl` on cards.
 - Sentence-case headlines, weight 700, Geist.
-- Use polarity (black fill vs gray fill) for emphasis instead of color.
+- Use polarity (charcoal fill vs gray fill) for emphasis.
 - `font-mono` for all numbers, IDs, coordinates.
 
 ❌ **DON'T**
-- Introduce ANY brand accent color (blue/green/orange/purple). Banned.
+- Introduce random brand colors. Enforce the warm off-white minimalist duet.
 - Use solid status colors as buttons or large surfaces — dots/badges only.
 - All-caps display headlines.
 - Drop shadows on every card — flat is default.
@@ -165,6 +165,5 @@ system.alert             → status dot + event row
 
 ---
 
-**Last Updated:** 2026-06-01
-**Theme:** Authentic Uber (black-and-white duet, pill geometry, Geist)
-**Reference:** Uber brand kit via design-taste-frontend-v1
+**Last Updated:** 2026-06-26
+**Theme:** Minimalist Warm UI (warm off-white, deep charcoal text, pill geometry)

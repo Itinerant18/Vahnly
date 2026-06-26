@@ -100,7 +100,7 @@ export function SlideToConfirm({
         {/* Background tint at threshold */}
         {progress > 0.7 && (
           <div
-            className="absolute inset-0 bg-white opacity-10"
+            className="absolute inset-0 bg-gray-0 opacity-10"
             style={{
               backgroundColor: `rgba(255, 255, 255, ${(progress - 0.7) * 0.5})`,
             }}
@@ -108,7 +108,7 @@ export function SlideToConfirm({
         )}
 
         {/* Label text */}
-        <span className="text-white font-bold text-lg z-10 pointer-events-none">
+        <span className="text-gray-0 font-bold text-lg z-10 pointer-events-none">
           {isLoading ? 'Processing...' : label}
         </span>
 
@@ -127,7 +127,7 @@ export function SlideToConfirm({
           aria-valuetext={`${pct}% — slide or press Enter to confirm`}
           aria-disabled={disabled || undefined}
           onKeyDown={onKeyDown}
-          className={`absolute left-2 w-12 h-12 bg-white rounded-lg z-20 outline-none focus-visible:ring-2 focus-visible:ring-content-primary focus-visible:ring-offset-2 ${
+          className={`absolute left-2 w-12 h-12 bg-gray-0 rounded-lg z-20 outline-none focus-visible:ring-2 focus-visible:ring-content-primary focus-visible:ring-offset-2 ${
             isLoading ? 'opacity-50' : 'cursor-grab active:cursor-grabbing'
           }`}
           animate={{

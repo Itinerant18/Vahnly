@@ -288,23 +288,11 @@ body,
 }
 
 /* ─────────────────────────────────────────────
-   DS5 DARK MODE — BADGE OVERRIDES
+   GLOBAL HOVER OVERRIDES FOR MINIMALIST THEME
    ───────────────────────────────────────────── */
-[data-theme="dark"] .badge-positive {
-  background-color: var(--surface-positive);
-  color: var(--positive-300);
-}
-[data-theme="dark"] .badge-warning {
-  background-color: var(--surface-warning);
-  color: var(--warning-300);
-}
-[data-theme="dark"] .badge-negative {
-  background-color: var(--surface-negative);
-  color: var(--negative-300);
-}
-[data-theme="dark"] .badge-accent {
-  background-color: var(--surface-accent);
-  color: var(--accent-300);
+.hover\:bg-gray-800:hover {
+  background-color: var(--content-primary) !important;
+  opacity: 0.9 !important;
 }
 
 /* ─────────────────────────────────────────────

@@ -407,12 +407,29 @@ export const IncidentRecoveryTerminal: React.FC = () => {
       const w = canvas.width;
       const h = canvas.height;
 
-      // Dark minimalist slate base map background
-      ctx.fillStyle = '#0f172a';
+      // Semantic canvas palette for Minimalist light UI
+      const CANVAS_PALETTE = {
+        background: '#FAFAFA',
+        grid: '#E0E0DD',
+        textPrimary: '#1A1A1A',
+        textSecondary: '#555552',
+        textMuted: '#8B8B88',
+        routeMuted: '#94A3B8',
+        sos: '#C94030',
+        fraud: '#F0B840',
+        info: '#4A6FA5',
+        pinOutline: '#1A1A1A',
+        pinFill: '#FAFAFA',
+        legendBg: 'rgba(250, 250, 250, 0.9)',
+        legendBorder: '#E0E0DD'
+      };
+
+      // Base map background
+      ctx.fillStyle = CANVAS_PALETTE.background;
       ctx.fillRect(0, 0, w, h);
 
       // Grid vector lines
-      ctx.strokeStyle = '#1e293b';
+      ctx.strokeStyle = CANVAS_PALETTE.grid;
       ctx.lineWidth = 1;
       const gridSize = 35;
       for (let x = 0; x < w; x += gridSize) {
@@ -457,17 +474,17 @@ export const IncidentRecoveryTerminal: React.FC = () => {
         ctx.closePath();
         
         ctx.fillStyle = incident_type === 'SOS' 
-          ? 'rgba(239, 68, 68, 0.16)' 
+          ? 'rgba(201, 64, 48, 0.16)' 
           : incident_type === 'FRAUD' 
-          ? 'rgba(245, 158, 11, 0.16)' 
-          : 'rgba(59, 130, 246, 0.16)';
+          ? 'rgba(240, 184, 64, 0.16)' 
+          : 'rgba(74, 111, 165, 0.16)';
         ctx.fill();
 
         ctx.strokeStyle = incident_type === 'SOS' 
-          ? 'rgba(239, 68, 68, 0.6)' 
+          ? 'rgba(201, 64, 48, 0.6)' 
           : incident_type === 'FRAUD' 
-          ? 'rgba(245, 158, 11, 0.6)' 
-          : 'rgba(59, 130, 246, 0.6)';
+          ? 'rgba(240, 184, 64, 0.6)' 
+          : 'rgba(74, 111, 165, 0.6)';
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
@@ -487,7 +504,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
           if (idx === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
         });
-        ctx.strokeStyle = '#475569'; // Muted dark slate
+        ctx.strokeStyle = CANVAS_PALETTE.routeMuted;
         ctx.lineWidth = 3;
         ctx.setLineDash([4, 6]);
         ctx.stroke();
@@ -500,7 +517,7 @@ export const IncidentRecoveryTerminal: React.FC = () => {
           if (idx === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
         });
-        ctx.strokeStyle = incident_type === 'SOS' ? '#f43f5e' : incident_type === 'FRAUD' ? '#fbbf24' : '#3b82f6';
+        ctx.strokeStyle = incident_type === 'SOS' ? CANVAS_PALETTE.sos : incident_type === 'FRAUD' ? CANVAS_PALETTE.fraud : CANVAS_PALETTE.info;
         ctx.lineWidth = 3;
         ctx.stroke();
 
@@ -508,51 +525,51 @@ export const IncidentRecoveryTerminal: React.FC = () => {
         const pulseRatio = ((Date.now() % 1400) / 1400) * 38;
         ctx.beginPath();
         ctx.arc(vehiclePos.x, vehiclePos.y, pulseRatio, 0, 2 * Math.PI);
-        ctx.strokeStyle = incident_type === 'SOS' ? 'rgba(244, 63, 94, 0.5)' : 'rgba(251, 191, 36, 0.5)';
+        ctx.strokeStyle = incident_type === 'SOS' ? 'rgba(201, 64, 48, 0.5)' : 'rgba(240, 184, 64, 0.5)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
         // Draw vehicle center indicator pins
         ctx.beginPath();
         ctx.arc(vehiclePos.x, vehiclePos.y, 8, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = CANVAS_PALETTE.pinFill;
         ctx.fill();
-        ctx.strokeStyle = '#020617';
+        ctx.strokeStyle = CANVAS_PALETTE.pinOutline;
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
         ctx.beginPath();
         ctx.arc(vehiclePos.x, vehiclePos.y, 4.5, 0, 2 * Math.PI);
-        ctx.fillStyle = incident_type === 'SOS' ? '#f43f5e' : incident_type === 'FRAUD' ? '#fbbf24' : '#3b82f6';
+        ctx.fillStyle = incident_type === 'SOS' ? CANVAS_PALETTE.sos : incident_type === 'FRAUD' ? CANVAS_PALETTE.fraud : CANVAS_PALETTE.info;
         ctx.fill();
 
         // Draw Map UI Legends overlay
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fillStyle = CANVAS_PALETTE.legendBg;
         ctx.fillRect(w - 150, 15, 135, 75);
-        ctx.strokeStyle = '#334155';
+        ctx.strokeStyle = CANVAS_PALETTE.legendBorder;
         ctx.strokeRect(w - 150, 15, 135, 75);
 
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = CANVAS_PALETTE.textPrimary;
         ctx.font = 'bold 9px monospace';
         ctx.fillText("MAP GRAPHIC INDEX", w - 142, 28);
         
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = CANVAS_PALETTE.textSecondary;
         ctx.font = '8px monospace';
         
         // Dotted Legend
-        ctx.beginPath(); ctx.moveTo(w - 142, 42); ctx.lineTo(w - 122, 42); ctx.strokeStyle = '#475569'; ctx.setLineDash([2,2]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(w - 142, 42); ctx.lineTo(w - 122, 42); ctx.strokeStyle = CANVAS_PALETTE.routeMuted; ctx.setLineDash([2,2]); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillText("Contract Route (Dot)", w - 117, 45);
 
         // Solid Trail Legend
-        ctx.beginPath(); ctx.moveTo(w - 142, 54); ctx.lineTo(w - 122, 54); ctx.strokeStyle = '#f43f5e'; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(w - 142, 54); ctx.lineTo(w - 122, 54); ctx.strokeStyle = incident_type === 'SOS' ? CANVAS_PALETTE.sos : CANVAS_PALETTE.info; ctx.stroke();
         ctx.fillText("Vehicle Trail (Solid)", w - 117, 57);
 
         // Shaded H3 Legend
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.35)'; ctx.fillRect(w - 142, 64, 20, 8);
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = incident_type === 'SOS' ? 'rgba(201, 64, 48, 0.35)' : 'rgba(74, 111, 165, 0.35)'; ctx.fillRect(w - 142, 64, 20, 8);
+        ctx.fillStyle = CANVAS_PALETTE.textSecondary;
         ctx.fillText("Active H3 Area", w - 117, 70);
       } else {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = CANVAS_PALETTE.textSecondary;
         ctx.font = '10px monospace';
         ctx.textAlign = 'center';
         ctx.fillText("STARK MINIMALIST BASE MAP CANVAS LAYER", w / 2, h / 2 - 10);

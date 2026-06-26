@@ -610,7 +610,7 @@ function UnifiedLoginContent() {
                   type="button"
                   onClick={() => startOTPVerification(otpPurpose!, phone.replace(/\s/g, ''))}
                   disabled={loading || otpResendTimer > 0}
-                  className="text-content-secondary hover:text-white transition disabled:text-content-tertiary cursor-pointer font-medium"
+                  className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
                 >
                   {otpResendTimer > 0 ? `Resend Code in ${otpResendTimer}s` : 'Resend Code'}
                 </button>

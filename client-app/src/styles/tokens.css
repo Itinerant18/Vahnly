@@ -18,55 +18,55 @@
    NOT use these directly — use semantic aliases below.
    ───────────────────────────────────────────── */
 :root {
-  /* Gray ramp (0 = white, 1000 = black) */
-  --gray-0:    #FFFFFF;
-  --gray-50:   #F6F6F6;
-  --gray-100:  #EEEEEE;
-  --gray-200:  #E2E2E2;
-  --gray-300:  #CBCBCB;
-  --gray-400:  #AFAFAF;
-  --gray-500:  #757575;
-  --gray-600:  #545454;
-  --gray-700:  #333333;
-  --gray-800:  #1F1F1F;
-  --gray-900:  #141414;
-  --gray-1000: #000000;
+  /* Gray ramp (0 = warm off-white canvas, 1000 = deep charcoal ink) */
+  --gray-0:    #FAFAFA;
+  --gray-50:   #F4F4F1;
+  --gray-100:  #EAEAE5;
+  --gray-200:  #E0E0DA;
+  --gray-300:  #C9C9C2;
+  --gray-400:  #ADADA5;
+  --gray-500:  #7E7E77;
+  --gray-600:  #60605B;
+  --gray-700:  #454541;
+  --gray-800:  #30302E;
+  --gray-900:  #222221;
+  --gray-1000: #1A1A1A;
 
-  /* Accent (blue) ramp */
-  --accent-50:  #EEF3FE;
-  --accent-100: #D3E0FD;
-  --accent-200: #A7C0FA;
-  --accent-300: #7AA3F6;
-  --accent-400: #276EF1;
-  --accent-500: #1B5ED4;
-  --accent-600: #1150B8;
+  /* Accent (muted steel-blue) ramp */
+  --accent-50:  #F0F4F8;
+  --accent-100: #D9E2EC;
+  --accent-200: #BCCCDC;
+  --accent-300: #9FB3C8;
+  --accent-400: #4A6FA5;
+  --accent-500: #3B5A84;
+  --accent-600: #2D4566;
 
   /* Positive (green) ramp */
-  --positive-50:  #E6F4EC;
-  --positive-100: #C1E3CF;
-  --positive-200: #8ECBAA;
-  --positive-300: #5AB285;
-  --positive-400: #3AA76D;
-  --positive-500: #2A8A56;
-  --positive-600: #1C6D3F;
+  --positive-50:  #EAF6EC;
+  --positive-100: #C7E8D2;
+  --positive-200: #9CD6AF;
+  --positive-300: #6FC38B;
+  --positive-400: #3A9D68;
+  --positive-500: #2D7F53;
+  --positive-600: #205F3E;
 
   /* Warning (yellow) ramp */
-  --warning-50:  #FFF9E6;
-  --warning-100: #FFEFC0;
-  --warning-200: #FFE099;
-  --warning-300: #FFCC66;
-  --warning-400: #FFC043;
-  --warning-500: #E6A800;
-  --warning-600: #B38200;
+  --warning-50:  #FFF8E7;
+  --warning-100: #FEEDC4;
+  --warning-200: #FDE096;
+  --warning-300: #FCD068;
+  --warning-400: #F0B840;
+  --warning-500: #C6942C;
+  --warning-600: #986F1B;
 
   /* Negative (red) ramp */
-  --negative-50:  #FBEAEA;
-  --negative-100: #F4BDBD;
-  --negative-200: #EC8F8F;
-  --negative-300: #E36161;
-  --negative-400: #D44333;
-  --negative-500: #B53829;
-  --negative-600: #8F2B1E;
+  --negative-50:  #FBECEB;
+  --negative-100: #F5C2BE;
+  --negative-200: #EE958F;
+  --negative-300: #E6685F;
+  --negative-400: #C94030;
+  --negative-500: #A13023;
+  --negative-600: #7A2017;
 
   /* ─────────────────────────────────────────────
      SPACING (8px base grid)
@@ -94,11 +94,11 @@
   --radius-pill: 999px; /* chips, avatars */
 
   /* ─────────────────────────────────────────────
-     ELEVATION (box-shadow)
+     ELEVATION (box-shadow) - 50% softer for Minimalist style
      ───────────────────────────────────────────── */
-  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.08);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.12);
-  --elevation-3: 0 -2px 16px rgba(0, 0, 0, 0.16);
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --elevation-3: 0 -2px 16px rgba(0, 0, 0, 0.08);
 
   /* ─────────────────────────────────────────────
      MOTION (Quintic — Uber standard)
@@ -120,31 +120,31 @@
   --font-mono:    var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
 
   /* ─────────────────────────────────────────────
-     SEMANTIC ALIASES — LIGHT MODE (default)
+     SEMANTIC ALIASES — MINIMALIST SINGLE MODE
      ───────────────────────────────────────────── */
 
   /* Background */
-  --background-primary:   var(--gray-0);       /* #FFFFFF */
-  --background-secondary: var(--gray-50);      /* #F6F6F6 */
-  --background-tertiary:  var(--gray-100);     /* #EEEEEE */
+  --background-primary:   var(--gray-0);       /* #FAFAFA */
+  --background-secondary: var(--gray-50);      /* #F4F4F1 */
+  --background-tertiary:  var(--gray-100);     /* #EAEAE5 */
 
   /* Content (text) */
-  --content-primary:   var(--gray-1000);  /* #000000 */
-  --content-secondary: var(--gray-600);   /* #545454 */
-  --content-tertiary:  var(--gray-500);   /* #757575 */
-  --content-accent:    var(--accent-400); /* #276EF1 */
+  --content-primary:   var(--gray-1000);  /* #1A1A1A */
+  --content-secondary: var(--gray-600);   /* #60605B */
+  --content-tertiary:  var(--gray-500);   /* #7E7E77 */
+  --content-accent:    var(--accent-400); /* #4A6FA5 */
   --content-positive:  var(--positive-400);
   --content-warning:   var(--warning-600);
   --content-negative:  var(--negative-400);
 
   /* Border */
-  --border-opaque:   var(--gray-200);   /* #E2E2E2 */
-  --border-selected: var(--gray-1000);  /* #000000 */
+  --border-opaque:   var(--gray-200);   /* #E0E0DA */
+  --border-selected: var(--gray-1000);  /* #1A1A1A */
   --border-accent:   var(--accent-400);
 
   /* Interactive */
-  --interactive-primary:      var(--gray-1000);  /* black button bg */
-  --interactive-primary-text: var(--gray-0);     /* white button text */
+  --interactive-primary:      var(--gray-1000);  /* charcoal button bg */
+  --interactive-primary-text: var(--gray-0);     /* off-white button text */
   --interactive-secondary:    var(--gray-100);
   --interactive-hover:        var(--gray-900);
   --interactive-focus:        var(--accent-400);
@@ -157,53 +157,13 @@
   --surface-neutral:  var(--gray-100);
 
   /* Driver status colors */
-  --status-online:   var(--positive-400);  /* #3AA76D */
-  --status-active:   var(--accent-400);    /* #276EF1 */
-  --status-pending:  var(--warning-400);   /* #FFC043 */
-  --status-offline:  var(--gray-500);      /* #757575 */
-  --status-negative: var(--negative-400);  /* #D44333 */
-}
+  --status-online:   var(--positive-400);
+  --status-active:   var(--accent-400);
+  --status-pending:  var(--warning-400);
+  --status-offline:  var(--gray-500);
+  --status-negative: var(--negative-400);
 
-/* ─────────────────────────────────────────────
-   SEMANTIC ALIASES — DARK MODE
-   Triggered by [data-theme="dark"] on <html>
-   ───────────────────────────────────────────── */
-[data-theme="dark"] {
-  /* Background */
-  --background-primary:   var(--gray-1000);  /* #000000 */
-  --background-secondary: var(--gray-900);   /* #141414 */
-  --background-tertiary:  var(--gray-800);   /* #1F1F1F */
-
-  /* Content (text) */
-  --content-primary:   var(--gray-0);        /* #FFFFFF */
-  --content-secondary: var(--gray-400);      /* #AFAFAF */
-  --content-tertiary:  var(--gray-500);      /* #757575 */
-  --content-accent:    var(--accent-300);    /* #7AA3F6 — lighter for dark */
-  --content-positive:  var(--positive-300);
-  --content-warning:   var(--warning-300);
-  --content-negative:  var(--negative-300);
-
-  /* Border */
-  --border-opaque:   var(--gray-700);   /* #333333 */
-  --border-selected: var(--gray-0);     /* #FFFFFF */
-  --border-accent:   var(--accent-300);
-
-  /* Interactive */
-  --interactive-primary:      var(--gray-0);     /* white button bg */
-  --interactive-primary-text: var(--gray-1000);  /* black button text */
-  --interactive-secondary:    var(--gray-800);
-  --interactive-hover:        var(--gray-100);
-  --interactive-focus:        var(--accent-300);
-
-  /* Status surfaces */
-  --surface-positive: rgba(58, 167, 109, 0.15);
-  --surface-warning:  rgba(255, 192, 67, 0.15);
-  --surface-negative: rgba(212, 67, 51, 0.15);
-  --surface-accent:   rgba(39, 110, 241, 0.15);
-  --surface-neutral:  var(--gray-800);
-
-  /* Elevation adapts to dark */
-  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --elevation-3: 0 -2px 16px rgba(0, 0, 0, 0.5);
+  /* Inverse */
+  --background-inverse: var(--gray-1000);
+  --content-inverse:    var(--gray-0);
 }

@@ -2,8 +2,6 @@
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
 
-  // Dark mode via [data-theme="dark"] attribute on <html>
-  darkMode: ['selector', '[data-theme="dark"]'],
 
   theme: {
     extend: {

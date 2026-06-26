@@ -24,7 +24,6 @@ interface MapInterpolatedProps {
   destination?: { lat: number; lng: number } | null;
   center?: { lat: number; lng: number };
   zoom?: number;
-  theme?: 'light' | 'dark';
 }
 
 interface InterpolatedState {
@@ -45,7 +44,6 @@ export default function MapInterpolated({
   pickup = null,
   destination = null,
   center = { lat: 22.5726, lng: 88.3639 }, // Kolkata defaults
-  theme = 'dark',
 }: MapInterpolatedProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const driverStateRef = useRef<Record<string, InterpolatedState>>({});
@@ -126,19 +124,18 @@ export default function MapInterpolated({
       const css = getComputedStyle(document.documentElement);
       const v = (name: string) => css.getPropertyValue(name).trim();
 
-      const isDark = theme === 'dark';
-      const bgColor = isDark ? v('--background-primary') : v('--border-opaque');
-      const gridColor = isDark ? v('--background-secondary') : v('--border-opaque');
-      const highwayColor = isDark ? v('--background-tertiary') : v('--border-opaque');
-      const routeColor = isDark ? v('--accent-400') : v('--background-primary');
-      const pinOutlineColor = isDark ? v('--content-primary') : v('--background-primary');
-      const pinLabelColor = isDark ? v('--content-primary') : v('--background-primary');
-      const vehicleColor = isDark ? v('--content-primary') : v('--background-primary');
-      const vehicleOutlineColor = isDark ? v('--background-primary') : v('--content-primary');
-      const vehicleTailColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
-      const h3FillColor = isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(0, 0, 0, 0.04)';
-      const h3StrokeColor = isDark ? 'rgba(239, 68, 68, 0.22)' : 'rgba(0, 0, 0, 0.15)';
-      const h3LabelColor = isDark ? v('--negative-400') : v('--background-tertiary');
+      const bgColor = v('--background-primary');
+      const gridColor = v('--border-opaque');
+      const highwayColor = v('--background-tertiary');
+      const routeColor = v('--accent-400');
+      const pinOutlineColor = v('--border-opaque');
+      const pinLabelColor = v('--content-primary');
+      const vehicleColor = v('--content-primary');
+      const vehicleOutlineColor = v('--background-primary');
+      const vehicleTailColor = 'rgba(0, 0, 0, 0.03)';
+      const h3FillColor = 'rgba(201, 64, 48, 0.08)';
+      const h3StrokeColor = 'rgba(201, 64, 48, 0.22)';
+      const h3LabelColor = v('--negative-400');
 
       // Clear with background color
       ctx.fillStyle = bgColor;
@@ -322,7 +319,7 @@ export default function MapInterpolated({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination, theme, prefersReducedMotion]);
+  }, [mapCenter, zoomLevel, h3Hexagons, pickup, destination, prefersReducedMotion]);
 
   // Handle Dragging / Map Panning
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -373,14 +370,14 @@ export default function MapInterpolated({
         <button
           onClick={() => setZoomLevel((z) => Math.min(18, z + 1))}
           aria-label="Zoom in"
-          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
+          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-content-primary hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           +
         </button>
         <button
           onClick={() => setZoomLevel((z) => Math.max(13, z - 1))}
           aria-label="Zoom out"
-          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
+          className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-content-primary hover:bg-background-tertiary/80 active:bg-background-tertiary transition"
         >
           −
         </button>

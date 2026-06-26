@@ -71,7 +71,7 @@ function SlideToAccept({ onAccept, variant = 'accept' }: SlideToAcceptProps) {
 
       {/* Draggable thumb */}
       <div
-        className={`absolute left-1 w-12 h-12 rounded-pill ${thumbCls} shadow-elevation-2 flex items-center justify-center text-white cursor-grab active:cursor-grabbing z-10 transition-none`}
+        className={`absolute left-1 w-12 h-12 rounded-pill ${thumbCls} shadow-elevation-2 flex items-center justify-center text-gray-0 cursor-grab active:cursor-grabbing z-10 transition-none`}
         style={{ left: `calc(${sliderVal}% * (100% - 52px) / 100 + 2px)` }}
         onMouseDown={(e) => { e.preventDefault(); isDragging.current = true; }}
         onMouseMove={(e) => handleMove(e.clientX)}

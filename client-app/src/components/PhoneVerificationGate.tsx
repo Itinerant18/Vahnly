@@ -163,9 +163,12 @@ export default function PhoneVerificationGate() {
       <div className="relative z-10 w-full max-w-md bg-background-secondary border border-border-opaque rounded-md p-6 sm:p-8 shadow-elevation-2">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-accent-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-accent-400">
-            🔒
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
           </div>
-          <h1 className="text-heading-large font-bold tracking-tight text-white">
+          <h1 className="text-heading-large font-bold tracking-tight text-content-primary">
             Phone Verification Required
           </h1>
           <p className="text-paragraph-small text-content-secondary mt-2">
@@ -222,7 +225,7 @@ export default function PhoneVerificationGate() {
                 type="button"
                 onClick={triggerSendOTP}
                 disabled={loading || resendTimer > 0}
-                className="text-content-secondary hover:text-white transition disabled:text-content-tertiary cursor-pointer font-medium"
+                className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
               >
                 {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Resend Code'}
               </button>

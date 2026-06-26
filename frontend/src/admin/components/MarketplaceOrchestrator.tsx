@@ -374,12 +374,29 @@ export const MarketplaceOrchestrator: React.FC = () => {
       const w = canvas.width;
       const h = canvas.height;
 
-      // Dark slate base map style
-      ctx.fillStyle = '#0b0f19';
+      // Semantic canvas palette for Minimalist light UI
+      const CANVAS_PALETTE = {
+        background: '#FAFAFA',
+        grid: '#E0E0DD',
+        riverBorder: '#E0E0DD',
+        riverFill: '#F3F4F6', // very soft light gray/blue
+        textPrimary: '#1A1A1A',
+        textSecondary: '#555552',
+        routeMuted: '#94A3B8',
+        blacklist: '#C94030',
+        surge: '#4A6FA5',
+        restrict: '#8A5CF5', // soft purple/indigo
+        success: '#3A9D68',
+        pinOutline: '#1A1A1A',
+        pinFill: '#FAFAFA'
+      };
+
+      // Base map style
+      ctx.fillStyle = CANVAS_PALETTE.background;
       ctx.fillRect(0, 0, w, h);
 
       // Grid vector lines
-      ctx.strokeStyle = '#111827';
+      ctx.strokeStyle = CANVAS_PALETTE.grid;
       ctx.lineWidth = 1;
       const spacing = 30;
       for (let x = 0; x < w; x += spacing) {
@@ -394,7 +411,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
       ctx.moveTo(w * 0.28, 0);
       ctx.quadraticCurveTo(w * 0.22, h * 0.38, w * 0.33, h * 0.65);
       ctx.lineTo(w * 0.18, h);
-      ctx.strokeStyle = '#1e293b';
+      ctx.strokeStyle = CANVAS_PALETTE.riverBorder;
       ctx.lineWidth = 16;
       ctx.stroke();
 
@@ -402,7 +419,7 @@ export const MarketplaceOrchestrator: React.FC = () => {
       ctx.moveTo(w * 0.28, 0);
       ctx.quadraticCurveTo(w * 0.22, h * 0.38, w * 0.33, h * 0.65);
       ctx.lineTo(w * 0.18, h);
-      ctx.strokeStyle = '#0f172a';
+      ctx.strokeStyle = CANVAS_PALETTE.riverFill;
       ctx.lineWidth = 10;
       ctx.stroke();
 
@@ -432,17 +449,17 @@ export const MarketplaceOrchestrator: React.FC = () => {
         ctx.closePath();
 
         // Color based on policy
-        let fill = 'rgba(51, 65, 85, 0.08)';
-        let stroke = '#475569';
+        let fill = 'rgba(85, 85, 82, 0.08)';
+        let stroke = CANVAS_PALETTE.textSecondary;
         if (zone.policy_type === 'BLACKLIST_BLOCK') {
-          fill = 'rgba(239, 68, 68, 0.06)';
-          stroke = 'rgba(239, 68, 68, 0.3)';
+          fill = 'rgba(201, 64, 48, 0.06)';
+          stroke = 'rgba(201, 64, 48, 0.3)';
         } else if (zone.policy_type === 'SURGE_FLOOR_FORCE') {
-          fill = 'rgba(59, 130, 246, 0.06)';
-          stroke = 'rgba(59, 130, 246, 0.3)';
+          fill = 'rgba(74, 111, 165, 0.06)';
+          stroke = 'rgba(74, 111, 165, 0.3)';
         } else if (zone.policy_type === 'TRANSMISSION_RESTRICT') {
-          fill = 'rgba(99, 102, 241, 0.06)';
-          stroke = 'rgba(99, 102, 241, 0.3)';
+          fill = 'rgba(138, 92, 245, 0.06)';
+          stroke = 'rgba(138, 92, 245, 0.3)';
         }
 
         ctx.fillStyle = fill;
@@ -464,26 +481,26 @@ export const MarketplaceOrchestrator: React.FC = () => {
         if (polygonPoints.length >= 3) {
           ctx.closePath();
           ctx.fillStyle = intersectionError 
-            ? 'rgba(244, 63, 94, 0.12)' 
+            ? 'rgba(201, 64, 48, 0.12)' 
             : policyType === 'BLACKLIST_BLOCK'
-            ? 'rgba(244, 63, 94, 0.18)'
+            ? 'rgba(201, 64, 48, 0.18)'
             : policyType === 'SURGE_FLOOR_FORCE'
-            ? 'rgba(59, 130, 246, 0.18)'
+            ? 'rgba(74, 111, 165, 0.18)'
             : policyType === 'TRANSMISSION_RESTRICT'
-            ? 'rgba(99, 102, 241, 0.18)'
-            : 'rgba(16, 185, 129, 0.18)';
+            ? 'rgba(138, 92, 245, 0.18)'
+            : 'rgba(58, 157, 104, 0.18)';
           ctx.fill();
         }
 
         ctx.strokeStyle = intersectionError 
-          ? '#ef4444' 
+          ? CANVAS_PALETTE.blacklist
           : policyType === 'BLACKLIST_BLOCK'
-          ? '#f43f5e'
+          ? CANVAS_PALETTE.blacklist
           : policyType === 'SURGE_FLOOR_FORCE'
-          ? '#3b82f6'
+          ? CANVAS_PALETTE.surge
           : policyType === 'TRANSMISSION_RESTRICT'
-          ? '#6366f1'
-          : '#10b981';
+          ? CANVAS_PALETTE.restrict
+          : CANVAS_PALETTE.success;
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
@@ -492,14 +509,14 @@ export const MarketplaceOrchestrator: React.FC = () => {
           const pt = project(lat, lng);
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, idx === 0 ? 6.5 : 5, 0, 2 * Math.PI);
-          ctx.fillStyle = idx === 0 ? '#10b981' : '#ffffff';
+          ctx.fillStyle = idx === 0 ? CANVAS_PALETTE.success : CANVAS_PALETTE.pinFill;
           ctx.fill();
-          ctx.strokeStyle = '#020617';
+          ctx.strokeStyle = CANVAS_PALETTE.pinOutline;
           ctx.lineWidth = 2;
           ctx.stroke();
 
           // Render index number
-          ctx.fillStyle = '#020617';
+          ctx.fillStyle = CANVAS_PALETTE.pinOutline;
           ctx.font = 'bold 8px monospace';
           ctx.textAlign = 'center';
           ctx.fillText(idx.toString(), pt.x, pt.y + 3);

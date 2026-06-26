@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/general/24x24/fill/pause-circle-fill">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor" fill-rule="evenodd" clip-rule="evenodd" d="M2 12C2 6.486 6.486 2 12 2C17.515 2 22 6.486 22 12C22 17.514 17.515 22 12 22C6.486 22 2 17.514 2 12ZM10 15C10 15.55 9.55 16 9 16C8.45 16 8 15.55 8 15V9C8 8.45 8.45 8 9 8C9.55 8 10 8.45 10 9V15ZM16 15C16 15.55 15.55 16 15 16C14.45 16 14 15.55 14 15V9C14 8.45 14.45 8 15 8C15.55 8 16 8.45 16 9V15Z" fill="#383B46"/>
+<mask id="mask0_11506_95520" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="2" y="2" width="20" height="20">
+<path id="&#240;&#159;&#142;&#168; Icon &#208;&#161;olor_2" fill-rule="evenodd" clip-rule="evenodd" d="M2 12C2 6.486 6.486 2 12 2C17.515 2 22 6.486 22 12C22 17.514 17.515 22 12 22C6.486 22 2 17.514 2 12ZM10 15C10 15.55 9.55 16 9 16C8.45 16 8 15.55 8 15V9C8 8.45 8.45 8 9 8C9.55 8 10 8.45 10 9V15ZM16 15C16 15.55 15.55 16 15 16C14.45 16 14 15.55 14 15V9C14 8.45 14.45 8 15 8C15.55 8 16 8.45 16 9V15Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_11506_95520)">
+</g>
+</g>
+</svg>
