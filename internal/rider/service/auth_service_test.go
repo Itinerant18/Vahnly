@@ -74,6 +74,7 @@ func (f *fakeAuthRepo) IncrementOTPAttempts(_ context.Context, _ string) error {
 	return nil
 }
 func (f *fakeAuthRepo) MarkOTPUsed(_ context.Context, _ string) error { f.marked = true; return nil }
+func (f *fakeAuthRepo) SetRiderPassword(_ context.Context, _, _ string) error { return nil }
 
 type fakeCache struct {
 	count    int64
@@ -93,6 +94,7 @@ func (c *fakeCache) StoreSession(_ context.Context, riderID, jti string, _ time.
 func (c *fakeCache) GetSession(_ context.Context, riderID string) (string, error) {
 	return c.sessions[riderID], nil
 }
+func (c *fakeCache) MintRefresh(_ context.Context, _, _ string) (string, error) { return "rt", nil }
 
 type capturingSMS struct{ sent int }
 
@@ -272,5 +274,17 @@ func TestRiderFromJWT_RoundTrip(t *testing.T) {
 	// A tampered/garbage token must be rejected.
 	if _, err := svc.RiderFromJWT(context.Background(), token+"x"); !errors.Is(err, ErrInvalidToken) && !errors.Is(err, ErrSessionInvalid) {
 		t.Errorf("expected rejection of tampered token, got %v", err)
+	}
+}
+
+func TestValidateRiderPassword(t *testing.T) {
+	cases := map[string]bool{
+		"password1": true, "abcd1234": true, "Abc!2xyz": true,
+		"short1": false, "12345678": false, "0000000000": false, "": false,
+	}
+	for pwd, ok := range cases {
+		if (validateRiderPassword(pwd) == nil) != ok {
+			t.Errorf("validateRiderPassword(%q): ok=%v want %v", pwd, validateRiderPassword(pwd) == nil, ok)
+		}
 	}
 }

@@ -722,6 +722,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/rider/auth/send-otp", otpSend(riderAppHandler.HandleSendOTP))
 	mux.HandleFunc("POST /api/v1/rider/auth/verify-otp", otpVerify(riderAppHandler.HandleVerifyOTP))
 	mux.HandleFunc("POST /api/v1/rider/auth/login/google", riderAppHandler.HandleRiderGoogleLogin)
+	// Rider phone+password (no OTP/SMS on routine login). See DOC/RIDER_LOGIN_PLAN.md.
+	mux.HandleFunc("POST /api/v1/rider/auth/login", loginGuard(riderAppHandler.HandleRiderLogin))
+	mux.HandleFunc("POST /api/v1/rider/auth/forgot-password", otpSend(riderAppHandler.HandleRiderForgotPassword))
+	mux.HandleFunc("POST /api/v1/rider/auth/reset-password", otpVerify(riderAppHandler.HandleRiderResetPassword))
+	mux.HandleFunc("POST /api/v1/rider/me/password", riderAuthMW.Require(riderAppHandler.HandleRiderSetPassword))
 
 	mux.HandleFunc("GET /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleGetMe))
 	mux.HandleFunc("PUT /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleUpdateMe))

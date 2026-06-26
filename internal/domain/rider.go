@@ -24,6 +24,7 @@ type Rider struct {
 	PreferredLanguage string     `json:"preferred_language"`
 	KYCLevel          string     `json:"kyc_level"`
 	IsActive          bool       `json:"is_active"`
+	PasswordHash      *string    `json:"-"` // bcrypt; nil for OTP-only riders. Never serialized.
 	LastLoginAt       *time.Time `json:"last_login_at,omitempty"`
 	ReferralCode      *string    `json:"referral_code,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`

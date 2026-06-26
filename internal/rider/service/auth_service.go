@@ -37,16 +37,21 @@ var (
 	ErrInvalidToken   = errors.New("invalid or expired token")
 	ErrSessionInvalid = errors.New("session not found or revoked")
 	ErrRiderInactive  = errors.New("rider account is inactive")
+
+	ErrInvalidCredentials = errors.New("invalid phone or password")
+	ErrWeakPassword       = errors.New("password too weak")
 )
 
 const (
-	otpPurposeLogin  = "LOGIN"
-	otpTTL           = 5 * time.Minute
-	otpRateWindow    = time.Hour
-	otpMaxPerWindow  = 5
-	bcryptOTPCost    = 10
-	riderSessionTTL  = 72 * time.Hour
-	riderTokenIssuer = "vahnly-rider-auth"
+	otpPurposeLogin    = "LOGIN"
+	otpPurposeReset    = "RESET"
+	otpTTL             = 5 * time.Minute
+	otpRateWindow      = time.Hour
+	otpMaxPerWindow    = 5
+	bcryptOTPCost      = 10
+	bcryptPasswordCost = 10
+	riderSessionTTL    = 72 * time.Hour
+	riderTokenIssuer   = "vahnly-rider-auth"
 )
 
 // indiaPhoneRe matches an E.164 Indian mobile number: +91 followed by a 10-digit
@@ -64,6 +69,7 @@ type AuthRepository interface {
 	GetActiveOTPSession(ctx context.Context, phone, purpose string) (*domain.RiderOTPSession, error)
 	IncrementOTPAttempts(ctx context.Context, sessionID string) error
 	MarkOTPUsed(ctx context.Context, sessionID string) error
+	SetRiderPassword(ctx context.Context, riderID, passwordHash string) error
 }
 
 // RiderCache abstracts the Redis operations used for OTP rate limiting and
@@ -72,6 +78,7 @@ type RiderCache interface {
 	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
 	StoreSession(ctx context.Context, riderID, jti string, ttl time.Duration) error
 	GetSession(ctx context.Context, riderID string) (string, error)
+	MintRefresh(ctx context.Context, role, userID string) (string, error)
 }
 
 // SMSSender delivers the OTP to the rider's handset. The concrete transactional
@@ -102,6 +109,147 @@ type AuthService struct {
 
 func NewAuthService(repo AuthRepository, cache RiderCache, sms SMSSender, jwtSecret string) *AuthService {
 	return &AuthService{repo: repo, cache: cache, sms: sms, jwtSecret: []byte(jwtSecret)}
+}
+
+// validateRiderPassword enforces the minimum: >= 8 chars and not entirely numeric (mirrors driver).
+func validateRiderPassword(pwd string) error {
+	if len([]rune(pwd)) < 8 {
+		return ErrWeakPassword
+	}
+	allDigits := true
+	for _, c := range pwd {
+		if c < '0' || c > '9' {
+			allDigits = false
+			break
+		}
+	}
+	if allDigits {
+		return ErrWeakPassword
+	}
+	return nil
+}
+
+// LoginByPassword authenticates a rider by phone + password. Anti-enumeration: a missing rider, an
+// unset password, and a wrong password all return ErrInvalidCredentials.
+func (s *AuthService) LoginByPassword(ctx context.Context, phone, password string) (*domain.Rider, string, error) {
+	phone = normalizePhone(phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		return nil, "", ErrInvalidCredentials
+	}
+	rider, err := s.repo.GetRiderByPhone(ctx, phone)
+	if err != nil || rider.PasswordHash == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+	if !rider.IsActive {
+		return nil, "", ErrRiderInactive
+	}
+	if bcrypt.CompareHashAndPassword([]byte(*rider.PasswordHash), []byte(password)) != nil {
+		return nil, "", ErrInvalidCredentials
+	}
+	_ = s.repo.TouchLastLogin(ctx, rider.ID)
+	token, err := s.IssueSession(ctx, rider)
+	if err != nil {
+		return nil, "", err
+	}
+	return rider, token, nil
+}
+
+// MintRefresh mints a rider refresh token so a password/reset login stays logged in (best-effort;
+// returns "" if the cache is unavailable). The handler includes it in the auth response.
+func (s *AuthService) MintRefresh(ctx context.Context, riderID string) string {
+	if s.cache == nil {
+		return ""
+	}
+	t, _ := s.cache.MintRefresh(ctx, "RIDER", riderID)
+	return t
+}
+
+// SetPassword sets/updates a rider's password (authenticated set-password step during onboarding or
+// settings). Policy-checked.
+func (s *AuthService) SetPassword(ctx context.Context, riderID, password string) error {
+	if err := validateRiderPassword(password); err != nil {
+		return err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptPasswordCost)
+	if err != nil {
+		return err
+	}
+	return s.repo.SetRiderPassword(ctx, riderID, string(hash))
+}
+
+// ForgotPassword sends a password-reset OTP. Anti-enumeration: returns nil whether or not the phone is
+// registered; the caller always responds 200.
+func (s *AuthService) ForgotPassword(ctx context.Context, phone string) error {
+	phone = normalizePhone(phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		return nil
+	}
+	rider, err := s.repo.GetRiderByPhone(ctx, phone)
+	if err != nil || rider == nil {
+		return nil // unknown number — reveal nothing
+	}
+	if s.cache != nil {
+		count, cErr := s.cache.IncrementWithTTL(ctx, "rider:otp:rate:"+phone, otpRateWindow)
+		if cErr == nil && count > otpMaxPerWindow {
+			return nil
+		}
+	}
+	otp, err := generateOTP()
+	if err != nil {
+		return nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(otp), bcryptOTPCost)
+	if err != nil {
+		return nil
+	}
+	if err := s.repo.CreateOTPSession(ctx, phone, string(hash), otpPurposeReset, otpTTL); err != nil {
+		return nil
+	}
+	if s.sms != nil {
+		_ = s.sms.SendSMS(phone, otp)
+	}
+	return nil
+}
+
+// ResetPassword verifies a RESET OTP, sets the new password, and auto-logs-in.
+func (s *AuthService) ResetPassword(ctx context.Context, phone, otp, newPassword string) (*domain.Rider, string, error) {
+	phone = normalizePhone(phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		return nil, "", ErrInvalidPhone
+	}
+	if err := validateRiderPassword(newPassword); err != nil {
+		return nil, "", err
+	}
+	session, err := s.repo.GetActiveOTPSession(ctx, phone, otpPurposeReset)
+	if err != nil {
+		return nil, "", ErrOTPNotFound
+	}
+	if session.Attempts >= session.MaxAttempts {
+		return nil, "", ErrOTPMaxAttempts
+	}
+	if bcrypt.CompareHashAndPassword([]byte(session.OTPHash), []byte(otp)) != nil {
+		_ = s.repo.IncrementOTPAttempts(ctx, session.ID)
+		return nil, "", ErrOTPInvalid
+	}
+	_ = s.repo.MarkOTPUsed(ctx, session.ID)
+
+	rider, err := s.repo.GetRiderByPhone(ctx, phone)
+	if err != nil || rider == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptPasswordCost)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := s.repo.SetRiderPassword(ctx, rider.ID, string(hash)); err != nil {
+		return nil, "", err
+	}
+	_ = s.repo.TouchLastLogin(ctx, rider.ID)
+	token, err := s.IssueSession(ctx, rider)
+	if err != nil {
+		return nil, "", err
+	}
+	return rider, token, nil
 }
 
 // normalizePhone trims spaces and prefixes a bare 10-digit Indian number with +91.
@@ -344,4 +492,8 @@ func (c *redisRiderCache) GetSession(ctx context.Context, riderID string) (strin
 		return "", err
 	}
 	return val, nil
+}
+
+func (c *redisRiderCache) MintRefresh(ctx context.Context, role, userID string) (string, error) {
+	return middleware.MintRefreshToken(ctx, c.client, role, userID)
 }

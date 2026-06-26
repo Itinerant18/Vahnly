@@ -85,7 +85,19 @@ Everything else (routine login, app reopen) = password / Google / silent refresh
 
 ---
 
-## 4. Scope — DECIDED: B (full rider phone+password build)
+## 4. Scope — DECIDED: B  ·  ✅ SHIPPED
+
+Built: migration `000120` (nullable `password_hash`, deploy-safe — db-migrator runs first); rider repo
+scan + `SetRiderPassword`; service `LoginByPassword` / `SetPassword` / `ForgotPassword` / `ResetPassword`
+(+ `MintRefresh` so password-login stays logged in 90d); routes `POST /rider/auth/login` (loginGuard),
+`/forgot-password` + `/reset-password` (OTP guards), `/rider/me/password` (authed); rider login screen now
+leads with **phone + password** + "Forgot password?" + "Sign up with phone (OTP)" fallback + Google.
+Policy test + `go build ./...` + rider tsc green. **OTP now only at register/forgot — never routine login.**
+
+> Deferred (tiny): an authed "Set password" in account settings (no OTP). For now the forgot-password
+> flow already lets an OTP-only rider set their first password (1 OTP), then password-login forever.
+
+### Original build order
 
 Build order (each step verifiable; mirrors the driver auth shipped this session):
 1. **Migration** `000NNN_riders_password_hash`: `ALTER TABLE riders ADD COLUMN password_hash text;`

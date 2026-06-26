@@ -100,19 +100,26 @@ type rowScanner interface {
 
 const riderColumns = `id, phone, phone_verified, name, email, email_verified, gender,
 	date_of_birth, profile_photo_url, preferred_language, kyc_level, is_active,
-	last_login_at, referral_code, created_at, updated_at`
+	last_login_at, referral_code, created_at, updated_at, password_hash`
 
 func scanRider(row rowScanner) (*domain.Rider, error) {
 	var r domain.Rider
 	err := row.Scan(
 		&r.ID, &r.Phone, &r.PhoneVerified, &r.Name, &r.Email, &r.EmailVerified, &r.Gender,
 		&r.DateOfBirth, &r.ProfilePhotoURL, &r.PreferredLanguage, &r.KYCLevel, &r.IsActive,
-		&r.LastLoginAt, &r.ReferralCode, &r.CreatedAt, &r.UpdatedAt,
+		&r.LastLoginAt, &r.ReferralCode, &r.CreatedAt, &r.UpdatedAt, &r.PasswordHash,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &r, nil
+}
+
+// SetRiderPassword stores a bcrypt password hash for a rider (register / reset).
+func (p *postgresRiderRepo) SetRiderPassword(ctx context.Context, riderID, passwordHash string) error {
+	_, err := p.dbPool.Exec(ctx,
+		`UPDATE riders SET password_hash = $1, updated_at = now() WHERE id = $2::uuid`, passwordHash, riderID)
+	return err
 }
 
 // ExportRiderData assembles the rider's personal data across the rider domain by

@@ -72,12 +72,19 @@ function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const router = useRouter();
-  const { googleLogin, fetchMe, setToken, isLoading } = useAuthStore();
+  const { googleLogin, fetchMe, setToken, passwordLogin, forgotPassword, resetPassword, isLoading } = useAuthStore();
 
-  type AuthStep = "choose" | "phone_verify" | "google-register";
+  type AuthStep = "choose" | "phone_verify" | "google-register" | "reset";
   const [step, setStep] = useState<AuthStep>("choose");
   const [referral, setReferral] = useState("");
   const [error, setError] = useState("");
+
+  // Phone + password login (no OTP / no SMS)
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  // Forgot / reset
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [resetPw, setResetPw] = useState("");
 
   // Google registration sub-flow state
   const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string } | null>(null);
@@ -92,6 +99,47 @@ export default function LoginPage() {
     setToken(jwt);
     try { await fetchMe(); } catch { /* profile loads on next request */ }
     router.replace(isNew ? "/onboarding" : "/home");
+  };
+
+  // ── Phone + password login ────────────────────────────────────────────────
+  const handlePasswordLogin = async () => {
+    setError("");
+    const phone = loginPhone.replace(/\D/g, "");
+    if (phone.length !== 10) { setError("Enter your 10-digit number."); return; }
+    if (!loginPassword) { setError("Enter your password."); return; }
+    try {
+      await passwordLogin(phone, loginPassword);
+      router.replace("/home");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Invalid phone or password.");
+    }
+  };
+
+  const handleForgotSend = async () => {
+    setError("");
+    const phone = loginPhone.replace(/\D/g, "");
+    if (phone.length !== 10) { setError("Enter your registered 10-digit number first."); return; }
+    try {
+      await forgotPassword(phone);
+      setForgotOtp("");
+      setResetPw("");
+      setStep("reset");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Could not send the reset code.");
+    }
+  };
+
+  const handleResetSubmit = async () => {
+    setError("");
+    const phone = loginPhone.replace(/\D/g, "");
+    if (forgotOtp.length < 6) { setError("Enter the 6-digit code."); return; }
+    if (resetPw.length < 8) { setError("New password must be at least 8 characters."); return; }
+    try {
+      await resetPassword(phone, forgotOtp, resetPw);
+      router.replace("/home");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Reset failed. Check the code and try again.");
+    }
   };
 
   // ── Google sign-in ───────────────────────────────────────────────────────
@@ -181,18 +229,67 @@ export default function LoginPage() {
 
         {step === "choose" && (
           <div className="space-y-5">
-            <h2 className="text-heading-medium text-content-primary">Get started</h2>
+            <h2 className="text-heading-medium text-content-primary">Welcome back</h2>
 
-            {/* Primary: Phone OTP */}
+            {/* Primary: phone + password (no OTP / no SMS) */}
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
+                  <span className="text-lg">🇮🇳</span>
+                  <span className="text-label-medium text-content-primary">+91</span>
+                </div>
+                <input
+                  className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                  placeholder="98765 43210"
+                  inputMode="numeric"
+                  type="tel"
+                  maxLength={10}
+                  value={loginPhone}
+                  onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                />
+              </div>
+              <input
+                className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                placeholder="Password"
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handlePasswordLogin(); }}
+              />
+              <button
+                className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                disabled={isLoading}
+                onClick={handlePasswordLogin}
+              >
+                {isLoading ? <Spinner /> : "Log In"}
+              </button>
+              <button
+                type="button"
+                onClick={handleForgotSend}
+                disabled={isLoading}
+                className="w-full text-center text-label-small text-content-secondary py-1 min-h-[36px] hover:text-content-primary transition-base"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-border-opaque" />
+              <span className="text-label-small text-content-tertiary">new here?</span>
+              <div className="flex-1 border-t border-border-opaque" />
+            </div>
+
+            {/* Sign up / OTP fallback */}
             <button
-              className="flex h-14 w-full items-center justify-center rounded-sm
-                bg-interactive-primary text-interactive-primary-text
-                text-label-large font-medium shadow-elevation-1 transition-base
-                hover:opacity-90 active:scale-[0.98]
+              className="flex h-12 w-full items-center justify-center rounded-sm
+                bg-background-primary border border-border-opaque
+                text-label-medium text-content-primary transition-base
+                hover:bg-background-secondary active:scale-[0.98]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               onClick={() => setStep("phone_verify")}
             >
-              📱 Continue with Phone
+              📱 Sign up with phone (OTP)
             </button>
 
             {/* Divider */}
@@ -376,6 +473,46 @@ export default function LoginPage() {
               onClick={() => { setStep("choose"); setGoogleRegInfo(null); setError(""); }}
             >
               Cancel
+            </button>
+          </div>
+        )}
+
+        {step === "reset" && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-heading-medium text-content-primary mb-1">Reset password</h2>
+              <p className="text-paragraph-small text-content-secondary">
+                Enter the code sent to +91 {loginPhone} and choose a new password.
+              </p>
+            </div>
+            <input
+              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              placeholder="6-digit code"
+              inputMode="numeric"
+              type="tel"
+              maxLength={6}
+              value={forgotOtp}
+              onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+            <input
+              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              placeholder="New password (min 8 chars)"
+              type="password"
+              value={resetPw}
+              onChange={(e) => setResetPw(e.target.value)}
+            />
+            <button
+              className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+              disabled={isLoading}
+              onClick={handleResetSubmit}
+            >
+              {isLoading ? <Spinner /> : "Reset & Log In"}
+            </button>
+            <button
+              className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base"
+              onClick={() => { setStep("choose"); setError(""); }}
+            >
+              Back
             </button>
           </div>
         )}

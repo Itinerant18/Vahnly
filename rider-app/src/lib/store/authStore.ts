@@ -54,6 +54,9 @@ export interface AuthState {
     email?: string;
     name?: string;
   }>;
+  passwordLogin: (phone: string, password: string) => Promise<void>;
+  forgotPassword: (phone: string) => Promise<void>;
+  resetPassword: (phone: string, otp: string, newPassword: string) => Promise<void>;
   fetchMe: () => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
@@ -110,6 +113,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isNewRider: res.is_new_rider ?? false,
       });
       return { registered: true, isNew: res.is_new_rider };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  passwordLogin: async (phone, password) => {
+    set({ isLoading: true });
+    try {
+      const res = await authApi.login(phone, password);
+      persistToken(res.token);
+      persistRefresh(res.refresh_token ?? null);
+      persistRider(res.rider);
+      set({ token: res.token, rider: res.rider, isNewRider: false });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  forgotPassword: async (phone) => {
+    await authApi.forgotPassword(phone);
+  },
+
+  resetPassword: async (phone, otp, newPassword) => {
+    set({ isLoading: true });
+    try {
+      const res = await authApi.resetPassword(phone, otp, newPassword);
+      persistToken(res.token);
+      persistRefresh(res.refresh_token ?? null);
+      persistRider(res.rider);
+      set({ token: res.token, rider: res.rider, isNewRider: false });
     } finally {
       set({ isLoading: false });
     }

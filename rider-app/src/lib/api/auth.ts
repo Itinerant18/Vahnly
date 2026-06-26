@@ -16,6 +16,13 @@ export interface GoogleLoginResponse {
   is_new_rider?: boolean;
 }
 
+export interface PasswordLoginResponse {
+  token: string;
+  refresh_token?: string;
+  rider: Rider;
+  is_new_rider: boolean;
+}
+
 export const authApi = {
   sendOTP: (phone: string) =>
     apiClient.post<{ message: string; expires_in_seconds: number }>(
@@ -42,6 +49,23 @@ export const authApi = {
         referred_by_code: regData.referred_by_code,
       }),
     }),
+
+  // Phone + password login (no OTP / no SMS).
+  login: (phone: string, password: string) =>
+    apiClient.post<PasswordLoginResponse>("/api/v1/rider/auth/login", { phone, password }),
+
+  forgotPassword: (phone: string) =>
+    apiClient.post<{ message: string }>("/api/v1/rider/auth/forgot-password", { phone }),
+
+  resetPassword: (phone: string, otp: string, newPassword: string) =>
+    apiClient.post<PasswordLoginResponse>("/api/v1/rider/auth/reset-password", {
+      phone,
+      otp,
+      new_password: newPassword,
+    }),
+
+  setPassword: (password: string) =>
+    apiClient.post<{ message: string }>("/api/v1/rider/me/password", { password }),
 
   me: () => apiClient.get<Rider>("/api/v1/rider/me"),
 

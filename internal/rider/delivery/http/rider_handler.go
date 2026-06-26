@@ -70,6 +70,10 @@ func (h *RiderHandler) writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, err.Error(), "ERR_OTP")
 	case errors.Is(err, service.ErrMaxEmergencyContacts):
 		writeError(w, http.StatusConflict, err.Error(), "ERR_MAX_CONTACTS")
+	case errors.Is(err, service.ErrInvalidCredentials):
+		writeError(w, http.StatusUnauthorized, "Invalid phone or password", "ERR_INVALID_CREDENTIALS")
+	case errors.Is(err, service.ErrWeakPassword):
+		writeError(w, http.StatusBadRequest, "Password must be at least 8 characters and not all numbers.", "ERR_WEAK_PASSWORD")
 	case errors.Is(err, service.ErrRiderInactive):
 		writeError(w, http.StatusForbidden, err.Error(), "ERR_INACTIVE")
 	case errors.Is(err, pgx.ErrNoRows):
@@ -371,6 +375,86 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 		"rider":        rider,
 		"is_new_rider": true,
 	})
+}
+
+// HandleRiderLogin authenticates a rider by phone + password (no OTP / no SMS).
+func (h *RiderHandler) HandleRiderLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone    string `json:"phone"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	rider, token, err := h.auth.LoginByPassword(r.Context(), req.Phone, req.Password)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{
+		"token":         token,
+		"refresh_token": h.auth.MintRefresh(r.Context(), rider.ID),
+		"rider":         rider,
+		"is_new_rider":  false,
+	})
+}
+
+// HandleRiderForgotPassword sends a password-reset OTP. Anti-enumeration: always 200.
+func (h *RiderHandler) HandleRiderForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	_ = h.auth.ForgotPassword(r.Context(), req.Phone)
+	writeData(w, http.StatusOK, map[string]any{"message": "If that number is registered, a reset code has been sent."})
+}
+
+// HandleRiderResetPassword verifies a RESET OTP, sets the new password, and auto-logs-in.
+func (h *RiderHandler) HandleRiderResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone       string `json:"phone"`
+		OTP         string `json:"otp"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	rider, token, err := h.auth.ResetPassword(r.Context(), req.Phone, req.OTP, req.NewPassword)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{
+		"token":         token,
+		"refresh_token": h.auth.MintRefresh(r.Context(), rider.ID),
+		"rider":         rider,
+		"is_new_rider":  false,
+	})
+}
+
+// HandleRiderSetPassword sets/updates the authenticated rider's password (onboarding / settings).
+func (h *RiderHandler) HandleRiderSetPassword(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.riderID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+	if err := h.auth.SetPassword(r.Context(), id, req.Password); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]any{"message": "password set"})
 }
 
 // ---- Profile ----
