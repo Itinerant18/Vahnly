@@ -506,6 +506,18 @@ func main() {
 		rateLimiter.SetFailClosed(true)
 	}
 
+	// Pre-auth abuse guards (P0): keyed by phone/IP since there is no authenticated user yet.
+	// Fail-open by default (a Redis blip must not lock everyone out of login); honors
+	// RATE_LIMIT_FAIL_CLOSED to harden. See DOC/RELIABILITY_PLAN.md.
+	otpSendPhone := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:phone", 3, time.Hour)        // SMS cost: 3/phone/hr
+	otpSendIP := rateLimiter.PerKey(middleware.ClientIPKey, "otp:ip", 15, time.Hour)              // SMS bomb: 15/IP/hr
+	otpVerify := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:verify", 5, 10*time.Minute)     // brute-force: 5/phone/10m
+	loginGuard := rateLimiter.PerKey(middleware.ClientIPKey, "login", 10, 15*time.Minute)         // spray: 10/IP/15m
+	fbVerifyGuard := rateLimiter.PerKey(middleware.ClientIPKey, "fbverify", 30, 15*time.Minute)   // 30/IP/15m
+	sosFlood := rateLimiter.PerKey(middleware.ClientIPKey, "sos", 20, time.Minute)                // runaway-loop guard only (never blocks one real SOS)
+	// otpSend composes the phone AND IP limits (both must pass).
+	otpSend := func(h http.HandlerFunc) http.HandlerFunc { return otpSendPhone(otpSendIP(h)) }
+
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
 	// Active region shards. Prefer the explicit env override; otherwise load from the
 	// regional_cities table (authoritative) instead of a hardcoded city list. Fail
@@ -548,11 +560,11 @@ func main() {
 	// Authentication / Access routes. Rider login is handled exclusively by the
 	// real OTP flow (/api/v1/rider/auth/send-otp + verify-otp); the old mock
 	// /api/v1/auth/rider/login endpoint was removed (it accepted any OTP).
-	mux.HandleFunc("POST /api/v1/auth/driver/login", handler.HandleDriverLogin)
+	mux.HandleFunc("POST /api/v1/auth/driver/login", loginGuard(handler.HandleDriverLogin))
 	// Public, unauthenticated, Redis-cached config the apps read on startup.
 	mux.HandleFunc("GET /api/v1/config/flags", handler.HandlePublicFlags)
 	mux.HandleFunc("GET /api/v1/config/app-version", handler.HandlePublicAppVersion)
-	mux.HandleFunc("POST /api/v1/admin/auth/login", adminAuthHandler.HandleAdminLogin)
+	mux.HandleFunc("POST /api/v1/admin/auth/login", loginGuard(adminAuthHandler.HandleAdminLogin))
 	// Admin creation must be an authenticated SUPER_ADMIN action. Leaving this public
 	// let anyone self-register an account with an arbitrary role (incl. SUPER_ADMIN),
 	// a full authentication bypass. New admins are provisioned via /admin/team/invite.
@@ -573,11 +585,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/auth/logout", adminAuthHandler.HandleAuthLogout)
 
 	// Driver App & Onboarding routes
-	mux.HandleFunc("POST /api/v1/driver/login", driverAuthHandler.HandleDriverLogin)
+	mux.HandleFunc("POST /api/v1/driver/login", loginGuard(driverAuthHandler.HandleDriverLogin))
 	mux.HandleFunc("POST /api/v1/driver/login/google", driverAuthHandler.HandleDriverGoogleLogin)
 	mux.HandleFunc("POST /api/v1/driver/register", driverAuthHandler.HandleDriverRegister)
-	mux.HandleFunc("POST /api/v1/driver/auth/send-otp", driverAuthHandler.HandleSendOTP)
-	mux.HandleFunc("POST /api/v1/driver/auth/verify-otp", driverAuthHandler.HandleVerifyOTP)
+	mux.HandleFunc("POST /api/v1/driver/auth/send-otp", otpSend(driverAuthHandler.HandleSendOTP))
+	mux.HandleFunc("POST /api/v1/driver/auth/verify-otp", otpVerify(driverAuthHandler.HandleVerifyOTP))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/step/{step_id}", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleSaveStep))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/upload", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleUploadDocument))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/presigned-url", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleGeneratePresignedURL))
@@ -588,7 +600,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/driver/duty/toggle", authGuard.AuthenticateJWT(driverDutyHandler.HandleDutyStateToggle))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/arrived", authGuard.AuthenticateJWT(driverTripHandler.MarkArrived))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/verify-start", authGuard.AuthenticateJWT(driverTripHandler.VerifyAndStartTrip))
-	mux.HandleFunc("POST /api/v1/driver/sos", authGuard.AuthenticateJWT(driverDutyHandler.HandleTriggerSOS))
+	mux.HandleFunc("POST /api/v1/driver/sos", sosFlood(authGuard.AuthenticateJWT(driverDutyHandler.HandleTriggerSOS)))
 	mux.HandleFunc("GET /api/v1/driver/stats", authGuard.AuthenticateJWT(driverDutyHandler.HandleGetStats))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/verify-otp", authGuard.AuthenticateJWT(driverDutyHandler.HandleVerifyOTPAndStartTrip))
@@ -658,10 +670,10 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/device-token", authGuard.AuthenticateJWT(handler.HandleRegisterDeviceToken))
 	mux.HandleFunc("POST /api/v1/driver/location", authGuard.AuthenticateJWT(handler.HandleDriverLocationUpdate))
 	mux.HandleFunc("POST /api/v1/payments/webhook", handler.HandlePaymentWebhook)
-	mux.HandleFunc("POST /api/v1/sos/trigger", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleTriggerSOS)))
+	mux.HandleFunc("POST /api/v1/sos/trigger", sosFlood(authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleTriggerSOS))))
 
 	// Driver Safety & Emergency Protocol (Feature 11)
-	mux.HandleFunc("POST /api/v1/driver/safety/sos", authGuard.AuthenticateJWT(driverSafetyHandler.TriggerSOSAlert))
+	mux.HandleFunc("POST /api/v1/driver/safety/sos", sosFlood(authGuard.AuthenticateJWT(driverSafetyHandler.TriggerSOSAlert)))
 	mux.HandleFunc("GET /api/v1/driver/safety/fatigue-check", authGuard.AuthenticateJWT(driverSafetyHandler.AssessFatigueLimits))
 
 	// Driver Offline mode caching & Sync Buffers (Feature 12)
@@ -691,12 +703,12 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/odometer", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverOdometerCheckpoint))))
 
 	// Unified Firebase auth verify — public, handles both driver + rider post-Firebase flows.
-	mux.HandleFunc("POST /api/v1/auth/firebase/verify", firebaseAuthHandler.HandleFirebaseVerify)
+	mux.HandleFunc("POST /api/v1/auth/firebase/verify", fbVerifyGuard(firebaseAuthHandler.HandleFirebaseVerify))
 
 	// Rider App: auth + onboarding routes. Public OTP endpoints, then RIDER-scoped
 	// protected endpoints guarded by the standalone rider auth middleware.
-	mux.HandleFunc("POST /api/v1/rider/auth/send-otp", riderAppHandler.HandleSendOTP)
-	mux.HandleFunc("POST /api/v1/rider/auth/verify-otp", riderAppHandler.HandleVerifyOTP)
+	mux.HandleFunc("POST /api/v1/rider/auth/send-otp", otpSend(riderAppHandler.HandleSendOTP))
+	mux.HandleFunc("POST /api/v1/rider/auth/verify-otp", otpVerify(riderAppHandler.HandleVerifyOTP))
 	mux.HandleFunc("POST /api/v1/rider/auth/login/google", riderAppHandler.HandleRiderGoogleLogin)
 
 	mux.HandleFunc("GET /api/v1/rider/me", riderAuthMW.Require(riderAppHandler.HandleGetMe))
@@ -736,7 +748,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/chat", riderAuthMW.Require(riderBookingHandler.HandleSendChat))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/location", riderAuthMW.Require(riderBookingHandler.HandleShareLocation))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/rate", riderAuthMW.Require(riderBookingHandler.HandleRateDriver))
-	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", riderAuthMW.Require(riderBookingHandler.HandleSOS))
+	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/sos", sosFlood(riderAuthMW.Require(riderBookingHandler.HandleSOS)))
 	mux.HandleFunc("POST /api/v1/rider/orders/{orderId}/stops", riderAuthMW.Require(riderBookingHandler.HandleAddStop))
 	mux.HandleFunc("PATCH /api/v1/rider/orders/{orderId}/drop", riderAuthMW.Require(riderBookingHandler.HandleChangeDrop))
 	mux.HandleFunc("PATCH /api/v1/rider/orders/{orderId}/extend", riderAuthMW.Require(riderBookingHandler.HandleExtend))
