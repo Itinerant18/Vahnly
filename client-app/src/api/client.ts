@@ -264,6 +264,40 @@ export async function driverLogin(phone: string, password: string): Promise<Driv
   };
 }
 
+// Forgot password: requests a reset OTP. Always succeeds (anti-enumeration) — the response never
+// reveals whether the number is registered.
+export async function driverForgotPassword(phone: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/v1/driver/auth/forgot-password', {
+    method: 'POST',
+    body: { phone },
+  });
+}
+
+// Reset password with the OTP + a new password. On success the driver is auto-logged-in (same flat
+// auth response as login), so the caller can drop straight into the app.
+export async function driverResetPassword(
+  phone: string,
+  otp: string,
+  newPassword: string,
+): Promise<DriverLoginResponse> {
+  const raw = await request<DriverLoginRaw>('/api/v1/driver/auth/reset-password', {
+    method: 'POST',
+    body: { phone, otp, new_password: newPassword },
+  });
+  return {
+    token: raw.token,
+    user: {
+      id: raw.driver_id,
+      role: raw.role ?? 'DRIVER',
+      name: raw.name,
+      current_state: '',
+      phone_verified: raw.phone_verified,
+      phone: raw.phone || phone,
+    },
+    phone_verified: raw.phone_verified,
+  };
+}
+
 export interface DriverGoogleLoginResponse {
   token?: string;
   user?: DriverAuthUser;

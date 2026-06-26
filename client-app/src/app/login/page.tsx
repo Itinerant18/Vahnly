@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, Suspense, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { driverLogin, driverRegister, driverGoogleLogin, sendDriverOTP, verifyDriverOTP } from '@/api/client';
+import { driverLogin, driverRegister, driverGoogleLogin, sendDriverOTP, verifyDriverOTP, driverForgotPassword, driverResetPassword } from '@/api/client';
 import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter } from 'next/navigation';
 import { Input, Button } from '@/components/ds';
@@ -42,7 +42,12 @@ function UnifiedLoginContent() {
   const [registrationPayload, setRegistrationPayload] = useState<any>(null);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
-  
+
+  // Forgot / reset password states
+  const [forgotMode, setForgotMode] = useState<'phone' | 'reset' | null>(null);
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
   // Logs state
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -431,6 +436,48 @@ function UnifiedLoginContent() {
     await startOTPVerification('google_registration', cleanPhone);
   };
 
+  const handleForgotSend = async () => {
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (cleanPhone.length < 10) { setAuthError('Enter your registered 10-digit number.'); return; }
+    setLoading(true);
+    setAuthError(null);
+    try {
+      await driverForgotPassword(cleanPhone);
+      setForgotMode('reset');
+      setForgotOtp('');
+      useToastStore.getState().show('If that number is registered, a reset code was sent.', 'info');
+    } catch (err) {
+      useToastStore.getState().show(friendlyError(err), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async () => {
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (forgotOtp.length < 6) { setAuthError('Enter the 6-digit code.'); return; }
+    if (newPassword.length < 8) { setAuthError('New password must be at least 8 characters.'); return; }
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const res = await driverResetPassword(cleanPhone, forgotOtp, newPassword);
+      if (!res.token || !res.user) throw new Error('Reset succeeded but no session was returned.');
+      login(res.token, {
+        id: res.user.id,
+        role: res.user.role,
+        name: res.user.name,
+        phone: cleanPhone,
+        phone_verified: res.phone_verified,
+      });
+      useToastStore.getState().show('Password updated — you are logged in.', 'success');
+      router.push('/driver');
+    } catch (err) {
+      useToastStore.getState().show(friendlyError(err), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen relative flex flex-col justify-center items-center p-4 sm:p-6 bg-background-primary text-content-primary font-sans overflow-hidden">
       {/* Grid line matrix background */}
@@ -456,7 +503,70 @@ function UnifiedLoginContent() {
           </div>
         )}
 
-        {showOtpVerification ? (
+        {forgotMode ? (
+          /* FORGOT / RESET PASSWORD VIEW */
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (forgotMode === 'phone') { handleForgotSend(); } else { handleResetSubmit(); }
+            }}
+            className="space-y-4 text-left"
+          >
+            <div className="mb-1">
+              <p className="text-paragraph-small text-content-secondary">
+                {forgotMode === 'phone'
+                  ? 'Enter your registered number — we will text a reset code.'
+                  : <>Enter the code sent to <strong>+91 {phone}</strong> and choose a new password.</>}
+              </p>
+            </div>
+
+            {forgotMode === 'phone' ? (
+              <Input
+                label="Driver Phone Number"
+                type="tel"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="99999 88888"
+                leftIcon={<span className="text-content-secondary font-mono text-paragraph-medium">+91</span>}
+                disabled={loading}
+              />
+            ) : (
+              <>
+                <Input
+                  label="Reset Code"
+                  type="tel"
+                  value={forgotOtp}
+                  onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="6-digit code"
+                  disabled={loading}
+                />
+                <Input
+                  label="New Password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  disabled={loading}
+                />
+              </>
+            )}
+
+            <div className="pt-2 space-y-3">
+              <Button type="submit" variant="primary" fullWidth loading={loading}>
+                {forgotMode === 'phone' ? 'Send Reset Code' : 'Reset Password & Sign In'}
+              </Button>
+              <Button
+                type="button"
+                variant="tertiary"
+                fullWidth
+                onClick={() => { setForgotMode(null); setAuthError(null); setForgotOtp(''); setNewPassword(''); }}
+                disabled={loading}
+              >
+                Back to login
+              </Button>
+            </div>
+          </form>
+        ) : showOtpVerification ? (
           /* OTP VERIFICATION VIEW */
           <form onSubmit={(e) => handleVerifyOtpSubmit(e)} className="space-y-6 text-left">
             <div className="mb-2">
@@ -687,6 +797,15 @@ function UnifiedLoginContent() {
               placeholder="••••••••"
               disabled={loading}
             />
+
+            <button
+              type="button"
+              onClick={() => { setAuthError(null); setForgotMode('phone'); }}
+              disabled={loading}
+              className="text-label-small text-content-secondary hover:text-content-primary transition cursor-pointer"
+            >
+              Forgot password?
+            </button>
 
             <div className="pt-2 space-y-3">
               <Button

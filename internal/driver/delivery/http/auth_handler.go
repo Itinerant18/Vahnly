@@ -186,6 +186,11 @@ func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if err := validatePasswordPolicy(req.Password); err != nil {
+		http.Error(w, "Password must be at least 8 characters and not all numbers.", http.StatusBadRequest)
+		return
+	}
+
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -804,6 +809,218 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if h.redis != nil {
+		_ = h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
+		Token:              tokenString,
+		ExpiresAt:          expirationTime,
+		Role:               "DRIVER",
+		DriverID:           dbDriverID,
+		VerificationStatus: dbVerificationStatus,
+		OnboardingStep:     dbOnboardingStep,
+		Name:               dbName,
+		PhoneVerified:      true,
+		Phone:              phone,
+	})
+}
+
+// validatePasswordPolicy enforces the minimum: >= 8 chars and not entirely numeric.
+func validatePasswordPolicy(pwd string) error {
+	if len([]rune(pwd)) < 8 {
+		return errors.New("password too short")
+	}
+	allDigits := true
+	for _, c := range pwd {
+		if c < '0' || c > '9' {
+			allDigits = false
+			break
+		}
+	}
+	if allDigits {
+		return errors.New("password all numeric")
+	}
+	return nil
+}
+
+// HandleForgotPassword sends a password-reset OTP. Anti-enumeration: always returns 200, regardless
+// of whether the phone is registered, so it can't be used to probe which numbers have accounts.
+func (h *DriverAuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	respondOK := func() {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "If that number is registered, a reset code has been sent.",
+		})
+	}
+
+	phone := normalizePhone(req.Phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		respondOK()
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Only proceed for a registered driver — but never reveal which.
+	var exists bool
+	if err := h.dbPool.QueryRow(ctx, "SELECT true FROM drivers WHERE phone = $1", phone).Scan(&exists); err != nil || !exists {
+		respondOK()
+		return
+	}
+
+	// Reuse the OTP rate limit (5/phone/hr); over-limit still returns 200.
+	if h.redis != nil {
+		key := "driver:otp:rate:" + phone
+		n, err := h.redis.Incr(ctx, key).Result()
+		if err == nil {
+			if n == 1 {
+				_ = h.redis.Expire(ctx, key, time.Hour).Err()
+			}
+			if n > 5 {
+				respondOK()
+				return
+			}
+		}
+	}
+
+	otp, err := generateOTP()
+	if err != nil {
+		respondOK()
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(otp), 10)
+	if err != nil {
+		respondOK()
+		return
+	}
+	expiresAt := time.Now().Add(5 * time.Minute)
+	_, _ = h.dbPool.Exec(ctx, `
+		INSERT INTO driver_otp_sessions (phone, otp_hash, purpose, expires_at)
+		VALUES ($1, $2, 'RESET', $3)`, phone, string(hash), expiresAt)
+
+	log.Printf("[DRIVER_SMS] password-reset OTP for %s is %s", phone, otp)
+	respondOK()
+}
+
+// HandleResetPassword verifies a RESET OTP, sets the new password (policy-checked), revokes all
+// existing sessions, and auto-logs-in (returns a fresh session JWT) so the driver lands in the app.
+func (h *DriverAuthHandler) HandleResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Phone       string `json:"phone"`
+		OTP         string `json:"otp"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	phone := normalizePhone(req.Phone)
+	if !indiaPhoneRe.MatchString(phone) {
+		http.Error(w, "Invalid phone number", http.StatusBadRequest)
+		return
+	}
+	if err := validatePasswordPolicy(req.NewPassword); err != nil {
+		http.Error(w, "Password must be at least 8 characters and not all numbers.", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Verify the RESET OTP (mirrors HandleVerifyOTP, scoped to purpose='RESET').
+	var sessionID, otpHash string
+	var attempts, maxAttempts int
+	err := h.dbPool.QueryRow(ctx, `
+		SELECT id, otp_hash, attempts, max_attempts
+		FROM driver_otp_sessions
+		WHERE phone = $1 AND purpose = 'RESET' AND used_at IS NULL AND expires_at > now()
+		ORDER BY created_at DESC
+		LIMIT 1`, phone).Scan(&sessionID, &otpHash, &attempts, &maxAttempts)
+	if err != nil {
+		http.Error(w, "No active reset request found or it has expired", http.StatusUnauthorized)
+		return
+	}
+	if attempts >= maxAttempts {
+		http.Error(w, "Too many attempts; request a new reset code", http.StatusUnauthorized)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(otpHash), []byte(req.OTP)) != nil {
+		_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET attempts = attempts + 1 WHERE id = $1::uuid", sessionID)
+		http.Error(w, "Incorrect code", http.StatusUnauthorized)
+		return
+	}
+	_, _ = h.dbPool.Exec(ctx, "UPDATE driver_otp_sessions SET used_at = now() WHERE id = $1::uuid", sessionID)
+
+	// Look up the driver.
+	var dbDriverID, dbName, dbCityPrefix, dbVerificationStatus string
+	var dbOnboardingStep int
+	err = h.dbPool.QueryRow(ctx, `
+		SELECT id, name, city_prefix, verification_status, onboarding_step
+		FROM drivers WHERE phone = $1`, phone).
+		Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Set the new password.
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	if _, err = h.dbPool.Exec(ctx, "UPDATE drivers SET password_hash = $1 WHERE id = $2::uuid", string(newHash), dbDriverID); err != nil {
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	// Revoke every existing session (the new jti below overwrites the session key, so any token
+	// issued before this reset is rejected), then auto-login.
+	if h.redis != nil {
+		_ = h.redis.Del(ctx, middleware.DriverSessionKey(dbDriverID)).Err()
+	}
+	h.recordAuditLog(ctx, dbDriverID, "PASSWORD_RESET", r.Header.Get("X-Device-Id"), getClientIP(r), r.Header.Get("X-App-Version"), "")
+
+	expirationTime := time.Now().Add(7 * 24 * time.Hour)
+	jti := uuid.NewString()
+	claims := &middleware.CustomClaims{
+		UserID:        dbDriverID,
+		Role:          "DRIVER",
+		CityScope:     dbCityPrefix,
+		PhoneVerified: true,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
+			Subject:   dbDriverID,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "vahnly-driver-auth",
+		},
+	}
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
+	if err != nil {
+		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
+		return
+	}
 	if h.redis != nil {
 		_ = h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err()
 	}
