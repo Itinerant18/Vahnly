@@ -598,6 +598,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/driver/auth/verify-otp", otpVerify(driverAuthHandler.HandleVerifyOTP))
 	mux.HandleFunc("POST /api/v1/driver/auth/forgot-password", otpSend(driverAuthHandler.HandleForgotPassword))
 	mux.HandleFunc("POST /api/v1/driver/auth/reset-password", otpVerify(driverAuthHandler.HandleResetPassword))
+	mux.HandleFunc("POST /api/v1/driver/auth/logout-all", authGuard.AuthenticateJWT(refreshHandler.HandleLogoutAll("DRIVER")))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/step/{step_id}", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleSaveStep))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/upload", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleUploadDocument))
 	mux.HandleFunc("POST /api/v1/driver/onboarding/presigned-url", authGuard.AuthenticateJWT(driverOnboardingHandler.HandleGeneratePresignedURL))

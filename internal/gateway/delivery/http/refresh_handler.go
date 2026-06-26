@@ -39,8 +39,50 @@ func (h *RefreshHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	role, userID, newRefresh, err := middleware.RotateRefreshToken(ctx, h.redis, req.RefreshToken)
-	if err != nil || role != "DRIVER" {
-		// Only driver refresh tokens are minted today; rider refresh is a follow-up.
+	if err != nil {
+		writeRefreshUnauthorized(w)
+		return
+	}
+
+	if role == "RIDER" {
+		var isActive bool
+		if qErr := h.dbPool.QueryRow(ctx, `SELECT is_active FROM riders WHERE id = $1::uuid`, userID).Scan(&isActive); qErr != nil || !isActive {
+			writeRefreshUnauthorized(w)
+			return
+		}
+		expiresAt := time.Now().Add(middleware.AccessTokenTTL())
+		jti := uuid.NewString()
+		claims := &middleware.CustomClaims{
+			UserID: userID,
+			Role:   "RIDER",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID:        jti,
+				Subject:   userID,
+				ExpiresAt: jwt.NewNumericDate(expiresAt),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				Issuer:    "vahnly-rider-auth",
+			},
+		}
+		access, sErr := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
+		if sErr != nil {
+			writeRefreshUnauthorized(w)
+			return
+		}
+		if h.redis != nil {
+			_ = h.redis.Set(ctx, "rider:session:"+userID, jti, middleware.RefreshTokenTTL).Err()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"token":         access,
+			"refresh_token": newRefresh,
+			"expires_at":    expiresAt,
+			"role":          "RIDER",
+			"rider_id":      userID,
+		})
+		return
+	}
+
+	if role != "DRIVER" {
 		writeRefreshUnauthorized(w)
 		return
 	}
@@ -93,6 +135,31 @@ func (h *RefreshHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		"onboarding_step":     onboardingStep,
 		"verification_status": verificationStatus,
 	})
+}
+
+// HandleLogoutAll revokes every session for the authenticated user: all refresh tokens + the session
+// jti (which kills all access tokens). role is fixed per route ("DRIVER" / "RIDER").
+func (h *RefreshHandler) HandleLogoutAll(role string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserIDFromContext(r.Context())
+		if !ok || userID == "" {
+			writeRefreshUnauthorized(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		middleware.RevokeAllRefreshTokens(ctx, h.redis, role, userID)
+		if h.redis != nil {
+			if role == "RIDER" {
+				_ = h.redis.Del(ctx, "rider:session:"+userID).Err()
+			} else {
+				_ = h.redis.Del(ctx, middleware.DriverSessionKey(userID)).Err()
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Logged out of all devices."})
+	}
 }
 
 func writeRefreshUnauthorized(w http.ResponseWriter) {

@@ -88,12 +88,12 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 	}
 
 	var platformJWT string
-	var driverRefresh string
+	var refreshTok string
 	var isNew bool
 
 	switch strings.ToLower(strings.TrimSpace(req.UserType)) {
 	case "rider":
-		platformJWT, isNew, err = h.riderFindOrCreate(ctx, fc.PhoneNumber)
+		platformJWT, refreshTok, isNew, err = h.riderFindOrCreate(ctx, fc.PhoneNumber)
 		if err != nil {
 			log.Printf("[FIREBASE_AUTH] rider error phone=%s: %v", fc.PhoneNumber, err)
 			writeJSON(w, 500, verifyResponse{Success: false, Message: "server error"})
@@ -101,7 +101,7 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 		}
 
 	case "driver":
-		platformJWT, driverRefresh, isNew, err = h.driverFindOrCreate(ctx, fc.PhoneNumber, fc.Email, fc.Name, req.Name, req.CityPrefix)
+		platformJWT, refreshTok, isNew, err = h.driverFindOrCreate(ctx, fc.PhoneNumber, fc.Email, fc.Name, req.Name, req.CityPrefix)
 		if err != nil {
 			log.Printf("[FIREBASE_AUTH] driver error phone=%s: %v", fc.PhoneNumber, err)
 			writeJSON(w, 500, verifyResponse{Success: false, Message: "server error"})
@@ -114,8 +114,8 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 	}
 
 	data := map[string]string{"token": platformJWT}
-	if driverRefresh != "" {
-		data["refresh_token"] = driverRefresh
+	if refreshTok != "" {
+		data["refresh_token"] = refreshTok
 	}
 	writeJSON(w, 200, verifyResponse{
 		Success:   true,
@@ -125,17 +125,22 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 }
 
 // riderFindOrCreate delegates to the rider auth service's phone-verified login path.
-func (h *FirebaseAuthHandler) riderFindOrCreate(ctx context.Context, phone string) (token string, isNew bool, err error) {
+func (h *FirebaseAuthHandler) riderFindOrCreate(ctx context.Context, phone string) (token, refresh string, isNew bool, err error) {
 	rider, tok, svcErr := h.riderAuth.LoginByVerifiedPhone(ctx, phone)
 	if svcErr != nil {
 		if errors.Is(svcErr, riderSvc.ErrNewRider) {
 			// New rider — rider is non-nil, tok is empty. Issue session for onboarding.
 			tok, err = h.riderAuth.IssueSession(ctx, rider)
-			return tok, true, err
+			if err != nil {
+				return "", "", true, err
+			}
+			refresh, _ = middleware.MintRefreshToken(ctx, h.redis, "RIDER", rider.ID)
+			return tok, refresh, true, nil
 		}
-		return "", false, svcErr
+		return "", "", false, svcErr
 	}
-	return tok, false, nil
+	refresh, _ = middleware.MintRefreshToken(ctx, h.redis, "RIDER", rider.ID)
+	return tok, refresh, false, nil
 }
 
 // driverFindOrCreate looks up (or creates) a driver by phone, then mints a JWT.

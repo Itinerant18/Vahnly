@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { authApi } from "../api/auth";
-import { setUnauthorizedHandler, TOKEN_STORAGE_KEY } from "../api/client";
+import { setUnauthorizedHandler, TOKEN_STORAGE_KEY, persistRefresh } from "../api/client";
 import type { Rider } from "../api/types";
 
 const RIDER_STORAGE_KEY = "dfu_rider_profile";
@@ -123,6 +123,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     persistToken(null);
+    persistRefresh(null);
     persistRider(null);
     set({ token: null, rider: null, isNewRider: false });
     if (typeof window !== "undefined") window.location.href = "/login";

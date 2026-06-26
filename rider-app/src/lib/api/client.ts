@@ -39,6 +39,50 @@ function readToken(): string | null {
   return window.localStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
+export const REFRESH_STORAGE_KEY = "dfu_rider_refresh";
+
+function readRefresh(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(REFRESH_STORAGE_KEY);
+}
+
+export function persistRefresh(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) window.localStorage.setItem(REFRESH_STORAGE_KEY, token);
+  else window.localStorage.removeItem(REFRESH_STORAGE_KEY);
+}
+
+// Single-flight refresh: a burst of 401s triggers one /auth/refresh; queued requests share it.
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function refreshRiderToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const rt = readRefresh();
+    if (!rt) return false;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as { token?: string; refresh_token?: string };
+      if (!data.token || typeof window === "undefined") return false;
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      persistRefresh(data.refresh_token ?? null);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 async function request<T>(
@@ -46,6 +90,7 @@ async function request<T>(
   path: string,
   body?: unknown,
   extraHeaders?: Record<string, string>,
+  _retried = false,
 ): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
   const token = readToken();
@@ -63,6 +108,11 @@ async function request<T>(
   }
 
   if (res.status === 401) {
+    // Refresh-on-401: silently refresh once, then retry with the fresh token.
+    if (!_retried && readRefresh()) {
+      const ok = await refreshRiderToken();
+      if (ok) return request<T>(method, path, body, extraHeaders, true);
+    }
     if (onUnauthorized) {
       onUnauthorized();
     } else if (typeof window !== "undefined") {

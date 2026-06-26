@@ -960,6 +960,7 @@ func (h *DriverAuthHandler) HandleResetPassword(w http.ResponseWriter, r *http.R
 	// issued before this reset is rejected), then auto-login.
 	if h.redis != nil {
 		_ = h.redis.Del(ctx, middleware.DriverSessionKey(dbDriverID)).Err()
+		middleware.RevokeAllRefreshTokens(ctx, h.redis, "DRIVER", dbDriverID)
 	}
 	h.recordAuditLog(ctx, dbDriverID, "PASSWORD_RESET", r.Header.Get("X-Device-Id"), getClientIP(r), r.Header.Get("X-App-Version"), "")
 

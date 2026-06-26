@@ -12,6 +12,7 @@ import {
   type ConfirmationResult,
   type User,
 } from "firebase/auth";
+import { persistRefresh } from "@/lib/api/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -170,10 +171,11 @@ export default function PhoneVerifyScreen({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firebase_id_token: firebaseIdToken, user_type: userType }),
       });
-      const data: { success: boolean; is_new_user: boolean; data?: { token: string }; message?: string } = await res.json();
+      const data: { success: boolean; is_new_user: boolean; data?: { token: string; refresh_token?: string }; message?: string } = await res.json();
       if (!data.success || !data.data?.token) {
         throw new Error(data.message ?? "Verification failed.");
       }
+      persistRefresh(data.data.refresh_token ?? null);
       onVerified(data.data.token, data.is_new_user);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";

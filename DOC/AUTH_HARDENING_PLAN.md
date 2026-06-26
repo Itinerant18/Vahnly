@@ -132,11 +132,17 @@ Design:
 Race/edge handling to get right (the cost of Option B): single-flight refresh, retry-once-then-logout,
 clock skew tolerance on expiry, and rotation-replay → full session revoke.
 
-### 4.2 Rider parity + logout-all-devices
-- Give **riders** the same jti-in-Redis session model drivers have (currently rider sessions aren't
-  centrally revocable) → enables logout + revoke-on-anything for riders too.
-- `POST /auth/logout-all` (driver + rider): delete all session rows for the user. Surface in settings as
-  "Log out of all devices."
+### 4.2 Rider parity + logout-all-devices  ✅ SHIPPED (driver logout-all; rider revoke = follow-up)
+- **Rider refresh — shipped.** Firebase-verify (the rider's primary login) mints a RIDER refresh token;
+  `/auth/refresh` handles the RIDER branch (rebuilds claims from `riders`, re-mints + rotates); rider-app
+  `client.ts` does single-flight refresh-on-401 (reads token from localStorage → no token threading);
+  `PhoneVerifyScreen` stores the refresh token, logout clears it.
+- **logout-all — shipped (driver).** Per-user refresh **index** (`refreshidx:<role>:<id>`) lets
+  `RevokeAllRefreshTokens` delete every token; `POST /driver/auth/logout-all` revokes all refresh tokens +
+  the session jti. **Applied on password-reset too** (a reset now kills all old sessions, not just the jti).
+- **Follow-up:** rider logout-all needs the `ContextKeyRider` extraction (rider middleware doesn't use the
+  shared userID context key) — small, deferred. Rider in-house OTP/google paths don't issue refresh yet
+  (firebase is primary; they degrade to 72h, safe).
 
 ---
 

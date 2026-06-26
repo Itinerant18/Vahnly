@@ -41,6 +41,13 @@ func refreshKey(token string) string {
 	return "refresh:" + hex.EncodeToString(sum[:])
 }
 
+// refreshIndexKey is the per-user SET of live refresh-token keys, so "log out all devices" can find
+// and delete them all. ponytail: the index may carry a few stale entries (a rotated key whose SREM
+// was missed) — deleting a stale key is a harmless no-op, so it never causes a missed revoke.
+func refreshIndexKey(role, userID string) string {
+	return "refreshidx:" + role + ":" + userID
+}
+
 // MintRefreshToken creates an opaque refresh token bound to (role, userID) and stores its hash.
 // Returns "" (no error) when Redis is unwired (dev) — callers simply omit the refresh token.
 func MintRefreshToken(ctx context.Context, rc *redis.ClusterClient, role, userID string) (string, error) {
@@ -52,10 +59,30 @@ func MintRefreshToken(ctx context.Context, rc *redis.ClusterClient, role, userID
 		return "", err
 	}
 	token := hex.EncodeToString(b)
-	if err := rc.Set(ctx, refreshKey(token), role+":"+userID, RefreshTokenTTL).Err(); err != nil {
+	key := refreshKey(token)
+	if err := rc.Set(ctx, key, role+":"+userID, RefreshTokenTTL).Err(); err != nil {
 		return "", err
 	}
+	idx := refreshIndexKey(role, userID)
+	_ = rc.SAdd(ctx, idx, key).Err()
+	_ = rc.Expire(ctx, idx, RefreshTokenTTL).Err()
 	return token, nil
+}
+
+// RevokeAllRefreshTokens deletes every refresh token for a user (used by logout-all + password reset).
+// Deletes keys one-by-one because they hash to different cluster slots (a multi-key DEL would fail).
+func RevokeAllRefreshTokens(ctx context.Context, rc *redis.ClusterClient, role, userID string) {
+	if rc == nil {
+		return
+	}
+	idx := refreshIndexKey(role, userID)
+	keys, err := rc.SMembers(ctx, idx).Result()
+	if err == nil {
+		for _, k := range keys {
+			_ = rc.Del(ctx, k).Err()
+		}
+	}
+	_ = rc.Del(ctx, idx).Err()
 }
 
 // RotateRefreshToken atomically consumes the presented refresh token (GetDel) and issues a fresh one.
@@ -73,6 +100,7 @@ func RotateRefreshToken(ctx context.Context, rc *redis.ClusterClient, presented 
 		return "", "", "", ErrInvalidRefreshToken
 	}
 	role, userID = parts[0], parts[1]
+	_ = rc.SRem(ctx, refreshIndexKey(role, userID), refreshKey(presented)).Err() // drop the consumed key
 	newToken, err = MintRefreshToken(ctx, rc, role, userID)
 	if err != nil {
 		return "", "", "", err
