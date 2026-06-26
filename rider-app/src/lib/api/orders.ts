@@ -61,8 +61,12 @@ export interface OrderHistoryResult {
 }
 
 export const ordersApi = {
-  create: (req: CreateOrderRequest) =>
-    apiClient.post<CreateOrderResult>("/api/v1/rider/orders", req),
+  create: (req: CreateOrderRequest, idempotencyKey?: string) =>
+    apiClient.post<CreateOrderResult>(
+      "/api/v1/rider/orders",
+      req,
+      idempotencyKey ? { "X-Idempotency-Key": idempotencyKey } : undefined,
+    ),
 
   active: () => apiClient.get<ActiveOrderResult>("/api/v1/rider/orders/active"),
 

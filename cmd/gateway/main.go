@@ -518,6 +518,10 @@ func main() {
 	// otpSend composes the phone AND IP limits (both must pass).
 	otpSend := func(h http.HandlerFunc) http.HandlerFunc { return otpSendPhone(otpSendIP(h)) }
 
+	// Idempotency (P1.2): a double-tapped Book / Pay carrying the same X-Idempotency-Key replays
+	// the first response instead of creating a duplicate order/charge (24h window).
+	idem := middleware.NewIdempotencyMiddleware(redisClusterClient, 24*time.Hour)
+
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
 	// Active region shards. Prefer the explicit env override; otherwise load from the
 	// regional_cities table (authoritative) instead of a hardcoded city list. Fail
@@ -610,7 +614,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/orders/quote", regionRouter.RouteRegionalTraffic(handler.HandleCreatePricingQuote))
 	mux.HandleFunc("PATCH /api/v1/orders/{order_id}/route", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(handler.HandleUpdateOrderRoute)))
 	mux.HandleFunc("GET /api/v1/telemetry/supply/near", regionRouter.RouteRegionalTraffic(handler.HandleGetTelemetrySupplyNear))
-	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCreateOrder))))
+	mux.HandleFunc("POST /api/v1/orders", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(idem.Wrap(handler.HandleCreateOrder)))))
 	// WS ticket mint (header-authenticated) + ticket-authenticated stream upgrade.
 	mux.HandleFunc("POST /api/v1/ws/ticket", authGuard.AuthenticateJWT(wsTicket.IssueTicket))
 	// Alias (same handler) — role-agnostic ticket minting for both rider and driver apps.
@@ -636,7 +640,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/abandon", authGuard.AuthenticateJWT(handler.HandleDriverAbandonTrip))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/events", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverAddOrderEvent))))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/end", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverEndTrip))))
-	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverConfirmPayment))))
+	mux.HandleFunc("POST /api/v1/driver/orders/{id}/confirm-payment", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(idem.Wrap(handler.HandleDriverConfirmPayment)))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/rate-rider", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverRateRider))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/car-issue-report", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleDriverCarIssueReport))))
 	mux.HandleFunc("GET /api/v1/driver/trips", authGuard.AuthenticateJWT(handler.HandleDriverGetTrips))
@@ -741,7 +745,7 @@ func main() {
 	// Rider App: fare estimate + booking lifecycle. Protected routes are RIDER-scoped;
 	// trip-share is public (sanitized, token-gated).
 	mux.HandleFunc("POST /api/v1/rider/fare-estimate", riderAuthMW.Require(riderBookingHandler.HandleFareEstimate))
-	mux.HandleFunc("POST /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleCreateOrder))
+	mux.HandleFunc("POST /api/v1/rider/orders", riderAuthMW.Require(idem.Wrap(riderBookingHandler.HandleCreateOrder)))
 	mux.HandleFunc("GET /api/v1/rider/orders/active", riderAuthMW.Require(riderBookingHandler.HandleGetActiveOrder))
 	mux.HandleFunc("GET /api/v1/rider/orders", riderAuthMW.Require(riderBookingHandler.HandleOrderHistory))
 	mux.HandleFunc("DELETE /api/v1/rider/orders/{orderId}/cancel", riderAuthMW.Require(riderBookingHandler.HandleCancelOrder))

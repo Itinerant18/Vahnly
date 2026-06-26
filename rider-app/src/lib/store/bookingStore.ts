@@ -40,6 +40,7 @@ export interface BookingState {
   paymentMethod: PaymentMethod;
   fareEstimate: FareEstimate | null;
   isSearching: boolean;
+  bookingIdemKey: string | null; // stable idempotency key for the current booking attempt
 
   setPickup: (p: LocationPoint | null) => void;
   setDropoff: (p: LocationPoint | null) => void;
@@ -80,6 +81,7 @@ const initial = {
   paymentMethod: "CASH" as PaymentMethod,
   fareEstimate: null as FareEstimate | null,
   isSearching: false,
+  bookingIdemKey: null as string | null,
 };
 
 export const useBookingStore = create<BookingState>((set, get) => ({
@@ -190,26 +192,41 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   bookDriver: async () => {
     const s = get();
     if (!s.pickup) throw new Error("pickup required");
-    const res = await ordersApi.create({
-      pickup_lat: s.pickup.lat,
-      pickup_lng: s.pickup.lng,
-      pickup_address: s.pickup.address,
-      dropoff_lat: s.dropoff?.lat,
-      dropoff_lng: s.dropoff?.lng,
-      dropoff_address: s.dropoff?.address,
-      stops: s.stops,
-      trip_type: s.tripType,
-      package_type: packageTypeFor(s.tripType),
-      duration_hours: s.durationHours,
-      garage_car_id: s.selectedCarId ?? undefined,
-      one_time_car: s.oneTimeCar ?? undefined,
-      persons_count: s.personsCount,
-      promo_code: s.promoCode || undefined,
-      d4m_care_opted: s.d4mCare,
-      owner_not_in_car: s.ownerNotInCar,
-      payment_method: s.paymentMethod,
-      scheduled_at: s.scheduledAt ?? undefined,
-    });
+    // Stable idempotency key for THIS booking attempt: generated once, reused on a retry, and
+    // cleared on success — so a double-tap / network retry replays the first order rather than
+    // creating a second one.
+    let idemKey = s.bookingIdemKey;
+    if (!idemKey) {
+      idemKey =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      set({ bookingIdemKey: idemKey });
+    }
+    const res = await ordersApi.create(
+      {
+        pickup_lat: s.pickup.lat,
+        pickup_lng: s.pickup.lng,
+        pickup_address: s.pickup.address,
+        dropoff_lat: s.dropoff?.lat,
+        dropoff_lng: s.dropoff?.lng,
+        dropoff_address: s.dropoff?.address,
+        stops: s.stops,
+        trip_type: s.tripType,
+        package_type: packageTypeFor(s.tripType),
+        duration_hours: s.durationHours,
+        garage_car_id: s.selectedCarId ?? undefined,
+        one_time_car: s.oneTimeCar ?? undefined,
+        persons_count: s.personsCount,
+        promo_code: s.promoCode || undefined,
+        d4m_care_opted: s.d4mCare,
+        owner_not_in_car: s.ownerNotInCar,
+        payment_method: s.paymentMethod,
+        scheduled_at: s.scheduledAt ?? undefined,
+      },
+      idemKey,
+    );
+    set({ bookingIdemKey: null }); // success — next booking gets a fresh key
     return { order: res.order, otp: res.otp };
   },
 
