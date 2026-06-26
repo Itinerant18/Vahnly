@@ -46,15 +46,20 @@ Two block models + existing metered/monthly. Tiers: **HATCHBACK · SEDAN · SUV 
 | Premium | ₹4,800 | ₹16/km | ₹700 | ₹100 |
 
 ```
-days        = ceil(total_km / 300)  (min 1)        # day-based on distance, not just hours
+days        = ceil(booked_hours / 12)  (min 1)     # IMPLEMENTED: rider books the engagement in
+                                                   # days (12h/day), NOT distance ÷ 300
+nights_away = days − 1
 day_fare    = day_rate[tier] × days
-extra_km    = max(0, total_km − 300×days) × extra_km_rate[tier]   # per the asymmetric-day model below
+extra_km    = max(0, total_km − 300×days) × extra_km_rate[tier]   # billed at trip-end on actuals
 allowance   = §4.3 cash allowance (separate line)
 night_chg   = ₹100 × nights_away                   # §4.2, into night_charge_paise
 overtime    : NONE hourly — an outstation overrun > 3h converts to a FULL extra day (§4.1)
 ```
 
-Asymmetric days are intended (KOL→Puri 500 km = day1 300 + day2 200; rider pays less on the short day).
+> ⚠ **OPEN DECISION:** day-count is **booked-hours ÷ 12** (implemented), not distance ÷ 300. A 12h
+> booking on a 500 km route = 1 day, even though the route table below implies 2. Booked-hours is
+> rider-controlled and deterministic; distance ÷ 300 matches the route table but needs a known total
+> distance. Confirm which basis is authoritative — they differ ~2× on long routes.
 
 **Common routes (reference, Sedan):** Digha 185km 1–2d ₹3,200+₹600 · Puri 500km 2–3d ₹6,400+2×₹600 ·
 Siliguri/NJP 600km 2d ₹6,400+1×₹600 · Durgapur 165km same-day ₹3,200 · Bishnupur 150km same-day ₹3,200.

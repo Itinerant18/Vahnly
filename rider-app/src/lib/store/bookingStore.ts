@@ -30,6 +30,7 @@ export interface BookingState {
   tripType: TripType;
   durationHours: number;
   selectedCarId: string | null;
+  carType: string | null; // tier of the selected/one-time car — drives tiered fare pricing
   oneTimeCar: OneTimeCar | null;
   personsCount: number;
   promoCode: string;
@@ -46,7 +47,7 @@ export interface BookingState {
   removeStop: (index: number) => void;
   setTripType: (t: TripType) => void;
   setDurationHours: (h: number) => void;
-  setSelectedCar: (carId: string | null) => void;
+  setSelectedCar: (carId: string | null, carType?: string | null) => void;
   setOneTimeCar: (car: OneTimeCar | null) => void;
   setPersonsCount: (n: number) => void;
   scheduledAt: string | null;
@@ -68,6 +69,7 @@ const initial = {
   tripType: "IN_CITY_ONE_WAY" as TripType,
   durationHours: 0,
   selectedCarId: null as string | null,
+  carType: null as string | null,
   oneTimeCar: null as OneTimeCar | null,
   personsCount: 1,
   scheduledAt: null as string | null,
@@ -101,8 +103,14 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     set({ durationHours: h });
     get().fetchFareEstimate();
   },
-  setSelectedCar: (carId) => set({ selectedCarId: carId, oneTimeCar: null }),
-  setOneTimeCar: (car) => set({ oneTimeCar: car, selectedCarId: null }),
+  setSelectedCar: (carId, carType = null) => {
+    set({ selectedCarId: carId, carType, oneTimeCar: null });
+    get().fetchFareEstimate();
+  },
+  setOneTimeCar: (car) => {
+    set({ oneTimeCar: car, selectedCarId: null, carType: car?.car_type ?? null });
+    get().fetchFareEstimate();
+  },
   setPersonsCount: (n) => set({ personsCount: Math.max(1, Math.min(8, n)) }),
   setScheduledAt: (t) => set({ scheduledAt: t }),
   setPromoCode: (code) => set({ promoCode: code }),
@@ -126,6 +134,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
         trip_type: s.tripType,
         package_type: packageTypeFor(s.tripType),
         duration_hours: s.durationHours,
+        car_type: s.carType ?? undefined,
         promo_code: s.promoCode,
         d4m_care: s.d4mCare,
         payment_method: s.paymentMethod,
@@ -166,6 +175,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           trip_type: s.tripType,
           package_type: packageTypeFor(s.tripType),
           duration_hours: s.durationHours,
+          car_type: s.carType ?? undefined,
           promo_code: s.promoCode || undefined,
           d4m_care: s.d4mCare,
           payment_method: s.paymentMethod,

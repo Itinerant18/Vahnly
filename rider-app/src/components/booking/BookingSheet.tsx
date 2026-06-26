@@ -274,7 +274,7 @@ export function BookingSheet() {
     garageApi.list().then(setCars).catch(() => {});
     garageApi.list().then((list) => {
       const def = list.find((c) => c.is_default);
-      if (def && !selectedCarId) setSelectedCar(def.id);
+      if (def && !selectedCarId) setSelectedCar(def.id, def.car_type);
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -838,7 +838,7 @@ export function BookingSheet() {
                 <button
                   key={car.id}
                   type="button"
-                  onClick={() => { setSelectedCar(car.id); setShowCarPicker(false); }}
+                  onClick={() => { setSelectedCar(car.id, car.car_type); setShowCarPicker(false); }}
                   className={[
                     "flex w-full items-center justify-between rounded-sm px-4 py-3 min-h-[56px] transition-base cursor-pointer",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
