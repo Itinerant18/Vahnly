@@ -213,20 +213,18 @@ function UnifiedLoginContent() {
           ...registrationPayload,
           phone_token: verifyRes.phone_token,
         };
-        await driverRegister(regPayload);
+        // Register now auto-logs-in — no second login round-trip.
+        const regRes = await driverRegister(regPayload);
         addAuditLog('REGISTER_SUCCESS', { phone: cleanPhone });
-
-        // Authenticate session after registration
-        const loginRes = await driverLogin(cleanPhone, registrationPayload.password);
-        login(loginRes.token, {
-          id: loginRes.user.id,
-          role: loginRes.user.role,
-          name: loginRes.user.name,
+        login(regRes.token, {
+          id: regRes.user.id,
+          role: regRes.user.role,
+          name: regRes.user.name,
           phone: cleanPhone,
-          phone_verified: loginRes.phone_verified,
-        }, loginRes.refresh_token);
+          phone_verified: regRes.phone_verified,
+        }, regRes.refresh_token);
 
-        addAuditLog('LOGIN_SUCCESS', { userId: loginRes.user.id, role: 'DRIVER' });
+        addAuditLog('LOGIN_SUCCESS', { userId: regRes.user.id, role: 'DRIVER' });
         router.push('/driver-onboarding');
       } else if (otpPurpose === 'google_registration') {
         // Complete Google registration with verified phone token

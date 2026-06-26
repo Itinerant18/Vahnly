@@ -253,11 +253,21 @@ func (h *DriverAuthHandler) HandleDriverRegister(w http.ResponseWriter, r *http.
 	ip := getClientIP(r)
 	h.recordAuditLog(ctx, newDriverID, "REGISTER_SUCCESS", r.Header.Get("X-Device-Id"), ip, r.Header.Get("X-App-Version"), r.Header.Get("X-Geo-Location"))
 
-	w.WriteHeader(http.StatusCreated)
+	// Auto-login: mint a session so the new driver lands in the app, not back at the login screen.
+	tokenString, refreshTok, expirationTime, _ := h.issueDriverSession(ctx, newDriverID, req.CityPrefix, true)
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":   "Driver registered successfully",
-		"driver_id": newDriverID,
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
+		Token:              tokenString,
+		RefreshToken:       refreshTok,
+		ExpiresAt:          expirationTime,
+		Role:               "DRIVER",
+		DriverID:           newDriverID,
+		VerificationStatus: "ONBOARDING",
+		OnboardingStep:     1,
+		Name:               req.Name,
+		PhoneVerified:      true,
+		Phone:              req.Phone,
 	})
 }
 

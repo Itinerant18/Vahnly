@@ -1,4 +1,5 @@
 import type { ApiEnvelope } from "./types";
+import { useToastStore } from "../store/useToastStore";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8085";
@@ -66,7 +67,12 @@ async function refreshRiderToken(): Promise<boolean> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: rt }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        if (typeof window !== "undefined") {
+          useToastStore.getState().show("Session expired. Please log in again.", "info");
+        }
+        return false;
+      }
       const data = (await res.json()) as { token?: string; refresh_token?: string };
       if (!data.token || typeof window === "undefined") return false;
       window.localStorage.setItem(TOKEN_STORAGE_KEY, data.token);

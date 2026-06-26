@@ -1,5 +1,6 @@
 import { StartTripPayload } from '../types/trip';
 import { useAuthStore } from '../store/useAuthStore';
+import { useToastStore } from '../store/useToastStore';
 
 export type DriverStatus = 'ONLINE_AVAILABLE' | 'OFFLINE';
 export type DevicePlatform = 'ANDROID_FCM' | 'IOS_APNS';
@@ -193,6 +194,7 @@ async function refreshAccessToken(): Promise<boolean> {
         body: JSON.stringify({ refresh_token: rt }),
       });
       if (!res.ok) {
+        useToastStore.getState().show('Session expired. Please log in again.', 'info');
         useAuthStore.getState().logout(); // refresh token rejected → real logout
         return false;
       }
@@ -812,11 +814,26 @@ export async function verifyDriverOTP(phone: string, otp: string): Promise<Drive
   };
 }
 
-export async function driverRegister(payload: any): Promise<DriverRegisterResponse> {
-  return request<DriverRegisterResponse>('/api/v1/driver/register', {
+// Register now auto-logs-in: the backend returns a full session, so the caller drops straight into
+// the app instead of making a second login call.
+export async function driverRegister(payload: any): Promise<DriverLoginResponse> {
+  const raw = await request<DriverLoginRaw>('/api/v1/driver/register', {
     method: 'POST',
     body: payload,
   });
+  return {
+    token: raw.token,
+    refresh_token: raw.refresh_token,
+    user: {
+      id: raw.driver_id,
+      role: raw.role ?? 'DRIVER',
+      name: raw.name,
+      current_state: '',
+      phone_verified: raw.phone_verified ?? true,
+      phone: raw.phone ?? payload.phone,
+    },
+    phone_verified: raw.phone_verified ?? true,
+  };
 }
 
 // saveOnboardingStep saves step data, supports offline caching queue

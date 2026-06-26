@@ -148,6 +148,19 @@ clock skew tolerance on expiry, and rotation-replay → full session revoke.
 
 ## 5. P2 — Seamless registration + storage + UX polish
 
+**Shipped:** ✅ **Auto-login on register** — driver register mints a session (returns token+refresh) so
+the driver lands in onboarding, no second login call (also fixed a header-after-WriteHeader bug). ✅
+**Session-expiry toast** — a genuinely-rejected refresh shows "Session expired. Please log in again."
+in both apps before the redirect.
+
+**Deferred (low value / higher cost — noted on purpose):** Capacitor Preferences storage (localStorage in
+a native WebView is bundled-assets only, not XSS-exposed like a website — the async-storage refactor isn't
+worth it now); post-login deep-link return (moderate; nice-to-have). Both small follow-ups.
+
+---
+
+### Original P2 detail
+
 - **Auto-login at end of registration (first-class).** The register handler issues the session JWT in its
   response so the user lands **in the app / onboarding**, never bounced to the login screen. (Driver
   register currently creates the account but the client re-logs-in — collapse that round-trip.)
