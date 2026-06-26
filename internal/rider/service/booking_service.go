@@ -115,14 +115,16 @@ type FareEstimateRequest struct {
 }
 
 type FareBreakdown struct {
-	BaseFarePaise       int64   `json:"base_fare_paise"`
-	DistanceChargePaise int64   `json:"distance_charge_paise"`
-	NightChargePaise    int64   `json:"night_charge_paise"`
-	D4MCarePaise        int64   `json:"d4m_care_paise"`
-	SurgeMultiplier     float64 `json:"surge_multiplier"`
-	PromoDiscountPaise  int64   `json:"promo_discount_paise"`
-	EstimatedTotalPaise int64   `json:"estimated_total_paise"`
-	EstimatedTotalINR   string  `json:"estimated_total_inr"`
+	BaseFarePaise        int64   `json:"base_fare_paise"`
+	DistanceChargePaise  int64   `json:"distance_charge_paise"`
+	NightChargePaise     int64   `json:"night_charge_paise"`
+	OvertimePaise        int64   `json:"overtime_paise"`
+	DriverAllowancePaise int64   `json:"driver_allowance_paise"`
+	D4MCarePaise         int64   `json:"d4m_care_paise"`
+	SurgeMultiplier      float64 `json:"surge_multiplier"`
+	PromoDiscountPaise   int64   `json:"promo_discount_paise"`
+	EstimatedTotalPaise  int64   `json:"estimated_total_paise"`
+	EstimatedTotalINR    string  `json:"estimated_total_inr"`
 }
 
 type FareEstimate struct {
@@ -139,7 +141,8 @@ type FareEstimate struct {
 	promoCodeID       string `json:"-"`
 }
 
-// EstimateFare computes a fare quote reusing the existing pricing engine formula.
+// EstimateFare computes a fare quote: tiered flat rate card for package/block bookings, or the
+// surged distance-metered engine for point-to-point.
 func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateRequest) (*FareEstimate, error) {
 	if !inIndiaBBox(req.PickupLat, req.PickupLng) {
 		return nil, ErrInvalidBooking
@@ -149,47 +152,8 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 		city = "KOL"
 	}
 
-	// Package (duration-based) pricing: flat rate card, NO surge, NO distance metering.
-	// The "no surge pricing" differentiator falls out naturally — this path never calls the
-	// surge quoter. Promo + D4M Care still apply; night charge does not (the block rate covers
-	// the time).
-	if pkgFare, ok := packageFarePaise(req.PackageType, req.DurationHours); ok {
-		cell := h3CellRes8(req.PickupLat, req.PickupLng)
-		d4m := int64(0)
-		if req.D4MCare {
-			d4m = d4mCarePaise
-		}
-		var promoDiscount int64
-		var promoCodeID string
-		if res, _ := s.promo.Validate(ctx, req.PromoCode, pkgFare, city); res != nil {
-			promoDiscount = res.DiscountPaise
-			promoCodeID = res.PromoCodeID
-		}
-		total := pkgFare + d4m - promoDiscount
-		if total < 0 {
-			total = 0
-		}
-		availability, _ := s.driverAvailability(ctx, city, req.PickupLat, req.PickupLng)
-		return &FareEstimate{
-			FareBreakdown: FareBreakdown{
-				BaseFarePaise:       pkgFare,
-				DistanceChargePaise: 0,
-				NightChargePaise:    0,
-				D4MCarePaise:        d4m,
-				SurgeMultiplier:     1.0, // packages are never surged
-				PromoDiscountPaise:  promoDiscount,
-				EstimatedTotalPaise: total,
-				EstimatedTotalINR:   fmt.Sprintf("₹%.2f", float64(total)/100),
-			},
-			EstimatedPickupETAMin: pickupETA(availability),
-			DriverAvailability:    availability,
-			SurgeActive:           false,
-			H3Cell:                cell,
-			dispatchFarePaise:     pkgFare,
-			promoCodeID:           promoCodeID,
-		}, nil
-	}
-
+	// One-way road distance (metres). Used by the metered path and by outstation extra-km math;
+	// computed up-front so both branches can read it.
 	straight := 0.0
 	if req.DropoffLat != nil && req.DropoffLng != nil {
 		straight = haversineMeters(req.PickupLat, req.PickupLng, *req.DropoffLat, *req.DropoffLng)
@@ -201,6 +165,57 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 
 	cell := h3CellRes8(req.PickupLat, req.PickupLng)
 
+	when := time.Now()
+	if req.ScheduledAt != nil {
+		when = *req.ScheduledAt
+	}
+
+	// Package/block pricing: tiered flat rate card, NO surge (the differentiator — this path never
+	// calls the surge quoter). Promo + D4M still apply. Overtime/extra-km are 0 at estimate time
+	// (no actual km/hours yet); they are applied at trip-end billing.
+	if q, ok := packageQuote(req.PackageType, req.CarType, req.DurationHours, roadMeters/1000, when); ok {
+		d4m := int64(0)
+		if req.D4MCare {
+			d4m = d4mCarePaise
+		}
+		// Promo validates against the commissionable service fare, not the allowance reimbursement.
+		var promoDiscount int64
+		var promoCodeID string
+		if res, _ := s.promo.Validate(ctx, req.PromoCode, q.ServiceFarePaise(), city); res != nil {
+			promoDiscount = res.DiscountPaise
+			promoCodeID = res.PromoCodeID
+		}
+		total := q.ServiceFarePaise() + q.RiderAddonsPaise() + d4m - promoDiscount
+		if total < 0 {
+			total = 0
+		}
+		availability, _ := s.driverAvailability(ctx, city, req.PickupLat, req.PickupLng)
+		return &FareEstimate{
+			FareBreakdown: FareBreakdown{
+				BaseFarePaise:        q.BasePaise,
+				DistanceChargePaise:  q.ExtraKmPaise,
+				NightChargePaise:     q.NightChargePaise,
+				OvertimePaise:        q.OvertimePaise,
+				DriverAllowancePaise: q.DriverAllowancePaise,
+				D4MCarePaise:         d4m,
+				SurgeMultiplier:      1.0, // packages are never surged
+				PromoDiscountPaise:   promoDiscount,
+				EstimatedTotalPaise:  total,
+				EstimatedTotalINR:    fmt.Sprintf("₹%.2f", float64(total)/100),
+			},
+			EstimatedPickupETAMin: pickupETA(availability),
+			DriverAvailability:    availability,
+			SurgeActive:           false,
+			H3Cell:                cell,
+			// dispatchFarePaise is the commissionable service fare (base + extra-km + overtime),
+			// EXCLUDING night surcharge, the driver-allowance reimbursement, D4M and promo — the
+			// allowance is a 100% rider→driver passthrough and must not inflate the payout/commission
+			// basis. Mirrors the metered path (which dispatches base+distance only).
+			dispatchFarePaise: q.ServiceFarePaise(),
+			promoCodeID:       promoCodeID,
+		}, nil
+	}
+
 	// Authoritative surged fare via the existing engine: (base + perMeter*dist) * surge.
 	surgedSubtotal, multiplier, err := s.quoter.GetFareQuote(ctx, city, cell, roadMeters)
 	if err != nil {
@@ -210,10 +225,6 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	distanceCharge := int64(math.Round(float64(farePerMeterPaise) * roadMeters))
 
 	night := int64(0)
-	when := time.Now()
-	if req.ScheduledAt != nil {
-		when = *req.ScheduledAt
-	}
 	if isNightIST(when) {
 		night = nightChargePaise
 	}
@@ -242,9 +253,9 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 			BaseFarePaise:       fareBasePaise,
 			DistanceChargePaise: distanceCharge,
 			NightChargePaise:    night,
-			D4MCarePaise:        d4m,
 			SurgeMultiplier:     multiplier,
 			PromoDiscountPaise:  promoDiscount,
+			D4MCarePaise:        d4m,
 			EstimatedTotalPaise: total,
 			EstimatedTotalINR:   fmt.Sprintf("₹%.2f", float64(total)/100),
 		},

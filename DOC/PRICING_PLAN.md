@@ -1,207 +1,188 @@
-# Vahnly Pricing Plan — Tiered Rate Table (in depth)
+# Vahnly Pricing Plan — Tiered Rate Card (FINAL spec)
 
-Status: **PROPOSAL / planning**. Not yet implemented. Grounded in the current code
-(file:line refs below). Rates in **paise** internally; ₹ in copy.
-
----
-
-## 1. Current state — two disconnected pricing worlds
-
-| World | What it has | Where | Problem |
-| :-- | :-- | :-- | :-- |
-| **Admin pricing config** | Per-`(city × car_type × trip_type)`: base, per-km, per-min, min, **night charge**, wait, cancel fees, D4M, platform/convenience/tax, **outstation per-day / per-km-outside / driver-allowance / night-halt**, versioning + revert | `frontend/src/admin/pages/PricingDashboard.tsx`, `internal/admin/.../pricing_handler.go` | **Redis-only** (`pricing:fare:active:<city>:<car>:<trip>`), no DB table, no seed → lost on flush. **Booking never reads it.** |
-| **Rider booking engine** (what actually prices) | Hardcoded constants + env `PKG_*`; **flat per package, no vehicle tier** | `booking_service.go:49-56,142-258`, `package_pricing.go:24-52` | No tier differentiation; ignores admin config; placeholder rates. |
-
-**The defect is one sentence:** `BookingService.EstimateFare` (`booking_service.go:142`) never reads the
-admin rate config. The rate "table" already exists in the admin surface — booking just doesn't consult it.
-
-So the plan's backbone is **close the booking ↔ rate-config gap + seed it**, *not* design a new rate store.
+Status: **spec locked, ready to implement (Phase 1)**. Grounded in current code (file:line below).
+Money in **paise** internally; ₹ in copy. Market: **Kolkata (KOL)** first.
 
 ---
 
-## 2. Trip-type taxonomy (existing — reuse, don't reinvent)
+## 1. Current state — the gap to close
 
-`trip_type` values already shipped (`types.ts:4-10`, migration `000118`, KOL seed `000119`):
+- **Admin pricing config** already models per-`(city × car_type × trip_type)` rates (base, night, outstation
+  per-day/night-halt/allowance, versioning) — but **Redis-only** and **booking never reads it**
+  (`PricingDashboard.tsx`, `pricing_handler.go`).
+- **Booking engine** (`booking_service.go:142-258`, `package_pricing.go:24-52`) actually prices via
+  **hardcoded constants + env `PKG_*`, no vehicle tier**.
+
+**Backbone of the work:** wire `EstimateFare` → the rate card + seed it. Not a new rate store.
+
+---
+
+## 2. Pricing models (final)
+
+Two block models + existing metered/monthly. Tiers: **HATCHBACK · SEDAN · SUV · PREMIUM**
+(Premium = Innova Crysta / Fortuner / Camry).
+
+### 2a. In-City Block — time + km capped
+
+| Tier | 6h / 60km | 8h / 80km | Extra km (city) | Overtime /hr |
+| :-- | --: | --: | --: | --: |
+| Hatchback | ₹650 | ₹800 | ₹11/km | ₹50 |
+| Sedan | ₹850 | ₹1,050 | ₹13/km | ₹60 |
+| SUV | ₹1,050 | ₹1,300 | ₹15/km | ₹80 |
+| Premium | ₹1,300 | ₹1,600 | ₹18/km | ₹100 |
+
+- Flat block fare up to the time **and** km cap. Beyond km cap → `extra_km × rate[tier]`.
+- Beyond block hours → `overtime/hr[tier] × ceil(extra_hours)` (in-city only).
+- 60/80 km caps deliberately leave headroom over realistic city errands (40–60 km) while blocking
+  "city block used as cheap outstation" (Kalyani/Barrackpore runs).
+
+### 2b. Outstation — per day, 300 km/day included
+
+| Tier | Day rate (300km) | Extra km/day | Night allowance | Night surcharge/night |
+| :-- | --: | --: | --: | --: |
+| Hatchback | ₹2,800 | ₹10/km | ₹600 | ₹100 |
+| Sedan | ₹3,200 | ₹12/km | ₹600 | ₹100 |
+| SUV | ₹4,000 | ₹14/km | ₹600 | ₹100 |
+| Premium | ₹4,800 | ₹16/km | ₹700 | ₹100 |
 
 ```
-IN_CITY_ONE_WAY · IN_CITY_ROUND · IN_CITY_HOURLY · MINI_OUTSTATION · OUTSTATION · MONTHLY
+days        = ceil(total_km / 300)  (min 1)        # day-based on distance, not just hours
+day_fare    = day_rate[tier] × days
+extra_km    = max(0, total_km − 300×days) × extra_km_rate[tier]   # per the asymmetric-day model below
+allowance   = §4.3 cash allowance (separate line)
+night_chg   = ₹100 × nights_away                   # §4.2, into night_charge_paise
+overtime    : NONE hourly — an outstation overrun > 3h converts to a FULL extra day (§4.1)
 ```
 
-Vehicle tiers already shipped (`types.ts:17`, rider garage `car_type`, admin `carTypes`):
+Asymmetric days are intended (KOL→Puri 500 km = day1 300 + day2 200; rider pays less on the short day).
 
-```
-HATCHBACK · SEDAN · SUV · PREMIUM
-```
+**Common routes (reference, Sedan):** Digha 185km 1–2d ₹3,200+₹600 · Puri 500km 2–3d ₹6,400+2×₹600 ·
+Siliguri/NJP 600km 2d ₹6,400+1×₹600 · Durgapur 165km same-day ₹3,200 · Bishnupur 150km same-day ₹3,200.
 
-Mapping the user's spec onto this taxonomy:
+### 2c. Existing, unchanged (rates TBD, not in this round)
+- `IN_CITY_ONE_WAY` / `IN_CITY_ROUND` — distance-metered (existing base+per-km), to be re-tiered later.
+- `MONTHLY` — flat/month per tier, TBD.
 
-| User term | Maps to | Pricing model |
+---
+
+## 3. Trip-type mapping (resolved against existing enum)
+
+Existing `trip_type` (`types.ts:4-10`): `IN_CITY_ONE_WAY · IN_CITY_ROUND · IN_CITY_HOURLY · MINI_OUTSTATION · OUTSTATION · MONTHLY`.
+
+| Model (§2) | trip_type | Notes |
 | :-- | :-- | :-- |
-| **Inter-city, ≤100 km, "6hrs"** | `MINI_OUTSTATION` | **fixed-duration block** per tier (₹/6h) + overtime/hr |
-| **Outstation / whole-day** (>100 km or multi-day) | `OUTSTATION` | **per-day** per tier + night-halt + food/lodging in-kind |
-| In-city hourly | `IN_CITY_HOURLY` | per-hour per tier, min hours (existing HOURLY) |
-| In-city point-to-point | `IN_CITY_ONE_WAY` / `IN_CITY_ROUND` | distance-metered (existing) |
-| Monthly | `MONTHLY` | flat/month per tier |
+| In-City Block (6h/8h) | `IN_CITY_HOURLY` | extended from per-hour to fixed 6h/8h blocks + km cap |
+| Outstation per-day | `OUTSTATION` | single-day route = `days=1` (no night allowance/surcharge) |
+| Metered point-to-point | `IN_CITY_ONE_WAY` / `IN_CITY_ROUND` | unchanged |
+| Monthly | `MONTHLY` | unchanged |
+
+**`MINI_OUTSTATION` is retired** — a sub-100/300 km day trip is just `OUTSTATION` with `days=1`. (Remove
+from KOL `supported_trip_types` seed `000119`; keep the enum value for back-compat on old rows.)
 
 ---
 
-## 3. Eligibility gate — distance is NOT pricing
+## 4. Surcharge & allowance rules (precise)
 
-"Inter-city **if within 100 km**" is an **eligibility rule**, not a price input (packages are flat, not
-metered). `EstimateFare` already computes haversine road distance (`booking_service.go:193-200`), so add a
-pure gate:
+### 4.1 Overtime
+- In-city block: `overtime/hr[tier]` (₹50/₹60/₹80/₹100) × `ceil(hours − block_hours)`.
+- Outstation: **no hourly overtime**. If overrun `> 3h`, bill **one full extra day** (`day_rate[tier]`).
+  (≤3h overrun absorbed.)
 
-```
-distance_km = haversine(pickup, dropoff) * roadFactor(1.3) / 1000
-≤ 100 km  → offer MINI_OUTSTATION (6h inter-city block) + IN_CITY_*
-> 100 km  → offer OUTSTATION (per-day) only; reject MINI_OUTSTATION
-```
-
-Surface as `eligible_trip_types` in the fare-estimate / city-config response so the booking picker only
-shows valid options. (City `supported_trip_types` stays the city-level allow-list; this is the
-per-trip distance filter on top.)
-
----
-
-## 4. The rate table
-
-Keyed by **(city, vehicle_tier, trip_type)**. Values below: **bold = given by user**, *italic = placeholder,
-confirm*. All per-city (KOL first).
-
-### 4a. MINI_OUTSTATION — inter-city ≤100 km, 6-hour block
-
-| Tier | Block (6h) | Overtime /hr | Incl. km* |
-| :-- | --: | --: | --: |
-| HATCHBACK | **₹450** | **₹50** | *100* |
-| SEDAN | *₹500* | **₹50** | *100* |
-| SUV | **₹550** | **₹50** | *100* |
-| PREMIUM | *₹650* | **₹50** | *100* |
-
-\* incl-km cap per block — confirm whether the 6h block also caps km (e.g. 100 km) with an extra-km charge
-beyond, or is purely time-based. Default assumption: **purely time-based**, 100 km is only the
-inter-city eligibility ceiling.
-
-- **Block** = flat fare for up to 6h. **Overtime** = `+₹50 × ceil(hours − 6)` for each hour past 6.
-- ₹450 / 6h = **₹75/hr effective** — this is a *fresh* card; the old `PKG_*` placeholders (₹150/hr) and
-  `package_pricing_test.go` get rewritten to these numbers (see §7).
-
-### 4b. OUTSTATION — whole-day / multi-day (>100 km) — **PROPOSED, confirm rates**
-
-Skeleton from existing `OUTSTATION` (`package_pricing.go:36-44`): per-day, 12h/day, ceil days, night-halt.
-
-| Tier | Per day (12h) | Night-halt /night | Extra hr /hr |
-| :-- | --: | --: | --: |
-| HATCHBACK | *₹1500* | *₹300* | **₹50** |
-| SEDAN | *₹1700* | *₹300* | **₹50** |
-| SUV | *₹2000* | *₹300* | **₹50** |
-| PREMIUM | *₹2500* | *₹400* | **₹50** |
-
-```
-days       = ceil(duration_hours / 12)
-day_fare   = per_day[tier] × days
-halt       = night_halt[tier] × (days − 1)        # one halt per overnight
-food/lodging = rider provides in-kind (see §5.3) — NOT a cash line by default
-total      = day_fare + halt + night_surcharge(§5.2) + overtime(extra hours)
-```
-
-### 4c. Other tiers (carry existing, re-tier later)
-
-- `IN_CITY_HOURLY`: per-hour per tier, min 2h (existing HOURLY skeleton). *Rates TBD per tier.*
-- `IN_CITY_ONE_WAY` / `IN_CITY_ROUND`: distance-metered (existing base + per-km), now **per-tier** base/per-km
-  (admin already models this). *Rates TBD.*
-- `MONTHLY`: flat/month per tier. *Rates TBD.*
-
----
-
-## 5. Surcharge rules (precise)
-
-### 5.1 Overtime
-`+₹50/hr` for each hour beyond the package's included hours (6h for MINI_OUTSTATION, 12h/day for OUTSTATION).
-Flat across tiers unless per-tier overtime is wanted (default: flat ₹50). New breakdown field
-`overtime_paise` (§6).
-
-### 5.2 Night charge (one-time, IST) — **tiered-replacement assumed, confirm**
-Applies when the booked work window crosses these IST thresholds (based on `scheduled_at`/now, the existing
-night-window logic at `booking_service.go:212-219`):
+### 4.2 Night charge — tiered, IST, higher bracket REPLACES (₹100 max/booking)
+Window check on `scheduled_at` / `trip_start_at` (NOT booking time):
 
 | Window (IST) | Surcharge |
 | :-- | --: |
-| 23:00 – 23:59 | **+₹50** |
-| ≥ 00:00 (past midnight) | **+₹100** |
+| 22:00 – 23:59 | +₹50 |
+| 00:00 – 05:59 | +₹100 |
+| else | ₹0 |
 
-**Assumption: tiered-replacement** — a trip into the early hours pays ₹100, *not* ₹50+₹100. Confirm vs
-cumulative. Reuses the existing `night_charge_paise` field (currently a flat ₹50 → becomes this tier).
+Replacement, not cumulative — a trip straddling midnight = ₹100, not ₹150. Edge: 05:59 → ₹100, 06:01 → ₹0.
+**Outstation multi-night:** `+₹100 × nights_away`, applied once per night regardless of arrival time.
+Stored in `night_charge_paise`.
 
-### 5.3 Night stay — food & lodging
-For OUTSTATION trips with an overnight halt, **the rider provides the driver food and lodging in-kind**
-(per spec: "if night stay, have to give food and lodging to the driver"). Default: **no cash line** — shown
-as a booking obligation/notice, plus the cash **night-halt allowance** (§4b) which covers incidental driver
-allowance, not accommodation.
-- *Alternative to confirm:* replace in-kind with a fixed cash **food+lodging allowance** (₹X/night) added to
-  the fare and paid out to the driver. (Pick one.)
+### 4.3 Driver food & lodging — CASH allowance (not in-kind), separate bill line
+`driver_allowance_paise`, labelled e.g. "Driver night allowance (2 nights) ₹1,200".
+
+| Component | Amount |
+| :-- | --: |
+| Food / day | ₹250 |
+| Lodging / night | ₹350 |
+| **Full night away** (Hatchback/Sedan/SUV) | **₹600** |
+| **Full night away** (Premium) | **₹700** |
+
+Apply: same-day return → ₹0 · overnight stay but driving back that evening → ₹300 (food only) ·
+each full night away → ₹600 (₹700 Premium).
 
 ---
 
-## 6. `fare_breakdown` extension
+## 5. Eligibility gate (distance = eligibility, not price)
+`EstimateFare` already has haversine road distance (`booking_service.go:193-200`). Surface
+`eligible_trip_types` in fare-estimate + city-config:
+- distance ≤ block km cap (60/80) → In-City Block + metered eligible.
+- larger / out-of-city → Outstation. (City `supported_trip_types` is the city allow-list; this is the
+  per-trip filter on top.)
 
-Map every charge to a field so the rate table and API contract stay in sync.
-Go struct `booking_service.go:117-126`, TS `types.ts:86-95`.
+---
+
+## 6. `fare_breakdown` fields (Go `booking_service.go:117-126`, TS `types.ts:86-95`)
 
 | Field | Status | Use |
 | :-- | :-- | :-- |
-| `base_fare_paise` | exists | package block fare / metered base |
-| `distance_charge_paise` | exists | metered trips only (0 for packages) |
-| `night_charge_paise` | exists → **retier** | §5.2 tiered night surcharge |
-| `surge_multiplier` | exists | packages = 1.0 (no surge) |
-| `d4m_care_paise` | exists | unchanged |
-| `promo_discount_paise` | exists | unchanged |
-| `overtime_paise` | **NEW** | §5.1 overtime |
-| `night_halt_paise` | **NEW** | §4b per-night halt allowance (OUTSTATION) |
-| `included_hours` / `overtime_hours` | **NEW (meta)** | transparency in receipt |
-| `food_lodging_notice` | **NEW (bool/meta)** | renders the in-kind obligation, no money |
+| `base_fare_paise` | exists | block fare / day-rate × days / metered base |
+| `distance_charge_paise` | exists | metered + **extra-km** (block over-cap / outstation over-300) |
+| `night_charge_paise` | retier | §4.2 tiered night + outstation ₹100×nights |
+| `overtime_paise` | **NEW** | §4.1 in-city overtime |
+| `driver_allowance_paise` | **NEW** | §4.3 cash food+lodging |
+| `surge_multiplier` | exists | blocks/outstation = 1.0 (no surge) |
+| `d4m_care_paise` · `promo_discount_paise` | exists | unchanged |
+| `included_hours` / `overtime_hours` / `nights_away` / `days` | **NEW meta** | receipt transparency |
 
-Add to both the Go struct and the TS type in the same change; persist new money fields on the order row
-(extend `InsertRiderOrder`).
+Add to Go struct + TS type together; persist new money fields on the order row (`InsertRiderOrder`).
 
 ---
 
-## 7. Implementation phases
+## 7. Implementation — Phase 1 status
 
-**Phase 1 — close the gap (delivers the user's table)**
-1. Seed the admin rate config (Redis `pricing:fare:active:<city>:<car>:<trip>`) for KOL × 4 tiers ×
-   trip_types with the §4 table (a boot-time seeder / migration-style script + a code-level default map so a
-   Redis flush degrades to defaults, not zeros).
-2. Rewrite `package_pricing.go` → tier-aware: `packageFarePaise(city, tier, tripType, hours)` reads the
-   config (fallback to the default map). Add MINI_OUTSTATION 6h-block + overtime; OUTSTATION per-day per tier.
-3. Wire `EstimateFare` (`booking_service.go:142`) to pass `carType` + `tripType` into pricing and to compute
-   §5 surcharges; populate the new breakdown fields.
-4. Add the §3 distance eligibility gate → `eligible_trip_types` in fare-estimate + city-config responses;
-   booking picker filters on it.
-5. Extend `fare_breakdown` (§6) Go + TS + order persistence.
+**SHIPPED (this change):**
+- ✅ Tier-aware rate engine — `package_pricing.go` rewritten: `packageQuote(packageType, carType,
+  durationHours, distanceKm, when)` returns a decomposed `PackageQuote`. In-City block (6h/8h select by
+  duration), Outstation per-day (ceil 12h/day, nights, allowance, ₹100/night, extra-km). Rate cards as Go
+  maps (the code-level default). Pure function — `when` passed in.
+- ✅ `EstimateFare` wired (`booking_service.go`) — distance computed up-front; packages routed through the
+  engine; tiered night surcharge (₹50/₹100, replaces) on blocks; `dispatchFarePaise` = **service fare only**
+  (base+extra-km+overtime) — allowance/night/d4m/promo excluded from the commission/payout basis.
+- ✅ `fare_breakdown` new fields `overtime_paise`, `driver_allowance_paise` — Go struct + TS type.
+- ✅ Tests rewritten (`package_pricing_test.go`): tier blocks, night tiers (21/22/00/05/06 IST), outstation
+  days/nights/allowance/extra-km, MINI→outstation, monthly, fall-through. `go build ./...`, service tests,
+  `tsc` all green.
+- ✅ `MINI_OUTSTATION` retired in pricing (routes to the outstation card; enum kept for old rows).
 
-**Phase 2 — durability (explicitly optional, not the backbone)**
-- Promote rate storage from Redis-only to a DB `rate_card` table (source of truth) with the admin handler
-  dual-writing + Redis as cache. Only if ops needs audit/durability beyond versioned Redis.
-  ⚠ Scope check: this touches `pricing_handler.go` storage layer — keep it a *named option*, not Phase 1.
+**DEFERRED (next slices, noted in code with `ponytail:`):**
+- ⏸ **Trip-end reconciliation** — overtime + extra-km are 0 at estimate (no actual km/hours yet); the per-tier
+  rates exist on the card but get *applied* in the driver-side trip-end bill flow. This is the next slice.
+- ⏸ **`eligible_trip_types` distance gate** (§5) in fare-estimate/city-config + picker filter.
+- ⏸ **Granular DB persistence** of `overtime_paise`/`driver_allowance_paise` columns (the *total* already
+  persists via `dispatchFarePaise`→`base_fare`).
+- ⏸ **KOL seed** — remove `MINI_OUTSTATION` from `supported_trip_types` (`000119`).
+- ⏸ **Redis admin-config wiring** — booking reads the Go default map today; reading
+  `pricing:fare:active:<city>:<car>:<trip>` is Phase 2.
+
+**Phase 2 (optional):** promote rate storage Redis-only → DB `rate_card` table (audit/durability).
 
 ---
 
-## 8. Test changes
-- `package_pricing_test.go:5-38` asserts the old env placeholders (₹150/hr etc.) → **rewrite** to the §4
-  table (MINI_OUTSTATION 6h block = ₹450/₹550; overtime; OUTSTATION per-day-per-tier; tiered night charge).
-- Add cases: distance gate (≤100 vs >100 km), night-charge tiers (22:59 none / 23:30 ₹50 / 00:30 ₹100),
-  overtime (6h→0, 8h→₹100), OUTSTATION multi-day halt.
+## 8. Tests
+- Rewrite `package_pricing_test.go` to §2 numbers (block 6h ₹650/8h ₹800 Hatchback; over-km extra; per-tier
+  overtime; outstation per-day/extra-km/allowance/night; >3h→full-day).
+- Add: distance gate (≤80 block vs > outstation), night tiers (21:59 ₹0 / 22:30 ₹50 / 00:30 ₹100 / 06:01 ₹0),
+  allowance (same-day ₹0 / evening-return ₹300 / full-night ₹600/₹700), outstation multi-day ceil + nights.
 
 ---
 
-## 9. Decisions to confirm (the only open items)
+## 9. Still open (small, non-blocking)
+1. `IN_CITY_ONE_WAY/ROUND` metered per-tier base+per-km — keep current flat for now? (TBD rates)
+2. `MONTHLY` per-tier rates — TBD.
+3. Confirm `MINI_OUTSTATION` retire (vs keep as alias for single-day outstation).
 
-1. **Full tier rates** — fill the *italic* placeholders: SEDAN/PREMIUM 6h inter-city blocks; **all** OUTSTATION
-   per-day rates by tier; IN_CITY_HOURLY / metered / MONTHLY per-tier rates.
-2. **Night charge stacking** — tiered-replacement (₹100 max) [assumed] vs cumulative (₹50+₹100).
-3. **Food & lodging** — rider in-kind [assumed] vs fixed cash allowance ₹X/night added to fare.
-4. **6h block km cap** — purely time-based [assumed] vs 100 km incl. + extra-km charge beyond.
-5. **Overtime** — flat ₹50/hr all tiers [assumed] vs per-tier.
-
-Everything else is baked from the spec + existing code. Give me 1–5 and I'll turn this into the
-implementation (Phase 1).
+Rationale notes (driver economics, route benchmarks) captured inline; full reasoning in chat history.

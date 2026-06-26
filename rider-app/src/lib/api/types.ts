@@ -87,6 +87,8 @@ export interface FareBreakdown {
   base_fare_paise: number;
   distance_charge_paise: number;
   night_charge_paise: number;
+  overtime_paise: number;
+  driver_allowance_paise: number;
   d4m_care_paise: number;
   surge_multiplier: number;
   promo_discount_paise: number;

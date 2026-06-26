@@ -4,71 +4,197 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// Package (duration-based) pricing — B4. The rider books a driver for a block of time or a
-// trip package rather than a metered point-to-point ride, so the fare comes from a flat rate
-// card, NOT distance, and NO surge applies ("no surge pricing" is the headline differentiator).
+// Package/block (duration-based) pricing — a tiered flat rate card. The rider books a block of
+// time (in-city) or a per-day outstation engagement rather than a metered point-to-point ride, so
+// the fare comes from a per-(vehicle-tier) rate card, NOT distance, and is NEVER surged ("no surge
+// pricing" is the headline differentiator). See DOC/PRICING_PLAN.md.
 //
-// Rates here are PLACEHOLDERS modelled on the drivers4me tiers. Every knob is env-overridable
-// (PKG_*); move to a rate_card table when ops needs to tune per-city without a redeploy.
+// ponytail: the rate card lives as Go maps here — the booking engine's source of truth and the
+// code-level default. Promote to the Redis admin pricing config / a rate_card table when ops needs
+// per-city tuning without a redeploy (plan Phase 2). Until then a Redis flush can't zero fares.
 const (
-	PackageHourly        = "HOURLY"
-	PackageMiniOutstation = "MINI_OUTSTATION"
-	PackageOutstation    = "OUTSTATION"
-	PackageMonthly       = "MONTHLY"
+	PackageHourly         = "HOURLY"          // In-City Block (6h/60km or 8h/80km, km-capped)
+	PackageMiniOutstation = "MINI_OUTSTATION" // retired — priced as single-day OUTSTATION (enum kept for old rows)
+	PackageOutstation     = "OUTSTATION"      // per-day, 300 km/day included
+	PackageMonthly        = "MONTHLY"
 )
 
-// packageFarePaise returns the rate-card fare for a package booking and true, or (0, false)
-// when packageType is empty/unknown (caller then falls back to distance pricing).
-func packageFarePaise(packageType string, durationHours int) (int64, bool) {
+// Vehicle tiers (mirror rider-app CarType / admin carTypes).
+const (
+	tierHatchback = "HATCHBACK"
+	tierSedan     = "SEDAN"
+	tierSUV       = "SUV"
+	tierPremium   = "PREMIUM"
+)
+
+// normalizeTier maps a free-form car type to a known tier, defaulting to HATCHBACK.
+func normalizeTier(carType string) string {
+	switch strings.ToUpper(strings.TrimSpace(carType)) {
+	case tierSedan:
+		return tierSedan
+	case tierSUV:
+		return tierSUV
+	case tierPremium:
+		return tierPremium
+	default:
+		return tierHatchback
+	}
+}
+
+// In-City Block rate card (paise). six/eight = the 6h/60km and 8h/80km block fares.
+type blockRate struct {
+	six, eight      int64
+	extraKmPaise    int64 // per km beyond the block's included km — billed at trip-end
+	overtimePerHour int64 // per hour beyond the block hours — billed at trip-end
+}
+
+var inCityBlockCard = map[string]blockRate{
+	tierHatchback: {six: 65000, eight: 80000, extraKmPaise: 1100, overtimePerHour: 5000},
+	tierSedan:     {six: 85000, eight: 105000, extraKmPaise: 1300, overtimePerHour: 6000},
+	tierSUV:       {six: 105000, eight: 130000, extraKmPaise: 1500, overtimePerHour: 8000},
+	tierPremium:   {six: 130000, eight: 160000, extraKmPaise: 1800, overtimePerHour: 10000},
+}
+
+// Outstation rate card (paise). perDay includes 300 km/day.
+type outstationRate struct {
+	perDay         int64
+	extraKmPaise   int64 // per km beyond 300×days
+	nightAllowance int64 // cash food+lodging per full night away — driver reimbursement passthrough
+	nightSurcharge int64 // per night away
+}
+
+var outstationCard = map[string]outstationRate{
+	tierHatchback: {perDay: 280000, extraKmPaise: 1000, nightAllowance: 60000, nightSurcharge: 10000},
+	tierSedan:     {perDay: 320000, extraKmPaise: 1200, nightAllowance: 60000, nightSurcharge: 10000},
+	tierSUV:       {perDay: 400000, extraKmPaise: 1400, nightAllowance: 60000, nightSurcharge: 10000},
+	tierPremium:   {perDay: 480000, extraKmPaise: 1600, nightAllowance: 70000, nightSurcharge: 10000},
+}
+
+var monthlyCard = map[string]int64{
+	tierHatchback: 2000000, tierSedan: 2200000, tierSUV: 2600000, tierPremium: 3000000,
+}
+
+const (
+	blockSixHours         = 6
+	blockEightHours       = 8
+	outstationHoursPerDay = 12
+)
+
+// PackageQuote decomposes a package/block fare. All money in paise.
+//   - BasePaise is the commissionable service fare (block fare, or day-rate × days).
+//   - NightChargePaise and DriverAllowancePaise are rider-total add-ons. DriverAllowancePaise is a
+//     driver reimbursement passthrough (food + lodging) and is intentionally NOT in the
+//     commissionable basis.
+//   - ExtraKmPaise / OvertimePaise are ZERO at estimate time (no actual km/hours until trip-end);
+//     the per-tier rates are carried on the card for trip-end reconciliation (deferred bill flow).
+type PackageQuote struct {
+	BasePaise            int64
+	NightChargePaise     int64
+	DriverAllowancePaise int64
+	ExtraKmPaise         int64
+	OvertimePaise        int64
+	Days                 int
+	NightsAway           int
+	IncludedHours        int
+}
+
+// ServiceFarePaise is the commissionable basis sent to dispatch/payout. Excludes the night
+// surcharge and the allowance reimbursement — matching the metered path, which dispatches
+// base+distance only.
+func (q PackageQuote) ServiceFarePaise() int64 {
+	return q.BasePaise + q.ExtraKmPaise + q.OvertimePaise
+}
+
+// RiderAddonsPaise are the non-service charges added to the rider total here (night + allowance).
+func (q PackageQuote) RiderAddonsPaise() int64 {
+	return q.NightChargePaise + q.DriverAllowancePaise
+}
+
+// nightSurchargePaise is the tiered IST night surcharge (one-time, higher bracket replaces lower):
+// ₹50 for 22:00–23:59, ₹100 for 00:00–05:59, ₹0 otherwise.
+func nightSurchargePaise(when time.Time) int64 {
+	h := when.In(istZone).Hour()
+	switch {
+	case h < 6:
+		return 10000
+	case h >= 22:
+		return 5000
+	default:
+		return 0
+	}
+}
+
+// packageQuote prices a package/block booking. Returns (quote, true) for a known package type, or
+// (zero, false) to fall through to distance pricing. distanceKm is the estimated one-way road
+// distance (0 if unknown) used for outstation extra-km math; when drives the night surcharge.
+func packageQuote(packageType, carType string, durationHours int, distanceKm float64, when time.Time) (PackageQuote, bool) {
+	tier := normalizeTier(carType)
 	switch strings.ToUpper(strings.TrimSpace(packageType)) {
+
 	case PackageHourly:
-		perHour := envPaise("PKG_HOURLY_PER_HOUR_PAISE", 15000) // ₹150/hr
-		minH := envInt("PKG_HOURLY_MIN_HOURS", 2)
-		return perHour * int64(max(durationHours, minH)), true
+		card := inCityBlockCard[tier]
+		// Block selection from duration: ≤6h → 6h/60km block, else → 8h/80km block.
+		// ponytail: derived from durationHours since the request carries no explicit block field;
+		// let the rider pick 6h vs 8h directly once the booking UI exposes it.
+		base, incl := card.six, blockSixHours
+		if durationHours > blockSixHours {
+			base, incl = card.eight, blockEightHours
+		}
+		return PackageQuote{
+			BasePaise:        base,
+			NightChargePaise: nightSurchargePaise(when),
+			IncludedHours:    incl,
+		}, true
 
-	case PackageMiniOutstation:
-		perHour := envPaise("PKG_MINI_PER_HOUR_PAISE", 14000) // ₹140/hr
-		minH := envInt("PKG_MINI_MIN_HOURS", 4)
-		return perHour * int64(max(durationHours, minH)), true
-
-	case PackageOutstation:
-		perDay := envPaise("PKG_OUTSTATION_PER_DAY_PAISE", 150000)   // ₹1500/day
-		nightHalt := envPaise("PKG_OUTSTATION_NIGHT_HALT_PAISE", 30000) // ₹300/night driver allowance
-		hoursPerDay := envInt("PKG_OUTSTATION_HOURS_PER_DAY", 12)
-		days := (max(durationHours, 1) + hoursPerDay - 1) / hoursPerDay // ceil
+	case PackageOutstation, PackageMiniOutstation:
+		card := outstationCard[tier]
+		days := (max(durationHours, 1) + outstationHoursPerDay - 1) / outstationHoursPerDay // ceil
 		if days < 1 {
 			days = 1
 		}
-		return perDay*int64(days) + nightHalt*int64(days-1), true
+		nights := days - 1
+		// Extra km beyond the per-day 300 km allowance, only when distance is known.
+		extraKm := int64(0)
+		if distanceKm > 0 {
+			over := distanceKm - float64(300*days)
+			if over > 0 {
+				extraKm = int64(over) * card.extraKmPaise
+			}
+		}
+		return PackageQuote{
+			BasePaise:            card.perDay * int64(days),
+			ExtraKmPaise:         extraKm,
+			DriverAllowancePaise: card.nightAllowance * int64(nights),
+			NightChargePaise:     card.nightSurcharge * int64(nights),
+			Days:                 days,
+			NightsAway:           nights,
+			IncludedHours:        days * outstationHoursPerDay,
+		}, true
 
 	case PackageMonthly:
-		return envPaise("PKG_MONTHLY_PER_MONTH_PAISE", 2000000), true // ₹20,000/mo
+		return PackageQuote{BasePaise: monthlyCard[tier]}, true
 
 	default:
-		return 0, false
+		return PackageQuote{}, false
 	}
 }
 
 // isPackageBooking reports whether a request selects a package tier (vs distance pricing).
 func isPackageBooking(packageType string) bool {
-	_, ok := packageFarePaise(packageType, 1)
-	return ok
+	switch strings.ToUpper(strings.TrimSpace(packageType)) {
+	case PackageHourly, PackageMiniOutstation, PackageOutstation, PackageMonthly:
+		return true
+	default:
+		return false
+	}
 }
 
 func envPaise(key string, def int64) int64 {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 {
-			return n
-		}
-	}
-	return def
-}
-
-func envInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			return n
 		}
 	}
