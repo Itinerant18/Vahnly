@@ -77,6 +77,22 @@ var monthlyCard = map[string]int64{
 	tierHatchback: 2000000, tierSedan: 2200000, tierSUV: 2600000, tierPremium: 3000000,
 }
 
+// In-city point-to-point metered rate card (paise): [base, per-km]. Surge is applied on top by the
+// booking engine; these are the pre-surge tier rates.
+var meteredCard = map[string][2]int64{
+	tierHatchback: {4000, 1100},  // ₹40 + ₹11/km
+	tierSedan:     {5000, 1300},  // ₹50 + ₹13/km
+	tierSUV:       {6000, 1500},  // ₹60 + ₹15/km
+	tierPremium:   {8000, 1800},  // ₹80 + ₹18/km
+}
+
+// meteredRateFor returns the pre-surge base (paise) and per-km (paise/km) for a point-to-point trip,
+// defaulting unknown tiers to HATCHBACK.
+func meteredRateFor(carType string) (basePaise, perKmPaise int64) {
+	r := meteredCard[normalizeTier(carType)]
+	return r[0], r[1]
+}
+
 const (
 	blockSixHours         = 6
 	blockEightHours       = 8

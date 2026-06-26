@@ -43,16 +43,14 @@ var (
 	ErrOutsideServiceArea  = errors.New("pickup is outside our service area; Vahnly operates in Kolkata only for now")
 )
 
-// Fare engine constants — mirror internal/pricing OrderPricingService. The
-// authoritative surged total comes from FareQuoter.GetFareQuote; these are used
-// only to decompose the breakdown for display.
+// Fare engine constants for the metered point-to-point path. Per-tier base/per-km live in the
+// metered rate card (package_pricing.go meteredCard); the surge multiplier comes from
+// FareQuoter.GetFareQuote.
 const (
-	fareBasePaise     int64 = 4000
-	farePerMeterPaise int64 = 15
-	d4mCarePaise      int64 = 4900
-	nightChargePaise  int64 = 5000
-	roadFactor              = 1.3
-	deg2rad                 = math.Pi / 180.0
+	d4mCarePaise     int64 = 4900
+	nightChargePaise int64 = 5000
+	roadFactor             = 1.3
+	deg2rad                = math.Pi / 180.0
 )
 
 // istZone is UTC+05:30. Built explicitly so night-charge logic does not depend
@@ -216,13 +214,17 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 		}, nil
 	}
 
-	// Authoritative surged fare via the existing engine: (base + perMeter*dist) * surge.
-	surgedSubtotal, multiplier, err := s.quoter.GetFareQuote(ctx, city, cell, roadMeters)
+	// Tier-based pre-surge metered fare (base + per-km), then apply the live surge multiplier from
+	// the engine (which also enforces the admin freeze cap). The quoter's own base-derived subtotal
+	// is discarded — the tier rate card is authoritative for the base.
+	base, perKmPaise := meteredRateFor(req.CarType)
+	distanceCharge := int64(math.Round(float64(perKmPaise) * roadMeters / 1000))
+	preSurge := base + distanceCharge
+	_, multiplier, err := s.quoter.GetFareQuote(ctx, city, cell, roadMeters)
 	if err != nil {
 		return nil, err
 	}
-
-	distanceCharge := int64(math.Round(float64(farePerMeterPaise) * roadMeters))
+	surgedSubtotal := int64(float64(preSurge) * multiplier)
 
 	night := int64(0)
 	if isNightIST(when) {
@@ -250,7 +252,7 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 
 	return &FareEstimate{
 		FareBreakdown: FareBreakdown{
-			BaseFarePaise:       fareBasePaise,
+			BaseFarePaise:       base,
 			DistanceChargePaise: distanceCharge,
 			NightChargePaise:    night,
 			SurgeMultiplier:     multiplier,

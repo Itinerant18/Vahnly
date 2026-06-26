@@ -63,9 +63,24 @@ below holds (KOL→Puri 500 km → 2 days) while open-ended/unknown-distance boo
 **Common routes (reference, Sedan):** Digha 185km 1–2d ₹3,200+₹600 · Puri 500km 2–3d ₹6,400+2×₹600 ·
 Siliguri/NJP 600km 2d ₹6,400+1×₹600 · Durgapur 165km same-day ₹3,200 · Bishnupur 150km same-day ₹3,200.
 
-### 2c. Existing, unchanged (rates TBD, not in this round)
-- `IN_CITY_ONE_WAY` / `IN_CITY_ROUND` — distance-metered (existing base+per-km), to be re-tiered later.
-- `MONTHLY` — flat/month per tier, TBD.
+### 2c. Point-to-point metered (IN_CITY_ONE_WAY / ROUND) — now per-tier
+
+Distance-metered, surge applied on top. Pre-surge `base + per-km` per tier (`meteredCard`):
+
+| Tier | Base | Per-km |
+| :-- | --: | --: |
+| Hatchback | ₹40 | ₹11 |
+| Sedan | ₹50 | ₹13 |
+| SUV | ₹60 | ₹15 |
+| Premium | ₹80 | ₹18 |
+
+`fare = (base[tier] + per_km[tier] × km) × surge`. The tier card is authoritative for the base; the
+surge multiplier (+ admin freeze cap) comes from the live quoter. ROUND doubles the distance.
+
+### 2d. MONTHLY — per tier (set)
+
+Flat per month: Hatchback ₹20,000 · Sedan ₹22,000 · SUV ₹26,000 · Premium ₹30,000. (Estimate-only —
+recurring billing is still blocked in `CreateOrder`.)
 
 ---
 
@@ -185,8 +200,9 @@ Add to Go struct + TS type together; persist new money fields on the order row (
 ---
 
 ## 9. Still open (small, non-blocking)
-1. `IN_CITY_ONE_WAY/ROUND` metered per-tier base+per-km — keep current flat for now? (TBD rates)
-2. `MONTHLY` per-tier rates — TBD.
-3. Confirm `MINI_OUTSTATION` retire (vs keep as alias for single-day outstation).
+- ⏸ Remove `MINI_OUTSTATION` from the KOL `supported_trip_types` seed (`000119`) — retired in pricing.
+- ⏸ Trip-end overtime/extra-km reconciliation (driver-side bill flow).
+- ⏸ `eligible_trip_types` distance gate in fare-estimate/city-config + picker filter.
 
-Rationale notes (driver economics, route benchmarks) captured inline; full reasoning in chat history.
+All rates are now set: in-city block (§2a), outstation per-day (§2b), point-to-point metered per-tier
+(§2c), MONTHLY (§2d). Rationale notes (driver economics, route benchmarks) inline; reasoning in history.

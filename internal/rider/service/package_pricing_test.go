@@ -116,3 +116,22 @@ func TestPackageQuote_MonthlyAndFallthrough(t *testing.T) {
 		t.Errorf("isPackageBooking(WEEKLY) = true, want false")
 	}
 }
+
+func TestMeteredRateFor(t *testing.T) {
+	cases := []struct {
+		tier        string
+		base, perKm int64
+	}{
+		{"HATCHBACK", 4000, 1100},
+		{"SEDAN", 5000, 1300},
+		{"SUV", 6000, 1500},
+		{"PREMIUM", 8000, 1800},
+		{"", 4000, 1100}, // unknown tier → hatchback
+	}
+	for _, c := range cases {
+		b, k := meteredRateFor(c.tier)
+		if b != c.base || k != c.perKm {
+			t.Errorf("meteredRateFor(%q) = (%d,%d), want (%d,%d)", c.tier, b, k, c.base, c.perKm)
+		}
+	}
+}
