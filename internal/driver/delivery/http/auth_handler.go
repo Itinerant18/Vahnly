@@ -44,6 +44,7 @@ type DriverRegisterRequest struct {
 
 type DriverAuthResponse struct {
 	Token              string    `json:"token"`
+	RefreshToken       string    `json:"refresh_token,omitempty"`
 	ExpiresAt          time.Time `json:"expires_at"`
 	Role               string    `json:"role"`
 	DriverID           string    `json:"driver_id"`
@@ -66,6 +67,37 @@ func NewDriverAuthHandler(dbPool *pgxpool.Pool, redisClient *redis.ClusterClient
 		redis:     redisClient,
 		jwtSecret: []byte(jwtSecret),
 	}
+}
+
+// issueDriverSession signs a (short-lived, env-configurable) access JWT, records its jti as the
+// driver's revocable session, and mints a paired long-lived refresh token. Centralizes the token
+// logic for login / OTP / google / reset so every entry point issues a refresh token consistently.
+func (h *DriverAuthHandler) issueDriverSession(ctx context.Context, driverID, cityScope string, phoneVerified bool) (accessToken, refreshToken string, expiresAt time.Time, err error) {
+	expiresAt = time.Now().Add(middleware.AccessTokenTTL())
+	jti := uuid.NewString()
+	claims := &middleware.CustomClaims{
+		UserID:        driverID,
+		Role:          "DRIVER",
+		CityScope:     cityScope,
+		PhoneVerified: phoneVerified,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
+			Subject:   driverID,
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "vahnly-driver-auth",
+		},
+	}
+	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	// Session jti lives for the refresh lifetime so the session stays valid across access refreshes.
+	if h.redis != nil {
+		_ = h.redis.Set(ctx, middleware.DriverSessionKey(driverID), jti, middleware.RefreshTokenTTL).Err()
+	}
+	refreshToken, _ = middleware.MintRefreshToken(ctx, h.redis, "DRIVER", driverID)
+	return accessToken, refreshToken, expiresAt, nil
 }
 
 func getClientIP(r *http.Request) string {
@@ -311,41 +343,16 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 	// Record audit trail
 	h.recordAuditLog(ctx, dbDriverID, "LOGIN_SUCCESS", deviceID, ip, appVersion, geoLocation)
 
-	// Generate signed JWT token
-	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
-	jti := uuid.NewString()
-	claims := &middleware.CustomClaims{
-		UserID:        dbDriverID,
-		Role:          "DRIVER",
-		CityScope:     dbCityPrefix,
-		PhoneVerified: dbPhoneVerified,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        jti,
-			Subject:   dbDriverID,
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "vahnly-driver-auth",
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.jwtSecret)
+	tokenString, refreshTok, expirationTime, err := h.issueDriverSession(ctx, dbDriverID, dbCityPrefix, dbPhoneVerified)
 	if err != nil {
 		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Record the session jti so the gateway's DRIVER session validator accepts this token.
-	// Without it, the validator returns session_revoked_or_expired on every authed request.
-	if h.redis != nil {
-		if sErr := h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err(); sErr != nil {
-			log.Printf("[AUTH_WARN] failed to record driver session for %s: %v", dbDriverID, sErr)
-		}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
 		Token:              tokenString,
+		RefreshToken:       refreshTok,
 		ExpiresAt:          expirationTime,
 		Role:               "DRIVER",
 		DriverID:           dbDriverID,
@@ -532,41 +539,16 @@ func (h *DriverAuthHandler) HandleDriverGoogleLogin(w http.ResponseWriter, r *ht
 	// Record audit trail
 	h.recordAuditLog(ctx, dbDriverID, "LOGIN_SUCCESS_GOOGLE", deviceID, ip, appVersion, geoLocation)
 
-	// Generate signed JWT token
-	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days token for mobile driver app
-	jti := uuid.NewString()
-	claims := &middleware.CustomClaims{
-		UserID:        dbDriverID,
-		Role:          "DRIVER",
-		CityScope:     dbCityPrefix,
-		PhoneVerified: dbPhoneVerified,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        jti,
-			Subject:   dbDriverID,
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "vahnly-driver-auth",
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.jwtSecret)
+	tokenString, refreshTok, expirationTime, err := h.issueDriverSession(ctx, dbDriverID, dbCityPrefix, dbPhoneVerified)
 	if err != nil {
 		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Record the session jti so the gateway's DRIVER session validator accepts this token.
-	// Without it, the validator returns session_revoked_or_expired on every authed request.
-	if h.redis != nil {
-		if sErr := h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err(); sErr != nil {
-			log.Printf("[AUTH_WARN] failed to record driver session for %s: %v", dbDriverID, sErr)
-		}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
 		Token:              tokenString,
+		RefreshToken:       refreshTok,
 		ExpiresAt:          expirationTime,
 		Role:               "DRIVER",
 		DriverID:           dbDriverID,
@@ -786,36 +768,16 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 	// Driver exists, verify their phone and log them in
 	_, _ = h.dbPool.Exec(ctx, "UPDATE drivers SET phone_verified = true, last_login_at = now() WHERE id = $1::uuid", dbDriverID)
 
-	// Issue JWT
-	expirationTime := time.Now().Add(7 * 24 * time.Hour)
-	jti := uuid.NewString()
-	claims := &middleware.CustomClaims{
-		UserID:        dbDriverID,
-		Role:          "DRIVER",
-		CityScope:     dbCityPrefix,
-		PhoneVerified: true,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        jti,
-			Subject:   dbDriverID,
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "vahnly-driver-auth",
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.jwtSecret)
+	tokenString, refreshTok, expirationTime, err := h.issueDriverSession(ctx, dbDriverID, dbCityPrefix, true)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	if h.redis != nil {
-		_ = h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err()
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
 		Token:              tokenString,
+		RefreshToken:       refreshTok,
 		ExpiresAt:          expirationTime,
 		Role:               "DRIVER",
 		DriverID:           dbDriverID,
@@ -1001,33 +963,16 @@ func (h *DriverAuthHandler) HandleResetPassword(w http.ResponseWriter, r *http.R
 	}
 	h.recordAuditLog(ctx, dbDriverID, "PASSWORD_RESET", r.Header.Get("X-Device-Id"), getClientIP(r), r.Header.Get("X-App-Version"), "")
 
-	expirationTime := time.Now().Add(7 * 24 * time.Hour)
-	jti := uuid.NewString()
-	claims := &middleware.CustomClaims{
-		UserID:        dbDriverID,
-		Role:          "DRIVER",
-		CityScope:     dbCityPrefix,
-		PhoneVerified: true,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        jti,
-			Subject:   dbDriverID,
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "vahnly-driver-auth",
-		},
-	}
-	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(h.jwtSecret)
+	tokenString, refreshTok, expirationTime, err := h.issueDriverSession(ctx, dbDriverID, dbCityPrefix, true)
 	if err != nil {
 		http.Error(w, "JWT token generation failed", http.StatusInternalServerError)
 		return
-	}
-	if h.redis != nil {
-		_ = h.redis.Set(ctx, middleware.DriverSessionKey(dbDriverID), jti, 7*24*time.Hour).Err()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(DriverAuthResponse{
 		Token:              tokenString,
+		RefreshToken:       refreshTok,
 		ExpiresAt:          expirationTime,
 		Role:               "DRIVER",
 		DriverID:           dbDriverID,

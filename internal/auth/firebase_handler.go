@@ -88,6 +88,7 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 	}
 
 	var platformJWT string
+	var driverRefresh string
 	var isNew bool
 
 	switch strings.ToLower(strings.TrimSpace(req.UserType)) {
@@ -100,7 +101,7 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 		}
 
 	case "driver":
-		platformJWT, isNew, err = h.driverFindOrCreate(ctx, fc.PhoneNumber, fc.Email, fc.Name, req.Name, req.CityPrefix)
+		platformJWT, driverRefresh, isNew, err = h.driverFindOrCreate(ctx, fc.PhoneNumber, fc.Email, fc.Name, req.Name, req.CityPrefix)
 		if err != nil {
 			log.Printf("[FIREBASE_AUTH] driver error phone=%s: %v", fc.PhoneNumber, err)
 			writeJSON(w, 500, verifyResponse{Success: false, Message: "server error"})
@@ -112,10 +113,14 @@ func (h *FirebaseAuthHandler) HandleFirebaseVerify(w http.ResponseWriter, r *htt
 		return
 	}
 
+	data := map[string]string{"token": platformJWT}
+	if driverRefresh != "" {
+		data["refresh_token"] = driverRefresh
+	}
 	writeJSON(w, 200, verifyResponse{
 		Success:   true,
 		IsNewUser: isNew,
-		Data:      map[string]string{"token": platformJWT},
+		Data:      data,
 	})
 }
 
@@ -137,7 +142,7 @@ func (h *FirebaseAuthHandler) riderFindOrCreate(ctx context.Context, phone strin
 func (h *FirebaseAuthHandler) driverFindOrCreate(
 	ctx context.Context,
 	phone, email, firebaseName, reqName, reqCityPrefix string,
-) (token string, isNew bool, err error) {
+) (token, refresh string, isNew bool, err error) {
 	var id, name, cityPrefix, verificationStatus string
 	var onboardingStep int
 
@@ -180,10 +185,10 @@ func (h *FirebaseAuthHandler) driverFindOrCreate(
 			VALUES ($1,$2,$3,$4,$5,'OFFLINE',false,1,'ONBOARDING',true)
 			RETURNING id
 		`, name, phone, emailVal, string(placeholder), cityPrefix).Scan(&id); err != nil {
-			return "", false, err
+			return "", "", false, err
 		}
 	} else {
-		return "", false, qErr
+		return "", "", false, qErr
 	}
 
 	jti := uuid.NewString()
@@ -204,12 +209,13 @@ func (h *FirebaseAuthHandler) driverFindOrCreate(
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, sErr := tok.SignedString(h.jwtSecret)
 	if sErr != nil {
-		return "", isNew, sErr
+		return "", "", isNew, sErr
 	}
 	if h.redis != nil {
-		_ = h.redis.Set(ctx, middleware.DriverSessionKey(id), jti, 7*24*time.Hour).Err()
+		_ = h.redis.Set(ctx, middleware.DriverSessionKey(id), jti, middleware.RefreshTokenTTL).Err()
 	}
-	return signed, isNew, nil
+	refresh, _ = middleware.MintRefreshToken(ctx, h.redis, "DRIVER", id)
+	return signed, refresh, isNew, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

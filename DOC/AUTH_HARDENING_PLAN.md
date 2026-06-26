@@ -99,9 +99,20 @@ Minimum: **≥ 8 chars, not all-numeric, not equal to the phone number.** One sh
 
 ---
 
-## 4. P1 — Seamless sessions via refresh tokens  ·  DECIDED: Option B (full refresh tokens)
+## 4. P1 — Seamless sessions via refresh tokens  ·  DECIDED: Option B  ·  BACKEND SHIPPED
 
-Chosen for a hard short-access-token cap. Design:
+**Shipped (backend, default-safe):** `middleware/refresh.go` (opaque token, sha256-hashed in Redis,
+`GetDel` rotation = replay-protection, `AccessTokenTTL()` env-overridable **default 7d = no behavior
+change**). `POST /auth/refresh` (driver) rotates + re-mints. **All 5 driver mint sites issue a refresh
+token** (password login, OTP-verify, google, reset, firebase-verify) via the shared
+`issueDriverSession` helper. Builds + tests green.
+
+**Remaining (next, careful):** the **client interceptor** (refresh-on-401, single-flight) in client-app
++ store the refresh token + thread it through the auth flows. Until that lands the refresh is dormant
+(7d access still works). **Then** flip `ACCESS_TOKEN_TTL=30m` (env, reversible) to activate the short
+cap. Rider refresh + logout-all = follow-ups.
+
+Design:
 
 - **Access token** ~30 min (replaces the 7d/72h token). Same `CustomClaims`, includes `jti` (the access
   jti stays Redis-checked, so an access token is *also* instantly revocable).

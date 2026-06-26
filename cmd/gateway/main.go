@@ -163,6 +163,7 @@ func main() {
 
 	adminAuthHandler := adminHttp.NewAdminAuthHandler(dbPool, jwtSecret)
 	driverAuthHandler := driverHttp.NewDriverAuthHandler(dbPool, redisClusterClient, jwtSecret)
+	refreshHandler := gatewayHttp.NewRefreshHandler(dbPool, redisClusterClient, jwtSecret)
 	driverOnboardingHandler := driverHttp.NewOnboardingHandler(dbPool)
 	if fieldCipher, err := crypto.NewFieldCipher(fieldEncKey); err != nil {
 		log.Fatalf("Field encryption cipher setup failed: %v", err)
@@ -521,6 +522,7 @@ func main() {
 	// Idempotency (P1.2): a double-tapped Book / Pay carrying the same X-Idempotency-Key replays
 	// the first response instead of creating a duplicate order/charge (24h window).
 	idem := middleware.NewIdempotencyMiddleware(redisClusterClient, 24*time.Hour)
+	refreshGuard := rateLimiter.PerKey(middleware.ClientIPKey, "refresh", 60, 15*time.Minute) // 60/IP/15m
 
 	// MILESTONE 22 INITIALIZATION: Instantiate the Region Shard Router
 	// Active region shards. Prefer the explicit env override; otherwise load from the
@@ -710,6 +712,9 @@ func main() {
 
 	// Unified Firebase auth verify — public, handles both driver + rider post-Firebase flows.
 	mux.HandleFunc("POST /api/v1/auth/firebase/verify", fbVerifyGuard(firebaseAuthHandler.HandleFirebaseVerify))
+	// Refresh-token exchange: a valid refresh token mints a new (short-lived) access token + a rotated
+	// refresh token. Public — the refresh token is the credential. See DOC/AUTH_HARDENING_PLAN.md.
+	mux.HandleFunc("POST /api/v1/auth/refresh", refreshGuard(refreshHandler.HandleRefresh))
 
 	// Rider App: auth + onboarding routes. Public OTP endpoints, then RIDER-scoped
 	// protected endpoints guarded by the standalone rider auth middleware.
