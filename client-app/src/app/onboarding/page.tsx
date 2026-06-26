@@ -50,6 +50,14 @@ export default function RiderOnboardingWizard() {
 
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
+  // ponytail: the profile-image upload was gutted in the minimalist redesign but the button's
+  // handler reference was left dangling (broke the build). No-op stub keeps it green; wire a real
+  // file input + upload here if profile upload is wanted again.
+  void setUploadProgress;
+  const triggerUploadClick = (_field: string) => {};
+  // ponytail: demo-vehicle prefill was removed in the redesign; stub keeps the "Skip Step" button green.
+  const toggleDemoVehicle = () => {};
+
   const logEvent = (action: string, meta: any) => {
     const time = new Date().toISOString();
     const str = `[RIDER_ONBOARDING_LOG] ${time} | ${action} | Meta: ${JSON.stringify(meta)}`;
