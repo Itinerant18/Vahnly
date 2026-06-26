@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTripStore } from "@/lib/store/tripStore";
 import { ordersApi } from "@/lib/api/orders";
+import { useToastStore } from "@/lib/store/useToastStore";
+import { friendlyError } from "@/lib/ui/errorMessage";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 
 const POSITIVE_TAGS = ["Polite", "Safe Driving", "Knew Routes", "Punctual", "Clean & Neat"];
@@ -68,7 +70,8 @@ export default function RatePage() {
       });
       setToast(true);
       setTimeout(() => router.replace("/home"), 1500);
-    } catch {
+    } catch (e) {
+      useToastStore.getState().show(friendlyError(e), "error");
       setSubmitting(false);
     }
   };

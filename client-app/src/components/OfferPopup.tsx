@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useOfferStore } from '@/store/useOfferStore';
+import { useToastStore } from '@/store/useToastStore';
+import { friendlyError } from '@/lib/ui/errorMessage';
 import { FareDisplay, ShieldIcon, AlertIcon, CarIcon } from '@/components/ds';
 
 // ── Slide-to-Accept ───────────────────────────────────────────────────────────
@@ -162,13 +164,21 @@ export function OfferPopup() {
   if (status !== 'OFFER_PENDING' || !currentOffer) return null;
 
   const handleAccept = async () => {
-    if (token) await acceptOffer(token, driverID);
+    if (!token) return;
+    try {
+      await acceptOffer(token, driverID);
+    } catch (e) {
+      useToastStore.getState().show(friendlyError(e), 'error');
+    }
   };
 
   const handleDecline = async (reason: string) => {
-    if (token) {
+    if (!token) return;
+    try {
       await declineOffer(token, driverID, reason);
       setShowDeclinePicker(false);
+    } catch (e) {
+      useToastStore.getState().show(friendlyError(e), 'error');
     }
   };
 

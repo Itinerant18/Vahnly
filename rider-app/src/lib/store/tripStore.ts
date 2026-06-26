@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { ordersApi } from "../api/orders";
+import { useToastStore } from "./useToastStore";
+import { friendlyError } from "../ui/errorMessage";
 import type { FareBreakdown, LatLng, Order, TripStatus } from "../api/types";
 
 // The server only persists a hash of the pickup OTP (orders.otp_hash), so the
@@ -120,13 +122,24 @@ export const useTripStore = create<TripState>((set, get) => ({
   cancelTrip: async (reason) => {
     const order = get().activeOrder;
     if (!order) return;
-    await ordersApi.cancel(order.id, reason);
-    set({ tripStatus: "CANCELLED" });
+    try {
+      await ordersApi.cancel(order.id, reason);
+      set({ tripStatus: "CANCELLED" });
+    } catch (e) {
+      useToastStore.getState().show(friendlyError(e), "error");
+      throw e;
+    }
   },
 
   triggerSOS: async () => {
     const order = get().activeOrder;
     if (!order) return;
-    await ordersApi.sos(order.id);
+    try {
+      await ordersApi.sos(order.id);
+      useToastStore.getState().show("SOS sent — your emergency contacts have been alerted.", "success");
+    } catch (e) {
+      useToastStore.getState().show("SOS could not be sent. Call emergency services directly.", "error");
+      throw e;
+    }
   },
 }));

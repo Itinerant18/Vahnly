@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useAuthStore } from "./useAuthStore";
+import { useToastStore } from "./useToastStore";
 
 interface SafetyState {
   isEmergencyActive: boolean;
@@ -39,9 +40,13 @@ export const useSafetyStore = create<SafetyState>((set) => ({
       if (response.ok) {
         const data = await response.json();
         set({ shareLink: data.share_link });
+        useToastStore.getState().show("SOS sent — alerting your emergency contacts.", "success");
+      } else {
+        useToastStore.getState().show("SOS could not be sent. Call emergency services directly.", "error");
       }
     } catch (err) {
       console.error("SOS Ingress failover initialization failed:", err);
+      useToastStore.getState().show("SOS could not be sent. Call emergency services directly.", "error");
     }
   },
   cancelSOS: () => set({ isEmergencyActive: false, shareLink: null }),

@@ -168,6 +168,7 @@ interface RequestOptions {
   method: HttpMethod;
   token?: string;
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 function buildUrl(path: string): string {
@@ -186,6 +187,10 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
 
   if (options.token) {
     headers.Authorization = `Bearer ${options.token}`;
+  }
+
+  if (options.headers) {
+    Object.assign(headers, options.headers);
   }
 
   const response = await fetch(buildUrl(path), {
@@ -1038,6 +1043,9 @@ export async function driverConfirmPayment(
     method: 'POST',
     token,
     body: payload,
+    // Stable per-order key: any retry of confirming THIS order's payment replays the first
+    // result instead of charging twice.
+    headers: { 'X-Idempotency-Key': `confirm-pay-${orderId}` },
   });
 }
 

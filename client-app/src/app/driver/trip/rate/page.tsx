@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { rateRider } from '@/api/client';
+import { useToastStore } from '@/store/useToastStore';
+import { friendlyError } from '@/lib/ui/errorMessage';
 import { CheckIcon } from '@/components/ds';
 
 export default function RateRiderPage() {
@@ -56,6 +58,7 @@ export default function RateRiderPage() {
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to rate rider:', err);
+      useToastStore.getState().show(friendlyError(err), 'error');
       // Even on failure, advance to the next-step choice — the trip is over.
       setSubmitted(true);
     } finally {
