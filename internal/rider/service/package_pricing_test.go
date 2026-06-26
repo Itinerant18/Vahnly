@@ -77,10 +77,17 @@ func TestPackageQuote_Outstation(t *testing.T) {
 	if q3.DriverAllowancePaise != 70000 {
 		t.Errorf("premium allowance=%d, want 70000", q3.DriverAllowancePaise)
 	}
-	// Extra-km: 1 day, one-way 400 km → 100 km over 300 → 100×₹12 = ₹1200 (Sedan).
-	q4, _ := packageQuote("OUTSTATION", "SEDAN", 8, 400, dayIST)
-	if q4.ExtraKmPaise != 120000 || q4.ServiceFarePaise() != 320000+120000 {
-		t.Errorf("extra-km: %+v service=%d", q4, q4.ServiceFarePaise())
+	// Hybrid day-count: a long route bumps days even with few booked hours.
+	// SEDAN 8h + 500 km one-way → hoursDays=1, kmDays=ceil(500/300)=2 → 2 days, 1 night.
+	q4, _ := packageQuote("OUTSTATION", "SEDAN", 8, 500, dayIST)
+	if q4.Days != 2 || q4.BasePaise != 640000 || q4.NightsAway != 1 ||
+		q4.DriverAllowancePaise != 60000 || q4.ExtraKmPaise != 0 {
+		t.Errorf("hybrid long route: %+v", q4)
+	}
+	// Short route doesn't bump: SEDAN 8h + 80 km → 1 day.
+	q4b, _ := packageQuote("OUTSTATION", "SEDAN", 8, 80, dayIST)
+	if q4b.Days != 1 || q4b.BasePaise != 320000 {
+		t.Errorf("hybrid short route: %+v", q4b)
 	}
 	// MINI_OUTSTATION is retired → priced via the outstation card.
 	q5, _ := packageQuote("MINI_OUTSTATION", "SEDAN", 8, 0, dayIST)

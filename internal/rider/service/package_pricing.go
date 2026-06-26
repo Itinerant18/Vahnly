@@ -81,6 +81,7 @@ const (
 	blockSixHours         = 6
 	blockEightHours       = 8
 	outstationHoursPerDay = 12
+	outstationKmPerDay    = 300
 )
 
 // PackageQuote decomposes a package/block fare. All money in paise.
@@ -151,15 +152,23 @@ func packageQuote(packageType, carType string, durationHours int, distanceKm flo
 
 	case PackageOutstation, PackageMiniOutstation:
 		card := outstationCard[tier]
-		days := (max(durationHours, 1) + outstationHoursPerDay - 1) / outstationHoursPerDay // ceil
+		// Hybrid day-count: the greater of booked-hours/12 and one-way-distance/300 — a long route
+		// can't be underbooked on hours, and an unknown distance (0) falls back to hours.
+		hoursDays := (max(durationHours, 1) + outstationHoursPerDay - 1) / outstationHoursPerDay // ceil
+		kmDays := 0
+		if distanceKm > 0 {
+			kmDays = (int(distanceKm) + outstationKmPerDay - 1) / outstationKmPerDay // ceil
+		}
+		days := max(hoursDays, kmDays)
 		if days < 1 {
 			days = 1
 		}
 		nights := days - 1
-		// Extra km beyond the per-day 300 km allowance, only when distance is known.
+		// Extra km beyond the per-day allowance (300×days). With the hybrid day-count, days already
+		// covers the one-way route, so this is ~0 at estimate; it surfaces at trip-end on actual km.
 		extraKm := int64(0)
 		if distanceKm > 0 {
-			over := distanceKm - float64(300*days)
+			over := distanceKm - float64(outstationKmPerDay*days)
 			if over > 0 {
 				extraKm = int64(over) * card.extraKmPaise
 			}
