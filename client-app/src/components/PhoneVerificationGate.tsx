@@ -135,7 +135,7 @@ export default function PhoneVerificationGate() {
           name: res.user.name,
           phone: cleanPhone,
           phone_verified: true,
-        });
+        }, res.refresh_token);
         console.log('[PhoneVerificationGate] Phone verified successfully, store updated');
       } else {
         setError('Verification succeeded, but session token was not received.');

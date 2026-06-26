@@ -193,7 +193,7 @@ function UnifiedLoginContent() {
           name: verifyRes.user.name,
           phone: cleanPhone,
           phone_verified: true,
-        });
+        }, verifyRes.refresh_token);
         void registerDriverPushNotifications(verifyRes.token).catch((pushErr) => {
           console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
         });
@@ -224,7 +224,7 @@ function UnifiedLoginContent() {
           name: loginRes.user.name,
           phone: cleanPhone,
           phone_verified: loginRes.phone_verified,
-        });
+        }, loginRes.refresh_token);
 
         addAuditLog('LOGIN_SUCCESS', { userId: loginRes.user.id, role: 'DRIVER' });
         router.push('/driver-onboarding');
@@ -244,7 +244,7 @@ function UnifiedLoginContent() {
             name: googleRes.user.name,
             phone: cleanPhone,
             phone_verified: googleRes.phone_verified,
-          });
+          }, googleRes.refresh_token);
 
           void registerDriverPushNotifications(googleRes.token).catch((pushErr) => {
             console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
@@ -322,7 +322,7 @@ function UnifiedLoginContent() {
         name: res.user.name,
         phone: cleanPhone,
         phone_verified: res.phone_verified,
-      });
+      }, res.refresh_token);
       void registerDriverPushNotifications(res.token).catch((pushErr) => {
         console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
       });
@@ -403,7 +403,7 @@ function UnifiedLoginContent() {
           name: res.user.name,
           phone: res.user.phone || '',
           phone_verified: res.phone_verified,
-        });
+        }, res.refresh_token);
         void registerDriverPushNotifications(res.token).catch((pushErr) => {
           console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
         });
@@ -468,7 +468,7 @@ function UnifiedLoginContent() {
         name: res.user.name,
         phone: cleanPhone,
         phone_verified: res.phone_verified,
-      });
+      }, res.refresh_token);
       useToastStore.getState().show('Password updated — you are logged in.', 'success');
       router.push('/driver');
     } catch (err) {

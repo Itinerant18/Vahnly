@@ -50,6 +50,7 @@ export interface DriverAuthUser {
 
 export interface DriverLoginResponse {
   token: string;
+  refresh_token?: string;
   user: DriverAuthUser;
   phone_verified?: boolean;
 }
@@ -175,7 +176,45 @@ function buildUrl(path: string): string {
   return `${BASE_URL.replace(/\/$/, '')}${path}`;
 }
 
-async function request<T>(path: string, options: RequestOptions): Promise<T> {
+// Single-flight refresh: a burst of concurrent 401s triggers exactly one /auth/refresh call; all
+// queued requests await the same result. On success the store gets the new access + rotated refresh
+// token; on a hard failure (invalid refresh) the session is cleared.
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const rt = useAuthStore.getState().refreshToken;
+    if (!rt) return false;
+    try {
+      const res = await fetch(buildUrl('/api/v1/auth/refresh'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!res.ok) {
+        useAuthStore.getState().logout(); // refresh token rejected → real logout
+        return false;
+      }
+      const data = (await res.json()) as { token?: string; refresh_token?: string };
+      if (!data.token) {
+        useAuthStore.getState().logout();
+        return false;
+      }
+      useAuthStore.getState().updateTokens(data.token, data.refresh_token);
+      return true;
+    } catch {
+      return false; // network error — leave the session intact, let the caller surface it
+    }
+  })();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+async function request<T>(path: string, options: RequestOptions, _retried = false): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Region-Prefix': REGION_PREFIX,
@@ -201,6 +240,14 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
 
   const bodyText = await response.text();
   if (!response.ok) {
+    // Refresh-on-401: an authenticated request whose access token expired — silently refresh once,
+    // then retry with the fresh token. Single-flight prevents a refresh stampede.
+    if (response.status === 401 && !_retried && options.token && useAuthStore.getState().refreshToken) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return request<T>(path, { ...options, token: useAuthStore.getState().token ?? undefined }, true);
+      }
+    }
     // Backend phone-OTP gate: a driver token without a verified number is rejected on
     // protected routes. Clear the session and bounce to /login so the OTP gate runs.
     if (response.status === 403 && bodyText.includes('phone_verification_required')) {
@@ -235,6 +282,7 @@ function encodeQuery(params: Record<string, string | number>): string {
 // not a nested { token, user }. Map it here so callers get DriverLoginResponse.
 interface DriverLoginRaw {
   token: string;
+  refresh_token?: string;
   role: 'DRIVER';
   driver_id: string;
   name: string;
@@ -252,6 +300,7 @@ export async function driverLogin(phone: string, password: string): Promise<Driv
   });
   return {
     token: raw.token,
+    refresh_token: raw.refresh_token,
     user: {
       id: raw.driver_id,
       role: raw.role ?? 'DRIVER',
@@ -286,6 +335,7 @@ export async function driverResetPassword(
   });
   return {
     token: raw.token,
+    refresh_token: raw.refresh_token,
     user: {
       id: raw.driver_id,
       role: raw.role ?? 'DRIVER',
@@ -300,6 +350,7 @@ export async function driverResetPassword(
 
 export interface DriverGoogleLoginResponse {
   token?: string;
+  refresh_token?: string;
   user?: DriverAuthUser;
   registered?: boolean;
   email?: string;
@@ -309,6 +360,7 @@ export interface DriverGoogleLoginResponse {
 
 interface DriverGoogleLoginRaw {
   token?: string;
+  refresh_token?: string;
   role?: 'DRIVER';
   driver_id?: string;
   name?: string;
@@ -352,6 +404,7 @@ export async function driverGoogleLogin(
   return {
     registered: true,
     token: raw.token,
+    refresh_token: raw.refresh_token,
     user: {
       id: raw.driver_id || '',
       role: raw.role ?? 'DRIVER',
@@ -717,6 +770,7 @@ export interface DriverVerifyOTPResponse {
   phone_token?: string;
   phone?: string;
   token?: string;
+  refresh_token?: string;
   user?: DriverAuthUser;
   phone_verified?: boolean;
 }
@@ -745,6 +799,7 @@ export async function verifyDriverOTP(phone: string, otp: string): Promise<Drive
   return {
     is_new_driver: false,
     token: res.token,
+    refresh_token: res.refresh_token,
     user: {
       id: res.driver_id,
       role: res.role ?? 'DRIVER',

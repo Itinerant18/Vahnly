@@ -107,10 +107,11 @@ change**). `POST /auth/refresh` (driver) rotates + re-mints. **All 5 driver mint
 token** (password login, OTP-verify, google, reset, firebase-verify) via the shared
 `issueDriverSession` helper. Builds + tests green.
 
-**Remaining (next, careful):** the **client interceptor** (refresh-on-401, single-flight) in client-app
-+ store the refresh token + thread it through the auth flows. Until that lands the refresh is dormant
-(7d access still works). **Then** flip `ACCESS_TOKEN_TTL=30m` (env, reversible) to activate the short
-cap. Rider refresh + logout-all = follow-ups.
+**Client interceptor — SHIPPED (client-app):** `useAuthStore` gains `refreshToken` + `updateTokens`;
+`request()` does single-flight refresh-on-401 → retry-once with the fresh token; all driver login paths
+(password, OTP, google, reset, gate) thread + store the refresh token. End-to-end driver refresh is now
+wired. **Activation:** set `ACCESS_TOKEN_TTL=30m` on the VM (env, reversible) once verified on-device —
+until then 7d access = no behavior change. Rider refresh + logout-all = follow-ups.
 
 Design:
 
