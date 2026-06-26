@@ -11,7 +11,7 @@ actionable is below, followed by what was skipped and why.
 
 ## Changes applied
 
-### Backend — database
+### Backend -- database
 
 - **`000101_add_orders_rider_created_index`** + **`000102_add_orders_status_city_created_index`** (new)
   - `idx_orders_rider_created` on `orders (rider_id, created_at DESC)` — rider trip
