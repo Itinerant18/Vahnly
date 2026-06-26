@@ -10,6 +10,7 @@ import { cityConfigApi } from "@/lib/api/cityConfig";
 import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
+import { CrossIcon, PinIcon, CarIcon, FlameIcon, CheckIcon } from "@/components/ds/Icon";
 import type { GarageCar, LocationPoint, PaymentMethod, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
@@ -207,9 +208,7 @@ function PlaceInput({
             className="flex min-w-[24px] items-center justify-center text-content-tertiary hover:text-content-primary"
             aria-label="Clear location"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <CrossIcon size={14} />
           </button>
         )}
       </div>
@@ -225,9 +224,7 @@ function PlaceInput({
                 hover:bg-background-secondary transition-base
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mt-0.5 flex-shrink-0">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" fill="currentColor" className="text-content-tertiary" />
-              </svg>
+              <PinIcon size={14} className="mt-0.5 flex-shrink-0 text-content-tertiary" />
               <span className="text-paragraph-small text-content-primary line-clamp-2">{r.display_name}</span>
             </button>
           ))}
@@ -445,11 +442,7 @@ export function BookingSheet() {
               <PlaceInput
                 value={dropoff?.address ?? ""}
                 placeholder="Where to?"
-                icon={
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" fill="currentColor" className="text-content-tertiary" />
-                  </svg>
-                }
+                icon={<PinIcon size={14} className="text-content-tertiary" />}
                 onSelect={setDropoff}
                 onClear={() => setDropoff(null)}
               />
@@ -556,11 +549,7 @@ export function BookingSheet() {
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               <div className="flex items-center gap-3">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 17l1.5-4.5L7 8h10l2.5 4.5L21 17H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-content-tertiary" />
-                  <circle cx="7.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" className="text-content-tertiary" />
-                  <circle cx="16.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" className="text-content-tertiary" />
-                </svg>
+                <CarIcon size={18} className="text-content-tertiary" />
                 <div className="text-left">
                   {selectedCar ? (
                     <>
@@ -632,9 +621,7 @@ export function BookingSheet() {
                       <FareDisplay amount={fareBreakdown?.estimated_total_paise ?? 0} size="lg" />
                       {fareEstimate.surge_active && (
                         <span className="inline-flex items-center gap-1 rounded-sm bg-surface-negative px-2 py-0.5 text-label-small text-content-negative">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M12 3c2 3 5 5 5 9a5 5 0 11-10 0c0-2 1-3 2-4 .5 1 1.5 1.5 2 1 .5-1.5-1-3.5 1-6z" />
-                          </svg>
+                          <FlameIcon size={11} className="text-content-negative" />
                           {fareBreakdown?.surge_multiplier?.toFixed(1)}× surge
                         </span>
                       )}
@@ -710,11 +697,7 @@ export function BookingSheet() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M3 17l1.5-4.5L7 8h10l2.5 4.5L21 17H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                    <circle cx="7.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
-                    <circle cx="16.5" cy="17.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
-                  </svg>
+                  <CarIcon size={20} />
                 </span>
                 <div>
                   <span className="text-label-medium text-content-primary">I won&apos;t be in the car</span>
@@ -742,9 +725,7 @@ export function BookingSheet() {
               />
               {promoStatus === "ok" && (
                 <span className="flex items-center text-content-positive" aria-label="Promo applied">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <CheckIcon size={16} />
                 </span>
               )}
               {promoStatus === "err" && (

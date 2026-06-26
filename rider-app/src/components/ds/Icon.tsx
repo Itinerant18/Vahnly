@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-// Shared inline-SVG icon set for the driver app.
+// Shared inline-SVG icon set for the rider app.
 // Replaces emoji glyphs with token-colored vectors (currentColor, strokeWidth 1.5).
 // Decorative by default (aria-hidden); pass a label via the surrounding element.
 

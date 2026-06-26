@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { useTripStore } from "@/lib/store/tripStore";
+import { BellIcon } from "@/components/ds/Icon";
 
 const CITIES = ["KOL", "BLR"];
 
@@ -48,10 +49,7 @@ export function TopBar() {
         {/* Notification bell */}
         <div className="relative">
           <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="flex h-10 w-10 items-center justify-center rounded-full bg-background-tertiary">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="var(--content-primary)" strokeWidth="1.5" />
-              <path d="M13.73 21a2 2 0 01-3.46 0" stroke="var(--content-primary)" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <BellIcon size={20} className="text-content-primary" />
           </button>
           {unreadCount > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-400 text-[9px] font-bold text-content-primary">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ordersApi } from "@/lib/api/orders";
 import { useBookingStore } from "@/lib/store/bookingStore";
+import { HomeIcon } from "@/components/ds/Icon";
 import type { Order } from "@/lib/api/types";
 
 const TILES = [
@@ -11,13 +12,7 @@ const TILES = [
     id: "garage",
     label: "My Garage",
     href: "/account/garage",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"
-          stroke="currentColor" strokeWidth="1.5" />
-        <path d="M9 21v-6h6v6" stroke="currentColor" strokeWidth="1.5" />
-      </svg>
-    ),
+    icon: <HomeIcon size={24} className="text-content-accent" />,
   },
   {
     id: "offers",
