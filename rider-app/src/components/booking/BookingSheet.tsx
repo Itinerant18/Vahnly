@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
+import { useToastStore } from "@/lib/store/useToastStore";
+import { friendlyError } from "@/lib/ui/errorMessage";
 import { garageApi } from "@/lib/api/garage";
 import { cityConfigApi } from "@/lib/api/cityConfig";
 import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
@@ -377,6 +379,7 @@ export function BookingSheet() {
       router.push(`/dispatch?orderId=${order.id}`);
     } catch (e) {
       setBookingError(e instanceof Error ? e.message : "Booking failed. Please try again.");
+      useToastStore.getState().show(friendlyError(e), "error");
       setBookingState("idle");
     }
   };

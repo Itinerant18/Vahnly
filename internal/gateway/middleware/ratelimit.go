@@ -131,7 +131,8 @@ func writeRateLimited(w http.ResponseWriter, retryAfterSec int) {
 	w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfterSec))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)
-	_, _ = w.Write([]byte(`{"success":false,"error":{"code":"rate_limited","message":"Too many attempts. Please wait a bit and try again."}}`))
+	// Envelope shape matches the apps' ApiEnvelope: {success, error:<string>, code:<string>}.
+	_, _ = w.Write([]byte(`{"success":false,"code":"rate_limited","error":"Too many attempts. Please wait a bit and try again."}`))
 }
 
 // ClientIPKey extracts the client IP, preferring the first X-Forwarded-For hop (set by the

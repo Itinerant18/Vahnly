@@ -7,6 +7,8 @@ import { registerDriverPushNotifications } from '@/services/notifications';
 import { useRouter } from 'next/navigation';
 import { Input, Button } from '@/components/ds';
 import { getGoogleIdToken } from '@/lib/googleAuth';
+import { useToastStore } from '@/store/useToastStore';
+import { friendlyError } from '@/lib/ui/errorMessage';
 
 function UnifiedLoginContent() {
   const router = useRouter();
@@ -406,6 +408,7 @@ function UnifiedLoginContent() {
     } catch (err: any) {
       console.error('[Google Sign-in] Failed:', err);
       setAuthError(err.message || 'Google Sign-in failed. Please try again.');
+      useToastStore.getState().show(friendlyError(err), 'error');
       addAuditLog('GOOGLE_SIGN_IN_FAILED', { error: String(err) });
     } finally {
       setLoading(false);

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/providers/ThemeProvider";
+import { Toaster } from "@/components/Toaster";
 
 // ── Inter — display, body, labels ──────────────────────────────────────────
 // RULE: Inter for ALL prose, headings, labels, addresses, phone numbers.
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         suppressHydrationWarning
       >
         <ThemeProvider>{children}</ThemeProvider>
+        <Toaster />
       </body>
     </html>
   );
