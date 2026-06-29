@@ -24,7 +24,8 @@ import {
   ChatIcon,
   DocumentIcon,
   LogoutDoorIcon,
-  MenuIcon
+  MenuIcon,
+  SuccessIcon
 } from '@/components/ds/Icon';
 
 export default function RiderAccountLayout({ children }: { children: React.ReactNode }) {
@@ -98,7 +99,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
               <div className="truncate">
                 <div className="flex items-center gap-1.5">
                   <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
-                  <span className="text-[10px] text-content-positive" title="Verified Driver Partner / Asset Owner">✓</span>
+                  <span className="text-[10px] text-content-positive" title="Verified Driver Partner / Asset Owner"><SuccessIcon size={12} /></span>
                 </div>
                 <span className="text-[9px] font-mono text-content-tertiary block truncate">{riderID.toUpperCase()}</span>
               </div>
@@ -181,7 +182,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
                   <div className="truncate">
                     <div className="flex items-center gap-1.5">
                       <h4 className="text-xs font-bold text-white truncate">{riderName}</h4>
-                      <span className="text-[10px] text-content-positive">✓</span>
+                      <span className="text-[10px] text-content-positive"><SuccessIcon size={12} /></span>
                     </div>
                     <span className="text-[9px] font-mono text-content-tertiary block truncate">{riderID.toUpperCase()}</span>
                   </div>

@@ -10,6 +10,7 @@ import {
   type SupportTicketListItem, type SupportTicketMessage, type TicketCategory, type DriverTrip,
 } from '@/api/client';
 import { formatCompactDate } from '@/lib/format';
+import { CarIcon, CardIcon, WrenchIcon, UserIcon, ShieldIcon, InfoIcon, PhoneIcon, SuccessIcon, PhotoIcon, BackIcon } from '@/components/ds/Icon';
 
 const HOTLINE = '+911800123456';
 
@@ -20,7 +21,7 @@ const STATUS_STYLE: Record<string, string> = {
   CLOSED: 'text-content-secondary bg-background-tertiary border-border-opaque',
 };
 
-type CatTile = { key: TicketCategory; label: string; icon: string };
+type CatTile = { key: TicketCategory; label: string; icon: React.ReactNode };
 
 export default function DriverSupportPage() {
   const t = useTranslations('support');
@@ -46,12 +47,12 @@ export default function DriverSupportPage() {
   const [replyMsg, setReplyMsg] = useState('');
 
   const cats: CatTile[] = [
-    { key: 'TRIP', label: t('catTrip'), icon: '🚗' },
-    { key: 'PAYMENT', label: t('catPayment'), icon: '💳' },
-    { key: 'VEHICLE', label: t('catVehicle'), icon: '🔧' },
-    { key: 'ACCOUNT', label: t('catAccount'), icon: '👤' },
-    { key: 'SAFETY', label: t('catSafety'), icon: '🛡️' },
-    { key: 'OTHER', label: t('catOther'), icon: '❓' },
+    { key: 'TRIP', label: t('catTrip'), icon: <CarIcon size={20} /> },
+    { key: 'PAYMENT', label: t('catPayment'), icon: <CardIcon size={20} /> },
+    { key: 'VEHICLE', label: t('catVehicle'), icon: <WrenchIcon size={20} /> },
+    { key: 'ACCOUNT', label: t('catAccount'), icon: <UserIcon size={20} /> },
+    { key: 'SAFETY', label: t('catSafety'), icon: <ShieldIcon size={20} /> },
+    { key: 'OTHER', label: t('catOther'), icon: <InfoIcon size={20} /> },
   ];
 
   const loadTickets = useCallback(async () => {
@@ -103,7 +104,7 @@ export default function DriverSupportPage() {
     <div className="space-y-5 text-left pb-6">
       {/* Hotline always visible */}
       <a href={`tel:${HOTLINE}`} className="flex items-center justify-center gap-2 rounded-xl bg-negative-400/10 border border-negative-400/30 text-content-negative py-3 text-xs font-mono font-bold uppercase tracking-wider">
-        📞 {t('hotline')}
+        <PhoneIcon size={16} /> {t('hotline')}
       </a>
 
       <div className="flex gap-2 font-mono text-[10px]">
@@ -114,7 +115,7 @@ export default function DriverSupportPage() {
       {/* NEW TICKET */}
       {view === 'new' && (createdNumber ? (
         <div className="bg-background-primary border border-positive-400/30 rounded-2xl p-8 text-center space-y-3">
-          <div className="text-4xl">✓</div>
+          <div className="text-4xl"><SuccessIcon size={36} /></div>
           <p className="text-white font-bold">{t('ticketCreated')}</p>
           <p className="text-content-positive font-mono text-lg">{createdNumber}</p>
           <button onClick={() => { setCreatedNumber(null); setView('list'); }} className="text-[10px] font-mono text-content-secondary underline">{t('myTickets')}</button>
@@ -155,7 +156,7 @@ export default function DriverSupportPage() {
 
           <div className="flex items-center gap-2">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleAttach(e.target.files[0])} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="bg-background-secondary text-content-secondary border border-border-opaque rounded-xl px-4 py-2 text-[10px] font-mono uppercase">📎 {t('attachPhoto')}</button>
+            <button type="button" onClick={() => fileRef.current?.click()} className="bg-background-secondary text-content-secondary border border-border-opaque rounded-xl px-4 py-2 text-[10px] font-mono uppercase"><PhotoIcon size={16} /> {t('attachPhoto')}</button>
             {attachments.length > 0 && <span className="text-[10px] font-mono text-content-positive">{attachments.length} attached</span>}
           </div>
 
@@ -186,7 +187,7 @@ export default function DriverSupportPage() {
       {/* THREAD */}
       {view === 'thread' && (
         <div className="space-y-3">
-          <button onClick={() => setView('list')} className="text-[10px] font-mono text-content-secondary">← {t('myTickets')}</button>
+          <button onClick={() => setView('list')} className="text-[10px] font-mono text-content-secondary"><BackIcon size={14} /> {t('myTickets')}</button>
           {!thread && <p className="text-[10px] font-mono text-content-tertiary">Loading…</p>}
           {thread && (
             <>

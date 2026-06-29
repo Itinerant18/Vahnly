@@ -6,6 +6,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { Shimmer, ErrorState } from "@/components/account/States";
 import { ordersApi } from "@/lib/api/orders";
 import { FareDisplay } from "@/components/ds";
+import { StarIcon } from "@/components/ds/Icon";
 import type { Order } from "@/lib/api/types";
 
 function DetailBody() {

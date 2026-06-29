@@ -10,6 +10,7 @@ import {
   uploadDocument,
 } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
+import { UserIcon, EditIcon, StarIcon, SettingsIcon, VehicleIcon } from '@/components/ds/Icon';
 
 export default function DriverProfilePage() {
   const { user, token } = useAuthStore();
@@ -177,8 +178,8 @@ export default function DriverProfilePage() {
           aria-label="Edit profile photo"
           className="h-20 w-20 bg-background-secondary border border-border-opaque rounded-2xl flex items-center justify-center text-3xl shrink-0 cursor-pointer hover:border-white transition disabled:opacity-50 relative"
         >
-          {photoUploading ? <span className="text-xs font-mono animate-pulse">…</span> : '👤'}
-          <span className="absolute -bottom-1 -right-1 bg-white text-black text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full">✎</span>
+          {photoUploading ? <span className="text-xs font-mono animate-pulse">…</span> : <UserIcon size={32} />}
+          <span className="absolute -bottom-1 -right-1 bg-white text-black text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full"><EditIcon size={12} /></span>
         </button>
 
         <div className="space-y-2 text-center sm:text-left flex-grow">
@@ -193,7 +194,7 @@ export default function DriverProfilePage() {
           <div className="flex justify-center sm:justify-start gap-4 text-xs font-mono pt-1 text-content-secondary">
             <div>
               <span className="text-content-tertiary block text-[9px] uppercase">RATING</span>
-              <span className="font-bold text-content-warning">★ 4.92</span>
+              <span className="font-bold text-content-warning"><StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> 4.92</span>
             </div>
             <div className="border-r border-border-opaque h-6"></div>
             <div>
@@ -249,10 +250,10 @@ export default function DriverProfilePage() {
           </h4>
           <div className="flex gap-2">
             <span className="bg-background-secondary text-white border border-border-opaque px-3 py-1.5 rounded-xl text-[9px] font-mono font-bold uppercase tracking-wider">
-              ⚙️ Stick Shift Manual
+              <SettingsIcon size={14} /> Stick Shift Manual
             </span>
             <span className="bg-background-secondary text-white border border-border-opaque px-3 py-1.5 rounded-xl text-[9px] font-mono font-bold uppercase tracking-wider">
-              🕹️ Automatic / EV
+              <VehicleIcon size={14} /> Automatic / EV
             </span>
           </div>
         </div>

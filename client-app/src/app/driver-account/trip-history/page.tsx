@@ -6,6 +6,7 @@ import { TripItem, TRIP_HISTORY } from './tripData';
 import { DriverTrip, getTripHistory } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { FareDisplay } from '@/components/ds';
+import { LocationIcon, FlagIcon, StarIcon } from '@/components/ds/Icon';
 
 function mapDriverTripToTripItem(trip: DriverTrip): TripItem {
   const baseFare = trip.base_fare_paise / 100;
@@ -266,8 +267,8 @@ export default function DriverTripHistoryPage() {
               </h4>
 
               <div className="space-y-3 text-xs font-mono text-content-secondary">
-                <div>📍 <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">Pickup Hub</span> {selectedTrip.pickup}</div>
-                <div>🏁 <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">Destination</span> {selectedTrip.dropoff}</div>
+                <div><LocationIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">Pickup Hub</span> {selectedTrip.pickup}</div>
+                <div><FlagIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">Destination</span> {selectedTrip.dropoff}</div>
                 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-opaque text-[10px] font-mono">
                   <div>
@@ -349,7 +350,7 @@ export default function DriverTripHistoryPage() {
               <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-1 text-left">
                 <span className="text-content-tertiary text-[8px] uppercase block">Rating You Received</span>
                 <span className="text-content-warning font-bold text-sm block">
-                  {Array.from({ length: selectedTrip.ratingReceived }).map((_, i) => '★').join('')}
+                  {Array.from({ length: selectedTrip.ratingReceived }).map((_, i) => <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />)}
                 </span>
                 <span className="text-content-secondary block text-[9px] mt-0.5">"{selectedTrip.commentReceived}"</span>
               </div>
@@ -357,7 +358,7 @@ export default function DriverTripHistoryPage() {
               <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-1 text-left">
                 <span className="text-content-tertiary text-[8px] uppercase block">Rating You Provided</span>
                 <span className="text-content-warning font-bold text-sm block">
-                  {Array.from({ length: selectedTrip.ratingGiven }).map((_, i) => '★').join('')}
+                  {Array.from({ length: selectedTrip.ratingGiven }).map((_, i) => <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />)}
                 </span>
                 <span className="text-content-secondary block text-[9px] mt-0.5">Tags: Polite, Safety conscious</span>
               </div>

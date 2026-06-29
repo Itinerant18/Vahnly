@@ -11,6 +11,7 @@ import {
   type ConfirmationResult,
   type User,
 } from 'firebase/auth';
+import { BackIcon } from '@/components/ds/Icon';
 
 const API_URL = process.env.NEXT_PUBLIC_API_GATEWAY || process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -229,7 +230,7 @@ export default function PhoneVerifyScreen({
                 onClick={onBack}
                 className="w-full text-center text-label-medium text-content-secondary py-2 hover:text-content-primary transition-base"
               >
-                ← Back
+                <BackIcon size={16} className="inline align-middle" /> Back
               </button>
             )}
           </div>
@@ -272,7 +273,7 @@ export default function PhoneVerifyScreen({
               onClick={() => { setStep('phone'); setOtp(['', '', '', '', '', '']); setError(''); }}
               className="w-full text-center text-label-medium text-content-secondary py-2 hover:text-content-primary transition-base"
             >
-              ← Change number
+              <BackIcon size={16} className="inline align-middle" /> Change number
             </button>
           </div>
         )}

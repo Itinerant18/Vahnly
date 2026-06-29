@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { InfoIcon, DownloadIcon, SearchIcon, ChatIcon } from '@/components/ds/Icon';
 
 type LegalSection = 'terms' | 'cancellation' | 'privacy' | 'insurance';
 
@@ -122,7 +123,7 @@ export default function LegalPoliciesPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-border-opaque pb-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white font-move flex items-center gap-2">
-            <span>⚖️</span> Legal & Policy Documents
+            <span><InfoIcon size={20} /></span> Legal & Policy Documents
           </h2>
           <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">
             Review user terms, cancellations rules, privacy safeguards, and insurance coverage
@@ -132,7 +133,7 @@ export default function LegalPoliciesPage() {
           onClick={handleDownloadPdf}
           className="bg-background-secondary hover:bg-background-tertiary text-white font-mono font-bold text-[9px] uppercase tracking-wider py-2 px-3 border border-border-opaque rounded-lg hover:border-border-opaque transition self-start sm:self-center"
         >
-          📥 Download PDF
+          <DownloadIcon size={14} /> Download PDF
         </button>
       </div>
 
@@ -166,7 +167,7 @@ export default function LegalPoliciesPage() {
           className="w-full bg-background-primary border border-border-opaque rounded-xl py-2.5 pl-9 pr-4 text-xs text-white placeholder-zinc-600 outline-none focus:border-border-opaque transition font-mono"
         />
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-content-tertiary text-xs">
-          🔍
+          <SearchIcon size={16} />
         </div>
         {searchQuery && (
           <button
@@ -223,7 +224,7 @@ export default function LegalPoliciesPage() {
           href="/account/support"
           className="bg-white hover:bg-background-tertiary text-black font-mono font-bold text-[9px] uppercase tracking-wider py-2.5 px-4 rounded-xl transition shrink-0 inline-block text-center cursor-pointer"
         >
-          💬 Contact Legal Desk
+          <ChatIcon size={14} /> Contact Legal Desk
         </a>
       </div>
     </div>

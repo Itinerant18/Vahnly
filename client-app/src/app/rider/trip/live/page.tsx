@@ -6,6 +6,7 @@ import { ResilientStreamManager } from '@/network/ResilientStreamManager';
 import { useAuthStore } from '@/store/useAuthStore';
 import { API_GATEWAY_BASE_URL } from '@/config';
 import { latLngToCell } from 'h3-js';
+import { SirenIcon, LinkIcon, RefreshIcon, UserIcon, CrossIcon, PlusIcon, WarningIcon, ClockIcon, FlagIcon } from '@/components/ds/Icon';
 
 interface DriverDetails {
   name: string;
@@ -690,7 +691,7 @@ function LiveTripContent() {
           aria-label="Emergency SOS"
           className="h-10 w-10 bg-negative-400 hover:bg-negative-400 text-white font-bold rounded-xl flex items-center justify-center shadow-lg border border-negative-400 animate-pulse transition cursor-pointer active:scale-95 text-xs"
         >
-          🚨
+          <SirenIcon size={20} />
         </button>
       </div>
 
@@ -700,7 +701,7 @@ function LiveTripContent() {
           onClick={handleGenerateShareLink}
           className="bg-background-primary/80 border border-border-opaque text-[8px] font-mono font-bold uppercase py-1.5 px-3 rounded-full tracking-wider shadow-md cursor-pointer hover:bg-background-secondary transition flex items-center gap-1 backdrop-blur-sm"
         >
-          🔗 Share Live Status
+          <LinkIcon size={16} className="inline align-middle" /> Share Live Status
         </button>
       </div>
 
@@ -773,7 +774,7 @@ function LiveTripContent() {
                 onClick={handleStartTripSimulated}
                 className="w-full bg-white hover:bg-background-tertiary text-black py-3 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider transition"
               >
-                🔄 Verify Handshake & Start Journey (Simulate)
+                <RefreshIcon size={16} className="inline align-middle" /> Verify Handshake & Start Journey (Simulate)
               </button>
             </div>
           ) : (
@@ -784,7 +785,7 @@ function LiveTripContent() {
               {!isExpanded && (
                 <div className="flex justify-between items-center bg-background-secondary/30 border border-border-opaque p-3.5 rounded-xl text-xs font-mono">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">👨🏽‍✈️</span>
+                    <span className="text-xl"><UserIcon size={20} /></span>
                     <div>
                       <span className="text-white font-sans font-bold block">{driverSpecs.name}</span>
                       <span className="text-[8px] text-content-tertiary block uppercase mt-0.5">{driverSpecs.plate}</span>
@@ -833,7 +834,7 @@ function LiveTripContent() {
                           aria-label="Remove stop"
                           className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                         >
-                          ✕
+                          <CrossIcon size={16} />
                         </button>
                       </div>
                     ))}
@@ -859,7 +860,7 @@ function LiveTripContent() {
                       onClick={handleAddStop}
                       className="text-[8px] font-mono font-bold uppercase text-content-tertiary hover:text-white flex items-center gap-1 cursor-pointer"
                     >
-                      ➕ Add Waypoint Stop (Max 3)
+                      <PlusIcon size={16} className="inline align-middle" /> Add Waypoint Stop (Max 3)
                     </button>
                   </div>
 
@@ -881,7 +882,7 @@ function LiveTripContent() {
                       onClick={() => setShowIssueModal(true)}
                       className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary hover:text-white text-center cursor-pointer"
                     >
-                      ⚠️ Report safety concern
+                      <WarningIcon size={16} className="inline align-middle" /> Report safety concern
                     </button>
                     <button
                       type="button"
@@ -891,7 +892,7 @@ function LiveTripContent() {
                       }}
                       className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl text-content-secondary text-center cursor-pointer"
                     >
-                      📅 Extend Duration (+1h)
+                      <ClockIcon size={16} className="inline align-middle" /> Extend Duration (+1h)
                     </button>
                   </div>
                 </div>
@@ -902,7 +903,7 @@ function LiveTripContent() {
                 onClick={handleEndTripSimulated}
                 className="w-full bg-negative-400 text-white hover:bg-negative-400 py-3.5 rounded-xl font-mono font-bold text-[9px] uppercase tracking-wider border border-negative-400 cursor-pointer text-center"
               >
-                🏁 Arrived at drop: Complete Transit (Simulate)
+                <FlagIcon size={16} className="inline align-middle" /> Arrived at drop: Complete Transit (Simulate)
               </button>
             </div>
           )}

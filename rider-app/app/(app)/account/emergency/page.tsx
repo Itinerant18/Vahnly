@@ -5,6 +5,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
 import { accountApi, type EmergencyContactInput } from "@/lib/api/account";
 import type { EmergencyContact } from "@/lib/api/types";
+import { InfoIcon, SirenIcon } from "@/components/ds/Icon";
 
 const INPUT =
   "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
@@ -45,7 +46,7 @@ export default function EmergencyPage() {
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-content-primary">Auto-share trip</span>
             <button onClick={() => setShowTip((v) => !v)} aria-label="Auto-share info" className="text-xs text-content-secondary">
-              ⓘ
+              <InfoIcon size={16} />
             </button>
           </div>
           <button
@@ -71,7 +72,7 @@ export default function EmergencyPage() {
       ) : (
         <div className="space-y-3">
           {contacts.length === 0 && (
-            <EmptyState icon="🆘" title="No contacts yet" message="Add up to 3 people to alert on SOS." />
+            <EmptyState icon={<SirenIcon size={64} />} title="No contacts yet" message="Add up to 3 people to alert on SOS." />
           )}
           {contacts.map((c) => (
             <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4">

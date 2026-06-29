@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { CameraIcon, CrossIcon, ChevronIcon, SirenIcon } from '@/components/ds/Icon';
 
 export default function RiderSupportPage() {
   const [ticketCategory, setTicketCategory] = useState('Trip dispute issue');
@@ -99,7 +100,7 @@ export default function RiderSupportPage() {
       {/* Safety dial */}
       <div className="bg-surface-negative/20 border border-negative-400 rounded-2xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h4 className="text-xs font-bold text-content-negative font-mono uppercase tracking-wider">🚨 Rider Safety Hotline</h4>
+          <h4 className="text-xs font-bold text-content-negative font-mono uppercase tracking-wider"><SirenIcon size={16} className="inline-block align-middle" /> Rider Safety Hotline</h4>
           <p className="text-[11px] text-content-negative/70 mt-1 font-sans leading-normal">
             For critical on-road accidents, immediate security concerns, or lost items contact, call emergency support.
           </p>
@@ -129,7 +130,7 @@ export default function RiderSupportPage() {
                   className="w-full text-left p-4 text-xs font-bold text-content-secondary hover:text-white transition flex justify-between items-center cursor-pointer"
                 >
                   <span>{faq.q}</span>
-                  <span>{faqOpen === idx ? '▲' : '▼'}</span>
+                  <span>{faqOpen === idx ? <ChevronIcon size={16} className="-rotate-90" /> : <ChevronIcon size={16} className="rotate-90" />}</span>
                 </button>
                 {faqOpen === idx && (
                   <div className="px-4 pb-4 text-[11px] text-content-secondary leading-relaxed font-sans border-t border-border-opaque/40 pt-2 bg-background-secondary/10">
@@ -240,7 +241,7 @@ export default function RiderSupportPage() {
                   onClick={() => imageInputRef.current?.click()}
                   className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque hover:border-border-opaque text-white font-mono text-[9px] uppercase px-4 py-2.5 rounded-xl cursor-pointer"
                 >
-                  📸 Attach Photo
+                  <CameraIcon size={14} className="inline-block align-middle" /> Attach Photo
                 </button>
                 <input
                   type="file"
@@ -262,7 +263,7 @@ export default function RiderSupportPage() {
                       aria-label="Remove photo"
                       className="absolute -top-1.5 -right-1.5 bg-negative-400 rounded-full h-4 w-4 text-[8px] font-bold flex items-center justify-center text-white"
                     >
-                      ×
+                      <CrossIcon size={10} />
                     </button>
                   </div>
                 )}

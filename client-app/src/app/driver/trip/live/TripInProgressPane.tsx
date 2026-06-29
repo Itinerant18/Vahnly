@@ -6,6 +6,7 @@ import { SlideToConfirm } from '../../../../components/SlideToConfirm';
 import { addOrderEvent } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { FareDisplay, StatusBadge, PhoneIcon, ChatIcon, PlusIcon, ParkingIcon, SirenIcon, RouteIcon } from '../../../../components/ds';
+import { StarIcon } from '@/components/ds/Icon';
 
 interface TripInProgressPaneProps {
   activeTrip: any;
@@ -215,7 +216,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                 <div>
                   <p className="text-heading-small text-content-primary">{activeTrip.customer_name}</p>
                   <p className="font-mono text-mono-small text-content-warning tabular-nums">
-                    ★ {activeTrip.customer_rating || '4.9'}
+                    <StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> {activeTrip.customer_rating || '4.9'}
                   </p>
                 </div>
               </div>

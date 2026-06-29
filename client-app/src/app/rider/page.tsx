@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { API_GATEWAY_BASE_URL } from '@/config';
 import { latLngToCell } from 'h3-js';
+import { MenuIcon, NotificationIcon, SearchIcon, CarIcon, RefreshIcon, GiftIcon, TrophyIcon, CrossIcon, ChevronIcon, SirenIcon, UserIcon, LockIcon, DocumentIcon, CardIcon, WorkBriefcaseIcon, LocationIcon, ShieldIcon, ChatIcon } from '@/components/ds/Icon';
 
 // Types
 interface CarItem {
@@ -888,7 +889,7 @@ export default function RiderDashboardPage() {
             className="h-9 w-9 bg-background-secondary hover:bg-background-tertiary rounded-xl border border-border-opaque flex items-center justify-center text-sm cursor-pointer transition active:scale-95"
             aria-label={t('openNavigationDrawer')}
           >
-            ☰
+            <MenuIcon size={20} />
           </button>
 
           <div>
@@ -912,7 +913,7 @@ export default function RiderDashboardPage() {
             href="/account/notifications"
             className="h-9 w-9 bg-background-secondary hover:bg-background-tertiary rounded-xl border border-border-opaque flex items-center justify-center relative transition hover:text-white"
           >
-            🔔
+            <NotificationIcon size={20} />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-negative-400 text-white font-mono font-bold text-[8px] h-4 w-4 rounded-full flex items-center justify-center">
                 {unreadCount}
@@ -995,7 +996,7 @@ export default function RiderDashboardPage() {
                 onClick={() => setSheetHeight(45)}
                 className="w-full bg-background-secondary/80 border border-border-opaque rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:border-border-opaque transition"
               >
-                <span className="text-content-tertiary">🔍</span>
+                <span className="text-content-tertiary"><SearchIcon size={18} /></span>
                 <span className="text-xs text-content-secondary font-mono">{t('searchPrompt')}</span>
               </div>
 
@@ -1005,7 +1006,7 @@ export default function RiderDashboardPage() {
                   href="/account/garage"
                   className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
-                  <span>🚗</span>
+                  <span><CarIcon size={20} /></span>
                   <span className="truncate">{t('tileMyGarage')}</span>
                 </Link>
                 <button
@@ -1020,21 +1021,21 @@ export default function RiderDashboardPage() {
                   }}
                   className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition cursor-pointer text-content-secondary hover:text-white"
                 >
-                  <span>🔄</span>
+                  <span><RefreshIcon size={20} /></span>
                   <span className="truncate">{t('tileRebookLast')}</span>
                 </button>
                 <Link
                   href="/account/rewards"
                   className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
-                  <span>🎁</span>
+                  <span><GiftIcon size={20} /></span>
                   <span className="truncate">{t('tileOffers')}</span>
                 </Link>
                 <Link
                   href="/account/refer"
                   className="bg-background-secondary hover:bg-background-tertiary p-2.5 rounded-xl border border-border-opaque text-center flex flex-col items-center gap-1 transition no-underline text-content-secondary hover:text-white"
                 >
-                  <span>🏆</span>
+                  <span><TrophyIcon size={20} /></span>
                   <span className="truncate">{t('tileReferEarn')}</span>
                 </Link>
               </div>
@@ -1108,7 +1109,7 @@ export default function RiderDashboardPage() {
                       aria-label="Remove stop"
                       className="bg-background-primary hover:bg-background-secondary text-content-negative border border-border-opaque h-8 w-8 rounded-lg mt-4 flex items-center justify-center cursor-pointer text-xs"
                     >
-                      ✕
+                      <CrossIcon size={16} />
                     </button>
                   </div>
                 ))}
@@ -1450,7 +1451,7 @@ export default function RiderDashboardPage() {
                   style={{ transform: `translateX(${slideX}px)` }}
                   className="absolute left-2 w-12 h-12 bg-white hover:bg-background-tertiary text-black rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-20 transition-colors"
                 >
-                  <span className="text-lg font-bold">➔</span>
+                  <span className="text-lg font-bold"><ChevronIcon size={20} /></span>
                 </div>
               </div>
             </div>
@@ -1546,7 +1547,7 @@ export default function RiderDashboardPage() {
       {showSosModal && (
         <div className="fixed inset-0 z-[999999] bg-surface-negative/95 backdrop-blur-md flex flex-col justify-center items-center p-6 text-center animate-fadeIn">
           <div className="max-w-md space-y-6">
-            <span className="text-5xl block animate-bounce">🚨</span>
+            <span className="text-5xl block animate-bounce"><SirenIcon size={48} /></span>
             <h2 className="text-3xl font-extrabold tracking-tight text-white font-mono uppercase">{t('emergencySosLockout')}</h2>
             <p className="text-content-negative text-xs leading-relaxed font-mono">
               {t('sosModalDescription', { name: riderName })}
@@ -1578,7 +1579,7 @@ export default function RiderDashboardPage() {
             <div>
               <div className="flex items-center gap-3 border-b border-border-opaque pb-6 mb-6">
                 <div className="h-12 w-12 rounded-xl bg-background-secondary border border-border-opaque flex items-center justify-center text-lg">
-                  👤
+                  <UserIcon size={32} />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold tracking-tight text-white">{riderName}</h4>
@@ -1593,17 +1594,17 @@ export default function RiderDashboardPage() {
 
               <nav className="space-y-1">
                 {[
-                  { label: t('navBookingHome'), href: '/rider', icon: '🔑' },
-                  { label: t('navMyGarage'), href: '/account/garage', icon: '🚗' },
-                  { label: t('navTripHistory'), href: '/account/bookings', icon: '📁' },
-                  { label: t('navMyProfile'), href: '/account/profile', icon: '👤' },
-                  { label: t('navPaymentsMethods'), href: '/account/payments', icon: '💳' },
-                  { label: t('navWalletBalance'), href: '/account/wallet', icon: '💼' },
-                  { label: t('navPromosRewards'), href: '/account/rewards', icon: '🎁' },
-                  { label: t('navReferEarn'), href: '/account/refer', icon: '🏆' },
-                  { label: t('navSavedPlaces'), href: '/account/places', icon: '📍' },
-                  { label: t('navEmergencyContacts'), href: '/account/emergency', icon: '🛡️' },
-                  { label: t('navSupportHelp'), href: '/account/support', icon: '💬' }
+                  { label: t('navBookingHome'), href: '/rider', icon: <LockIcon size={18} /> },
+                  { label: t('navMyGarage'), href: '/account/garage', icon: <CarIcon size={18} /> },
+                  { label: t('navTripHistory'), href: '/account/bookings', icon: <DocumentIcon size={18} /> },
+                  { label: t('navMyProfile'), href: '/account/profile', icon: <UserIcon size={18} /> },
+                  { label: t('navPaymentsMethods'), href: '/account/payments', icon: <CardIcon size={18} /> },
+                  { label: t('navWalletBalance'), href: '/account/wallet', icon: <WorkBriefcaseIcon size={18} /> },
+                  { label: t('navPromosRewards'), href: '/account/rewards', icon: <GiftIcon size={18} /> },
+                  { label: t('navReferEarn'), href: '/account/refer', icon: <TrophyIcon size={18} /> },
+                  { label: t('navSavedPlaces'), href: '/account/places', icon: <LocationIcon size={18} /> },
+                  { label: t('navEmergencyContacts'), href: '/account/emergency', icon: <ShieldIcon size={18} /> },
+                  { label: t('navSupportHelp'), href: '/account/support', icon: <ChatIcon size={18} /> }
                 ].map((item) => (
                   <Link
                     key={item.label}

@@ -5,16 +5,17 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { getDriverWallet, type DriverWalletTxn } from '@/api/client';
 import { formatCompactDate } from '@/lib/format';
 import { FareDisplay } from '@/components/ds';
+import { RouteIcon, ParkingIcon, FlameIcon, GiftIcon, PlusIcon, CashIcon } from '@/components/ds/Icon';
 
 // Maps a transaction description to a type icon. The driver wallet is system-managed
 // (toll/parking reimbursements, fuel card, referral bonuses) — no self top-up.
-function txnIcon(description: string, entry: 'CREDIT' | 'DEBIT'): string {
+function txnIcon(description: string, entry: 'CREDIT' | 'DEBIT'): React.ReactNode {
   const d = description.toLowerCase();
-  if (d.includes('toll') || d.includes('fastag')) return '🛣️';
-  if (d.includes('park')) return '🅿️';
-  if (d.includes('fuel')) return '⛽';
-  if (d.includes('referral') || d.includes('bonus')) return '🎁';
-  return entry === 'CREDIT' ? '➕' : '➖';
+  if (d.includes('toll') || d.includes('fastag')) return <RouteIcon size={20} />;
+  if (d.includes('park')) return <ParkingIcon size={20} />;
+  if (d.includes('fuel')) return <FlameIcon size={20} />;
+  if (d.includes('referral') || d.includes('bonus')) return <GiftIcon size={20} />;
+  return entry === 'CREDIT' ? <PlusIcon size={20} /> : <CashIcon size={20} />;
 }
 
 export default function DriverWalletPage() {

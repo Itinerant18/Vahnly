@@ -1,20 +1,21 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { ordersApi } from "@/lib/api/orders";
 import { supportApi } from "@/lib/api/support";
+import { CarIcon, CardIcon, UserIcon, DocumentIcon, ShieldIcon, SuccessIcon, ChatIcon, PhoneIcon } from "@/components/ds/Icon";
 import type { Order, SupportTicket, SupportTicketMessage } from "@/lib/api/types";
 
-const CATEGORIES = [
-  { key: "trip", label: "Trip", icon: "🚗", needsTrip: true },
-  { key: "payment", label: "Payment", icon: "💳", needsTrip: true },
-  { key: "driver", label: "Driver Behavior", icon: "🧑‍✈️", needsTrip: true },
-  { key: "lost", label: "Lost Item", icon: "🎒", needsTrip: true },
-  { key: "account", label: "Account", icon: "👤", needsTrip: false },
-  { key: "safety", label: "Safety", icon: "🛡️", needsTrip: false },
-  { key: "other", label: "Other", icon: "❓", needsTrip: false },
+const CATEGORIES: { key: string; label: string; icon: React.ReactNode; needsTrip: boolean }[] = [
+  { key: "trip", label: "Trip", icon: <CarIcon size={20} />, needsTrip: true },
+  { key: "payment", label: "Payment", icon: <CardIcon size={20} />, needsTrip: true },
+  { key: "driver", label: "Driver Behavior", icon: <UserIcon size={20} />, needsTrip: true },
+  { key: "lost", label: "Lost Item", icon: <DocumentIcon size={20} />, needsTrip: true },
+  { key: "account", label: "Account", icon: <UserIcon size={20} />, needsTrip: false },
+  { key: "safety", label: "Safety", icon: <ShieldIcon size={20} />, needsTrip: false },
+  { key: "other", label: "Other", icon: <DocumentIcon size={20} />, needsTrip: false },
 ];
 
 const FAQS = [
@@ -281,8 +282,8 @@ function SupportBody() {
   if (createdTicket) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-positive text-3xl">
-          ✅
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-positive">
+          <SuccessIcon size={32} className="text-content-positive" />
         </div>
         <p className="text-base font-bold text-content-primary">Ticket #{createdTicket.id.slice(0, 8)} created</p>
         <p className="max-w-xs text-sm text-content-secondary">
@@ -393,13 +394,13 @@ function SupportBody() {
           disabled={!chatAvailable}
           className="rounded-2xl bg-background-secondary py-4 text-sm font-semibold text-content-primary disabled:opacity-40"
         >
-          💬 {chatAvailable ? "Start Live Chat" : "Live Chat"}
+          <ChatIcon size={16} className="mr-1.5 inline-block" /> {chatAvailable ? "Start Live Chat" : "Live Chat"}
         </button>
         <a
           href="tel:+918000000000"
           className="rounded-2xl bg-background-secondary py-4 text-center text-sm font-semibold text-content-primary"
         >
-          📞 Call Support
+          <PhoneIcon size={16} className="mr-1.5 inline-block" /> Call Support
         </a>
       </div>
       <p className="mt-2 text-center text-xs text-content-tertiary">Chat available 9AM–9PM IST</p>

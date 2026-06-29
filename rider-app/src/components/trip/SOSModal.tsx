@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTripStore } from "@/lib/store/tripStore";
+import { SirenIcon } from "@/components/ds/Icon";
 
 interface SOSModalProps {
   onClose: () => void;
@@ -28,7 +29,7 @@ export function SOSModal({ onClose }: SOSModalProps) {
         <div className="mx-6 w-full max-w-sm rounded-2xl bg-background-secondary p-6 ring-2 ring-negative-400">
           <div className="mb-4 flex items-center justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-negative ring-2 ring-negative-400 animate-pulse">
-              <span className="text-3xl">🆘</span>
+              <SirenIcon size={32} className="text-content-negative" />
             </div>
           </div>
           <h2 className="text-center text-lg font-bold text-content-negative">SOS Activated</h2>
@@ -52,7 +53,7 @@ export function SOSModal({ onClose }: SOSModalProps) {
         <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-white/20" />
         <div className="mb-5 mt-3 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-negative">
-            <span className="text-2xl">🆘</span>
+            <SirenIcon size={24} className="text-content-negative" />
           </div>
           <div>
             <h2 className="text-base font-bold text-content-primary">Activate SOS?</h2>

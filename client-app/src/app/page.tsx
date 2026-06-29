@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import Link from 'next/link';
+import { CarIcon, ShieldIcon, LocationIcon } from '@/components/ds/Icon';
 
 export default function Home() {
   const router = useRouter();
@@ -116,7 +117,7 @@ export default function Home() {
         <section id="features" className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 border-t border-border-opaque">
           <div className="bg-background-secondary/30 backdrop-blur-sm border border-border-opaque p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-white/5 text-white flex items-center justify-center font-bold text-lg mb-2">
-              🚗
+              <CarIcon size={24} />
             </div>
             <h3 className="font-bold text-white text-base">Match Optimizer</h3>
             <p className="text-content-secondary text-xs leading-relaxed">
@@ -126,7 +127,7 @@ export default function Home() {
 
           <div className="bg-background-secondary/30 backdrop-blur-sm border border-border-opaque p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-white/5 text-white flex items-center justify-center font-bold text-lg mb-2">
-              🛡️
+              <ShieldIcon size={24} />
             </div>
             <h3 className="font-bold text-white text-base">MFA Gateways</h3>
             <p className="text-content-secondary text-xs leading-relaxed">
@@ -136,7 +137,7 @@ export default function Home() {
 
           <div className="bg-background-secondary/30 backdrop-blur-sm border border-border-opaque p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-white/5 text-white flex items-center justify-center font-bold text-lg mb-2">
-              📍
+              <LocationIcon size={24} />
             </div>
             <h3 className="font-bold text-white text-base">Telemetry Hubs</h3>
             <p className="text-content-secondary text-xs leading-relaxed">

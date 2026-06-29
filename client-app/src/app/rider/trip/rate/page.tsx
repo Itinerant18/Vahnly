@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { API_GATEWAY_BASE_URL } from '@/config';
+import { StarIcon, CheckIcon, WarningIcon } from '@/components/ds/Icon';
 
 function TripRateContent() {
   const t = useTranslations('riderTripRate');
@@ -117,7 +118,7 @@ function TripRateContent() {
                     isActive ? 'text-content-warning scale-110' : 'text-content-tertiary'
                   }`}
                 >
-                  ★
+                  <StarIcon size={30} className="fill-current" />
                 </button>
               );
             })}
@@ -150,7 +151,7 @@ function TripRateContent() {
                       : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                   }`}
                 >
-                  👍 {tagLabels[tag]}
+                  <CheckIcon size={14} className="align-middle" /> {tagLabels[tag]}
                 </button>
               ))}
             </div>
@@ -171,7 +172,7 @@ function TripRateContent() {
                         : 'bg-background-secondary border-border-opaque text-content-secondary hover:text-white'
                     }`}
                   >
-                    ⚠️ {tagLabels[tag]}
+                    <WarningIcon size={14} className="align-middle" /> {tagLabels[tag]}
                   </button>
                 ))}
               </div>

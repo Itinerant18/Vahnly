@@ -1,6 +1,7 @@
 "use client";
 
 import { useTripStore } from "@/lib/store/tripStore";
+import { ChatIcon, PhoneIcon, LinkIcon } from "@/components/ds/Icon";
 
 interface ShareTripSheetProps {
   onClose: () => void;
@@ -51,21 +52,21 @@ export function ShareTripSheet({ onClose }: ShareTripSheetProps) {
             onClick={() => shareNative("whatsapp")}
             className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
-            <span className="text-2xl">💬</span>
+            <ChatIcon size={24} className="text-content-primary" />
             <span className="text-[11px] text-content-secondary">WhatsApp</span>
           </button>
           <button
             onClick={() => shareNative("sms")}
             className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
-            <span className="text-2xl">📱</span>
+            <PhoneIcon size={24} className="text-content-primary" />
             <span className="text-[11px] text-content-secondary">SMS</span>
           </button>
           <button
             onClick={copyLink}
             className="flex flex-col items-center gap-2 rounded-xl bg-background-tertiary py-4"
           >
-            <span className="text-2xl">🔗</span>
+            <LinkIcon size={24} className="text-content-primary" />
             <span className="text-[11px] text-content-secondary">Copy Link</span>
           </button>
         </div>

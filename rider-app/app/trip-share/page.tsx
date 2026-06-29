@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ordersApi } from "@/lib/api/orders";
+import { LinkIcon } from "@/components/ds/Icon";
 
 // Public (no-auth) live trip tracking page. Lives outside the (app) route group
 // so it has no auth guard — anyone with the share link can view it. The token is
@@ -94,8 +95,8 @@ function TripShareView() {
           </div>
         ) : expired || !data ? (
           <div className="rounded-2xl bg-background-secondary p-6 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary text-2xl">
-              🔗
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary">
+              <LinkIcon size={24} className="text-content-secondary" />
             </div>
             <h2 className="text-base font-bold text-content-primary">This trip link is no longer active</h2>
             <p className="mt-1.5 text-sm text-content-secondary">

@@ -8,6 +8,7 @@ import {
 } from '@/api/client';
 import { formatCompactDate } from '@/lib/format';
 import { FareDisplay } from '@/components/ds';
+import { CheckIcon, WarningIcon } from '@/components/ds/Icon';
 
 const MIN_PAYOUT_PAISE = 10000; // ₹100
 
@@ -123,7 +124,7 @@ export default function DriverPayoutsPage() {
 
             {feedback && (
               <div className={`rounded-xl px-3 py-2 text-[10px] font-mono ${feedback.kind === 'ok' ? 'bg-positive-400/10 text-content-positive border border-positive-400/30' : 'bg-negative-400/10 text-content-negative border border-negative-400/30'}`}>
-                {feedback.kind === 'ok' ? '✓ ' : '⚠ '}{feedback.msg}
+                {feedback.kind === 'ok' ? <CheckIcon size={12} /> : <WarningIcon size={12} />} {feedback.msg}
               </div>
             )}
 

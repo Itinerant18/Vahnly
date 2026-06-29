@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ChatIcon, PhoneIcon, LinkIcon } from "@/components/ds/Icon";
 import { Share } from "@capacitor/share";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, ErrorState } from "@/components/account/States";
@@ -84,9 +85,9 @@ export default function ReferPage() {
 
       {/* Share row */}
       <div className="mt-4 grid grid-cols-4 gap-2">
-        <ShareBtn icon="💬" label="WhatsApp" onClick={() => doShare("whatsapp")} />
-        <ShareBtn icon="📱" label="SMS" onClick={() => doShare("sms")} />
-        <ShareBtn icon="🔗" label="Copy" onClick={copy} />
+        <ShareBtn icon={<ChatIcon size={22} />} label="WhatsApp" onClick={() => doShare("whatsapp")} />
+        <ShareBtn icon={<PhoneIcon size={22} />} label="SMS" onClick={() => doShare("sms")} />
+        <ShareBtn icon={<LinkIcon size={22} />} label="Copy" onClick={copy} />
         <ShareBtn icon="•••" label="More" onClick={() => doShare()} />
       </div>
 
@@ -135,7 +136,7 @@ export default function ReferPage() {
   );
 }
 
-function ShareBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+function ShareBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-1.5 rounded-2xl bg-background-secondary py-3">
       <span className="text-xl">{icon}</span>

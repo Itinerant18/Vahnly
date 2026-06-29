@@ -9,6 +9,7 @@ import { rateRider } from '@/api/client';
 import { useToastStore } from '@/store/useToastStore';
 import { friendlyError } from '@/lib/ui/errorMessage';
 import { CheckIcon } from '@/components/ds';
+import { StarIcon } from '@/components/ds/Icon';
 
 export default function RateRiderPage() {
   const t = useTranslations('driverTripRate');
@@ -132,7 +133,7 @@ export default function RateRiderPage() {
                   star <= rating ? 'text-content-warning' : 'text-content-tertiary'
                 }`}
               >
-                ★
+                <StarIcon size={30} className="fill-current" />
               </button>
             ))}
           </div>

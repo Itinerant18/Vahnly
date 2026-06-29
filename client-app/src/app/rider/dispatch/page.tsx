@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { API_GATEWAY_BASE_URL } from '@/config';
 import { latLngToCell } from 'h3-js';
 import { FareDisplay } from '@/components/ds';
+import { CarIcon, PhoneIcon, ChatIcon, ChevronIcon, SearchIcon, RefreshIcon, SignalIcon, ClockIcon, BackIcon, CheckIcon, UserIcon } from '@/components/ds/Icon';
 
 interface DriverDetails {
   id: string;
@@ -546,7 +547,7 @@ export default function RiderDispatchPage() {
 
             {/* Matched Vehicle Context Label */}
             <div className="bg-background-secondary/40 p-3.5 border border-border-opaque rounded-xl text-xs font-mono text-content-secondary leading-normal">
-              🚗 <span className="text-content-tertiary font-bold uppercase text-[9px]">{t('vehicleTarget')}</span> {t('guidingYourVehicle', { car: assignedDriver.car, plate: assignedDriver.plate })}
+              <CarIcon size={16} className="inline align-middle" /> <span className="text-content-tertiary font-bold uppercase text-[9px]">{t('vehicleTarget')}</span> {t('guidingYourVehicle', { car: assignedDriver.car, plate: assignedDriver.plate })}
             </div>
 
             {/* Secure Communication Channels */}
@@ -555,13 +556,13 @@ export default function RiderDispatchPage() {
                 onClick={() => alert('📞 Connection routed: Dialing proxy number +91 99999 88888. Real identity secure.')}
                 className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
-                📞 Secure Call
+                <PhoneIcon size={16} className="inline align-middle" /> Secure Call
               </button>
               <button
                 onClick={() => setShowChatModal(true)}
                 className="bg-background-secondary hover:bg-background-tertiary border border-border-opaque py-3 rounded-xl font-bold uppercase text-content-secondary cursor-pointer text-center"
               >
-                💬 In-App Chat
+                <ChatIcon size={16} className="inline align-middle" /> In-App Chat
               </button>
             </div>
 
@@ -572,7 +573,7 @@ export default function RiderDispatchPage() {
               }}
               className="w-full bg-white hover:bg-background-tertiary text-black py-4 rounded-xl text-xs font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer text-center font-sans mt-2"
             >
-              ➔ Open Active Journey Timelines
+              <ChevronIcon size={16} className="inline align-middle" /> Open Active Journey Timelines
             </button>
           </div>
         )}
@@ -582,7 +583,7 @@ export default function RiderDispatchPage() {
           <div className="w-full max-w-md mx-auto bg-background-primary/95 border border-border-opaque rounded-2xl p-6 space-y-5 shadow-2xl backdrop-blur-md text-left animate-slideUp">
             
             <div className="text-center border-b border-border-opaque pb-3.5">
-              <span className="text-4xl block animate-bounce">🔍</span>
+              <span className="text-4xl block animate-bounce"><SearchIcon size={36} /></span>
               <h3 className="text-base font-bold text-white font-mono uppercase tracking-widest mt-3">No Driver Available Nearby</h3>
               <p className="text-[10px] text-content-secondary font-sans leading-normal mt-1">
                 Regional demand spike in Kolkata Sector V area. Scanning bounds limits reached without pilot allocation handshake.
@@ -596,7 +597,7 @@ export default function RiderDispatchPage() {
                 onClick={handleRequeueSearch}
                 className="w-full bg-white hover:bg-background-tertiary text-black py-4 rounded-xl transition cursor-pointer active:scale-95 text-center font-sans"
               >
-                🔄 Re-verify & Re-queue Match
+                <RefreshIcon size={16} className="inline align-middle" /> Re-verify & Re-queue Match
               </button>
 
               {/* Radius Expansion Multiplier Trigger */}
@@ -608,7 +609,7 @@ export default function RiderDispatchPage() {
                 }}
                 className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque py-3.5 rounded-xl transition cursor-pointer text-center"
               >
-                📡 Expand Scan search Radius
+                <SignalIcon size={16} className="inline align-middle" /> Expand Scan search Radius
               </button>
 
               {/* Future Scheduler Integration Drawer */}
@@ -616,7 +617,7 @@ export default function RiderDispatchPage() {
                 onClick={() => setShowSchedulerModal(true)}
                 className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary border border-border-opaque py-3.5 rounded-xl transition cursor-pointer text-center"
               >
-                📅 Convert to scheduled trip
+                <ClockIcon size={16} className="inline align-middle" /> Convert to scheduled trip
               </button>
             </div>
 
@@ -624,7 +625,7 @@ export default function RiderDispatchPage() {
               onClick={() => router.push('/rider')}
               className="w-full text-center text-content-tertiary hover:text-white font-mono text-[9px] uppercase tracking-widest font-bold block pt-2"
             >
-              ← Back to booking console
+              <BackIcon size={16} className="inline align-middle" /> Back to booking console
             </button>
           </div>
         )}
@@ -663,7 +664,7 @@ export default function RiderDispatchPage() {
                       : 'bg-background-secondary/50 border-border-opaque text-content-secondary hover:text-white'
                   }`}
                 >
-                  {cancelReason === reason ? '✔️ ' : ''}{reason}
+                  {cancelReason === reason ? <CheckIcon size={14} className="inline align-middle mr-1" /> : ''}{reason}
                 </button>
               ))}
             </div>
@@ -699,7 +700,7 @@ export default function RiderDispatchPage() {
             {/* Header info */}
             <div className="bg-background-secondary/50 p-4 border-b border-border-opaque flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">👨🏽‍✈️</span>
+                <span className="text-xl"><UserIcon size={20} /></span>
                 <div>
                   <h4 className="font-bold text-xs text-white leading-none">{assignedDriver.name}</h4>
                   <span className="text-[8px] text-content-tertiary font-mono block mt-1 uppercase">PILOT MASKED CONNECTION PORT</span>

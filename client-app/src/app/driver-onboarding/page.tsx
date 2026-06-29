@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDriverOnboardingStore } from '@/store/useDriverOnboardingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { saveOnboardingStep, uploadDocument, syncOfflineOnboarding, updateDriverProfile } from '@/api/client';
+import { SettingsIcon, CarIcon, CheckIcon } from '@/components/ds/Icon';
 
 export default function DriverOnboardingWizard() {
   const router = useRouter();
@@ -507,7 +508,7 @@ export default function DriverOnboardingWizard() {
                         onboardingData.manualExpertise ? 'bg-interactive-primary text-interactive-primary-text border-border-selected' : 'bg-background-secondary border-border-opaque text-content-secondary'
                       }`}
                     >
-                      <span className="text-xl">⚙️</span>
+                      <span className="text-xl"><SettingsIcon size={20} /></span>
                       <span>Manual Gearbox</span>
                       <span className="text-[8px] font-mono uppercase">{onboardingData.manualExpertise ? 'Certified' : 'Bypassed'}</span>
                     </button>
@@ -518,7 +519,7 @@ export default function DriverOnboardingWizard() {
                         onboardingData.automaticExpertise ? 'bg-interactive-primary text-interactive-primary-text border-border-selected' : 'bg-background-secondary border-border-opaque text-content-secondary'
                       }`}
                     >
-                      <span className="text-xl">🕹️</span>
+                      <span className="text-xl"><CarIcon size={20} /></span>
                       <span>Automatic / EV</span>
                       <span className="text-[8px] font-mono uppercase">{onboardingData.automaticExpertise ? 'Certified' : 'Bypassed'}</span>
                     </button>
@@ -570,7 +571,7 @@ export default function DriverOnboardingWizard() {
                   )}
                   {ifscLookup.status === 'verified' && ifscLookup.label && (
                     <p className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] font-mono text-content-positive">
-                      <span>✓</span>
+                      <span><CheckIcon size={14} /></span>
                       <span>{ifscLookup.label}</span>
                     </p>
                   )}

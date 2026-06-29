@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { LocationIcon, FlagIcon } from '@/components/ds/Icon';
 
 interface BillBreakdown {
   basePaise: number;
@@ -397,8 +398,8 @@ export default function RiderBookingsPage() {
               </h4>
 
               <div className="space-y-3 text-xs font-mono text-content-secondary">
-                <div>📍 <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('pickupLocation')}</span> {selectedBooking.pickup}</div>
-                <div>🏁 <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('destination')}</span> {selectedBooking.dropoff}</div>
+                <div><LocationIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('pickupLocation')}</span> {selectedBooking.pickup}</div>
+                <div><FlagIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[9px] block mb-0.5 font-mono">{t('destination')}</span> {selectedBooking.dropoff}</div>
                 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-opaque text-[10px] font-mono">
                   <div>

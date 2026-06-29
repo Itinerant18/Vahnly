@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { UserIcon, SuccessIcon } from '@/components/ds/Icon';
 
 export default function RiderProfilePage() {
   const { user } = useAuthStore();
@@ -94,7 +95,7 @@ export default function RiderProfilePage() {
             />
           ) : (
             <div className="h-20 w-20 bg-background-secondary border border-border-opaque rounded-2xl flex items-center justify-center text-3xl text-content-tertiary group-hover:opacity-75 transition">
-              👤
+              <UserIcon size={32} />
             </div>
           )}
           <div className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-[10px] font-mono uppercase font-bold text-white">
@@ -113,7 +114,7 @@ export default function RiderProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <h3 className="text-base font-bold text-white flex items-center gap-1.5 justify-center sm:justify-start">
               <span>{riderName}</span>
-              <span className="text-content-positive text-xs" title="Verified Account">✓</span>
+              <span className="text-content-positive text-xs" title="Verified Account"><SuccessIcon size={14} /></span>
             </h3>
             <span className={`px-2.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider w-max mx-auto sm:mx-0 border ${
               kycLevel === 'Fully Authenticated'
@@ -185,7 +186,7 @@ export default function RiderProfilePage() {
               />
               {emailVerified ? (
                 <span className="bg-surface-positive/20 text-content-positive border border-positive-400 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
-                  Verified ✓
+                  Verified <SuccessIcon size={14} />
                 </span>
               ) : (
                 <button
@@ -209,7 +210,7 @@ export default function RiderProfilePage() {
                 className="flex-grow bg-background-secondary border border-positive-400 text-content-secondary rounded-xl p-2.5 focus:outline-none"
               />
               <span className="bg-surface-positive/20 text-content-positive border border-positive-400 text-[8px] px-3 py-2.5 rounded-xl font-bold flex items-center justify-center uppercase shrink-0">
-                Verified ✓
+                Verified <SuccessIcon size={14} />
               </span>
             </div>
           </div>

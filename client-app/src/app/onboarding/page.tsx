@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AnimatedIcon, HomeAddressIcon, WorkIcon } from "@/components/ds/Icon";
+import { AnimatedIcon, HomeAddressIcon, WorkIcon, WarningIcon, ChevronIcon } from "@/components/ds/Icon";
 import { AnimMapPin } from "@/assets/icons/animated";
 
 export default function RiderOnboardingWizard() {
@@ -209,7 +209,7 @@ export default function RiderOnboardingWizard() {
           
           {validationError && (
             <div className="bg-negative-400/30 border border-negative-400 text-content-negative p-3.5 rounded-xl text-xs font-mono animate-fadeIn">
-              ⚠️ {validationError}
+              <WarningIcon size={14} className="inline-block align-text-bottom" /> {validationError}
             </div>
           )}
 
@@ -294,7 +294,7 @@ export default function RiderOnboardingWizard() {
                   onClick={toggleDemoVehicle} 
                   className="text-content-tertiary hover:text-content-primary font-mono text-[9px] uppercase font-bold tracking-wider"
                 >
-                  Skip Step ➔
+                  Skip Step <ChevronIcon size={14} className="inline-block align-text-bottom" />
                 </button>
               </div>
 

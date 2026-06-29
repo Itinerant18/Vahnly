@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { EmptyState, SkeletonList } from "@/components/account/States";
+import { ShieldIcon } from "@/components/ds/Icon";
 import { insuranceApi, type FileClaimInput } from "@/lib/api/insurance";
 import { ordersApi } from "@/lib/api/orders";
 import type { InsuranceClaim, InsuranceCoverage, Order } from "@/lib/api/types";
@@ -375,7 +376,7 @@ export default function InsurancePage() {
             <SkeletonList rows={3} />
           ) : showEmpty ? (
             <EmptyState
-              icon="🛡️"
+              icon={<ShieldIcon size={28} />}
               title="No claims yet"
               message="File a claim for a covered trip and track its status here."
             />

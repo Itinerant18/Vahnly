@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { Shimmer, SkeletonList, ErrorState, EmptyState } from "@/components/account/States";
+import { WalletIcon, BookingIcon } from "@/components/ds/Icon";
 import { walletApi } from "@/lib/api/wallet";
 import { FareDisplay } from "@/components/ds";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
@@ -70,7 +71,7 @@ export default function WalletPage() {
         <div className="rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 p-5">
           <div className="flex items-center justify-between">
             <p className="text-xs text-white/80">Wallet Balance</p>
-            <span className="text-xl">👛</span>
+            <WalletIcon size={22} className="text-white/80" />
           </div>
           <FareDisplay amount={wallet.balance_paise} size="lg" className="mt-2 block font-bold text-content-primary" />
           {wallet.locked_paise > 0 && (
@@ -95,7 +96,7 @@ export default function WalletPage() {
       ) : txns.length === 0 && txError ? (
         <ErrorState onRetry={loadTxns} />
       ) : txns.length === 0 ? (
-        <EmptyState icon="🧾" title="No transactions yet" message="Add money to get started." />
+        <EmptyState icon={<BookingIcon size={28} />} title="No transactions yet" message="Add money to get started." />
       ) : (
         <div className="space-y-2">
           {txns.map((t) => {

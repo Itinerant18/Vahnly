@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useToastStore } from '@/store/useToastStore';
+import { PlusIcon, WarningIcon, OctagonAlertIcon } from '@/components/ds/Icon';
 import {
   getVehicles, createVehicle, uploadVehicleDocument, deleteVehicleNew,
   type DriverVehicleFull, type VehicleDocSlot, type VehicleDocStatus,
@@ -108,8 +109,8 @@ export default function DriverVehiclesPage() {
         <p className="text-content-tertiary text-[10px] font-mono uppercase tracking-wider mt-0.5">RC • Insurance • PUC</p>
       </div>
 
-      {anyExpired && <div className="rounded-xl border border-negative-400/30 bg-negative-400/10 text-content-negative px-4 py-2.5 text-[11px] font-mono">⛔ {t('expiredBanner')}</div>}
-      {!anyExpired && anyExpiring && <div className="rounded-xl border border-warning-400/30 bg-warning-400/10 text-content-warning px-4 py-2.5 text-[11px] font-mono">⚠ {t('expiringBanner')}</div>}
+      {anyExpired && <div className="rounded-xl border border-negative-400/30 bg-negative-400/10 text-content-negative px-4 py-2.5 text-[11px] font-mono"><OctagonAlertIcon size={14} className="inline-block align-text-bottom" /> {t('expiredBanner')}</div>}
+      {!anyExpired && anyExpiring && <div className="rounded-xl border border-warning-400/30 bg-warning-400/10 text-content-warning px-4 py-2.5 text-[11px] font-mono"><WarningIcon size={14} className="inline-block align-text-bottom" /> {t('expiringBanner')}</div>}
 
       {loading && <p className="text-[10px] font-mono text-content-tertiary">Loading…</p>}
       {!loading && vehicles.length === 0 && <p className="text-[10px] font-mono text-content-tertiary">{t('noVehicles')}</p>}
@@ -137,7 +138,7 @@ export default function DriverVehiclesPage() {
 
       {/* Add Vehicle FAB */}
       <button onClick={() => setShowAdd(true)} aria-label="Add vehicle"
-        className="fixed bottom-24 right-6 h-14 w-14 rounded-full bg-white text-black text-2xl font-bold shadow-lg flex items-center justify-center z-20">+</button>
+        className="fixed bottom-24 right-6 h-14 w-14 rounded-full bg-white text-black text-2xl font-bold shadow-lg flex items-center justify-center z-20"><PlusIcon size={28} /></button>
 
       {showAdd && (
         <div className="fixed inset-0 bg-black/70 z-30 flex items-end sm:items-center justify-center p-4" onClick={() => setShowAdd(false)}>

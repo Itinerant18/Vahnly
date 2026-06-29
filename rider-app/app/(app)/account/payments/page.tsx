@@ -5,7 +5,7 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { EmptyState } from "@/components/account/States";
 import { paymentsApi, type AddPaymentMethodInput } from "@/lib/api/payments";
 import type { SavedCard, UpiMethod } from "@/lib/api/types";
-import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimatedIcon, CardIcon, PaymentIcon } from "@/components/ds/Icon";
 import { AnimWallet } from "@/assets/icons/animated";
 
 const INPUT =
@@ -228,7 +228,7 @@ export default function PaymentsPage() {
               <div key={c.id} className="rounded-xl bg-background-secondary px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">💳</span>
+                    <CardIcon size={20} className="text-content-secondary" />
                     <span className="text-sm text-content-primary">
                       {c.brand} •••• {c.last4}
                     </span>
@@ -338,7 +338,7 @@ export default function PaymentsPage() {
                 className="flex items-center justify-between rounded-xl bg-background-secondary px-4 py-3"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🏦</span>
+                  <PaymentIcon size={20} className="text-content-secondary" />
                   <span className="text-sm text-content-primary">{u.vpa}</span>
                   {u.is_default && (
                     <span className="rounded-full bg-surface-accent px-2 py-0.5 text-[10px] font-semibold text-content-accent">

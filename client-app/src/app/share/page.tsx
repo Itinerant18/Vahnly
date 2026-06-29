@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
+import { UserIcon, LocationIcon, FlagIcon } from '@/components/ds/Icon';
 
 function PublicShareContent() {
   const t = useTranslations('share');
@@ -93,7 +94,7 @@ function PublicShareContent() {
         <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
           <div className="flex items-center gap-3 border-b border-border-opaque pb-3">
             <div className="h-10 w-10 bg-background-secondary rounded-xl flex items-center justify-center text-lg">
-              👤
+              <UserIcon size={20} />
             </div>
             <div>
               <h4 className="text-xs font-bold text-white">{tripData.driverName} ({tripData.driverRating})</h4>
@@ -104,8 +105,8 @@ function PublicShareContent() {
           </div>
 
           <div className="space-y-2.5 text-xs font-mono text-content-secondary">
-            <div>📍 <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-0.5">{t('pickupNode')}</span> {tripData.pickup}</div>
-            <div>🏁 <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-0.5 font-mono">{t('destination')}</span> {tripData.dropoff}</div>
+            <div><LocationIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-0.5">{t('pickupNode')}</span> {tripData.pickup}</div>
+            <div><FlagIcon size={20} /> <span className="text-content-tertiary font-bold uppercase text-[8px] block mb-0.5 font-mono">{t('destination')}</span> {tripData.dropoff}</div>
             <div className="border-t border-border-opaque pt-2.5 text-[9px]">
               <span className="text-content-tertiary block text-[8px] uppercase font-bold">{t('assignedVehicle')}</span>
               <span className="text-white block mt-0.5">{tripData.car}</span>

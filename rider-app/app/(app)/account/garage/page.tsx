@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
+import { SuccessIcon, CameraIcon } from "@/components/ds/Icon";
 import { garageApi, type GarageCarInput } from "@/lib/api/garage";
 import type { CarType, GarageCar, Transmission } from "@/lib/api/types";
 import { compressImage } from "@/lib/utils/imageCompress";
@@ -350,7 +351,7 @@ function CarFormSheet({
                   key={slot}
                   className="flex cursor-pointer flex-col items-center gap-1 rounded-xl bg-background-tertiary py-4 text-center"
                 >
-                  <span className="text-xl">{docs[slot] ? "✅" : "📷"}</span>
+                  {docs[slot] ? <SuccessIcon size={22} className="text-content-positive" /> : <CameraIcon size={22} className="text-content-secondary" />}
                   <span className="text-[10px] text-content-secondary">{docs[slot] ?? slot}</span>
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleDoc(slot)} />
                 </label>

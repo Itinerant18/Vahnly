@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { CardIcon } from '@/components/ds/Icon';
 
 export default function RiderPaymentsPage() {
   const { user } = useAuthStore();
@@ -265,7 +266,7 @@ export default function RiderPaymentsPage() {
             <div className="bg-gradient-to-tr from-background-secondary to-background-tertiary rounded-2xl p-5 border border-border-opaque/40 relative overflow-hidden flex flex-col justify-between min-h-[140px] text-white">
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold tracking-widest">{cardBrand.toUpperCase()} PLATINUM</span>
-                <span className="text-[14px]">💳</span>
+                <span className="text-[14px]"><CardIcon size={16} /></span>
               </div>
 
               <div className="space-y-3">
