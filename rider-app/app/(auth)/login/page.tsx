@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { getGoogleIdToken } from "@/lib/googleAuth";
 import PhoneVerifyScreen from "@/components/auth/PhoneVerifyScreen";
+import { authApi } from "@/lib/api/auth";
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner({ size = 20 }: { size?: number }) {
@@ -74,7 +75,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { googleLogin, fetchMe, setToken, passwordLogin, forgotPassword, resetPassword, isLoading } = useAuthStore();
 
-  type AuthStep = "choose" | "phone_verify" | "google-register" | "reset";
+  type AuthStep = "choose" | "phone_verify" | "google-register" | "reset" | "set_password";
   const [step, setStep] = useState<AuthStep>("choose");
   const [referral, setReferral] = useState("");
   const [error, setError] = useState("");
@@ -85,6 +86,9 @@ export default function LoginPage() {
   // Forgot / reset
   const [forgotOtp, setForgotOtp] = useState("");
   const [resetPw, setResetPw] = useState("");
+  // Create-password (new rider, right after OTP verify)
+  const [newPw, setNewPw] = useState("");
+  const [savingPw, setSavingPw] = useState(false);
 
   // Google registration sub-flow state
   const [googleRegInfo, setGoogleRegInfo] = useState<{ idToken: string; email: string; name: string } | null>(null);
@@ -98,7 +102,28 @@ export default function LoginPage() {
   const handlePhoneVerified = async (jwt: string, isNew: boolean) => {
     setToken(jwt);
     try { await fetchMe(); } catch { /* profile loads on next request */ }
-    router.replace(isNew ? "/onboarding" : "/home");
+    if (isNew) {
+      // New rider — let them set a password now so every future login skips OTP (no SMS).
+      setError("");
+      setNewPw("");
+      setStep("set_password");
+    } else {
+      router.replace("/home");
+    }
+  };
+
+  const handleCreatePassword = async () => {
+    setError("");
+    if (newPw.length < 8) { setError("Password must be at least 8 characters."); return; }
+    setSavingPw(true);
+    try {
+      await authApi.setPassword(newPw);
+      router.replace("/onboarding");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Could not set password. You can set it later in Settings.");
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   // ── Phone + password login ────────────────────────────────────────────────
@@ -513,6 +538,38 @@ export default function LoginPage() {
               onClick={() => { setStep("choose"); setError(""); }}
             >
               Back
+            </button>
+          </div>
+        )}
+
+        {step === "set_password" && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-heading-medium text-content-primary mb-1">Create a password</h2>
+              <p className="text-paragraph-small text-content-secondary">
+                Set a password so next time you can log in without an OTP.
+              </p>
+            </div>
+            <input
+              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              placeholder="Password (min 8 chars)"
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreatePassword(); }}
+            />
+            <button
+              className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+              disabled={savingPw}
+              onClick={handleCreatePassword}
+            >
+              {savingPw ? <Spinner /> : "Create password & continue"}
+            </button>
+            <button
+              className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base"
+              onClick={() => router.replace("/onboarding")}
+            >
+              Skip for now
             </button>
           </div>
         )}
