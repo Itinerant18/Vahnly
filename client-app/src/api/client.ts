@@ -629,7 +629,7 @@ export async function getDriverAccountEarnings(
 export async function triggerDriverWithdrawal(
   token: string,
 ): Promise<{ status: string; payout_id: string }> {
-  return request<{ status: string; payout_id: string }>('/api/v1/driver-account/payouts/withdraw', { method: 'POST', token });
+  return request<{ status: string; payout_id: string }>('/api/v1/driver/payouts/withdraw', { method: 'POST', token });
 }
 
 // ─── Driver-account features (FEAT-002: vehicles / wallet / training) ──────────
@@ -669,7 +669,7 @@ export interface DriverWalletTxn {
 }
 
 export async function getDriverWallet(token: string): Promise<{ balance_paise: number; transactions: DriverWalletTxn[] }> {
-  return request<{ balance_paise: number; transactions: DriverWalletTxn[] }>('/api/v1/driver-account/wallet', { method: 'GET', token });
+  return request<{ balance_paise: number; transactions: DriverWalletTxn[] }>('/api/v1/driver/wallet', { method: 'GET', token });
 }
 
 export interface TrainingModule {
@@ -682,7 +682,7 @@ export interface TrainingModule {
 }
 
 export async function getDriverTraining(token: string): Promise<{ modules: TrainingModule[] }> {
-  return request<{ modules: TrainingModule[] }>('/api/v1/driver-account/training', { method: 'GET', token });
+  return request<{ modules: TrainingModule[] }>('/api/v1/driver/training', { method: 'GET', token });
 }
 
 export async function submitTrainingQuiz(
@@ -690,7 +690,7 @@ export async function submitTrainingQuiz(
   moduleId: string,
   score: number,
 ): Promise<{ status: string; score: number }> {
-  return request<{ status: string; score: number }>(`/api/v1/driver-account/training/${moduleId}/submit`, {
+  return request<{ status: string; score: number }>(`/api/v1/driver/training/${moduleId}/submit`, {
     method: 'POST',
     token,
     body: { score },
@@ -700,7 +700,7 @@ export async function submitTrainingQuiz(
 export async function getDriverNotifications(
   token: string,
 ): Promise<DriverNotification[]> {
-  return request<DriverNotification[]>('/api/v1/driver-account/notifications', { method: 'GET', token });
+  return request<DriverNotification[]>('/api/v1/driver/notifications', { method: 'GET', token });
 }
 
 export async function registerDeviceToken(
@@ -1616,5 +1616,16 @@ export interface FatigueCheckResponse {
 
 export async function getFatigueCheck(token: string): Promise<FatigueCheckResponse> {
   return request<FatigueCheckResponse>("/api/v1/driver/safety/fatigue-check", { method: "GET", token });
+}
+
+export interface DriverLocationStatus {
+  last_seen_seconds_ago: number | null;
+  is_visible_to_dispatch: boolean;
+  on_cooldown: boolean;
+  cooldown_expires_in_seconds: number;
+}
+
+export async function getDriverLocationStatus(token: string): Promise<DriverLocationStatus> {
+  return request<DriverLocationStatus>("/api/v1/driver/location/status", { method: "GET", token });
 }
 

@@ -22,6 +22,20 @@ WebSocket fan-out to the rider, driver, and admin apps. Launch region: **Kolkata
 
 ---
 
+## Environment Setup
+
+⚠️ Copy each app's `.env.example` before running:
+
+```bash
+cp rider-app/.env.example  rider-app/.env.local
+cp client-app/.env.example client-app/.env.local
+cp frontend/.env.example   frontend/.env       # Vite reads .env / .env.local
+```
+
+- The gateway runs on port **8080** (`HTTP_PORT` in root `.env`) — not 8085.
+- The admin app reads `VITE_GATEWAY_BASE_URL`; the rider/driver apps read `NEXT_PUBLIC_*`. Each `.env.example` lists only the keys that app actually reads.
+- Firebase is per-app — fill each `.env.example`'s placeholders with that app's own project credentials.
+
 ## Runtime path
 
 ```text

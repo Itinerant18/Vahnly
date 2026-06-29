@@ -559,7 +559,14 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 				return nil, fmt.Errorf("failed to enqueue scheduled booking: %w", enqErr)
 			}
 		} else if s.publisher != nil {
-			_ = s.publisher.Publish(ctx, "order.created", orderID, payloadBytes)
+			if pubErr := s.publisher.Publish(ctx, "order.created", orderID, payloadBytes); pubErr != nil {
+				// The order is persisted CREATED and counts as the rider's active booking,
+				// but dispatch never received order.created so it would never match — a ghost
+				// booking. Mirror the scheduled-enqueue failure path above: cancel to clear the
+				// active-order block and surface the failure for a clean retry.
+				_ = s.orders.CancelOrder(ctx, orderID, riderID, "dispatch_unavailable", 0)
+				return nil, fmt.Errorf("booking created but dispatch unavailable, please retry: %w", pubErr)
+			}
 		}
 	}
 

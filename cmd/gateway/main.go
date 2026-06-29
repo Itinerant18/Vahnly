@@ -632,6 +632,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/trip/complete", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleCompleteTrip))))
 	mux.HandleFunc("GET /api/v1/driver/me", authGuard.AuthenticateJWT(handler.HandleDriverGetProfile))
 	mux.HandleFunc("POST /api/v1/driver/status", authGuard.AuthenticateJWT(handler.HandleDriverSetStatus))
+	mux.HandleFunc("GET /api/v1/driver/location/status", authGuard.AuthenticateJWT(handler.HandleDriverLocationStatus))
 	mux.HandleFunc("GET /api/v1/driver/offer", authGuard.AuthenticateJWT(handler.HandleDriverGetOffer))
 	mux.HandleFunc("PATCH /api/v1/driver/orders/{id}/offer-response", authGuard.AuthenticateJWT(regionRouter.RouteRegionalTraffic(rateLimiter.LimitRouteConcurrency(handler.HandleOfferResponse))))
 	mux.HandleFunc("POST /api/v1/driver/orders/{id}/chat", authGuard.AuthenticateJWT(handler.HandleDriverSendChat))
@@ -699,6 +700,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/driver-account/wallet", authGuard.AuthenticateJWT(driverFeaturesHandler.GetWallet))
 	mux.HandleFunc("GET /api/v1/driver-account/training", authGuard.AuthenticateJWT(driverFeaturesHandler.ListTraining))
 	mux.HandleFunc("POST /api/v1/driver-account/training/{id}/submit", authGuard.AuthenticateJWT(driverFeaturesHandler.SubmitTrainingQuiz))
+	// /api/v1/driver/* aliases for the decoupled client-app (same driver-account handlers).
+	// earnings & vehicles are intentionally NOT aliased here — those paths are already bound
+	// to different handlers (driverEarningsHandler / driverSelfServiceHandler); the client
+	// keeps calling /api/v1/driver-account/{earnings,vehicles} for those.
+	mux.HandleFunc("POST /api/v1/driver/payouts/withdraw", authGuard.AuthenticateJWT(driverAccountHandler.TriggerInstantPayout))
+	mux.HandleFunc("GET /api/v1/driver/notifications", authGuard.AuthenticateJWT(driverAccountHandler.GetNotifications))
+	mux.HandleFunc("GET /api/v1/driver/training", authGuard.AuthenticateJWT(driverFeaturesHandler.ListTraining))
+	mux.HandleFunc("POST /api/v1/driver/training/{id}/submit", authGuard.AuthenticateJWT(driverFeaturesHandler.SubmitTrainingQuiz))
 
 	// Driver Engagement (incentives, performance, notifications, profile, referrals).
 	mux.HandleFunc("GET /api/v1/driver/incentives", authGuard.AuthenticateJWT(driverEngagementHandler.GetIncentives))
@@ -871,6 +880,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
 	mux.HandleFunc("PATCH /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
 	mux.HandleFunc("GET /api/v1/admin/riders/{riderId}/insurance/claims", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD"}, riderInsuranceHandler.AdminListClaims))
+	mux.HandleFunc("GET /api/v1/admin/insurance/claims", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD"}, riderInsuranceHandler.AdminListAllClaims))
 	mux.HandleFunc("GET /api/v1/admin/insurance/claims/{claimId}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD"}, riderInsuranceHandler.AdminGetClaim))
 	mux.HandleFunc("PATCH /api/v1/admin/insurance/claims/{claimId}/status", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN"}, riderInsuranceHandler.AdminUpdateClaimStatus))
 
@@ -1328,6 +1338,32 @@ func main() {
 		})
 	})
 
+	// GET /api/v1/health/dispatch — reports whether the separate dispatch binary is alive,
+	// via the short-TTL heartbeat it writes to Redis every 15s. Public (no auth): rider/ops
+	// tooling polls it to tell "no drivers available" apart from "dispatch is down". The
+	// heartbeat proves the dispatch process — which hosts the order.created consumer — is
+	// live, so no separate Kafka consumer-group introspection is needed.
+	mux.HandleFunc("GET /api/v1/health/dispatch", func(w http.ResponseWriter, r *http.Request) {
+		hbCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		ts, err := redisClusterClient.Get(hbCtx, "dispatch:heartbeat").Result()
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			reason := "heartbeat_missing" // redis.Nil: dispatch offline >60s or never started
+			if err != redis.Nil {
+				reason = "redis_unreachable"
+			}
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "degraded", "dispatch": "unreachable", "reason": reason,
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ok", "dispatch": "running", "last_heartbeat_unix": ts,
+		})
+	})
+
 	corsMiddleware := middleware.NewCORSMiddleware()
 	metricsMiddleware := middleware.NewMetricsMiddleware()
 
@@ -1359,6 +1395,23 @@ func main() {
 
 	// Periodically sample business gauges (active trips, online drivers) from the DB.
 	go startBusinessMetricsSampler(mainCtx, dbPool)
+
+	// Dispatch-presence check, delayed past the concurrent-boot window so a gateway-first
+	// start doesn't false-warn. For continuous detection, poll /api/v1/health/dispatch.
+	// ponytail: one-shot snapshot; upgrade to an edge-triggered monitor if catching a
+	// mid-run dispatch outage from the logs ever matters.
+	go func() {
+		select {
+		case <-mainCtx.Done():
+			return
+		case <-time.After(20 * time.Second):
+		}
+		hbCtx, cancel := context.WithTimeout(mainCtx, 2*time.Second)
+		defer cancel()
+		if err := redisClusterClient.Get(hbCtx, "dispatch:heartbeat").Err(); err != nil {
+			log.Printf("[STARTUP_WARN] DISPATCH SERVICE NOT DETECTED — bookings will be created but never matched (heartbeat absent: %v)", err)
+		}
+	}()
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

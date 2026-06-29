@@ -121,6 +121,9 @@ const CarIssuesDashboard = lazy(() =>
 const PromoCodesManager = lazy(() =>
   import('./pages/PromoCodesManager').then((m) => ({ default: m.PromoCodesManager }))
 );
+const InsuranceClaims = lazy(() =>
+  import('./pages/InsuranceClaims').then((m) => ({ default: m.InsuranceClaims }))
+);
 
 // Suspense wrapper for lazy routes
 const LazyWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -162,6 +165,7 @@ export const adminRoutes: RouteObject[] = [
   { path: 'payouts', element: <LazyWrap><PayoutsDashboard /></LazyWrap> },
   { path: 'support', element: <LazyWrap><SupportDashboard /></LazyWrap> },
   { path: 'safety', element: <LazyWrap><SafetyDashboard /></LazyWrap> },
+  { path: 'insurance', element: <LazyWrap><InsuranceClaims /></LazyWrap> },
   { path: 'marketing', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
   { path: 'communications/push', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
   { path: 'communications', element: <LazyWrap><MarketingDashboard /></LazyWrap> },
@@ -224,6 +228,7 @@ export const navItems: NavItem[] = [
   // Engagement
   { key: 'support', label: 'Support / Tickets', path: '/support', icon: 'Support', group: 'engagement' },
   { key: 'safety', label: 'Safety & Incidents', path: '/safety', icon: 'Safety', group: 'engagement' },
+  { key: 'insurance', label: 'Insurance Claims', path: '/insurance', icon: 'Compliance', group: 'engagement' },
   { key: 'marketing', label: 'Marketing & Campaigns', path: '/marketing', icon: 'Marketing', group: 'engagement' },
   { key: 'communications', label: 'Communications', path: '/communications', icon: 'Comms', group: 'engagement' },
   { key: 'content', label: 'Content (CMS)', path: '/content', icon: 'Content', group: 'engagement' },

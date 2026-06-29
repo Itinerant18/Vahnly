@@ -2205,6 +2205,46 @@ func (h *GatewayHandler) HandleDriverSetStatus(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// HandleDriverLocationStatus lets an online driver poll whether their GPS is fresh enough to
+// be matched (the spatial scanner drops drivers whose last ping is >30s old) and whether
+// they're in the post-decline match cooldown. Redis-only (no DB) so it's cheap to poll.
+func (h *GatewayHandler) HandleDriverLocationStatus(w http.ResponseWriter, r *http.Request) {
+	driverID, ok := requireDriverIdentity(w, r)
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Millisecond)
+	defer cancel()
+
+	const staleThresholdSecs = 30 // must match SpatialScanner.ScanNearbyDrivers
+
+	resp := map[string]interface{}{
+		"last_seen_seconds_ago":       nil,
+		"is_visible_to_dispatch":      false,
+		"on_cooldown":                 false,
+		"cooldown_expires_in_seconds": 0,
+	}
+
+	if raw, err := h.clusterClient.Get(ctx, "driver:lastseen:"+driverID).Result(); err == nil {
+		if ts, perr := strconv.ParseInt(raw, 10, 64); perr == nil {
+			age := time.Now().Unix() - ts
+			if age < 0 {
+				age = 0
+			}
+			resp["last_seen_seconds_ago"] = age
+			resp["is_visible_to_dispatch"] = age <= staleThresholdSecs
+		}
+	}
+
+	if ttl, err := h.clusterClient.TTL(ctx, "cooldown:driver:"+driverID).Result(); err == nil && ttl > 0 {
+		resp["on_cooldown"] = true
+		resp["cooldown_expires_in_seconds"] = int(ttl.Seconds())
+	}
+
+	writeJSONResponse(w, http.StatusOK, resp)
+}
+
 type LocationDetails struct {
 	Address string  `json:"address"`
 	Lat     float64 `json:"lat"`
@@ -2770,7 +2810,19 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 		pipe.ZRem(ctx, oldSpatialZSetKey, req.DriverID)
 	}
 	pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: req.DriverID})
+	// Evict drivers in this cell that stopped reporting GPS long ago, so the set
+	// doesn't accumulate stale members until the 24h key TTL. The matching scan
+	// already ignores anything past its 30s stale window, so this only bounds
+	// memory — never matchability. Window is deliberately well past 30s so a
+	// briefly-lagging driver isn't churned out; they'd re-add on the next ping
+	// anyway. ponytail: piggybacks the existing ping pipeline, no extra roundtrip.
+	const staleEvictWindowSec = 120
+	staleEvictCutoff := int64(nowEpoch) - staleEvictWindowSec
+	pipe.ZRemRangeByScore(ctx, spatialZSetKey, "-inf", fmt.Sprintf("(%d", staleEvictCutoff))
 	pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+	// City-free last-seen mirror so GET /api/v1/driver/location/status can report GPS
+	// recency without a per-poll DB lookup. 60s TTL outlives the 30s stale window.
+	pipe.Set(ctx, "driver:lastseen:"+req.DriverID, time.Now().Unix(), 60*time.Second)
 	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
 		http.Error(w, "driver_location_spatial_update_failed", http.StatusInternalServerError)
 		return

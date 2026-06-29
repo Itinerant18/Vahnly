@@ -195,6 +195,30 @@ func main() {
 	healthServer := observability.NewHealthServer(dbPool, redisClusterClient, brokersList, algoStrategy)
 	go healthServer.Start(metricsPort)
 
+	// Liveness heartbeat: the gateway runs as a separate process with no direct line to
+	// this binary, so publish a short-TTL key it can poll (GET /api/v1/health/dispatch).
+	// If this process dies the key expires within 60s and the gateway reports "degraded".
+	go func() {
+		writeHeartbeat := func() {
+			hbCtx, hbCancel := context.WithTimeout(ctx, 2*time.Second)
+			defer hbCancel()
+			if err := redisClusterClient.Set(hbCtx, "dispatch:heartbeat", time.Now().Unix(), 60*time.Second).Err(); err != nil {
+				log.Printf("[HEARTBEAT_WARN] Failed to write dispatch:heartbeat: %v", err)
+			}
+		}
+		writeHeartbeat() // write immediately so the key exists before the first tick
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				writeHeartbeat()
+			}
+		}
+	}()
+
 	// 9. System Signal Intercept and Graceful Shutdown Protocol
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)

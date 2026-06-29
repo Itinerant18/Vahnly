@@ -122,6 +122,43 @@ func (h *InsuranceHandler) AdminListClaims(w http.ResponseWriter, r *http.Reques
 	writeData(w, http.StatusOK, claims)
 }
 
+// AdminListAllClaims backs GET /api/v1/admin/insurance/claims — every claim across
+// all riders, newest first. Mirrors AdminListClaims but without the rider_id filter.
+func (h *InsuranceHandler) AdminListAllClaims(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(), `
+		SELECT c.id::text, c.order_id::text, c.rider_id::text, COALESCE(r.name, 'Rider'),
+		       COALESCE(c.claim_type, ''), COALESCE(c.description, ''), c.status, c.amount_paise, c.photos, c.created_at
+		FROM rider_insurance_claims c
+		LEFT JOIN riders r ON r.id = c.rider_id
+		ORDER BY c.created_at DESC
+		LIMIT 200`)
+	if err != nil {
+		h.internal(w, err)
+		return
+	}
+	defer rows.Close()
+
+	claims := make([]adminInsuranceClaim, 0)
+	for rows.Next() {
+		var c adminInsuranceClaim
+		var photos []byte
+		if err := rows.Scan(
+			&c.ID, &c.OrderID, &c.RiderID, &c.RiderName,
+			&c.ClaimType, &c.Description, &c.Status, &c.AmountPaise, &photos, &c.CreatedAt,
+		); err != nil {
+			h.internal(w, err)
+			return
+		}
+		c.Photos = decodePhotos(photos)
+		claims = append(claims, c)
+	}
+	if err := rows.Err(); err != nil {
+		h.internal(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, claims)
+}
+
 func (h *InsuranceHandler) AdminGetClaim(w http.ResponseWriter, r *http.Request) {
 	claimID := strings.TrimSpace(r.PathValue("claimId"))
 	if claimID == "" {

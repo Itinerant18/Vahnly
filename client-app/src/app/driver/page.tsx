@@ -39,6 +39,8 @@ import {
   getDriverOrder,
   getFatigueCheck,
   FatigueCheckResponse,
+  getDriverLocationStatus,
+  DriverLocationStatus,
   sendDriverChat,
   startWait,
   resumeTrip,
@@ -161,6 +163,8 @@ export default function DriverTerminalPage() {
 
   // Fatigue / mandatory-break monitor (polled every 5 min while ONLINE)
   const [fatigue, setFatigue] = useState<FatigueCheckResponse | null>(null);
+  const [locStatus, setLocStatus] = useState<DriverLocationStatus | null>(null);
+  const [cooldownSecs, setCooldownSecs] = useState(0);
 
   // SOS hold to confirm trigger states
   const sosHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -386,6 +390,33 @@ export default function DriverTerminalPage() {
     const interval = setInterval(checkFatigue, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [token, dutyState]);
+
+  // GPS-staleness + decline-cooldown monitor: poll every 20s while ONLINE so the driver
+  // sees why dispatch isn't reaching them (stale GPS → invisible, or post-decline cooldown).
+  useEffect(() => {
+    if (!token || dutyState !== 'ONLINE') return;
+
+    const checkLocation = async () => {
+      try {
+        const data = await getDriverLocationStatus(token);
+        setLocStatus(data);
+        if (data.on_cooldown) setCooldownSecs(data.cooldown_expires_in_seconds);
+      } catch (err) {
+        console.warn('Failed to fetch location status:', err);
+      }
+    };
+
+    checkLocation();
+    const interval = setInterval(checkLocation, 20000);
+    return () => clearInterval(interval);
+  }, [token, dutyState]);
+
+  // Local 1s tick for the cooldown countdown; re-synced by each 20s poll above.
+  useEffect(() => {
+    if (cooldownSecs <= 0) return;
+    const t = setTimeout(() => setCooldownSecs((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [cooldownSecs]);
 
   // Simulated SVG Map Glide coordinate adjustments
   useEffect(() => {
@@ -1109,6 +1140,23 @@ export default function DriverTerminalPage() {
           <span className="font-bold uppercase tracking-wider">
             Mandatory rest break required — {fatigue.message || 'you have reached the daily driving limit. Please go offline and rest.'}
           </span>
+        </div>
+      )}
+
+      {/* GPS STALENESS BANNER — driver is online but their last ping is >30s old, so the
+          dispatch scanner can't see them. Hidden while on cooldown (that banner takes priority). */}
+      {dutyState === 'ONLINE' && locStatus && !locStatus.is_visible_to_dispatch && !locStatus.on_cooldown && (
+        <div className="fixed top-0 inset-x-0 z-[100000] bg-surface-warning px-4 py-2.5 flex items-center justify-center gap-2 font-mono text-label-small text-content-warning shadow-elevation-1 text-center">
+          <span className="flex items-center animate-pulse"><SignalIcon size={18} /></span>
+          Your GPS signal is weak. Move to an open area to receive ride requests.
+        </div>
+      )}
+
+      {/* DECLINE COOLDOWN BANNER — driver recently declined/timed-out an offer. */}
+      {dutyState === 'ONLINE' && locStatus?.on_cooldown && cooldownSecs > 0 && (
+        <div className="fixed top-0 inset-x-0 z-[100000] bg-background-secondary border-b border-border-opaque px-4 py-2.5 flex items-center justify-center gap-2 font-mono text-label-small text-content-secondary shadow text-center">
+          <span className="flex items-center"><ClockIcon size={16} /></span>
+          You declined a ride. New requests resume in {cooldownSecs}s.
         </div>
       )}
 

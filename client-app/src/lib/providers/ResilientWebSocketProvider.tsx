@@ -52,7 +52,16 @@ export function ResilientWebSocketProvider({
         return;
       }
 
-      const ws = new WebSocket(`${wsUrl}/api/v1/dispatch/stream?ticket=${encodeURIComponent(ticket)}`);
+      // Fixed: was connecting with no order_id, which the gateway rejects with 400
+      // missing_target_order_id (handler.go:270), so global state never updated. This is
+      // the driver-level stream, not order-scoped, so we register a driver session sentinel
+      // as order_id. Real global-event routing keys off driver:{driverID} from the ticket
+      // identity (handler.go:291-295, 362-364) regardless of this value.
+      const driverId = useAuthStore.getState().user?.id ?? 'unknown';
+      const sessionKey = `stream-session-${driverId}`;
+      const ws = new WebSocket(
+        `${wsUrl}/api/v1/dispatch/stream?ticket=${encodeURIComponent(ticket)}&order_id=${encodeURIComponent(sessionKey)}`,
+      );
 
       ws.onopen = () => {
         console.log('WebSocket connected');
