@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API_GATEWAY_BASE_URL } from '../../config';
 
 interface SettingGroup {
   key: string;
@@ -74,20 +75,77 @@ function buildInitial(groups: SettingGroup[]): Values {
   return v;
 }
 
+// Backend stores settings as a flat key→string KV store (the same store
+// ConfigDashboard's "Global Settings" tab edits). Coerce the raw string back to
+// the widget's typed value on load.
+function coerce(type: SettingItem['type'], raw: string): string | boolean | number {
+  if (type === 'number') return raw === '' ? 0 : Number(raw);
+  if (type === 'toggle') return raw === 'true' || raw === '1';
+  return raw;
+}
+
 export const SettingsDashboard: React.FC = () => {
   const [values, setValues] = useState<Values>(buildInitial(defaultGroups));
-  const [saved, setSaved] = useState(false);
   const [activeGroup, setActiveGroup] = useState(defaultGroups[0].key);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const role = localStorage.getItem('admin_role') || 'SUPER_ADMIN';
+  const email = localStorage.getItem('admin_email') || '';
+  const headers = { 'X-Admin-Role': role, 'X-Admin-Email': email, 'Content-Type': 'application/json' };
+  const url = `${API_GATEWAY_BASE_URL}/api/v1/admin/config/settings`;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const byKey = new Map<string, string>();
+      for (const s of (data.settings || [])) byKey.set(s.key, String(s.value));
+      // Merge backend values over the hardcoded defaults; keys the backend
+      // doesn't return keep their default value.
+      setValues(prev => {
+        const next = { ...prev };
+        for (const g of defaultGroups) for (const s of g.settings) {
+          if (byKey.has(s.key)) next[`${g.key}.${s.key}`] = coerce(s.type, byKey.get(s.key)!);
+        }
+        return next;
+      });
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const set = (gk: string, sk: string, val: string | boolean | number) => {
     setSaved(false);
     setValues(prev => ({ ...prev, [`${gk}.${sk}`]: val }));
   };
 
-  const handleSave = () => {
-    // In production this would POST to /api/v1/admin/settings
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    setSaving(true);
+    setError(false);
+    try {
+      const settings = defaultGroups.flatMap(g =>
+        g.settings.map(s => ({ key: s.key, value: String(values[`${g.key}.${s.key}`]) })),
+      );
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ settings }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const activeGroupData = defaultGroups.find(g => g.key === activeGroup)!;
@@ -119,7 +177,20 @@ export const SettingsDashboard: React.FC = () => {
           <p className="text-sm text-content-tertiary">{activeGroupData.description}</p>
         </div>
 
-        <div className="space-y-4">
+        {error && (
+          <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2">
+            <p className="text-sm text-content-negative">Couldn’t reach the settings service. Values shown may be defaults and changes may not be saved.</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        <div className={`space-y-4 ${loading ? 'opacity-50 animate-pulse pointer-events-none' : ''}`}>
           {activeGroupData.settings.map(s => {
             const vk = `${activeGroupData.key}.${s.key}`;
             const val = values[vk];
@@ -173,9 +244,10 @@ export const SettingsDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
-            className="px-5 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg text-sm font-medium"
+            disabled={saving || loading}
+            className="px-5 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
           {saved && <span className="text-sm text-content-positive">✓ Settings saved</span>}
           <span className="text-xs text-content-tertiary ml-auto">Some settings require a gateway restart to take effect.</span>
