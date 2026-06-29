@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { UserIcon, LocationIcon, FlagIcon } from '@/components/ds/Icon';
+import { UserIcon, LocationIcon, FlagIcon, StarIcon } from '@/components/ds/Icon';
 
 function PublicShareContent() {
   const t = useTranslations('share');
@@ -23,7 +23,7 @@ function PublicShareContent() {
     id: tripId,
     riderName: 'Sarah Connor (Car Owner)',
     driverName: 'Aniket Karmakar',
-    driverRating: '★ 4.92',
+    driverRating: '4.92',
     car: 'Audi A6 (Automatic) • WB-02-AK-9988',
     pickup: 'Salt Lake Sector V Tech Hub, Kolkata',
     dropoff: 'Park Street Dining Grid, Kolkata',
@@ -97,7 +97,7 @@ function PublicShareContent() {
               <UserIcon size={20} />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white">{tripData.driverName} ({tripData.driverRating})</h4>
+              <h4 className="text-xs font-bold text-white flex items-center gap-1">{tripData.driverName} (<StarIcon size={12} className="text-yellow-500 fill-yellow-500" />{tripData.driverRating})</h4>
               <span className="text-[9px] font-mono text-content-tertiary uppercase tracking-wider block mt-0.5">
                 {t('pilotAllocatedBy', { name: tripData.riderName.split(' ')[0] })}
               </span>

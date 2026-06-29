@@ -6,12 +6,12 @@ import { useTranslations } from 'next-intl';
 export default function RiderPlacesPage() {
   const t = useTranslations('accountPlaces');
   const [places, setPlaces] = useState([
-    { id: '1', label: '🏠 Home Location', address: 'Cyberdyne Systems HQ, Alipore Grid, Kolkata' },
-    { id: '2', label: '🏢 Work Office', address: 'Salt Lake Sector V Tech Hub, Kolkata' }
+    { id: '1', label: 'Home Location', address: 'Cyberdyne Systems HQ, Alipore Grid, Kolkata' },
+    { id: '2', label: 'Work Office', address: 'Salt Lake Sector V Tech Hub, Kolkata' }
   ]);
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newLabel, setNewLabel] = useState('🌟 Custom');
+  const [newLabel, setNewLabel] = useState('Custom');
   const [newAddress, setNewAddress] = useState('');
 
   const handleAddPlace = (e: React.FormEvent) => {

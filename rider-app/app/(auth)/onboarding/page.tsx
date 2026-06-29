@@ -11,7 +11,7 @@ import { accountApi } from "@/lib/api/account";
 import { useAuthStore } from "@/lib/store/authStore";
 import { compressImage, blobToDataUrl } from "@/lib/utils/imageCompress";
 import type { CarType, Transmission } from "@/lib/api/types";
-import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimatedIcon, HomeAddressIcon, WorkBriefcaseIcon, PinIcon } from "@/components/ds/Icon";
 import { AnimUser, AnimMapPin, AnimBell } from "@/assets/icons/animated";
 
 const TOTAL_STEPS = 6;
@@ -586,7 +586,7 @@ export default function OnboardingPage() {
 
           <div className="space-y-5">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-content-secondary">🏠 Home address</label>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-content-secondary"><HomeAddressIcon size={14} /> Home address</label>
               <input
                 className={INPUT}
                 placeholder="Enter your home address"
@@ -597,14 +597,14 @@ export default function OnboardingPage() {
                 className="mt-2 text-xs font-medium text-content-accent"
                 onClick={() => fillCurrentLocation(setHome, home)}
               >
-                {home.lat != null
-                  ? `📍 ${home.lat.toFixed(4)}, ${home.lng?.toFixed(4)}`
-                  : "Use current location"}
+                {home.lat != null ? (
+                  <span className="inline-flex items-center gap-1"><PinIcon size={12} /> {home.lat.toFixed(4)}, {home.lng?.toFixed(4)}</span>
+                ) : "Use current location"}
               </button>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-content-secondary">💼 Work address</label>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-content-secondary"><WorkBriefcaseIcon size={14} /> Work address</label>
               <input
                 className={INPUT}
                 placeholder="Enter your work address"
@@ -615,9 +615,9 @@ export default function OnboardingPage() {
                 className="mt-2 text-xs font-medium text-content-accent"
                 onClick={() => fillCurrentLocation(setWork, work)}
               >
-                {work.lat != null
-                  ? `📍 ${work.lat.toFixed(4)}, ${work.lng?.toFixed(4)}`
-                  : "Use current location"}
+                {work.lat != null ? (
+                  <span className="inline-flex items-center gap-1"><PinIcon size={12} /> {work.lat.toFixed(4)}, {work.lng?.toFixed(4)}</span>
+                ) : "Use current location"}
               </button>
             </div>
           </div>
