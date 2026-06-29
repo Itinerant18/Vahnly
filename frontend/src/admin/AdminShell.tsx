@@ -7,25 +7,29 @@ import { AdminAuthGateway } from './components/AdminAuthGateway';
 import { AdminChangePassword } from './components/AdminChangePassword';
 import { SsoCallback } from './components/SsoCallback';
 import {
-  IconDashboard, IconMap, IconTrips, IconRiders, IconDrivers,
+  IconDashboard, IconLiveOperations, IconTrips, IconRiders, IconDrivers,
   IconVehicles, IconDispatch, IconPricing, IconPromotions,
   IconPayments, IconPayouts, IconSupport, IconSafety,
   IconMarketing, IconComms, IconContent, IconAnalytics,
   IconCompliance, IconDocuments, IconSettings, IconAudit,
-  IconAPI, IconTeam, IconSearch, IconBell, IconPlus,
-  IconChevron, IconLogout,
+  IconAPI, IconTeam, IconCorporate, IconAIIntelligence,
+  IconDriverOps, IconPlatformHealth, IconCarbonESG,
+  IconFranchise, IconAdminTools, IconNotifications,
+  IconSearch, IconBell, IconPlus, IconChevron, IconLogout,
 } from './components/SidebarIcons';
 
 // Icon lookup map
 const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> = {
-  Dashboard: IconDashboard, Map: IconMap, Trips: IconTrips, Riders: IconRiders,
+  Dashboard: IconDashboard, LiveOperations: IconLiveOperations, Map: IconLiveOperations, Trips: IconTrips, Riders: IconRiders,
   Drivers: IconDrivers, Vehicles: IconVehicles, Dispatch: IconDispatch,
   Pricing: IconPricing, Promotions: IconPromotions, Payments: IconPayments,
   Payouts: IconPayouts, Support: IconSupport, Safety: IconSafety,
   Marketing: IconMarketing, Comms: IconComms, Content: IconContent,
   Analytics: IconAnalytics, Compliance: IconCompliance, Documents: IconDocuments,
   Settings: IconSettings, Audit: IconAudit, API: IconAPI, Team: IconTeam,
-  Bell: IconBell, Corporate: IconTeam,
+  Bell: IconBell, Corporate: IconCorporate, AIIntelligence: IconAIIntelligence,
+  DriverOps: IconDriverOps, PlatformHealth: IconPlatformHealth, CarbonESG: IconCarbonESG,
+  Franchise: IconFranchise, AdminTools: IconAdminTools, Notifications: IconNotifications,
 };
 
 // ─── Notification + search types ──────────────────────────────────────────

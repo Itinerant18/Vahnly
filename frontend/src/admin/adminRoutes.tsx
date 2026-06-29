@@ -203,7 +203,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   // Core
   { key: 'dashboard', label: 'Dashboard', path: '/', icon: 'Dashboard', group: 'core' },
-  { key: 'operations', label: 'Live Operations', path: '/operations', icon: 'Map', group: 'core' },
+  { key: 'operations', label: 'Live Operations', path: '/operations', icon: 'LiveOperations', group: 'core' },
 
   // Fleet
   { key: 'trips', label: 'Trips', path: '/trips', icon: 'Trips', group: 'fleet' },
@@ -235,15 +235,15 @@ export const navItems: NavItem[] = [
   { key: 'settings', label: 'Configuration', path: '/settings', icon: 'Settings', group: 'system' },
   { key: 'audit', label: 'Audit Logs', path: '/audit', icon: 'Audit', group: 'system' },
   { key: 'api', label: 'Developer / API', path: '/api', icon: 'API', group: 'system' },
-  { key: 'notifications', label: 'Notifications Center', path: '/notifications', icon: 'Bell', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'SUPPORT_LEAD', 'SAFETY', 'FINANCE'] },
+  { key: 'notifications', label: 'Notifications Center', path: '/notifications', icon: 'Notifications', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'SUPPORT_LEAD', 'SAFETY', 'FINANCE'] },
   { key: 'corporate', label: 'Corporate / B2B', path: '/corporate', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE'] },
   { key: 'team', label: 'Team & Roles', path: '/team', icon: 'Team', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
-  { key: 'ai-intelligence', label: 'AI Intelligence', path: '/ai-intelligence', icon: 'Analytics', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'COMPLIANCE', 'ANALYTICS'] },
-  { key: 'driver-ops', label: 'Driver Ops', path: '/driver-ops', icon: 'Drivers', group: 'fleet', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FLEET_MANAGER'] },
-  { key: 'platform', label: 'Platform Health', path: '/platform', icon: 'API', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-  { key: 'esg', label: 'Carbon & ESG', path: '/esg', icon: 'Compliance', group: 'system', allowedRoles: ['SUPER_ADMIN', 'COMPLIANCE', 'ANALYTICS'] },
-  { key: 'franchise', label: 'Franchise / Multi-tenant', path: '/franchise', icon: 'Corporate', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
-  { key: 'admin-tools', label: 'Admin Tools', path: '/admin-tools', icon: 'Settings', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+  { key: 'ai-intelligence', label: 'AI Intelligence', path: '/ai-intelligence', icon: 'AIIntelligence', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'COMPLIANCE', 'ANALYTICS'] },
+  { key: 'driver-ops', label: 'Driver Ops', path: '/driver-ops', icon: 'DriverOps', group: 'fleet', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FLEET_MANAGER'] },
+  { key: 'platform', label: 'Platform Health', path: '/platform', icon: 'PlatformHealth', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+  { key: 'esg', label: 'Carbon & ESG', path: '/esg', icon: 'CarbonESG', group: 'system', allowedRoles: ['SUPER_ADMIN', 'COMPLIANCE', 'ANALYTICS'] },
+  { key: 'franchise', label: 'Franchise / Multi-tenant', path: '/franchise', icon: 'Franchise', group: 'system', allowedRoles: ['SUPER_ADMIN'] },
+  { key: 'admin-tools', label: 'Admin Tools', path: '/admin-tools', icon: 'AdminTools', group: 'system', allowedRoles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
 ];
 
 export const navGroups: { key: string; label: string }[] = [
