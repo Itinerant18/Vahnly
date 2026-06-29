@@ -146,24 +146,38 @@ export function DriverOpsDashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [newCampaign, setNewCampaign] = useState(emptyCampaign);
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   const load = useCallback(async () => {
-    const [c, f, m, s] = await Promise.all([
-      fetch(`${API}/driver-ops/incentives`, { headers: authHeaders() }).then(r => r.json()),
-      fetch(`${API}/driver-ops/coaching/flags?open=true`, { headers: authHeaders() }).then(r => r.json()),
-      fetch(`${API}/driver-ops/coaching/modules`, { headers: authHeaders() }).then(r => r.json()),
-      fetch(`${API}/driver-ops/telematics/summaries`, { headers: authHeaders() }).then(r => r.json()),
-    ]);
-    setCampaigns(c.campaigns ?? []);
-    setFlags(f.flags ?? []);
-    setModules(m.modules ?? []);
-    setSummaries(s.summaries ?? []);
+    setLoading(true); setError(false);
+    try {
+      const [c, f, m, s] = await Promise.all([
+        fetch(`${API}/driver-ops/incentives`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API}/driver-ops/coaching/flags?open=true`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API}/driver-ops/coaching/modules`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API}/driver-ops/telematics/summaries`, { headers: authHeaders() }).then(r => r.json()),
+      ]);
+      setCampaigns(c.campaigns ?? []);
+      setFlags(f.flags ?? []);
+      setModules(m.modules ?? []);
+      setSummaries(s.summaries ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const loadInspections = useCallback(async () => {
     const qs = inspStatus ? `?status=${inspStatus}` : '';
-    const r = await fetch(`${API}/driver-ops/inspections${qs}`, { headers: authHeaders() });
-    const d = await r.json();
-    setInspections(d.inspections ?? []);
+    try {
+      const r = await fetch(`${API}/driver-ops/inspections${qs}`, { headers: authHeaders() });
+      const d = await r.json();
+      setInspections(d.inspections ?? []);
+    } catch {
+      setError(true);
+    }
   }, [inspStatus]);
 
   useEffect(() => { load(); }, [load]);
@@ -213,6 +227,14 @@ export function DriverOpsDashboard() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-content-primary">Driver Operations</h1>
+
+      {loading && <p className="text-xs text-content-tertiary animate-pulse">Loading…</p>}
+      {error && (
+        <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2">
+          <p className="text-sm text-content-negative">Some data failed to load.</p>
+          <button type="button" onClick={() => { load(); loadInspections(); }} className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors">Retry</button>
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-border-opaque">
         {TABS.map(t => (

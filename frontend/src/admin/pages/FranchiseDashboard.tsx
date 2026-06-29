@@ -69,17 +69,33 @@ export function FranchiseDashboard() {
   const [showAddOp, setShowAddOp] = useState(false);
   const [newOp, setNewOp] = useState({ tenant_id: '', admin_email: '', role: 'OPERATOR_ADMIN' });
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   const loadTenants = useCallback(async () => {
-    const r = await fetch(`${API}/franchise/tenants`, { headers: authHeaders() });
-    const d = await r.json();
-    setTenants(d.tenants ?? []);
+    setLoading(true); setError(false);
+    try {
+      const r = await fetch(`${API}/franchise/tenants`, { headers: authHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      setTenants(d.tenants ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const loadOperators = useCallback(async () => {
     const qs = filterTenant ? `?tenant_id=${filterTenant}` : '';
-    const r = await fetch(`${API}/franchise/operators${qs}`, { headers: authHeaders() });
-    const d = await r.json();
-    setOperators(d.operators ?? []);
+    try {
+      const r = await fetch(`${API}/franchise/operators${qs}`, { headers: authHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      setOperators(d.operators ?? []);
+    } catch {
+      setError(true);
+    }
   }, [filterTenant]);
 
   useEffect(() => { loadTenants(); loadOperators(); }, [loadTenants, loadOperators]);
@@ -110,6 +126,14 @@ export function FranchiseDashboard() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-content-primary">Multi-tenant / Franchise</h1>
+
+      {loading && <p className="text-xs text-content-tertiary animate-pulse">Loading…</p>}
+      {error && (
+        <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2">
+          <p className="text-sm text-content-negative">Some data failed to load.</p>
+          <button type="button" onClick={() => { loadTenants(); loadOperators(); }} className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors">Retry</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-surface-accent rounded-lg p-4">

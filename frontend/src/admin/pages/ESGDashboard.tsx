@@ -87,14 +87,24 @@ export function ESGDashboard() {
   const [records, setRecords] = useState<CarbonRecord[]>([]);
   const [reports, setReports] = useState<ESGReport[]>([]);
   const [mtd, setMtd] = useState<MTDSummary>({ total_emission_kg: 0, total_trips: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await fetch(`${API}/esg/summary`, { headers: authHeaders() });
-    const d = await r.json();
-    setFactors(d.emission_factors ?? []);
-    setRecords(d.carbon_records ?? []);
-    setReports(d.esg_reports ?? []);
-    setMtd(d.mtd_summary ?? { total_emission_kg: 0, total_trips: 0 });
+    setLoading(true); setError(false);
+    try {
+      const r = await fetch(`${API}/esg/summary`, { headers: authHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      setFactors(d.emission_factors ?? []);
+      setRecords(d.carbon_records ?? []);
+      setReports(d.esg_reports ?? []);
+      setMtd(d.mtd_summary ?? { total_emission_kg: 0, total_trips: 0 });
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -115,6 +125,14 @@ export function ESGDashboard() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-content-primary">Carbon & ESG Reporting</h1>
+
+      {loading && <p className="text-xs text-content-tertiary animate-pulse">Loading…</p>}
+      {error && (
+        <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2">
+          <p className="text-sm text-content-negative">Some data failed to load.</p>
+          <button type="button" onClick={() => load()} className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors">Retry</button>
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-border-opaque">
         {TABS.map(t => (

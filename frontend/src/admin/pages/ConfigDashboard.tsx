@@ -2,6 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
 import { DataTable, type ColumnDef } from '../../components/ds/DataTable';
 
+function SectionError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2 mb-4">
+      <p className="text-sm text-content-negative">Couldn’t load this section.</p>
+      <button type="button" onClick={onRetry} className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors">Retry</button>
+    </div>
+  );
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 interface PlatformSetting { key: string; value: string; data_type: string; category: string; description: string; }
 interface FeatureFlag {
@@ -115,19 +124,22 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
   const [settings, setSettings] = useState<PlatformSetting[]>([]);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
+    try {
+      setLoadError(false);
       const res = await fetch(`${base}/settings`, { headers });
-      if (res.ok) {
-        const d = await res.json();
-        setSettings(d.settings || []);
-        const vals: Record<string, string> = {};
-        for (const s of (d.settings || [])) vals[s.key] = s.value;
-        setLocalValues(vals);
-      }
-    })();
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json();
+      setSettings(d.settings || []);
+      const vals: Record<string, string> = {};
+      for (const s of (d.settings || [])) vals[s.key] = s.value;
+      setLocalValues(vals);
+    } catch { setLoadError(true); }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const save = async (category: string) => {
     const settingsToSave = settings.filter(s => s.category === category).map(s => ({ key: s.key, value: localValues[s.key] ?? s.value }));
@@ -139,6 +151,7 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
 
   return (
     <div className="space-y-6">
+      {loadError && <SectionError onRetry={load} />}
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-content-primary">Global Settings</h2><p className="text-sm text-content-tertiary">Brand, locale, support, and legal configuration</p></div>
         {saved && <span className="text-sm text-content-positive">✓ Saved</span>}
@@ -179,10 +192,15 @@ const GlobalSettingsSection: React.FC<{ base: string; headers: Record<string, st
 const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [editing, setEditing] = useState<FeatureFlag | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchFlags = useCallback(async () => {
-    const res = await fetch(`${base}/flags`, { headers });
-    if (res.ok) { const d = await res.json(); setFlags(d.flags || []); }
+    try {
+      setLoadError(false);
+      const res = await fetch(`${base}/flags`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setFlags(d.flags || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const toggle = async (flag: FeatureFlag) => {
@@ -219,6 +237,7 @@ const FeatureFlagsSection: React.FC<{ base: string; headers: Record<string, stri
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchFlags} />}
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-content-primary">Feature Flags</h2><p className="text-sm text-content-tertiary">Toggle features, set rollout %, city scope</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ id: 0, flag_key: '', name: '', description: '', is_enabled: false, rollout_percentage: 0, target_cities: [], target_roles: [], is_kill_switch: false, updated_at: '' })}
@@ -279,10 +298,15 @@ const AppVersionsSection: React.FC<{ base: string; headers: Record<string, strin
   const [versions, setVersions] = useState<AppVersion[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newV, setNewV] = useState<Partial<AppVersion>>({ platform: 'ANDROID', version_string: '', release_type: 'OPTIONAL', min_supported_version: '', release_notes: '', store_url: '', is_latest: true });
+  const [loadError, setLoadError] = useState(false);
 
   const fetchVersions = useCallback(async () => {
-    const res = await fetch(`${base}/versions`, { headers });
-    if (res.ok) { const d = await res.json(); setVersions(d.versions || []); }
+    try {
+      setLoadError(false);
+      const res = await fetch(`${base}/versions`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setVersions(d.versions || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const addVersion = async () => {
@@ -326,6 +350,7 @@ const AppVersionsSection: React.FC<{ base: string; headers: Record<string, strin
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchVersions} />}
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-content-primary">App Version Management</h2><p className="text-sm text-content-tertiary">Force update, optional update, min version</p></div>
         {isSuperAdmin && <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Add Version</button>}
@@ -381,11 +406,16 @@ const IntegrationsSection: React.FC<{ base: string; headers: Record<string, stri
   const [editing, setEditing] = useState<Integration | null>(null);
   const [healthChecking, setHealthChecking] = useState<string | null>(null);
   const [catFilter, setCatFilter] = useState('');
+  const [loadError, setLoadError] = useState(false);
 
   const fetchIntegrations = useCallback(async () => {
-    const p = catFilter ? `?category=${catFilter}` : '';
-    const res = await fetch(`${base}/integrations${p}`, { headers });
-    if (res.ok) { const d = await res.json(); setIntegrations(d.integrations || []); }
+    try {
+      setLoadError(false);
+      const p = catFilter ? `?category=${catFilter}` : '';
+      const res = await fetch(`${base}/integrations${p}`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setIntegrations(d.integrations || []);
+    } catch { setLoadError(true); }
   }, [catFilter]);
 
   const saveEditing = async () => {
@@ -407,6 +437,7 @@ const IntegrationsSection: React.FC<{ base: string; headers: Record<string, stri
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchIntegrations} />}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h2 className="text-lg font-bold text-content-primary">Integrations</h2><p className="text-sm text-content-tertiary">API keys, webhooks, health monitoring</p></div>
         <div className="flex gap-1 flex-wrap">
@@ -480,11 +511,16 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
   const [templates, setTemplates] = useState<NotifTemplate[]>([]);
   const [channel, setChannel] = useState('');
   const [editing, setEditing] = useState<Partial<NotifTemplate> | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
-    const p = channel ? `?channel=${channel}` : '';
-    const res = await fetch(`${base}/templates${p}`, { headers });
-    if (res.ok) { const d = await res.json(); setTemplates(d.templates || []); }
+    try {
+      setLoadError(false);
+      const p = channel ? `?channel=${channel}` : '';
+      const res = await fetch(`${base}/templates${p}`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setTemplates(d.templates || []);
+    } catch { setLoadError(true); }
   }, [channel]);
 
   const save = async () => {
@@ -497,6 +533,7 @@ const TemplatesSection: React.FC<{ base: string; headers: Record<string, string>
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchTemplates} />}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h2 className="text-lg font-bold text-content-primary">Notification Templates</h2><p className="text-sm text-content-tertiary">Push, SMS, Email, WhatsApp with variable substitution</p></div>
         <div className="flex gap-1">
@@ -598,10 +635,15 @@ const CANCEL_RULE_COLUMNS: ColumnDef<CancelRule>[] = [
 const CancelRulesSection: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
   const [rules, setRules] = useState<CancelRule[]>([]);
   const [editing, setEditing] = useState<Partial<CancelRule> | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchRules = useCallback(async () => {
-    const res = await fetch(`${base}/cancellation-rules`, { headers });
-    if (res.ok) { const d = await res.json(); setRules(d.rules || []); }
+    try {
+      setLoadError(false);
+      const res = await fetch(`${base}/cancellation-rules`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setRules(d.rules || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const save = async () => {
@@ -636,6 +678,7 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchRules} />}
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-content-primary">Cancellation & Refund Rules</h2><p className="text-sm text-content-tertiary">Rules engine evaluated in priority order</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ applies_to: 'RIDER', trip_status_at_cancel: 'CREATED', minutes_elapsed_min: 0, minutes_elapsed_max: 999999, cancellation_fee_pct: 0, cancellation_fee_fixed_paise: 0, refund_pct: 100, party_at_fault: 'NONE', is_active: true, priority: 0 })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Rule</button>}
@@ -687,10 +730,15 @@ const CancelRulesSection: React.FC<{ base: string; headers: Record<string, strin
 const RatingRulesSection: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
   const [rules, setRules] = useState<RatingRule[]>([]);
   const [editing, setEditing] = useState<Partial<RatingRule> | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchRules = useCallback(async () => {
-    const res = await fetch(`${base}/rating-rules`, { headers });
-    if (res.ok) { const d = await res.json(); setRules(d.rules || []); }
+    try {
+      setLoadError(false);
+      const res = await fetch(`${base}/rating-rules`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setRules(d.rules || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const save = async () => {
@@ -707,6 +755,7 @@ const RatingRulesSection: React.FC<{ base: string; headers: Record<string, strin
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchRules} />}
       <div className="flex items-center justify-between">
         <div><h2 className="text-lg font-bold text-content-primary">Rating Threshold Rules</h2><p className="text-sm text-content-tertiary">Auto-warning, suspend, ban triggers based on rating</p></div>
         {isSuperAdmin && <button onClick={() => setEditing({ applies_to: 'DRIVER', threshold_type: 'WARNING', min_trips_required: 10, rating_below: 4.0, action: 'SEND_WARNING', cooldown_days: 0, is_active: true })} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Rule</button>}

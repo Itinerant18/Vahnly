@@ -44,6 +44,15 @@ function relTime(iso: string | null) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+function SectionError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="bg-surface-negative border-l-4 border-l-negative-400 rounded-sm px-4 py-3 flex items-center gap-2 mb-4">
+      <p className="text-sm text-content-negative">Couldn’t load this section.</p>
+      <button type="button" onClick={onRetry} className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-xs text-content-negative hover:bg-background-secondary transition-colors">Retry</button>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const DeveloperDashboard: React.FC = () => {
   const [tab, setTab] = useState<Tab>('keys');
@@ -92,10 +101,15 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
   const [showCreate, setShowCreate] = useState(false);
   const [newKey, setNewKey] = useState<any>({ name: '', owner_type: 'CORPORATE', owner_name: '', scopes: ['trips:read'], rate_limit_per_min: 60, is_sandbox: false });
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchKeys = useCallback(async () => {
-    const res = await fetch(`${base}/keys`, { headers });
-    if (res.ok) { const d = await res.json(); setKeys(d.keys || []); }
+    setLoadError(false);
+    try {
+      const res = await fetch(`${base}/keys`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setKeys(d.keys || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const createKey = async () => {
@@ -118,6 +132,7 @@ const APIKeysTab: React.FC<{ base: string; headers: Record<string, string>; isSu
 
   return (
     <div className="space-y-4">
+      {loadError && <SectionError onRetry={fetchKeys} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-content-tertiary">Plaintext keys are shown ONCE at creation and cannot be retrieved again.</p>
         {isSuperAdmin && <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Generate Key</button>}
@@ -202,10 +217,15 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
   const [newWh, setNewWh] = useState<any>({ name: '', endpoint_url: '', owner_type: 'CORPORATE', subscribed_events: [] });
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchWebhooks = useCallback(async () => {
-    const res = await fetch(`${base}/webhooks`, { headers });
-    if (res.ok) { const d = await res.json(); setWebhooks(d.webhooks || []); setAvailableEvents(d.available_events || []); }
+    setLoadError(false);
+    try {
+      const res = await fetch(`${base}/webhooks`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setWebhooks(d.webhooks || []); setAvailableEvents(d.available_events || []);
+    } catch { setLoadError(true); }
   }, []);
 
   const createWebhook = async () => {
@@ -228,6 +248,7 @@ const WebhooksTab: React.FC<{ base: string; headers: Record<string, string>; isS
 
   return (
     <div className="space-y-4">
+      {loadError && <SectionError onRetry={fetchWebhooks} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-content-tertiary">Subscribe to platform events via HTTP POST webhooks. Signed with HMAC-SHA256.</p>
         {isSuperAdmin && <button onClick={() => setShowCreate(!showCreate)} className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90">+ Add Webhook</button>}
@@ -335,20 +356,26 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const PAGE_SIZE = 50;
 
   const fetchLogs = useCallback(async () => {
+    setLoadError(false);
     const p = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
     if (keyFilter) p.set('key_prefix', keyFilter);
     if (statusFilter) p.set('status_code', statusFilter);
-    const res = await fetch(`${base}/logs?${p}`, { headers });
-    if (res.ok) { const d = await res.json(); setLogs(d.logs || []); setTotal(d.total || 0); setStats(d.stats); }
+    try {
+      const res = await fetch(`${base}/logs?${p}`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setLogs(d.logs || []); setTotal(d.total || 0); setStats(d.stats);
+    } catch { setLoadError(true); }
   }, [page, keyFilter, statusFilter]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   return (
     <div className="space-y-4">
+      {loadError && <SectionError onRetry={fetchLogs} />}
       <div className="flex gap-2 flex-wrap">
         <input placeholder="Filter by key prefix…" value={keyFilter} onChange={e => { setKeyFilter(e.target.value); setPage(0); }}
           className="border border-background-secondary rounded-lg px-3 py-1.5 text-sm bg-background-primary text-content-primary w-44 focus:outline-none focus:ring-1 focus:ring-accent" />
@@ -387,16 +414,22 @@ const APILogsTab: React.FC<{ base: string; headers: Record<string, string> }> = 
 // ── Sandbox Tab ───────────────────────────────────────────────────────────────
 const SandboxTab: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers }) => {
   const [sandboxKeys, setSandboxKeys] = useState<APIKey[]>([]);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try {
       const res = await fetch(`${base}/keys?sandbox=true`, { headers });
-      if (res.ok) { const d = await res.json(); setSandboxKeys(d.keys || []); }
-    })();
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json(); setSandboxKeys(d.keys || []);
+    } catch { setLoadError(true); }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={load} />}
       <div className="bg-surface-warning border border-warning-400 rounded-xl p-5">
         <div className="text-sm font-semibold text-content-warning mb-1">🧪 Sandbox Environment</div>
         <p className="text-sm text-content-warning">Sandbox keys operate against a separate copy of the platform with seeded test data. Trips, payments, and driver state changes made in sandbox do not affect production data.</p>
@@ -431,10 +464,18 @@ const SandboxTab: React.FC<{ base: string; headers: Record<string, string>; isSu
 const StatusPageTab: React.FC<{ base: string; headers: Record<string, string>; isSuperAdmin: boolean }> = ({ base, headers, isSuperAdmin }) => {
   const [incidents, setIncidents] = useState<StatusIncident[]>([]);
   const [editing, setEditing] = useState<Partial<StatusIncident> | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchIncidents = useCallback(async () => {
-    const res = await fetch(`${base}/incidents`, { headers });
-    if (res.ok) { const d = await res.json(); setIncidents(d.incidents || []); }
+    setLoadError(false);
+    try {
+      const res = await fetch(`${base}/incidents`, { headers });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json();
+      setIncidents(d.incidents || []);
+    } catch {
+      setLoadError(true);
+    }
   }, []);
 
   const save = async () => {
@@ -454,6 +495,7 @@ const StatusPageTab: React.FC<{ base: string; headers: Record<string, string>; i
 
   return (
     <div className="space-y-5">
+      {loadError && <SectionError onRetry={fetchIncidents} />}
       <div className={`rounded-xl p-4 flex items-center gap-3 ${systemOK ? 'bg-surface-positive border border-positive-400' : 'bg-surface-negative border border-negative-400'}`}>
         <span className="text-2xl">{systemOK ? '✅' : '⚠️'}</span>
         <div>
