@@ -7,21 +7,38 @@ import { ordersApi } from "@/lib/api/orders";
 import { FareDisplay } from "@/components/ds";
 import { Shimmer } from "@/components/account/States";
 
-const LINKS: { href: string; label: string; icon: string }[] = [
-  { href: "/account/profile", label: "Profile", icon: "👤" },
-  { href: "/account/garage", label: "My Garage", icon: "🚗" },
-  { href: "/account/bookings", label: "My Trips", icon: "🧾" },
-  { href: "/account/payments", label: "Payments", icon: "💳" },
-  { href: "/account/wallet", label: "Wallet", icon: "👛" },
-  { href: "/account/rewards", label: "Promos", icon: "🎁" },
-  { href: "/account/refer", label: "Refer & Earn", icon: "📣" },
-  { href: "/account/places", label: "Saved Places", icon: "📍" },
-  { href: "/account/emergency", label: "Emergency", icon: "🆘" },
-  { href: "/account/insurance", label: "D4M Care", icon: "🛡️" },
-  { href: "/account/notifications", label: "Notifications", icon: "🔔" },
-  { href: "/account/support", label: "Support", icon: "💬" },
-  { href: "/account/settings", label: "Settings", icon: "⚙️" },
-  { href: "/account/legal", label: "Legal", icon: "📄" },
+import {
+  UserIcon,
+  CarIcon,
+  BookingIcon,
+  CardIcon,
+  WalletIcon,
+  GiftIcon,
+  FlagIcon,
+  LocationIcon,
+  SirenIcon,
+  ShieldIcon,
+  NotificationIcon,
+  ChatIcon,
+  SettingsIcon,
+  DocumentIcon,
+} from "@/components/ds/Icon";
+
+const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
+  { href: "/account/profile", label: "Profile", icon: <UserIcon size={20} /> },
+  { href: "/account/garage", label: "My Garage", icon: <CarIcon size={20} /> },
+  { href: "/account/bookings", label: "My Trips", icon: <BookingIcon size={20} /> },
+  { href: "/account/payments", label: "Payments", icon: <CardIcon size={20} /> },
+  { href: "/account/wallet", label: "Wallet", icon: <WalletIcon size={20} /> },
+  { href: "/account/rewards", label: "Promos", icon: <GiftIcon size={20} /> },
+  { href: "/account/refer", label: "Refer & Earn", icon: <FlagIcon size={20} /> },
+  { href: "/account/places", label: "Saved Places", icon: <LocationIcon size={20} /> },
+  { href: "/account/emergency", label: "Emergency", icon: <SirenIcon size={20} /> },
+  { href: "/account/insurance", label: "D4M Care", icon: <ShieldIcon size={20} /> },
+  { href: "/account/notifications", label: "Notifications", icon: <NotificationIcon size={20} /> },
+  { href: "/account/support", label: "Support", icon: <ChatIcon size={20} /> },
+  { href: "/account/settings", label: "Settings", icon: <SettingsIcon size={20} /> },
+  { href: "/account/legal", label: "Legal", icon: <DocumentIcon size={20} /> },
 ];
 
 function loyaltyTier(trips: number): { name: string; color: string } {

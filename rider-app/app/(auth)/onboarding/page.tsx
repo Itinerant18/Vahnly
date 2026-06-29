@@ -11,6 +11,8 @@ import { accountApi } from "@/lib/api/account";
 import { useAuthStore } from "@/lib/store/authStore";
 import { compressImage, blobToDataUrl } from "@/lib/utils/imageCompress";
 import type { CarType, Transmission } from "@/lib/api/types";
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimUser, AnimMapPin, AnimBell } from "@/assets/icons/animated";
 
 const TOTAL_STEPS = 6;
 const CAR_TYPES: CarType[] = ["HATCHBACK", "SEDAN", "SUV", "PREMIUM"];
@@ -394,7 +396,7 @@ export default function OnboardingPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photoUrl} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
-                  "📷"
+                  <AnimatedIcon src={AnimUser} size={80} trigger="in" />
                 )}
               </div>
               <div>
@@ -703,7 +705,7 @@ export default function OnboardingPage() {
 
           <div className="rounded-2xl bg-background-secondary p-6 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-background-tertiary text-3xl">
-              🔔
+              <AnimatedIcon src={AnimBell} size={80} trigger="in" colors="primary:#F59E0B,secondary:#FCD34D" />
             </div>
             {notifState === "idle" ? (
               <button
@@ -747,7 +749,7 @@ export default function OnboardingPage() {
 
           <div className="rounded-2xl bg-background-secondary p-6 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-background-tertiary text-3xl">
-              📍
+              <AnimatedIcon src={AnimMapPin} size={80} trigger="in" colors="primary:#EF4444,secondary:#FCA5A5" />
             </div>
             {locState === "idle" ? (
               <button

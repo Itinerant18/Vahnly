@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { ordersApi } from '@/lib/api/orders';
 import Link from 'next/link';
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimShield, AnimCar, AnimWallet } from "@/assets/icons/animated";
 
 // Statuses for which an in-progress trip should send the rider straight to the
 // live screen instead of the home tab.
@@ -133,7 +135,7 @@ export default function IndexPage() {
         <section id="features" className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 border-t border-slate-200/80">
           <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              🛡️
+              <AnimatedIcon src={AnimShield} size={64} trigger="loop-on-hover" colors="primary:#1A73E8,secondary:#4FC3F7" />
             </div>
             <h3 className="font-bold text-slate-900 text-base">Verified Drivers</h3>
             <p className="text-slate-500 text-sm leading-relaxed">
@@ -143,7 +145,7 @@ export default function IndexPage() {
 
           <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              ⚡
+              <AnimatedIcon src={AnimCar} size={64} trigger="loop-on-hover" colors="primary:#FF6B35,secondary:#FFB74D" />
             </div>
             <h3 className="font-bold text-slate-900 text-base">Instant Dispatch</h3>
             <p className="text-slate-500 text-sm leading-relaxed">
@@ -153,7 +155,7 @@ export default function IndexPage() {
 
           <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
             <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              💰
+              <AnimatedIcon src={AnimWallet} size={64} trigger="loop-on-hover" colors="primary:#10B981,secondary:#6EE7B7" />
             </div>
             <h3 className="font-bold text-slate-900 text-base">Transparent Pricing</h3>
             <p className="text-slate-500 text-sm leading-relaxed">

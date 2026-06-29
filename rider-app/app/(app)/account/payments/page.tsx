@@ -5,6 +5,8 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { EmptyState } from "@/components/account/States";
 import { paymentsApi, type AddPaymentMethodInput } from "@/lib/api/payments";
 import type { SavedCard, UpiMethod } from "@/lib/api/types";
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimWallet } from "@/assets/icons/animated";
 
 const INPUT =
   "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
@@ -219,7 +221,7 @@ export default function PaymentsPage() {
       {/* Saved cards */}
       <Section title="Saved Cards">
         {cards.length === 0 ? (
-          <EmptyState icon="💳" title="No cards saved" message="Add a card for faster checkout." />
+          <EmptyState icon={<AnimatedIcon src={AnimWallet} size={64} trigger="in" colors="primary:#10B981,secondary:#34D399" />} title="No cards saved" message="Add a card for faster checkout." />
         ) : (
           <div className="mb-3 space-y-2">
             {cards.map((c) => (

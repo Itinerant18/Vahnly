@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useTripStore } from "@/lib/store/tripStore";
 
+import { PhoneIcon, ChatIcon, ShareIcon, UserIcon, CrossIcon } from "@/components/ds/Icon";
+
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -68,8 +70,8 @@ export function DriverCard({
           {driverInfo?.photo ? (
             <img src={driverInfo.photo} alt={driverInfo.name ?? "Driver"} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-content-secondary text-lg select-none">
-              👤
+            <div className="flex h-full w-full items-center justify-center text-content-secondary select-none">
+              <UserIcon size={32} className="text-content-secondary" />
             </div>
           )}
         </div>
@@ -106,16 +108,16 @@ export function DriverCard({
           {/* Action grid */}
           <div className="flex gap-3 pt-2">
             {[
-              { icon: "📞", label: "Call", onClick: onCall },
+              { icon: <PhoneIcon size={20} />, label: "Call", onClick: onCall },
               {
-                icon: "💬",
+                icon: <ChatIcon size={20} />,
                 label: "Chat",
                 onClick: () => {
                   setChatToast(true);
                   setTimeout(() => setChatToast(false), 2000);
                 },
               },
-              { icon: "📤", label: "Share", onClick: onShare },
+              { icon: <ShareIcon size={20} />, label: "Share", onClick: onShare },
             ].map(({ icon, label, onClick }) => (
               <button
                 key={label}
@@ -126,7 +128,7 @@ export function DriverCard({
                   hover:bg-background-tertiary transition-base cursor-pointer
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                <span className="text-xl">{icon}</span>
+                {icon}
                 <span className="text-label-small text-content-secondary">{label}</span>
               </button>
             ))}
@@ -140,7 +142,7 @@ export function DriverCard({
                   hover:opacity-80 transition-base cursor-pointer
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative-400"
               >
-                <span className="text-xl">✕</span>
+                <CrossIcon size={20} />
                 <span className="text-label-small text-content-negative">Cancel</span>
               </button>
             )}

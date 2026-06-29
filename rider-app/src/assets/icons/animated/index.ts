@@ -1,0 +1,15 @@
+export { default as AnimCar }          from './car.json';
+export { default as AnimMapPin }       from './map-pin.json';
+export { default as AnimStar }         from './star.json';
+export { default as AnimBell }         from './bell.json';
+export { default as AnimWallet }       from './wallet.json';
+export { default as AnimShield }       from './shield.json';
+export { default as AnimGift }         from './gift.json';
+export { default as AnimTrophy }       from './trophy.json';
+export { default as AnimCheck }        from './check.json';
+export { default as AnimWarning }      from './warning.json';
+export { default as AnimEmptyBox }     from './empty-box.json';
+export { default as AnimPhone }        from './phone.json';
+export { default as AnimChat }         from './chat.json';
+export { default as AnimUser }         from './user.json';
+export { default as AnimSettings }     from './settings.json';

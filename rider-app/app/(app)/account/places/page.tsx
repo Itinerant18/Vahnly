@@ -7,15 +7,17 @@ import { SkeletonList, EmptyState, ErrorState } from "@/components/account/State
 import { accountApi, type SavePlaceInput } from "@/lib/api/account";
 import type { SavedPlace } from "@/lib/api/types";
 
+import { HomeAddressIcon, WorkBriefcaseIcon, LocationIcon } from "@/components/ds/Icon";
+
 const PlacePickerMap = dynamic(() => import("@/components/account/PlacePickerMap"), {
   ssr: false,
   loading: () => <div className="h-56 w-full animate-pulse rounded-2xl bg-background-tertiary" />,
 });
 
-const LABELS: { value: SavePlaceInput["label"]; icon: string; name: string }[] = [
-  { value: "HOME", icon: "🏠", name: "Home" },
-  { value: "WORK", icon: "💼", name: "Work" },
-  { value: "CUSTOM", icon: "📍", name: "Other" },
+const LABELS: { value: SavePlaceInput["label"]; icon: React.ReactNode; name: string }[] = [
+  { value: "HOME", icon: <HomeAddressIcon size={20} />, name: "Home" },
+  { value: "WORK", icon: <WorkBriefcaseIcon size={20} />, name: "Work" },
+  { value: "CUSTOM", icon: <LocationIcon size={20} />, name: "Other" },
 ];
 
 const KOLKATA = { lat: 22.5726, lng: 88.3639 };
@@ -37,7 +39,7 @@ export default function PlacesPage() {
     load();
   };
 
-  const iconFor = (label: string) => LABELS.find((l) => l.value === label)?.icon ?? "📍";
+  const iconFor = (label: string) => LABELS.find((l) => l.value === label)?.icon ?? <LocationIcon size={20} />;
 
   return (
     <AccountScaffold title="Saved Places">
@@ -48,7 +50,7 @@ export default function PlacesPage() {
       ) : (
         <div className="space-y-3">
           {places.length === 0 && (
-            <EmptyState icon="📍" title="No saved places" message="Save Home & Work for one-tap booking." />
+            <EmptyState icon={<LocationIcon size={40} className="text-content-secondary" />} title="No saved places" message="Save Home & Work for one-tap booking." />
           )}
           {places.map((p) => (
             <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4">

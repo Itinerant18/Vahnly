@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatedIcon, HomeAddressIcon, WorkIcon } from "@/components/ds/Icon";
+import { AnimMapPin } from "@/assets/icons/animated";
 
 export default function RiderOnboardingWizard() {
   const router = useRouter();
@@ -388,7 +390,7 @@ export default function RiderOnboardingWizard() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">🏠 Residential Home Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono flex items-center gap-1"><HomeAddressIcon size={14} /> Residential Home Address</label>
                   <input
                     type="text"
                     value={riderData.homeAddress}
@@ -398,7 +400,7 @@ export default function RiderOnboardingWizard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono">🏢 Professional Work Address</label>
+                  <label className="block text-[10px] uppercase font-bold text-content-tertiary mb-1.5 font-mono flex items-center gap-1"><WorkIcon size={14} /> Professional Work Address</label>
                   <input
                     type="text"
                     value={riderData.workAddress}
@@ -509,7 +511,9 @@ export default function RiderOnboardingWizard() {
               <h2 className="text-lg font-bold font-move text-content-primary border-b border-border-opaque pb-2">Step 6 — Platform Location Permissions</h2>
               
               <div className="space-y-4 text-center py-6 font-sans">
-                <span className="text-4xl block">📍</span>
+                <div className="flex justify-center mb-2">
+                  <AnimatedIcon src={AnimMapPin} size={80} trigger="in" colors="primary:#EF4444,secondary:#FCA5A5" />
+                </div>
                 <p className="text-xs text-content-secondary max-w-sm mx-auto leading-relaxed">
                   Location data is required to route active trip coordinates, estimate driver ETAs, and enable public share tracking streams.
                 </p>

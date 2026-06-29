@@ -4,10 +4,12 @@ import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useToastStore, type ToastType } from "@/lib/store/useToastStore";
 
-const TYPE_STYLE: Record<ToastType, { container: string; icon: string }> = {
-  success: { container: "bg-surface-positive border-positive-200 text-content-positive", icon: "✓" },
-  error: { container: "bg-surface-negative border-negative-200 text-content-negative", icon: "✕" },
-  info: { container: "bg-background-secondary border-border-opaque text-content-primary", icon: "ℹ" },
+import { SuccessIcon, ErrorIcon, InfoIcon } from "@/components/ds/Icon";
+
+const TYPE_STYLE: Record<ToastType, { container: string; icon: React.ReactNode }> = {
+  success: { container: "bg-surface-positive border-positive-200 text-content-positive", icon: <SuccessIcon size={18} className="text-green-500" /> },
+  error: { container: "bg-surface-negative border-negative-200 text-content-negative", icon: <ErrorIcon size={18} className="text-red-500" /> },
+  info: { container: "bg-background-secondary border-border-opaque text-content-primary", icon: <InfoIcon size={18} className="text-content-primary" /> },
 };
 
 export const Toaster: React.FC = () => {

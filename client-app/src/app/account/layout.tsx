@@ -5,6 +5,28 @@ import Link from 'next/link';
 import AuthGuard from '../../components/AuthGuard';
 import { useAuthStore } from '@/store/useAuthStore';
 
+import {
+  IconFolder as FolderIcon,
+  IconLock as LockIcon
+} from '@tabler/icons-react';
+import {
+  CarIcon,
+  UserIcon,
+  CardIcon,
+  WalletIcon,
+  GiftIcon,
+  TrophyIcon,
+  LocationIcon,
+  SirenIcon,
+  ShieldIcon,
+  NotificationIcon,
+  SettingsIcon,
+  ChatIcon,
+  DocumentIcon,
+  LogoutDoorIcon,
+  MenuIcon
+} from '@/components/ds/Icon';
+
 export default function RiderAccountLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,22 +51,22 @@ export default function RiderAccountLayout({ children }: { children: React.React
   const riderName = user?.name || 'Sarah Connor';
   const riderID = user?.id || 'usr-mock-11';
 
-  const menuItems = [
-    { label: 'Booking Console', href: '/rider', icon: '🔑' },
-    { label: 'My Garage', href: '/account/garage', icon: '🚗' },
-    { label: 'Trip History', href: '/account/bookings', icon: '📁' },
-    { label: 'My Profile', href: '/account/profile', icon: '👤' },
-    { label: 'Payments & Methods', href: '/account/payments', icon: '💳' },
-    { label: 'Wallet Balance', href: '/account/wallet', icon: '💼' },
-    { label: 'Promos & Rewards', href: '/account/rewards', icon: '🎁' },
-    { label: 'Refer & Earn', href: '/account/refer', icon: '🏆' },
-    { label: 'Saved Places', href: '/account/places', icon: '📍' },
-    { label: 'Emergency Contacts', href: '/account/emergency', icon: '🛡️' },
-    { label: 'Insurance & Care', href: '/account/insurance', icon: '📄' },
-    { label: 'Notifications Inbox', href: '/account/notifications', icon: '🔔' },
-    { label: 'System Settings', href: '/account/settings', icon: '⚙️' },
-    { label: 'Support & FAQs', href: '/account/support', icon: '💬' },
-    { label: 'Legal Policies', href: '/account/legal', icon: '⚖️' }
+  const menuItems: { label: string; href: string; icon: React.ReactNode }[] = [
+    { label: 'Booking Console', href: '/rider', icon: <LockIcon size={18} /> },
+    { label: 'My Garage', href: '/account/garage', icon: <CarIcon size={18} /> },
+    { label: 'Trip History', href: '/account/bookings', icon: <FolderIcon size={18} /> },
+    { label: 'My Profile', href: '/account/profile', icon: <UserIcon size={18} /> },
+    { label: 'Payments & Methods', href: '/account/payments', icon: <CardIcon size={18} /> },
+    { label: 'Wallet Balance', href: '/account/wallet', icon: <WalletIcon size={18} /> },
+    { label: 'Promos & Rewards', href: '/account/rewards', icon: <GiftIcon size={18} /> },
+    { label: 'Refer & Earn', href: '/account/refer', icon: <TrophyIcon size={18} /> },
+    { label: 'Saved Places', href: '/account/places', icon: <LocationIcon size={18} /> },
+    { label: 'Emergency Contacts', href: '/account/emergency', icon: <SirenIcon size={18} /> },
+    { label: 'Insurance & Care', href: '/account/insurance', icon: <ShieldIcon size={18} /> },
+    { label: 'Notifications Inbox', href: '/account/notifications', icon: <NotificationIcon size={18} /> },
+    { label: 'System Settings', href: '/account/settings', icon: <SettingsIcon size={18} /> },
+    { label: 'Support & FAQs', href: '/account/support', icon: <ChatIcon size={18} /> },
+    { label: 'Legal Policies', href: '/account/legal', icon: <DocumentIcon size={18} /> }
   ];
 
   return (
@@ -70,7 +92,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
                 />
               ) : (
                 <div className="h-10 w-10 bg-background-tertiary rounded-lg flex items-center justify-center text-xs text-content-tertiary border border-border-opaque">
-                  👤
+                  <UserIcon size={18} />
                 </div>
               )}
               <div className="truncate">
@@ -103,9 +125,9 @@ export default function RiderAccountLayout({ children }: { children: React.React
                 useAuthStore.getState().logout();
                 window.location.href = '/login';
               }}
-              className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-border-opaque cursor-pointer"
+              className="w-full bg-background-secondary hover:bg-background-tertiary text-content-secondary hover:text-white rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-wider transition font-mono border border-border-opaque cursor-pointer flex items-center justify-center gap-1.5"
             >
-              🚪 Terminate Session
+              <LogoutDoorIcon size={14} /> Terminate Session
             </button>
           </div>
         </aside>
@@ -118,7 +140,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
               aria-label="Open menu"
               className="h-8 w-8 bg-background-secondary rounded-lg border border-border-opaque flex items-center justify-center text-sm cursor-pointer"
             >
-              ☰
+              <MenuIcon size={18} />
             </button>
             <h2 className="text-xs font-bold font-mono tracking-widest text-white">RIDER PORTAL</h2>
           </div>
@@ -153,7 +175,7 @@ export default function RiderAccountLayout({ children }: { children: React.React
                     />
                   ) : (
                     <div className="h-10 w-10 bg-background-tertiary rounded-lg flex items-center justify-center text-xs text-content-tertiary border border-border-opaque">
-                      👤
+                      <UserIcon size={18} />
                     </div>
                   )}
                   <div className="truncate">
@@ -186,9 +208,9 @@ export default function RiderAccountLayout({ children }: { children: React.React
                     useAuthStore.getState().logout();
                     window.location.href = '/login';
                   }}
-                  className="w-full bg-background-secondary hover:bg-background-tertiary text-content-tertiary hover:text-white border border-border-opaque rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono"
+                  className="w-full bg-background-secondary hover:bg-background-tertiary text-content-tertiary hover:text-white border border-border-opaque rounded-lg py-2 text-[9px] font-bold uppercase tracking-wider transition font-mono flex items-center justify-center gap-1.5"
                 >
-                  🚪 Logout
+                  <LogoutDoorIcon size={14} /> Logout
                 </button>
               </div>
             </div>

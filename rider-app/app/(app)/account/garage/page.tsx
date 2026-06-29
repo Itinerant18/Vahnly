@@ -7,6 +7,9 @@ import { garageApi, type GarageCarInput } from "@/lib/api/garage";
 import type { CarType, GarageCar, Transmission } from "@/lib/api/types";
 import { compressImage } from "@/lib/utils/imageCompress";
 
+import { AnimatedIcon, StarIcon, WarningIcon, CarIcon } from "@/components/ds/Icon";
+import { AnimCar } from "@/assets/icons/animated";
+
 const CAR_TYPES: CarType[] = ["HATCHBACK", "SEDAN", "SUV", "PREMIUM"];
 const TRANSMISSIONS: Transmission[] = ["MANUAL", "AUTOMATIC"];
 
@@ -57,21 +60,27 @@ function CarCard({
   return (
     <div className="overflow-hidden rounded-2xl bg-background-secondary">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 p-4 text-left">
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-background-tertiary text-2xl">
-          🚗
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-background-tertiary">
+          <CarIcon size={24} className="text-content-secondary" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-content-primary">
             {car.make} {car.model} {car.year}
           </p>
-          <div className="mt-1 flex flex-wrap gap-1.5">
+          <div className="mt-1 flex flex-wrap gap-1.5 font-medium">
             <Tag>{car.car_type}</Tag>
             <Tag>{car.transmission}</Tag>
-            {car.is_default && <Tag accent>Default ★</Tag>}
+            {car.is_default && (
+              <Tag accent>
+                <span className="flex items-center gap-1">
+                  Default <StarIcon size={10} className="text-yellow-500 fill-yellow-500" />
+                </span>
+              </Tag>
+            )}
           </div>
         </div>
         {(alert || warn) && (
-          <span className={`text-lg ${alert ? "text-content-negative" : "text-content-warning"}`}>⚠️</span>
+          <WarningIcon size={16} className={alert ? "text-content-negative" : "text-content-warning"} />
         )}
       </button>
 
@@ -154,7 +163,7 @@ export default function GaragePage() {
         <SkeletonList rows={3} />
       ) : cars.length === 0 ? (
         <EmptyState
-          icon="🚗"
+          icon={<AnimatedIcon src={AnimCar} size={64} trigger="in" colors="primary:#1A73E8,secondary:#FF6B35" />}
           title="No cars yet"
           message="Add the car you want a driver for."
           action={

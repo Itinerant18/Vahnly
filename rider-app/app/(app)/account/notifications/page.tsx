@@ -7,6 +7,9 @@ import { SkeletonList, EmptyState, ErrorState } from "@/components/account/State
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import type { RiderNotificationItem } from "@/lib/api/types";
 
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimBell } from "@/assets/icons/animated";
+
 function dayBucket(iso: string): "Today" | "Yesterday" | "Earlier" {
   const d = new Date(iso);
   const now = new Date();
@@ -64,7 +67,7 @@ export default function NotificationsPage() {
       ) : loading ? (
         <SkeletonList rows={5} height="h-16" />
       ) : notifications.length === 0 ? (
-        <EmptyState icon="🔔" title="No notifications yet" message="Trip updates and offers will appear here." />
+        <EmptyState icon={<AnimatedIcon src={AnimBell} size={64} trigger="loop-on-hover" colors="primary:#F59E0B,secondary:#FCD34D" />} title="No notifications yet" message="Trip updates and offers will appear here." />
       ) : (
         <div className="space-y-5">
           {ORDER.filter((b) => groups[b]?.length).map((b) => (

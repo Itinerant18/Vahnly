@@ -2,6 +2,9 @@
 
 import type { ReactNode } from "react";
 
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimEmptyBox, AnimWarning } from "@/assets/icons/animated";
+
 /** Shimmer block — pulsing placeholder, never a spinner. */
 export function Shimmer({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-background-tertiary ${className}`} />;
@@ -18,7 +21,7 @@ export function SkeletonList({ rows = 4, height = "h-20" }: { rows?: number; hei
 }
 
 export function EmptyState({
-  icon = "📭",
+  icon,
   title,
   message,
   action,
@@ -28,9 +31,10 @@ export function EmptyState({
   message?: string;
   action?: ReactNode;
 }) {
+  const defaultIcon = icon ?? <AnimatedIcon src={AnimEmptyBox} size={80} trigger="in" />;
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="text-5xl">{icon}</div>
+      {defaultIcon}
       <p className="text-base font-semibold text-content-primary">{title}</p>
       {message && <p className="max-w-xs text-sm text-content-secondary">{message}</p>}
       {action && <div className="mt-2">{action}</div>}
@@ -41,7 +45,7 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message?: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="text-5xl">⚠️</div>
+      <AnimatedIcon src={AnimWarning} size={80} trigger="loop" colors="primary:#FF6B35,secondary:#FFC107" />
       <p className="text-base font-semibold text-content-primary">Something went wrong</p>
       <p className="max-w-xs text-sm text-content-secondary">{message ?? "Please try again."}</p>
       <button

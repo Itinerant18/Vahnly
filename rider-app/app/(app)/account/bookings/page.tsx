@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
+import { AnimatedIcon } from "@/components/ds/Icon";
+import { AnimEmptyBox } from "@/assets/icons/animated";
 import { ordersApi } from "@/lib/api/orders";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { FareDisplay } from "@/components/ds";
@@ -206,7 +208,7 @@ export default function BookingsPage() {
       ) : orders === null ? (
         <SkeletonList rows={4} height="h-28" />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="🧾" title={`No ${tab.toLowerCase()} trips`} message="Your trips will show up here." />
+        <EmptyState icon={<AnimatedIcon src={AnimEmptyBox} size={64} trigger="in" />} title={`No ${tab.toLowerCase()} trips`} message="Your trips will show up here." />
       ) : (
         <div className="space-y-3">
           {filtered.map((o) => (
