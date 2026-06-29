@@ -6,8 +6,7 @@ import AuthGuard from '../../components/AuthGuard';
 import { useAuthStore } from '@/store/useAuthStore';
 
 import {
-  IconFolder as FolderIcon,
-  IconLock as LockIcon
+  IconFolder as FolderIcon
 } from '@tabler/icons-react';
 import {
   CarIcon,
@@ -53,7 +52,6 @@ export default function RiderAccountLayout({ children }: { children: React.React
   const riderID = user?.id || 'usr-mock-11';
 
   const menuItems: { label: string; href: string; icon: React.ReactNode }[] = [
-    { label: 'Booking Console', href: '/rider', icon: <LockIcon size={18} /> },
     { label: 'My Garage', href: '/account/garage', icon: <CarIcon size={18} /> },
     { label: 'Trip History', href: '/account/bookings', icon: <FolderIcon size={18} /> },
     { label: 'My Profile', href: '/account/profile', icon: <UserIcon size={18} /> },
@@ -145,10 +143,6 @@ export default function RiderAccountLayout({ children }: { children: React.React
             </button>
             <h2 className="text-xs font-bold font-mono tracking-widest text-white">RIDER PORTAL</h2>
           </div>
-
-          <Link href="/rider" className="text-[9px] font-mono font-bold uppercase tracking-wider border border-border-opaque px-3 py-1.5 rounded-full hover:bg-background-secondary transition">
-            ← Map Home
-          </Link>
         </div>
 
         {/* 3. MOBILE MENU SIDE DRAWER POPUP */}

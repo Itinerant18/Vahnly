@@ -17,13 +17,13 @@ export default function Home() {
     if (token && isAuthenticated) {
       const activeTripId = localStorage.getItem('active_trip_id');
       if (activeTripId) {
-        router.push(`/rider/trip/live?tripId=${encodeURIComponent(activeTripId)}`);
+        router.push('/driver');
         return;
       }
-      
+
       const onboardingCompleted = localStorage.getItem('rider_onboarding_completed') === 'true';
       if (onboardingCompleted) {
-        router.push('/rider');
+        router.push('/driver');
       } else {
         router.push('/onboarding');
       }

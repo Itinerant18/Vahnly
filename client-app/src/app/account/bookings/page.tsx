@@ -252,11 +252,6 @@ export default function RiderBookingsPage() {
     setIsPlaying(true);
   };
 
-  const handleCloneBooking = (item: BookingItem) => {
-    // Redirect with query parameters to prefill the booking console layout
-    window.location.href = `/rider?pickup=${encodeURIComponent(item.pickup)}&dropoff=${encodeURIComponent(item.dropoff)}&type=${item.type}`;
-  };
-
   const handleRaiseDispute = (item: BookingItem) => {
     // Redirect to support page with trip ID and auto pre-select option
     window.location.href = `/account/support?tripId=${item.id}`;
@@ -389,12 +384,6 @@ export default function RiderBookingsPage() {
             <div className="bg-background-primary border border-border-opaque rounded-2xl p-5 space-y-4">
               <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider border-b border-border-opaque pb-2 flex justify-between items-center">
                 <span>{t('tripSpecifications')}</span>
-                <button
-                  onClick={() => handleCloneBooking(selectedBooking)}
-                  className="text-[8px] text-content-secondary hover:text-white underline uppercase cursor-pointer"
-                >
-                  {t('rebookClone')}
-                </button>
               </h4>
 
               <div className="space-y-3 text-xs font-mono text-content-secondary">

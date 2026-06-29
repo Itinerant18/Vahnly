@@ -175,7 +175,7 @@ export default function RiderOnboardingWizard() {
     localStorage.setItem('rider_profile_name', riderData.fullName);
     
     alert('Onboarding setup finished! Welcome to the Vahnly ride portal.');
-    router.push('/rider');
+    router.push('/driver');
   };
 
   return (
