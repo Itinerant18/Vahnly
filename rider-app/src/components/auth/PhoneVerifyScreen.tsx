@@ -23,6 +23,8 @@ interface PhoneVerifyScreenProps {
   existingFirebaseUser?: User | null;
   userType: "driver" | "rider";
   title?: string;
+  /** Optional: show a back link on the phone step (returns to the caller's screen). */
+  onBack?: () => void;
 }
 
 export default function PhoneVerifyScreen({
@@ -30,6 +32,7 @@ export default function PhoneVerifyScreen({
   existingFirebaseUser,
   userType,
   title = "Verify Your Mobile Number",
+  onBack,
 }: PhoneVerifyScreenProps) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
@@ -290,6 +293,15 @@ export default function PhoneVerifyScreen({
             >
               {loading ? "Sending…" : "Send OTP"}
             </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px]
+                  hover:text-content-primary transition-base"
+              >
+                ← Back
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-5">

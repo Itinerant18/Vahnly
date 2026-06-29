@@ -77,6 +77,7 @@ export default function LoginPage() {
 
   type AuthStep = "choose" | "phone_verify" | "google-register" | "reset" | "set_password";
   const [step, setStep] = useState<AuthStep>("choose");
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [referral, setReferral] = useState("");
   const [error, setError] = useState("");
 
@@ -223,7 +224,8 @@ export default function LoginPage() {
       <PhoneVerifyScreen
         userType="rider"
         onVerified={handlePhoneVerified}
-        title="Enter Your Mobile Number"
+        onBack={() => { setStep("choose"); setError(""); }}
+        title="Create Your Account"
       />
     );
   }
@@ -254,68 +256,112 @@ export default function LoginPage() {
 
         {step === "choose" && (
           <div className="space-y-5">
-            <h2 className="text-heading-medium text-content-primary">Welcome back</h2>
-
-            {/* Primary: phone + password (no OTP / no SMS) */}
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
-                  <span className="text-lg">🇮🇳</span>
-                  <span className="text-label-medium text-content-primary">+91</span>
-                </div>
-                <input
-                  className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
-                  placeholder="98765 43210"
-                  inputMode="numeric"
-                  type="tel"
-                  maxLength={10}
-                  value={loginPhone}
-                  onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                />
-              </div>
-              <input
-                className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
-                placeholder="Password"
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handlePasswordLogin(); }}
-              />
+            {/* Log In / Sign Up segmented toggle */}
+            <div className="flex gap-1 rounded-sm border border-border-opaque bg-background-primary p-1">
               <button
-                className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-                disabled={isLoading}
-                onClick={handlePasswordLogin}
+                type="button"
+                onClick={() => { setMode("login"); setError(""); }}
+                className={`flex-1 h-10 rounded-sm text-label-medium font-medium transition-base ${
+                  mode === "login"
+                    ? "bg-interactive-primary text-interactive-primary-text shadow-elevation-1"
+                    : "text-content-secondary hover:text-content-primary"
+                }`}
               >
-                {isLoading ? <Spinner /> : "Log In"}
+                Log In
               </button>
               <button
                 type="button"
-                onClick={handleForgotSend}
-                disabled={isLoading}
-                className="w-full text-center text-label-small text-content-secondary py-1 min-h-[36px] hover:text-content-primary transition-base"
+                onClick={() => { setMode("signup"); setError(""); }}
+                className={`flex-1 h-10 rounded-sm text-label-medium font-medium transition-base ${
+                  mode === "signup"
+                    ? "bg-interactive-primary text-interactive-primary-text shadow-elevation-1"
+                    : "text-content-secondary hover:text-content-primary"
+                }`}
               >
-                Forgot password?
+                Sign Up
               </button>
             </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-border-opaque" />
-              <span className="text-label-small text-content-tertiary">new here?</span>
-              <div className="flex-1 border-t border-border-opaque" />
-            </div>
+            {mode === "login" ? (
+              /* ── Returning user: phone + password (no OTP / no SMS) ── */
+              <div className="space-y-3">
+                <h2 className="text-heading-medium text-content-primary">Welcome back</h2>
+                <div className="flex gap-2">
+                  <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
+                    <span className="text-lg">🇮🇳</span>
+                    <span className="text-label-medium text-content-primary">+91</span>
+                  </div>
+                  <input
+                    className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                    placeholder="98765 43210"
+                    inputMode="numeric"
+                    type="tel"
+                    maxLength={10}
+                    value={loginPhone}
+                    onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  />
+                </div>
+                <input
+                  className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                  placeholder="Password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handlePasswordLogin(); }}
+                />
+                <button
+                  className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                  disabled={isLoading}
+                  onClick={handlePasswordLogin}
+                >
+                  {isLoading ? <Spinner /> : "Log In"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleForgotSend}
+                  disabled={isLoading}
+                  className="w-full text-center text-label-small text-content-secondary py-1 min-h-[36px] hover:text-content-primary transition-base"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            ) : (
+              /* ── New user: verify number once, then set a password ── */
+              <div className="space-y-3">
+                <h2 className="text-heading-medium text-content-primary">Create your account</h2>
+                <p className="text-paragraph-small text-content-secondary">
+                  Verify your number once with an OTP, then set a password. After that,
+                  just log in with your password — no OTP, no SMS.
+                </p>
+                <button
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-sm
+                    bg-interactive-primary text-interactive-primary-text
+                    text-label-large font-medium shadow-elevation-1 transition-base
+                    hover:opacity-90 active:scale-[0.98]
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                  onClick={() => { setError(""); setStep("phone_verify"); }}
+                >
+                  Sign up with phone number
+                </button>
 
-            {/* Sign up / OTP fallback */}
-            <button
-              className="flex h-12 w-full items-center justify-center rounded-sm
-                bg-background-primary border border-border-opaque
-                text-label-medium text-content-primary transition-base
-                hover:bg-background-secondary active:scale-[0.98]
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
-              onClick={() => setStep("phone_verify")}
-            >
-              📱 Sign up with phone (OTP)
-            </button>
+                {/* Referral code (new users only) */}
+                <div className="pt-1">
+                  <label className="text-label-small text-content-secondary block mb-1">
+                    Referral Code (optional)
+                  </label>
+                  <input
+                    className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary
+                      px-4 font-mono text-mono-small text-content-primary uppercase
+                      placeholder:text-content-tertiary
+                      outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400
+                      transition-base"
+                    placeholder="e.g. DFU1A2B3"
+                    value={referral}
+                    onChange={(e) => setReferral(e.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-3">
@@ -324,7 +370,7 @@ export default function LoginPage() {
               <div className="flex-1 border-t border-border-opaque" />
             </div>
 
-            {/* Social buttons */}
+            {/* Social buttons (sign in OR sign up) */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -360,23 +406,6 @@ export default function LoginPage() {
                   Soon
                 </span>
               </button>
-            </div>
-
-            {/* Referral code */}
-            <div>
-              <label className="text-label-small text-content-secondary block mb-1">
-                Referral Code (optional)
-              </label>
-              <input
-                className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary
-                  px-4 font-mono text-mono-small text-content-primary uppercase
-                  placeholder:text-content-tertiary
-                  outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400
-                  transition-base"
-                placeholder="e.g. DFU1A2B3"
-                value={referral}
-                onChange={(e) => setReferral(e.target.value.toUpperCase())}
-              />
             </div>
           </div>
         )}
