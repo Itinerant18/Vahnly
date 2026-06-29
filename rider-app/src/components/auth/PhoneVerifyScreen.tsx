@@ -13,8 +13,7 @@ import {
   type User,
 } from "firebase/auth";
 import { persistRefresh } from "@/lib/api/client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { authApi } from "@/lib/api/auth";
 
 interface PhoneVerifyScreenProps {
   /** Called after phone verified + backend JWT received */
@@ -169,12 +168,7 @@ export default function PhoneVerifyScreen({
         }
       }
 
-      const res = await fetch(`${API_URL}/api/v1/auth/firebase/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firebase_id_token: firebaseIdToken, user_type: userType }),
-      });
-      const data: { success: boolean; is_new_user: boolean; data?: { token: string; refresh_token?: string }; message?: string } = await res.json();
+      const data = await authApi.firebaseVerify(firebaseIdToken, userType);
       if (!data.success || !data.data?.token) {
         throw new Error(data.message ?? "Verification failed.");
       }

@@ -11,8 +11,14 @@
  */
 
 import { MotionConfig } from 'framer-motion';
+import { useEffect } from 'react';
+import { loadRegionFromCityConfig } from '@/api/client';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    void loadRegionFromCityConfig();
+  }, []);
+
   // reducedMotion="user" makes every Framer Motion animation honour the OS
   // prefers-reduced-motion setting (CSS handles the rest via globals.css).
   return <MotionConfig reducedMotion="user">{children}</MotionConfig>;

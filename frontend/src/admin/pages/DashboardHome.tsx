@@ -262,7 +262,7 @@ function LiveFleetMapCard({ drivers }: { drivers: LiveDriver[] }) {
 export const DashboardHome: React.FC = () => {
   const {
     kpis, tripsChart, revenueChart, cancelChart, driversChart,
-    alerts, recentTrips, drivers, timeRange, setTimeRange, error,
+    alerts, recentTrips, drivers, timeRange, setTimeRange, loading, error, reload,
   } = useDashboardData();
 
   return (
@@ -282,23 +282,30 @@ export const DashboardHome: React.FC = () => {
             <p className="text-label-medium text-content-negative">
               Some live data failed to load. Showing the latest available values — figures may be incomplete.
             </p>
+            <button
+              type="button"
+              onClick={reload}
+              className="ml-auto rounded-sm border border-negative-400 px-3 py-1 text-label-medium text-content-negative hover:bg-background-secondary transition-base"
+            >
+              Retry
+            </button>
           </div>
         )}
 
         {/* KPI Cards — 12 cards. `loading` placeholder until KPIs resolve. */}
         <div className="grid grid-cols-4 gap-4">
-          <StatCard label="Total Trips"       value={kpis ? formatNumber(kpis.totalTrips) : '—'}  loading={!kpis} trend={kpis ? { value: kpis.totalTripsDelta } : null} />
-          <StatCard label="Active Trips"      value={kpis ? formatNumber(kpis.activeTrips) : '—'} loading={!kpis} trend={kpis ? { value: kpis.activeTripsChange, suffix: '' } : null} />
-          <StatCard label="New Signups"       value={kpis ? formatNumber(kpis.newRiderSignups + kpis.newDriverSignups) : '—'} loading={!kpis} trend={kpis ? { value: kpis.newSignupsDelta } : null} />
-          <StatCard label="Online Drivers"    value={kpis ? `${kpis.onlineDrivers}/${formatNumber(kpis.totalDrivers)}` : '—'} loading={!kpis} trend={kpis ? { value: kpis.onlineDriversDelta } : null} />
-          <StatCard label="Cancellation Rate" value={kpis ? `${kpis.cancellationRate}%` : '—'}    loading={!kpis} trend={kpis ? { value: kpis.cancellationDelta } : null} />
-          <StatCard label="Avg ETA"           value={kpis ? `${kpis.avgEtaMinutes} min` : '—'}    loading={!kpis} />
-          <StatCard label="Avg Rating"        value={kpis ? `${kpis.avgRating} ★` : '—'}          loading={!kpis} />
-          <StatCard label="Revenue"           value={kpis ? `₹${formatNumber(kpis.grossRevenue)}` : '—'} loading={!kpis} trend={kpis ? { value: kpis.revenueDelta } : null} />
-          <StatCard label="Promo Cost"        value={kpis ? formatPaiseCompact(kpis.promoCostPaise) : '—'} loading={!kpis} />
-          <StatCard label="Outstanding Payouts" value={kpis ? formatPaiseCompact(kpis.outstandingPayoutsPaise) : '—'} loading={!kpis} />
-          <StatCard label="Open Tickets / SLA Breaches" value={kpis ? `${formatNumber(kpis.openTickets)} / ${formatNumber(kpis.slaBreaches)}` : '—'} loading={!kpis} />
-          <StatCard label="SOS (24h)"         value={kpis ? formatNumber(kpis.sos24h) : '—'}      loading={!kpis} />
+          <StatCard label="Total Trips"       value={kpis ? formatNumber(kpis.totalTrips) : '—'}  loading={loading || !kpis} trend={kpis ? { value: kpis.totalTripsDelta } : null} />
+          <StatCard label="Active Trips"      value={kpis ? formatNumber(kpis.activeTrips) : '—'} loading={loading || !kpis} trend={kpis ? { value: kpis.activeTripsChange, suffix: '' } : null} />
+          <StatCard label="New Signups"       value={kpis ? formatNumber(kpis.newRiderSignups + kpis.newDriverSignups) : '—'} loading={loading || !kpis} trend={kpis ? { value: kpis.newSignupsDelta } : null} />
+          <StatCard label="Online Drivers"    value={kpis ? `${kpis.onlineDrivers}/${formatNumber(kpis.totalDrivers)}` : '—'} loading={loading || !kpis} trend={kpis ? { value: kpis.onlineDriversDelta } : null} />
+          <StatCard label="Cancellation Rate" value={kpis ? `${kpis.cancellationRate}%` : '—'}    loading={loading || !kpis} trend={kpis ? { value: kpis.cancellationDelta } : null} />
+          <StatCard label="Avg ETA"           value={kpis ? `${kpis.avgEtaMinutes} min` : '—'}    loading={loading || !kpis} />
+          <StatCard label="Avg Rating"        value={kpis ? `${kpis.avgRating} ★` : '—'}          loading={loading || !kpis} />
+          <StatCard label="Revenue"           value={kpis ? `₹${formatNumber(kpis.grossRevenue)}` : '—'} loading={loading || !kpis} trend={kpis ? { value: kpis.revenueDelta } : null} />
+          <StatCard label="Promo Cost"        value={kpis ? formatPaiseCompact(kpis.promoCostPaise) : '—'} loading={loading || !kpis} />
+          <StatCard label="Outstanding Payouts" value={kpis ? formatPaiseCompact(kpis.outstandingPayoutsPaise) : '—'} loading={loading || !kpis} />
+          <StatCard label="Open Tickets / SLA Breaches" value={kpis ? `${formatNumber(kpis.openTickets)} / ${formatNumber(kpis.slaBreaches)}` : '—'} loading={loading || !kpis} />
+          <StatCard label="SOS (24h)"         value={kpis ? formatNumber(kpis.sos24h) : '—'}      loading={loading || !kpis} />
         </div>
 
         {/* Charts */}

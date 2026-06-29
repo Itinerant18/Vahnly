@@ -510,12 +510,12 @@ func main() {
 	// Pre-auth abuse guards (P0): keyed by phone/IP since there is no authenticated user yet.
 	// Fail-open by default (a Redis blip must not lock everyone out of login); honors
 	// RATE_LIMIT_FAIL_CLOSED to harden. See DOC/RELIABILITY_PLAN.md.
-	otpSendPhone := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:phone", 3, time.Hour)        // SMS cost: 3/phone/hr
-	otpSendIP := rateLimiter.PerKey(middleware.ClientIPKey, "otp:ip", 15, time.Hour)              // SMS bomb: 15/IP/hr
-	otpVerify := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:verify", 5, 10*time.Minute)     // brute-force: 5/phone/10m
-	loginGuard := rateLimiter.PerKey(middleware.ClientIPKey, "login", 10, 15*time.Minute)         // spray: 10/IP/15m
-	fbVerifyGuard := rateLimiter.PerKey(middleware.ClientIPKey, "fbverify", 30, 15*time.Minute)   // 30/IP/15m
-	sosFlood := rateLimiter.PerKey(middleware.ClientIPKey, "sos", 20, time.Minute)                // runaway-loop guard only (never blocks one real SOS)
+	otpSendPhone := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:phone", 3, time.Hour)      // SMS cost: 3/phone/hr
+	otpSendIP := rateLimiter.PerKey(middleware.ClientIPKey, "otp:ip", 15, time.Hour)            // SMS bomb: 15/IP/hr
+	otpVerify := rateLimiter.PerKey(middleware.PhoneBodyKey, "otp:verify", 5, 10*time.Minute)   // brute-force: 5/phone/10m
+	loginGuard := rateLimiter.PerKey(middleware.ClientIPKey, "login", 10, 15*time.Minute)       // spray: 10/IP/15m
+	fbVerifyGuard := rateLimiter.PerKey(middleware.ClientIPKey, "fbverify", 30, 15*time.Minute) // 30/IP/15m
+	sosFlood := rateLimiter.PerKey(middleware.ClientIPKey, "sos", 20, time.Minute)              // runaway-loop guard only (never blocks one real SOS)
 	// otpSend composes the phone AND IP limits (both must pass).
 	otpSend := func(h http.HandlerFunc) http.HandlerFunc { return otpSendPhone(otpSendIP(h)) }
 
@@ -870,6 +870,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/admin/riders/{id}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "FLEET_MANAGER", "CUSTOMER_SUPPORT", "AUDITOR", "CITY_MANAGER", "FINANCE", "COMPLIANCE"}, riderHandler.HandleGetRiderDetail))
 	mux.HandleFunc("POST /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
 	mux.HandleFunc("PATCH /api/v1/admin/riders/{id}/{action}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "OPERATIONS_MANAGER", "CUSTOMER_SUPPORT", "FINANCE", "COMPLIANCE"}, riderHandler.HandleRiderActions))
+	mux.HandleFunc("GET /api/v1/admin/riders/{riderId}/insurance/claims", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD"}, riderInsuranceHandler.AdminListClaims))
+	mux.HandleFunc("GET /api/v1/admin/insurance/claims/{claimId}", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT", "SUPPORT_LEAD"}, riderInsuranceHandler.AdminGetClaim))
+	mux.HandleFunc("PATCH /api/v1/admin/insurance/claims/{claimId}/status", authGuard.RequireAnyRole([]string{"SUPER_ADMIN", "ADMIN"}, riderInsuranceHandler.AdminUpdateClaimStatus))
 
 	// Phase 11 rider management (real tables). More-specific patterns take precedence
 	// over the {action} wildcard above in the Go 1.22 ServeMux.

@@ -3,14 +3,16 @@
 import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { API_GATEWAY_BASE_URL } from '@/config';
+import { addOrderEvent } from '@/api/client';
 import { StarIcon, CheckIcon, WarningIcon } from '@/components/ds/Icon';
+import { useAuthStore } from '@/store/useAuthStore';
 
 function TripRateContent() {
   const t = useTranslations('riderTripRate');
   const searchParams = useSearchParams();
   const router = useRouter();
   const tripId = searchParams?.get('tripId') || 'trp-sandbox-2209';
+  const { token } = useAuthStore();
 
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
@@ -59,11 +61,14 @@ function TripRateContent() {
     if (finalTip > 0) {
       console.log(`[PaymentEngine] Debited tip ₹${finalTip.toFixed(2)} to driver wallet profile.`);
       try {
-        await fetch(`${API_GATEWAY_BASE_URL}/api/v1/payments/webhook`, { // simulate wallet ledger write
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'driver.tip', amount_paise: finalTip * 100, order_id: tripId })
-        });
+        if (token) {
+          const tipEventPayload = {
+            event_type: 'driver.tip',
+            amount_paise: finalTip * 100,
+            description: `Rider tip ₹${finalTip.toFixed(2)}`,
+          } as unknown as Parameters<typeof addOrderEvent>[2];
+          await addOrderEvent(token, tripId, tipEventPayload);
+        }
       } catch (e) {}
     }
 

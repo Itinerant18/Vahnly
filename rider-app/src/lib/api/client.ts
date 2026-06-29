@@ -145,11 +145,72 @@ async function request<T>(
   return (envelope?.data ?? (undefined as unknown)) as T;
 }
 
+async function requestRawJson<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+  extraHeaders?: Record<string, string>,
+  _retried = false,
+): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
+  const token = readToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new NetworkError(`Request to ${path} failed (offline?)`);
+  }
+
+  if (res.status === 401 && !_retried && readRefresh()) {
+    const ok = await refreshRiderToken();
+    if (ok) return requestRawJson<T>(method, path, body, extraHeaders, true);
+  }
+
+  const data = (await res.json()) as T;
+  if (!res.ok) {
+    const message = data && typeof data === "object" && "message" in data
+      ? String((data as { message?: unknown }).message)
+      : `request failed (${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+  return data;
+}
+
+async function requestBlob(path: string, _retried = false): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, { method: "GET", headers });
+  } catch {
+    throw new NetworkError(`Request to ${path} failed (offline?)`);
+  }
+
+  if (res.status === 401 && !_retried && readRefresh()) {
+    const ok = await refreshRiderToken();
+    if (ok) return requestBlob(path, true);
+  }
+
+  if (!res.ok) throw new ApiError(`request failed (${res.status})`, res.status);
+  return res.blob();
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>("POST", path, body, headers),
+  postRaw: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    requestRawJson<T>("POST", path, body, headers),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   del: <T>(path: string, body?: unknown) => request<T>("DELETE", path, body),
+  blob: (path: string) => requestBlob(path),
 };

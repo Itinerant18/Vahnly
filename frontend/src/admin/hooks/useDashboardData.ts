@@ -1,5 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { API_GATEWAY_BASE_URL } from '../../config';
+import {
+  getAnalyticsSummary,
+  getDashboardKPIs,
+  type AnalyticsSummaryResponse,
+  type DashboardKpisResponse,
+} from '../lib/api/dashboard';
 
 export type TimeRange = 'today' | 'week' | 'month';
 
@@ -76,15 +82,17 @@ function authHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json' };
 }
 
-// ─── API fetchers (return null on failure so fallback kicks in) ──────
-async function fetchKpis(range: TimeRange): Promise<KpiData | null> {
+// ─── API fetchers (return null on failure so the UI shows incomplete live data) ──────
+async function fetchKpis(): Promise<KpiData | null> {
   try {
-    const res = await fetch(
-      `${API_GATEWAY_BASE_URL}/api/v1/admin/dashboard/kpis?range=${range}`,
-      { headers: authHeaders() }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
+    const data = await getDashboardKPIs();
+    return mapKpis(data);
+  } catch {
+    return null;
+  }
+}
+
+function mapKpis(data: DashboardKpisResponse): KpiData {
     return {
       totalTrips: data.total_trips ?? 0,
       activeTrips: data.active_trips ?? 0,
@@ -109,28 +117,45 @@ async function fetchKpis(range: TimeRange): Promise<KpiData | null> {
       cancellationDelta: data.cancellation_delta ?? 0,
       revenueDelta: data.revenue_delta ?? 0,
     };
+}
+
+async function fetchCharts(range: TimeRange): Promise<ChartsData | null> {
+  try {
+    const data = await getAnalyticsSummary(toAnalyticsRange(range));
+    return mapAnalyticsSummaryToCharts(data);
   } catch {
     return null;
   }
 }
 
-async function fetchCharts(range: TimeRange): Promise<ChartsData | null> {
-  try {
-    const res = await fetch(
-      `${API_GATEWAY_BASE_URL}/api/v1/admin/dashboard/charts?range=${range}`,
-      { headers: authHeaders() }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return {
-      tripsChart: (data.trips_chart ?? []).map((p: { label: string; value: number }) => ({ label: p.label, value: p.value })),
-      revenueChart: (data.revenue_chart ?? []).map((p: { label: string; value: number }) => ({ label: p.label, value: p.value })),
-      cancelChart: (data.cancel_chart ?? []).map((p: { label: string; value: number }) => ({ label: p.label, value: p.value })),
-      driversChart: (data.drivers_chart ?? []).map((p: { label: string; value: number }) => ({ label: p.label, value: p.value })),
-    };
-  } catch {
-    return null;
-  }
+function toAnalyticsRange(range: TimeRange): '7d' | '30d' | '90d' {
+  if (range === 'month') return '30d';
+  return '7d';
+}
+
+function mapAnalyticsSummaryToCharts(data: AnalyticsSummaryResponse): ChartsData {
+  const totalTrips = data.total_trips ?? 0;
+  const completedTrips = data.completed_trips ?? 0;
+  const cancelledTrips = data.cancelled_trips ?? 0;
+  return {
+    tripsChart: [
+      { label: 'Total', value: totalTrips },
+      { label: 'Completed', value: completedTrips },
+      { label: 'Cancelled', value: cancelledTrips },
+    ],
+    revenueChart: [
+      { label: 'Revenue', value: Math.round((data.revenue_paise ?? 0) / 100) },
+      { label: 'Avg fare', value: Math.round((data.avg_fare_paise ?? 0) / 100) },
+    ],
+    cancelChart: [
+      { label: 'Cancelled', value: data.cancellation_rate ?? 0 },
+      { label: 'Completed', value: totalTrips > 0 ? Math.round((completedTrips / totalTrips) * 10000) / 100 : 0 },
+    ],
+    driversChart: [
+      { label: 'Active', value: data.active_drivers ?? 0 },
+      { label: 'Unique riders', value: data.unique_riders ?? 0 },
+    ],
+  };
 }
 
 async function fetchAlerts(): Promise<AlertItem[] | null> {
@@ -228,7 +253,7 @@ export function useDashboardData() {
   // Fetch KPIs and charts whenever timeRange changes.
   const loadRangeData = useCallback(async (range: TimeRange) => {
     const [kpiResult, chartResult] = await Promise.all([
-      fetchKpis(range),
+      fetchKpis(),
       fetchCharts(range),
     ]);
 
@@ -258,6 +283,12 @@ export function useDashboardData() {
     if (tripsResult) setRecentTrips(tripsResult); else setError(true);
     if (driverResult) setDrivers(driverResult); else setError(true);
   }, []);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    Promise.all([loadRangeData(timeRange), loadStaticData()]).finally(() => setLoading(false));
+  }, [loadRangeData, loadStaticData, timeRange]);
 
   // Load range data on mount and whenever the range changes.
   useEffect(() => {
@@ -296,5 +327,6 @@ export function useDashboardData() {
     setTimeRange,
     loading,
     error,
+    reload,
   };
 }

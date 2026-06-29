@@ -27,7 +27,49 @@ export const WS_BASE_URL =
   process.env.NEXT_PUBLIC_WS_GATEWAY ||
   BASE_URL.replace(/^http/i, 'ws');
 
-const REGION_PREFIX = 'KOL';
+let currentRegion = (process.env.NEXT_PUBLIC_REGION_PREFIX || '').trim().toUpperCase();
+let cityConfigRegionPromise: Promise<string> | null = null;
+
+function normalizeRegion(region: string): string {
+  return region.trim().toUpperCase();
+}
+
+export function setRegion(region: string): void {
+  currentRegion = normalizeRegion(region);
+}
+
+function getRegionPrefix(): string {
+  return currentRegion || 'KOL';
+}
+
+export async function loadRegionFromCityConfig(): Promise<string> {
+  if (currentRegion) return currentRegion;
+  if (cityConfigRegionPromise) return cityConfigRegionPromise;
+
+  cityConfigRegionPromise = (async () => {
+    try {
+      const response = await fetch(buildUrl('/api/v1/city-config'), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return getRegionPrefix();
+
+      const payload = await response.json();
+      const data = payload?.data ?? payload;
+      const region = normalizeRegion(data?.region_prefix || data?.city_prefix || '');
+      if (region) setRegion(region);
+    } catch {
+      // Keep the KOL fallback if city config is unavailable during startup.
+    }
+    return getRegionPrefix();
+  })();
+
+  try {
+    return await cityConfigRegionPromise;
+  } finally {
+    cityConfigRegionPromise = null;
+  }
+}
 
 export class ApiClientError extends Error {
   constructor(
@@ -219,7 +261,7 @@ async function refreshAccessToken(): Promise<boolean> {
 async function request<T>(path: string, options: RequestOptions, _retried = false): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'X-Region-Prefix': REGION_PREFIX,
+    'X-Region-Prefix': getRegionPrefix(),
   };
 
   if (options.body !== undefined) {
@@ -933,7 +975,7 @@ export async function uploadDocument(
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'X-Region-Prefix': REGION_PREFIX,
+      'X-Region-Prefix': getRegionPrefix(),
     },
     body: formData,
   });
@@ -1251,7 +1293,7 @@ export async function getEarningsStatementCsv(
 ): Promise<string> {
   const res = await fetch(buildUrl(`/api/v1/driver/earnings/statement?year=${year}&month=${month}`), {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": getRegionPrefix() },
   });
   if (!res.ok) {
     throw new ApiClientError(`statement_failed_${res.status}`, res.status, await res.text());
@@ -1355,7 +1397,7 @@ export async function uploadVehicleDocument(
   if (expiryDate) form.append("expiry_date", expiryDate);
   const res = await fetch(buildUrl(`/api/v1/driver/vehicles/${vehicleId}/documents`), {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": getRegionPrefix() },
     body: form,
   });
   const text = await res.text();
@@ -1402,7 +1444,7 @@ export async function uploadSupportAttachment(token: string, file: File): Promis
   form.append("file", file);
   const res = await fetch(buildUrl("/api/v1/driver/support/attachments"), {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": REGION_PREFIX },
+    headers: { Authorization: `Bearer ${token}`, "X-Region-Prefix": getRegionPrefix() },
     body: form,
   });
   const text = await res.text();

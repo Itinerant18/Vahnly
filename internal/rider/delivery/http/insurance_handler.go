@@ -31,14 +31,20 @@ func (h *InsuranceHandler) internal(w http.ResponseWriter, err error) {
 }
 
 type insuranceClaim struct {
-	ID          string   `json:"id"`
-	OrderID     string   `json:"order_id"`
-	ClaimType   string   `json:"claim_type"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	AmountPaise *int64   `json:"amount_paise,omitempty"`
-	Photos      []string `json:"photos,omitempty"`
+	ID          string    `json:"id"`
+	OrderID     string    `json:"order_id"`
+	ClaimType   string    `json:"claim_type"`
+	Description string    `json:"description"`
+	Status      string    `json:"status"`
+	AmountPaise *int64    `json:"amount_paise,omitempty"`
+	Photos      []string  `json:"photos,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type adminInsuranceClaim struct {
+	insuranceClaim
+	RiderID   string `json:"rider_id"`
+	RiderName string `json:"rider_name"`
 }
 
 func (h *InsuranceHandler) HandleListClaims(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +79,145 @@ func (h *InsuranceHandler) HandleListClaims(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeData(w, http.StatusOK, claims)
+}
+
+func (h *InsuranceHandler) AdminListClaims(w http.ResponseWriter, r *http.Request) {
+	riderID := strings.TrimSpace(r.PathValue("riderId"))
+	if riderID == "" {
+		writeError(w, http.StatusBadRequest, "rider_id is required", "ERR_VALIDATION")
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT c.id::text, c.order_id::text, c.rider_id::text, COALESCE(r.name, 'Rider'),
+		       COALESCE(c.claim_type, ''), COALESCE(c.description, ''), c.status, c.amount_paise, c.photos, c.created_at
+		FROM rider_insurance_claims c
+		LEFT JOIN riders r ON r.id = c.rider_id
+		WHERE c.rider_id = $1::uuid
+		ORDER BY c.created_at DESC`, riderID)
+	if err != nil {
+		h.internal(w, err)
+		return
+	}
+	defer rows.Close()
+
+	claims := make([]adminInsuranceClaim, 0)
+	for rows.Next() {
+		var c adminInsuranceClaim
+		var photos []byte
+		if err := rows.Scan(
+			&c.ID, &c.OrderID, &c.RiderID, &c.RiderName,
+			&c.ClaimType, &c.Description, &c.Status, &c.AmountPaise, &photos, &c.CreatedAt,
+		); err != nil {
+			h.internal(w, err)
+			return
+		}
+		c.Photos = decodePhotos(photos)
+		claims = append(claims, c)
+	}
+	if err := rows.Err(); err != nil {
+		h.internal(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, claims)
+}
+
+func (h *InsuranceHandler) AdminGetClaim(w http.ResponseWriter, r *http.Request) {
+	claimID := strings.TrimSpace(r.PathValue("claimId"))
+	if claimID == "" {
+		writeError(w, http.StatusBadRequest, "claim_id is required", "ERR_VALIDATION")
+		return
+	}
+
+	claim, ok := h.adminClaimByID(w, r, claimID)
+	if !ok {
+		return
+	}
+	writeData(w, http.StatusOK, claim)
+}
+
+type adminUpdateClaimStatusRequest struct {
+	Status string `json:"status"`
+	Note   string `json:"note"`
+}
+
+func (h *InsuranceHandler) AdminUpdateClaimStatus(w http.ResponseWriter, r *http.Request) {
+	claimID := strings.TrimSpace(r.PathValue("claimId"))
+	if claimID == "" {
+		writeError(w, http.StatusBadRequest, "claim_id is required", "ERR_VALIDATION")
+		return
+	}
+
+	var req adminUpdateClaimStatusRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body", "ERR_BAD_REQUEST")
+		return
+	}
+
+	status, ok := adminClaimStatus(req.Status)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "status must be approved, rejected, or pending", "ERR_VALIDATION")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE rider_insurance_claims
+		SET status = $2, updated_at = now()
+		WHERE id = $1::uuid`, claimID, status)
+	if err != nil {
+		h.internal(w, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "claim not found", "ERR_NOT_FOUND")
+		return
+	}
+	if h.logger != nil && strings.TrimSpace(req.Note) != "" {
+		h.logger.Printf("[RIDER_INSURANCE] admin updated claim %s to %s: %s", claimID, status, strings.TrimSpace(req.Note))
+	}
+
+	claim, ok := h.adminClaimByID(w, r, claimID)
+	if !ok {
+		return
+	}
+	writeData(w, http.StatusOK, claim)
+}
+
+func adminClaimStatus(status string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "approved":
+		return "APPROVED", true
+	case "rejected":
+		return "REJECTED", true
+	case "pending":
+		return "UNDER_REVIEW", true
+	default:
+		return "", false
+	}
+}
+
+func (h *InsuranceHandler) adminClaimByID(w http.ResponseWriter, r *http.Request, claimID string) (adminInsuranceClaim, bool) {
+	var c adminInsuranceClaim
+	var photos []byte
+	err := h.db.QueryRow(r.Context(), `
+		SELECT c.id::text, c.order_id::text, c.rider_id::text, COALESCE(r.name, 'Rider'),
+		       COALESCE(c.claim_type, ''), COALESCE(c.description, ''), c.status, c.amount_paise, c.photos, c.created_at
+		FROM rider_insurance_claims c
+		LEFT JOIN riders r ON r.id = c.rider_id
+		WHERE c.id = $1::uuid`, claimID).Scan(
+		&c.ID, &c.OrderID, &c.RiderID, &c.RiderName,
+		&c.ClaimType, &c.Description, &c.Status, &c.AmountPaise, &photos, &c.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "claim not found", "ERR_NOT_FOUND")
+		return adminInsuranceClaim{}, false
+	}
+	if err != nil {
+		h.internal(w, err)
+		return adminInsuranceClaim{}, false
+	}
+	c.Photos = decodePhotos(photos)
+	return c, true
 }
 
 type fileClaimRequest struct {

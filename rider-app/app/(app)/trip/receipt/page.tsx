@@ -2,7 +2,8 @@
 
 import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { API_BASE_URL, TOKEN_STORAGE_KEY } from "@/lib/api/client";
+import { TOKEN_STORAGE_KEY } from "@/lib/api/client";
+import { ordersApi } from "@/lib/api/orders";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 
@@ -32,12 +33,7 @@ function ReceiptContent() {
     }
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/v1/rider/orders/${targetId}/invoice`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) throw new Error(`invoice fetch failed (${res.status})`);
-      const blob = await res.blob();
+      const blob = await ordersApi.getInvoice(targetId);
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_GATEWAY_BASE_URL } from '../../config';
 import { DataTable, type ColumnDef, type BulkAction } from '../../components/ds/DataTable';
 import { AdminBadge } from '../../components/ds/AdminBadge';
 import { exportToCsv, type CsvColumn } from '../lib/tableTools';
 import { formatPaise } from '../lib/money';
+import { cancelOrder, getOrders } from '../lib/api/orders';
 
 export interface TripItem {
   id: string;
@@ -75,41 +75,46 @@ export const TripsList: React.FC = () => {
   // Convert a local datetime-local value (YYYY-MM-DDTHH:mm) to RFC3339 for the API.
   const toRFC3339 = (local: string): string => (local ? new Date(local).toISOString() : '');
 
+  const clearFilters = () => {
+    setSearch('');
+    setStatus('');
+    setCity('');
+    setTripType('');
+    setCarType('');
+    setPayment('');
+    setTransmission('');
+    setPromo('');
+    setD4mCare('');
+    setDateStart('');
+    setDateEnd('');
+    setRatingLess3(false);
+  };
+
   const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (status) params.append('status', status);
-      if (city) params.append('city_prefix', city);
-      if (tripType) params.append('trip_type', tripType);
-      if (carType) params.append('car_type', carType);
-      if (payment) params.append('payment_method', payment);
-      if (transmission) params.append('transmission', transmission);
-      if (promo) params.append('promo_applied', promo);
-      if (d4mCare) params.append('d4m_care', d4mCare);
-      if (dateStart) params.append('date_start', toRFC3339(dateStart));
-      if (dateEnd) params.append('date_end', toRFC3339(dateEnd));
-      if (ratingLess3) params.append('rating_less_than_3', 'true');
-      params.append('limit', String(PAGE_SIZE));
-      params.append('offset', String(page * PAGE_SIZE));
-
-      const role = localStorage.getItem('admin_role') || 'ADMIN';
-
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders?${params.toString()}`, {
-        headers: {
-          'X-Admin-Role': role,
-        },
+      const result = await getOrders({
+        page: page + 1,
+        limit: PAGE_SIZE,
+        search,
+        status,
+        city,
+        tripType,
+        carType,
+        payment,
+        transmission,
+        promo,
+        d4mCare,
+        dateFrom: toRFC3339(dateStart),
+        dateTo: toRFC3339(dateEnd),
+        ratingLess3,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        const list: TripItem[] = data || [];
-        setTrips(list);
-        setHasMore(list.length === PAGE_SIZE);
-      }
+      setTrips(result.orders as TripItem[]);
+      setHasMore(result.hasMore);
     } catch (err) {
       console.error('Failed to fetch trips', err);
+      setTrips([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
@@ -132,19 +137,11 @@ export const TripsList: React.FC = () => {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Cancel ${selectedIds.length} selected trip(s)? This frees the assigned drivers.`)) return;
 
-    const role = localStorage.getItem('admin_role') || 'ADMIN';
     let successCount = 0;
     for (const orderId of selectedIds) {
       try {
-        const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/cancel`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Role': role,
-          },
-          body: JSON.stringify({ order_id: orderId }),
-        });
-        if (res.ok) successCount++;
+        await cancelOrder(orderId);
+        successCount++;
       } catch (err) {
         console.error(`Cancel failed for trip ${orderId}`, err);
       }
@@ -449,20 +446,7 @@ export const TripsList: React.FC = () => {
           </div>
 
           <button
-            onClick={() => {
-              setSearch('');
-              setStatus('');
-              setCity('');
-              setTripType('');
-              setCarType('');
-              setPayment('');
-              setTransmission('');
-              setPromo('');
-              setD4mCare('');
-              setDateStart('');
-              setDateEnd('');
-              setRatingLess3(false);
-            }}
+            onClick={clearFilters}
             className="text-[11px] text-content-tertiary hover:text-content-primary font-medium transition-colors"
           >
             Reset Filters
@@ -480,9 +464,16 @@ export const TripsList: React.FC = () => {
         rowKey={(t) => t.id}
         onRowClick={(t) => navigate(`/trips/${t.id}`)}
         emptyState={
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="text-sm font-semibold text-content-primary">No trips matches found</span>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-sm font-semibold text-content-primary">No orders found</span>
             <span className="text-xs text-content-tertiary">Try modifying your filter matrix or search terms</span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-[11px] text-content-primary underline font-medium"
+            >
+              Clear filters
+            </button>
           </div>
         }
       />

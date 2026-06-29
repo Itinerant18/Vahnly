@@ -127,4 +127,7 @@ export const ordersApi = {
       dropoff_lng: number;
       eta_minutes: number;
     }>(`/api/v1/trip-share/${shareToken}`),
+
+  getInvoice: (orderId: string) =>
+    apiClient.blob(`/api/v1/rider/orders/${orderId}/invoice`),
 };

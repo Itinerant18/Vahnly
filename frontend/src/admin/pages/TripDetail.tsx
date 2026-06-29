@@ -2,9 +2,18 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { API_GATEWAY_BASE_URL } from '../../config';
 import { AdminBadge } from '../../components/ds/AdminBadge';
 import { OdometerVerificationPanel } from '../components/OdometerVerificationPanel';
+import { ApiError } from '../lib/apiClient';
+import {
+  cancelOrder as cancelAdminOrder,
+  getActiveDriversForReassign,
+  getOrder,
+  getOrderForensicAudit,
+  getOrderGpsTrail,
+  postOrderAction,
+  reassignOrder,
+} from '../lib/api/orders';
 
 interface GpsPoint {
   lat: number;
@@ -146,10 +155,39 @@ type ConfirmAction = {
   run: (reason: string) => Promise<boolean>;
 };
 
+function TripDetailSkeleton() {
+  return (
+    <div className="w-full h-full overflow-y-auto p-6 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-background-secondary pb-4 gap-4">
+        <div className="space-y-2">
+          <div className="h-3 w-32 rounded-sm bg-background-tertiary animate-pulse" />
+          <div className="h-8 w-80 rounded-sm bg-background-tertiary animate-pulse" />
+        </div>
+        <div className="flex gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-8 w-24 rounded-pill bg-background-tertiary animate-pulse" />
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 space-y-6">
+          <div className="h-80 rounded-xl bg-background-tertiary animate-pulse" />
+          <div className="h-72 rounded-xl bg-background-tertiary animate-pulse" />
+        </div>
+        <div className="lg:col-span-2 space-y-6">
+          <div className="h-56 rounded-xl bg-background-tertiary animate-pulse" />
+          <div className="h-64 rounded-xl bg-background-tertiary animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const TripDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<TripDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [notFound, setNotFound] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [gpsTrail, setGpsTrail] = useState<GpsPoint[]>([]);
 
@@ -167,6 +205,7 @@ export const TripDetail: React.FC = () => {
   // Reassign picker.
   const [showReassignModal, setShowReassignModal] = useState<boolean>(false);
   const [reassignDriverId, setReassignDriverId] = useState<string>('');
+  const [driverSearch, setDriverSearch] = useState<string>('');
   const [driverPool, setDriverPool] = useState<DriverPoolItem[]>([]);
   const [poolLoading, setPoolLoading] = useState<boolean>(false);
 
@@ -179,11 +218,9 @@ export const TripDetail: React.FC = () => {
   const [audit, setAudit] = useState<ForensicAudit | null>(null);
   const [auditLoading, setAuditLoading] = useState<boolean>(true);
 
-  const role = () => localStorage.getItem('admin_role') || 'ADMIN';
-
   useEffect(() => {
-    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/gps-trail`, { headers: { 'X-Admin-Role': role() } })
-      .then((r) => (r.ok ? r.json() : { trail: [] }))
+    if (!id) return;
+    getOrderGpsTrail(id)
       .then((d) => setGpsTrail(d.trail || []))
       .catch(() => setGpsTrail([]));
   }, [id]);
@@ -201,17 +238,21 @@ export const TripDetail: React.FC = () => {
   }, [data, gpsTrail]);
 
   const fetchTripDetail = useCallback(async () => {
+    if (!id) {
+      setData(null);
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setNotFound(false);
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}`, {
-        headers: { 'X-Admin-Role': role() },
-      });
-      if (res.ok) {
-        const payload = await res.json();
-        setData(payload);
-      }
+      const payload = await getOrder(id);
+      setData(payload);
     } catch (err) {
       console.error('Failed to load trip details', err);
+      setData(null);
+      setNotFound(err instanceof ApiError && err.status === 404);
     } finally {
       setLoading(false);
     }
@@ -223,9 +264,9 @@ export const TripDetail: React.FC = () => {
 
   // Forensic audit tab.
   useEffect(() => {
+    if (!id) return;
     setAuditLoading(true);
-    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/forensic-audit`, { headers: { 'X-Admin-Role': role() } })
-      .then((r) => (r.ok ? r.json() : null))
+    getOrderForensicAudit(id)
       .then((d) => setAudit(d))
       .catch(() => setAudit(null))
       .finally(() => setAuditLoading(false));
@@ -233,29 +274,14 @@ export const TripDetail: React.FC = () => {
 
   // Generic per-id POST action helper. Returns whether it succeeded.
   const postAction = useCallback(async (actionPath: string, payload?: Record<string, unknown>): Promise<boolean> => {
-    const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/${id}/${actionPath}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role() },
-      body: payload ? JSON.stringify(payload) : undefined,
-    });
-    if (!res.ok) {
-      const errMsg = await res.text();
-      throw new Error(errMsg || `Action '${actionPath}' failed`);
-    }
+    if (!id) throw new Error('missing_order_id');
+    await postOrderAction(id, actionPath, payload);
     return true;
   }, [id]);
 
-  // Cancel uses the collection route POST /admin/orders/cancel with body { order_id }.
-  const cancelOrder = useCallback(async (): Promise<boolean> => {
-    const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/orders/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Role': role() },
-      body: JSON.stringify({ order_id: id }),
-    });
-    if (!res.ok) {
-      const errMsg = await res.text();
-      throw new Error(errMsg || 'Cancellation failed');
-    }
+  const cancelTrip = useCallback(async (reason: string): Promise<boolean> => {
+    if (!id) throw new Error('missing_order_id');
+    await cancelAdminOrder(id, reason);
     return true;
   }, [id]);
 
@@ -328,23 +354,24 @@ export const TripDetail: React.FC = () => {
   // Reassign driver picker: load the live driver pool from GET /admin/drivers.
   const openReassign = () => {
     setReassignDriverId('');
+    setDriverSearch('');
     setShowReassignModal(true);
     setPoolLoading(true);
-    fetch(`${API_GATEWAY_BASE_URL}/api/v1/admin/drivers?status=ACTIVE`, { headers: { 'X-Admin-Role': role() } })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d: DriverPoolItem[]) => setDriverPool(d || []))
+    getActiveDriversForReassign()
+      .then((d) => setDriverPool(d || []))
       .catch(() => setDriverPool([]))
       .finally(() => setPoolLoading(false));
   };
 
   const handleReassignDriver = async () => {
-    if (!reassignDriverId) return;
+    if (!id || !reassignDriverId) return;
     setActionLoading(true);
     try {
-      await postAction('reassign', { driver_id: reassignDriverId });
+      await reassignOrder(id, reassignDriverId);
       showToast('Driver reassigned.', 'ok');
       setShowReassignModal(false);
       setReassignDriverId('');
+      setDriverSearch('');
       await fetchTripDetail();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Reassign failed.', 'err');
@@ -366,18 +393,22 @@ export const TripDetail: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-sm text-content-tertiary animate-pulse">Loading trip ledger details…</div>
-      </div>
+  const filteredDriverPool = useMemo(() => {
+    const query = driverSearch.trim().toLowerCase();
+    if (!query) return driverPool;
+    return driverPool.filter((drv) =>
+      [drv.driver_id, drv.name, drv.phone, drv.city_prefix].some((value) => String(value ?? '').toLowerCase().includes(query))
     );
+  }, [driverPool, driverSearch]);
+
+  if (loading) {
+    return <TripDetailSkeleton />;
   }
 
   if (!data) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-lg font-bold text-content-primary mb-1">Trip Record Missing</div>
+        <div className="text-lg font-bold text-content-primary mb-1">{notFound ? 'Order not found' : 'Trip Record Missing'}</div>
         <p className="text-xs text-content-tertiary max-w-sm">The requested Order UUID does not exist or you do not have permission to view it.</p>
         <Link to="/trips" className="mt-4 text-xs font-semibold text-content-primary underline">Back to Trips List</Link>
       </div>
@@ -448,7 +479,7 @@ export const TripDetail: React.FC = () => {
               confirmLabel: 'Cancel Trip',
               destructive: true,
               requireReason: true,
-              run: () => cancelOrder(),
+              run: (reason) => cancelTrip(reason),
             })}
             disabled={actionLoading || trip.status === 'CANCELLED'}
             className="text-[11px] font-semibold bg-content-primary hover:bg-gray-800 text-gray-0 rounded-pill h-8 px-3.5 transition-colors disabled:opacity-40"
@@ -896,13 +927,20 @@ export const TripDetail: React.FC = () => {
               <h3 className="text-sm font-bold text-content-primary">Reassign Driver</h3>
               <p className="text-xs text-content-tertiary mt-1">Select an active driver to reassign this order</p>
             </div>
+            <input
+              type="text"
+              placeholder="Search driver name, phone, city, ID..."
+              className="w-full h-9 rounded-pill bg-background-secondary border border-background-secondary px-3 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none focus:border-content-primary"
+              value={driverSearch}
+              onChange={(e) => setDriverSearch(e.target.value)}
+            />
             {poolLoading ? (
               <div className="py-8 text-center text-xs text-content-tertiary animate-pulse">Loading driver pool…</div>
-            ) : driverPool.length === 0 ? (
+            ) : filteredDriverPool.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-tertiary">No active drivers available.</div>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {driverPool.map((drv) => (
+                {filteredDriverPool.map((drv) => (
                   <button
                     key={drv.driver_id}
                     onClick={() => setReassignDriverId(drv.driver_id)}
@@ -923,7 +961,7 @@ export const TripDetail: React.FC = () => {
             )}
             <div className="flex justify-end space-x-2 border-t border-background-secondary pt-3">
               <button
-                onClick={() => { setShowReassignModal(false); setReassignDriverId(''); }}
+                onClick={() => { setShowReassignModal(false); setReassignDriverId(''); setDriverSearch(''); }}
                 disabled={actionLoading}
                 className="text-xs text-content-secondary hover:text-content-primary px-3"
               >

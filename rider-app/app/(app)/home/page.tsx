@@ -9,6 +9,7 @@ import { useBookingStore } from "@/lib/store/bookingStore";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { useTripStore } from "@/lib/store/tripStore";
 import { nearbyApi, type NearbyDriver } from "@/lib/api/nearby";
+import { cityConfigApi } from "@/lib/api/cityConfig";
 
 // Leaflet must be lazily loaded — no SSR
 const RiderMap = dynamic(() => import("@/components/map/RiderMap"), {
@@ -16,16 +17,30 @@ const RiderMap = dynamic(() => import("@/components/map/RiderMap"), {
   loading: () => <div className="h-full w-full bg-background-secondary" />,
 });
 
+// Fallback only — replaced by city config on load
+const DEFAULT_CENTER = { lat: 22.5726, lng: 88.3639 };
+
 export default function HomePage() {
   const [userLocation, setUserLocation]  = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([]);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 22.5726, lng: 88.3639 });
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
   const setPickup = useBookingStore((s) => s.setPickup);
 
   // Hydrate the bell unread badge and the SOS shortcut's active-order gate.
   useEffect(() => {
     useNotificationStore.getState().fetchNotifications().catch(() => {});
     useTripStore.getState().hydrateActiveOrder();
+  }, []);
+
+  useEffect(() => {
+    cityConfigApi
+      .get()
+      .then((config) => {
+        if (typeof config.center_lat === "number" && typeof config.center_lng === "number") {
+          setMapCenter({ lat: config.center_lat, lng: config.center_lng });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,10 +62,9 @@ export default function HomePage() {
         loadNearby(loc.lat, loc.lng);
       },
       () => {
-        const fallback = { lat: 22.5726, lng: 88.3639 };
-        setMapCenter(fallback);
-        setPickup({ ...fallback, address: "Kolkata, West Bengal" });
-        loadNearby(fallback.lat, fallback.lng);
+        setMapCenter(DEFAULT_CENTER);
+        setPickup({ ...DEFAULT_CENTER, address: "Kolkata, West Bengal" });
+        loadNearby(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
       },
       { enableHighAccuracy: true, timeout: 8000 },
     );

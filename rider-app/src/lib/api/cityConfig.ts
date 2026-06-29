@@ -2,6 +2,8 @@ import { apiClient } from "./client";
 
 export interface CityConfig {
   city_prefix: string;
+  center_lat?: number;
+  center_lng?: number;
   operating_hours_start: string; // "HH:MM"
   operating_hours_end: string; // "HH:MM"
   supported_trip_types: string[]; // empty = all tiers allowed

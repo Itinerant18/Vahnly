@@ -3,61 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getTripById } from '../tripData';
+import { getDriverOrder, type DriverOrderDetail } from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useToastStore } from '@/store/useToastStore';
 import { FareDisplay } from '@/components/ds';
 import { StarIcon } from '@/components/ds/Icon';
-
-interface AuditTrailProps {
-  auditData: {
-    offer_timestamps: { received_ts: string; responded_ts: string; response_latency: number };
-    odometer_inputs: { start_km: number; end_km: number; otp_attempts: number };
-    route_metrics: { wait_time_minutes: number; route_deviations_m: number };
-    hardware_state: { device_model: string; network_type: string; battery_pct_drain: number };
-  };
-}
-
-export const TripAuditTrailPanel: React.FC<AuditTrailProps> = ({ auditData }) => {
-  return (
-    <div className="bg-background-primary text-content-primary p-6 rounded-2xl border border-border-opaque space-y-6 max-w-xl mx-auto font-mono text-xs text-left">
-      <div className="border-b border-border-opaque pb-3 flex justify-between items-center">
-        <span className="font-black text-content-warning tracking-wider">🔒 FORENSIC AUDIT TRAIL</span>
-        <span className="bg-background-secondary text-content-tertiary px-2 py-0.5 rounded text-[8px]">SECURE_LOG</span>
-      </div>
-
-      {/* Lifecycle Vectors */}
-      <div className="space-y-2">
-        <h4 className="text-content-secondary font-bold uppercase tracking-wide text-[9px] text-content-accent">1. Offer Execution Metrics</h4>
-        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-border-opaque">
-          <div>Received: <span className="text-content-secondary">{new Date(auditData.offer_timestamps.received_ts).toLocaleTimeString()}</span></div>
-          <div>Latency: <span className="text-content-positive">{auditData.offer_timestamps.response_latency}ms</span></div>
-        </div>
-      </div>
-
-      {/* Physics Validation Checks */}
-      <div className="space-y-2">
-        <h4 className="text-content-secondary font-bold uppercase tracking-wide text-[9px] text-content-accent">2. Physical Asset Checkpoints</h4>
-        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-border-opaque">
-          <div>Start Odo: <span className="text-content-secondary">{auditData.odometer_inputs.start_km} KM</span></div>
-          <div>End Odo: <span className="text-content-secondary">{auditData.odometer_inputs.end_km} KM</span></div>
-          <div>OTP Attempts: <span className="text-content-secondary">{auditData.odometer_inputs.otp_attempts}</span></div>
-          <div>Deviations: <span className="text-content-negative">{auditData.route_metrics.route_deviations_m}m</span></div>
-        </div>
-      </div>
-
-      {/* Hardware Diagnostics Log */}
-      <div className="space-y-2">
-        <h4 className="text-content-secondary font-bold uppercase tracking-wide text-[9px] text-content-warning">3. Hardware Diagnostics Envelope</h4>
-        <div className="grid grid-cols-2 gap-2 bg-black/40 p-3 rounded-lg border border-border-opaque">
-          <div>Terminal: <span className="text-content-secondary truncate block">{auditData.hardware_state.device_model}</span></div>
-          <div>Network Mode: <span className="text-content-secondary">{auditData.hardware_state.network_type}</span></div>
-          <div className="col-span-2">Battery Draw Over Route: <span className="text-content-warning">-{auditData.hardware_state.battery_pct_drain}%</span></div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 export default function TripDetailClient({ tripId }: { tripId: string }) {
   const trip = getTripById(tripId);
@@ -65,65 +15,20 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
   const { token } = useAuthStore();
   const [replayProgress, setReplayProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-
-  const [auditData, setAuditData] = useState<any>({
-    offer_timestamps: {
-      received_ts: new Date(Date.now() - 3600000).toISOString(),
-      responded_ts: new Date(Date.now() - 3540000).toISOString(),
-      response_latency: 850
-    },
-    odometer_inputs: {
-      start_km: 14500,
-      end_km: 14525,
-      otp_attempts: 1
-    },
-    route_metrics: {
-      wait_time_minutes: 4,
-      route_deviations_m: 120
-    },
-    hardware_state: {
-      device_model: "SM-G998B (Galaxy S21 Ultra)",
-      network_type: "5G_SA",
-      battery_pct_drain: 4
-    }
-  });
+  const [driverOrder, setDriverOrder] = useState<DriverOrderDetail | null>(null);
 
   useEffect(() => {
-    if (!tripId) return;
-    const fetchAudit = async () => {
+    if (!tripId || !token) return;
+    const fetchDriverOrder = async () => {
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`/api/v1/admin/orders/${tripId}/forensic-audit`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setAuditData({
-            offer_timestamps: {
-              received_ts: data.offer_timestamps?.received_ts || new Date(Date.now() - 3600000).toISOString(),
-              responded_ts: data.offer_timestamps?.responded_ts || new Date(Date.now() - 3540000).toISOString(),
-              response_latency: data.offer_timestamps?.response_latency || 0,
-            },
-            odometer_inputs: {
-              start_km: data.odometer_inputs?.start_km || 0,
-              end_km: data.odometer_inputs?.end_km || 0,
-              otp_attempts: data.odometer_inputs?.otp_attempts || 0,
-            },
-            route_metrics: {
-              wait_time_minutes: data.route_metrics?.wait_time_minutes || 0,
-              route_deviations_m: data.route_metrics?.route_deviations_m || 0,
-            },
-            hardware_state: {
-              device_model: data.hardware_state?.device_model || "Unknown",
-              network_type: data.hardware_state?.network_type || "Unknown",
-              battery_pct_drain: data.hardware_state?.battery_pct_drain || 0,
-            }
-          });
-        }
+        // Driver-scoped endpoint — do not replace with admin endpoint
+        const order = await getDriverOrder(token, tripId);
+        setDriverOrder(order);
       } catch (err) {
-        console.error('Failed to fetch forensic audit trail:', err);
+        console.error('Failed to fetch driver trip detail:', err);
       }
     };
-    fetchAudit();
+    fetchDriverOrder();
   }, [tripId, token]);
 
   useEffect(() => {
@@ -244,6 +149,18 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
                 <span className="text-content-tertiary block text-[8px] uppercase font-bold">Transit Time</span>
                 <span className="text-white block mt-0.5 font-bold">{trip.duration} Mins</span>
               </div>
+              {driverOrder && (
+                <>
+                  <div>
+                    <span className="text-content-tertiary block text-[8px] uppercase font-bold">Order Status</span>
+                    <span className="text-white block mt-0.5 font-bold">{driverOrder.status}</span>
+                  </div>
+                  <div>
+                    <span className="text-content-tertiary block text-[8px] uppercase font-bold">Last Odometer</span>
+                    <span className="text-white block mt-0.5 font-bold">{driverOrder.last_odometer} KM</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -326,9 +243,6 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
           </div>
         </div>
       </div>
-
-      {/* Forensic Audit Panel */}
-      <TripAuditTrailPanel auditData={auditData} />
     </div>
   );
 }

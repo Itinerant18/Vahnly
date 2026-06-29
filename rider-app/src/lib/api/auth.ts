@@ -23,6 +23,13 @@ export interface PasswordLoginResponse {
   is_new_rider: boolean;
 }
 
+export interface FirebaseVerifyResponse {
+  success: boolean;
+  is_new_user: boolean;
+  data?: { token: string; refresh_token?: string };
+  message?: string;
+}
+
 export const authApi = {
   sendOTP: (phone: string) =>
     apiClient.post<{ message: string; expires_in_seconds: number }>(
@@ -66,6 +73,12 @@ export const authApi = {
 
   setPassword: (password: string) =>
     apiClient.post<{ message: string }>("/api/v1/rider/me/password", { password }),
+
+  firebaseVerify: (firebaseIdToken: string, userType: "driver" | "rider") =>
+    apiClient.postRaw<FirebaseVerifyResponse>("/api/v1/auth/firebase/verify", {
+      firebase_id_token: firebaseIdToken,
+      user_type: userType,
+    }),
 
   me: () => apiClient.get<Rider>("/api/v1/rider/me"),
 

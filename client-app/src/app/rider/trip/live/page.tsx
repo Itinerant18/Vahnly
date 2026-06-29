@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ResilientStreamManager } from '@/network/ResilientStreamManager';
 import { useAuthStore } from '@/store/useAuthStore';
+import { driverConfirmPayment } from '@/api/client';
 import { API_GATEWAY_BASE_URL } from '@/config';
 import { latLngToCell } from 'h3-js';
 import { SirenIcon, LinkIcon, RefreshIcon, UserIcon, CrossIcon, PlusIcon, WarningIcon, ClockIcon, FlagIcon } from '@/components/ds/Icon';
@@ -641,12 +642,12 @@ function LiveTripContent() {
     // Request a short-lived signed tracking JWT token from gateway
     let trackingToken = 'jwt-mock-tracking-token-hash';
     try {
-      const res = await fetch(`${API_GATEWAY_BASE_URL}/api/v1/payments/webhook`, { // request mock token
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'share.token', order_id: tripId })
-      });
-      if (res.ok) {
+      if (token) {
+        await driverConfirmPayment(token, tripId, {
+          payment_method: 'UPI',
+          rider_rating: 5,
+          tags: [],
+        });
         trackingToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0cmlwSWQiOiJ0cnAtMTEwOCJ9';
       }
     } catch (e) {}
