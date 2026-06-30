@@ -560,12 +560,24 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 			}
 		} else if s.publisher != nil {
 			if pubErr := s.publisher.Publish(ctx, "order.created", orderID, payloadBytes); pubErr != nil {
-				// The order is persisted CREATED and counts as the rider's active booking,
-				// but dispatch never received order.created so it would never match — a ghost
-				// booking. Mirror the scheduled-enqueue failure path above: cancel to clear the
-				// active-order block and surface the failure for a clean retry.
-				_ = s.orders.CancelOrder(ctx, orderID, riderID, "dispatch_unavailable", 0)
-				return nil, fmt.Errorf("booking created but dispatch unavailable, please retry: %w", pubErr)
+				// Kafka down at booking time: the order is persisted CREATED but dispatch never got
+				// order.created. Rather than cancel (forces a rebook) or silently succeed (a ghost
+				// booking), park the same payload in the store-and-replay queue dated now — the
+				// dispatch scheduler re-emits order.created on its next tick once Kafka recovers, so
+				// dispatch self-heals while the rider keeps a normal pending trip. Idempotent end to
+				// end: EnqueueScheduledDispatch is ON CONFLICT DO NOTHING, the sweeper stamps
+				// dispatched_at once, and the matcher only assigns WHERE status='CREATED'
+				// (order_consumer.go:637), so a duplicate or post-cancel replay never double-dispatches.
+				// ponytail: shares the scheduled-booking queue, so there is no 10-min give-up bound — a
+				// multi-hour Kafka outage could replay a still-CREATED order late. Add a max-age filter
+				// (or a dedicated dispatch_failed column) if late replays ever become a problem.
+				if enqErr := s.orders.EnqueueScheduledDispatch(ctx, orderID, time.Now(), payloadBytes); enqErr != nil {
+					// Kafka and the replay queue are both unavailable — nothing can dispatch this
+					// order, so fall back to fail-fast: cancel to clear the active-order block and
+					// surface the failure for a clean retry.
+					_ = s.orders.CancelOrder(ctx, orderID, riderID, "dispatch_unavailable", 0)
+					return nil, fmt.Errorf("booking created but dispatch unavailable, please retry: %w", enqErr)
+				}
 			}
 		}
 	}
