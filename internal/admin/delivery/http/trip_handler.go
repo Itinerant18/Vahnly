@@ -373,48 +373,22 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		       COALESCE(d.name, 'Unassigned') as driver_name,
 		       COALESCE(d.phone, '') as driver_phone,
 		       COALESCE(d.is_verified, false) as driver_verified,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 0 THEN 'in-city round' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 1 THEN 'one-way' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 2 THEN 'mini-outstation' 
-		         ELSE 'outstation' 
-		       END as trip_type,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 0 THEN 'Hatchback' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 1 THEN 'Sedan' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 2 THEN 'SUV' 
-		         ELSE 'Premium' 
-		       END as car_type,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 2) = 0 THEN 'Manual' 
-		         ELSE 'Automatic' 
-		       END as transmission,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 3) = 0 THEN 'Stripe' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 3) = 1 THEN 'Razorpay' 
-		         ELSE 'Cash' 
-		       END as payment_method,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) = 0 THEN 'WELCOME50' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) = 1 THEN 'SAVEMORE' 
-		         ELSE 'None' 
-		       END as promo_applied,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 2) = 0 THEN true 
-		         ELSE false 
-		       END as d4m_care,
-		       CASE 
-		         WHEN o.status = 'COMPLETED'::order_status_enum THEN (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) + 1)::int 
-		         ELSE 0 
-		       END as rating,
-		       CASE 
-		         WHEN o.assigned_driver_id IS NULL THEN 'N/A' 
-		         ELSE 'WB-02-' || CHR(65 + (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 26)::int)) || 
-		                          CHR(65 + (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint/26, 26)::int)) || '-' || 
-		                          LPAD((MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 10000)::text), 4, '0') 
-		       END as plate
+		       COALESCE(o.trip_type, '') as trip_type,
+		       COALESCE(o.one_time_car_type, rg.car_type, '') as car_type,
+		       COALESCE(o.one_time_car_transmission, rg.transmission, '') as transmission,
+		       COALESCE(o.payment_method, '') as payment_method,
+		       COALESCE(o.promo_code, 'None') as promo_applied,
+		       COALESCE(o.d4m_care_opted, false) as d4m_care,
+		       CASE WHEN o.status = 'COMPLETED'::order_status_enum THEN COALESCE(o.rider_rating_for_driver, 0) ELSE 0 END as rating,
+		       COALESCE(rg.registration_plate, 'N/A') as plate,
+		       COALESCE(rd.name, '') as rider_name,
+		       COALESCE(rd.phone, '') as rider_phone,
+		       TRIM(COALESCE(o.one_time_car_make, rg.make, '') || ' ' || COALESCE(o.one_time_car_model, rg.model, '')) as car_model,
+		       COALESCE(o.promo_discount_paise, 0) as promo_discount_paise
 		FROM orders o
 		LEFT JOIN drivers d ON o.assigned_driver_id = d.id
+		LEFT JOIN rider_garage rg ON rg.id = o.garage_car_id
+		LEFT JOIN riders rd ON rd.id = o.customer_id
 		WHERE o.id = $1::uuid
 	`
 
@@ -423,6 +397,8 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	var completedAt *time.Time
 	var driverPhone, driverName string
 	var driverVerified bool
+	var riderName, riderPhone, carModel string
+	var promoDiscountPaise int64
 
 	err := h.dbPool.QueryRow(ctx, query, id).Scan(
 		&rec.ID, &rec.CityPrefix, &rec.CustomerID, &rec.Status,
@@ -430,6 +406,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		&rec.PickupH3Cell, &rec.AssignedDriver, &rec.SurgeMultiplier, &rec.BaseFarePaise, &rec.CreatedAt, &rec.AssignedAt, &pickedUpAt, &completedAt,
 		&driverName, &driverPhone, &driverVerified,
 		&rec.TripType, &rec.CarType, &rec.Transmission, &rec.PaymentMethod, &rec.PromoApplied, &rec.D4MCare, &rec.Rating, &rec.Plate,
+		&riderName, &riderPhone, &carModel, &promoDiscountPaise,
 	)
 	if err != nil {
 		http.Error(w, "order_not_found", http.StatusNotFound)
@@ -463,15 +440,24 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		Lat float64 `json:"lat"`
 		Lng float64 `json:"lng"`
 	}
-	var polyline []LatLng
-	polyline = append(polyline, LatLng{Lat: rec.PickupLat, Lng: rec.PickupLng})
-	for i := 1; i <= 3; i++ {
-		ratio := float64(i) / 4.0
-		lat := rec.PickupLat + (rec.DropoffLat-rec.PickupLat)*ratio
-		lng := rec.PickupLng + (rec.DropoffLng-rec.PickupLng)*ratio
-		polyline = append(polyline, LatLng{Lat: lat, Lng: lng})
+	// Real recorded GPS trail (same source as the gps-trail endpoint). No fabricated
+	// midpoints — fall back to just the pickup/dropoff endpoints if nothing was recorded.
+	polyline := []LatLng{}
+	if gpsRows, gErr := h.dbPool.Query(ctx,
+		`SELECT latitude, longitude FROM orders_gps_trail WHERE order_id = $1::uuid ORDER BY captured_at ASC`, id); gErr == nil {
+		for gpsRows.Next() {
+			var lat, lng float64
+			if gpsRows.Scan(&lat, &lng) == nil {
+				polyline = append(polyline, LatLng{Lat: lat, Lng: lng})
+			}
+		}
+		gpsRows.Close()
 	}
-	polyline = append(polyline, LatLng{Lat: rec.DropoffLat, Lng: rec.DropoffLng})
+	if len(polyline) == 0 {
+		polyline = append(polyline,
+			LatLng{Lat: rec.PickupLat, Lng: rec.PickupLng},
+			LatLng{Lat: rec.DropoffLat, Lng: rec.DropoffLng})
+	}
 
 	type RiderCard struct {
 		CustomerID string `json:"customer_id"`
@@ -479,11 +465,17 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		Phone      string `json:"phone"`
 		TripCount  int    `json:"trip_count"`
 	}
+	riderDisplayName := riderName
+	if riderDisplayName == "" {
+		riderDisplayName = fmt.Sprintf("Rider (%s)", rec.CustomerID[0:4])
+	}
+	var riderTrips int
+	_ = h.dbPool.QueryRow(ctx, `SELECT COUNT(*) FROM orders WHERE customer_id = $1::uuid`, rec.CustomerID).Scan(&riderTrips)
 	riderCard := RiderCard{
 		CustomerID: rec.CustomerID,
-		Name:       fmt.Sprintf("Rider (%s)", rec.CustomerID[0:4]),
-		Phone:      "+91 9876543210",
-		TripCount:  14,
+		Name:       riderDisplayName,
+		Phone:      riderPhone,
+		TripCount:  riderTrips,
 	}
 
 	type DriverCard struct {
@@ -495,12 +487,14 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	}
 	var driverCard *DriverCard
 	if rec.AssignedDriver != nil {
+		var driverTrips int
+		_ = h.dbPool.QueryRow(ctx, `SELECT COUNT(*) FROM orders WHERE assigned_driver_id = $1::uuid`, *rec.AssignedDriver).Scan(&driverTrips)
 		driverCard = &DriverCard{
 			DriverID:   *rec.AssignedDriver,
 			Name:       driverName,
 			Phone:      driverPhone,
 			IsVerified: driverVerified,
-			TripCount:  42,
+			TripCount:  driverTrips,
 		}
 	}
 
@@ -510,13 +504,9 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		Type         string `json:"type"`
 		Transmission string `json:"transmission"`
 	}
-	vehicleModel := "Maruti Swift"
-	if rec.CarType == "Premium" {
-		vehicleModel = "Audi A6"
-	} else if rec.CarType == "SUV" {
-		vehicleModel = "Toyota Innova"
-	} else if rec.CarType == "Sedan" {
-		vehicleModel = "Honda City"
+	vehicleModel := carModel
+	if vehicleModel == "" {
+		vehicleModel = "—"
 	}
 	vehicleCard := VehicleCard{
 		Plate:        rec.Plate,
@@ -531,12 +521,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	if rec.D4MCare {
 		care = 15.0
 	}
-	promo := 0.0
-	if rec.PromoApplied == "WELCOME50" {
-		promo = -50.0
-	} else if rec.PromoApplied == "SAVEMORE" {
-		promo = -30.0
-	}
+	promo := -float64(promoDiscountPaise) / 100.0
 	tax := (base + surge + care + promo) * 0.05
 	total := base + surge + care + promo + tax
 
@@ -589,15 +574,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 			}
 		}
 	}
-	if len(paymentAttempts) == 0 {
-		paymentAttempts = append(paymentAttempts, PaymentAttempt{
-			Timestamp:  rec.CreatedAt.Add(10 * time.Minute),
-			Status:     "SUCCEEDED",
-			Amount:     total,
-			TxnID:      "pi_simulated_" + id[0:6],
-			Provider:   rec.PaymentMethod,
-		})
-	}
+	// No simulated payment fallback — an empty list honestly means no payment_intents row.
 
 	type ComplaintItem struct {
 		ID       string `json:"id"`
