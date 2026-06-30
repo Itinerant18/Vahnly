@@ -63,6 +63,55 @@ type ActiveWebSocketSession struct {
 	Connection  *websocket.Conn
 }
 
+// driverSessionSet holds every live dispatch-stream socket a single driver currently
+// owns. The driver app opens more than one connection to /api/v1/dispatch/stream (the
+// offer consumer plus the connection-status chip), and all of them authenticate under
+// the same driver identity. Keying them in a flat last-writer-wins map meant a fresh
+// offer was delivered to whichever socket registered last — often the status chip,
+// which discards assignment frames, so the offer popup never appeared. Holding a set and
+// fanning offers to all of them guarantees the offer-consumer socket receives it.
+type driverSessionSet struct {
+	mu sync.Mutex
+	m  map[*ActiveWebSocketSession]struct{}
+}
+
+func (h *GatewayHandler) addDriverSession(driverID string, s *ActiveWebSocketSession) {
+	raw, _ := h.driverSessions.LoadOrStore(driverID, &driverSessionSet{m: map[*ActiveWebSocketSession]struct{}{}})
+	set := raw.(*driverSessionSet)
+	set.mu.Lock()
+	set.m[s] = struct{}{}
+	set.mu.Unlock()
+}
+
+func (h *GatewayHandler) removeDriverSession(driverID string, s *ActiveWebSocketSession) {
+	raw, ok := h.driverSessions.Load(driverID)
+	if !ok {
+		return
+	}
+	set := raw.(*driverSessionSet)
+	set.mu.Lock()
+	delete(set.m, s)
+	set.mu.Unlock()
+	// ponytail: leave the empty set in place rather than racing a delete against a
+	// concurrent reconnect's LoadOrStore. It's one empty struct per driver who ever
+	// connected — bounded by the driver roster; add reaping only if that ever matters.
+}
+
+func (h *GatewayHandler) driverSessionList(driverID string) []*ActiveWebSocketSession {
+	raw, ok := h.driverSessions.Load(driverID)
+	if !ok {
+		return nil
+	}
+	set := raw.(*driverSessionSet)
+	set.mu.Lock()
+	out := make([]*ActiveWebSocketSession, 0, len(set.m))
+	for s := range set.m {
+		out = append(out, s)
+	}
+	set.mu.Unlock()
+	return out
+}
+
 type GatewayHandler struct {
 	dbPool            *pgxpool.Pool
 	kafkaWriter       *kafka.Writer
@@ -74,6 +123,11 @@ type GatewayHandler struct {
 
 	// Thread-safe local session registry mapping active order IDs to WebSocket metadata
 	localSessions sync.Map
+
+	// driverSessions maps driverID -> *driverSessionSet: every dispatch-stream socket a
+	// driver holds. Offers fan out to the whole set so the offer-consumer socket always
+	// receives them, even when the driver also has a status-chip socket open.
+	driverSessions sync.Map
 }
 
 func NewGatewayHandler(db *pgxpool.Pool, kw *kafka.Writer, ps *pricingSvc.OrderPricingService, client *redis.ClusterClient) *GatewayHandler {
@@ -289,9 +343,11 @@ func (h *GatewayHandler) HandleMatchRealtimeStream(w http.ResponseWriter, r *htt
 	h.localSessions.Store(targetOrderID, sessionMetadata)
 	defer h.localSessions.Delete(targetOrderID)
 	if driverID, ok := middleware.GetUserIDFromContext(r.Context()); ok && driverID != "" {
-		driverSessionKey := fmt.Sprintf("driver:%s", driverID)
-		h.localSessions.Store(driverSessionKey, sessionMetadata)
-		defer h.localSessions.Delete(driverSessionKey)
+		// Register in the per-driver set, not a single flat key: the app holds more than
+		// one stream socket per driver, and a flat key let them clobber each other so the
+		// offer landed on whichever socket registered last (see driverSessions).
+		h.addDriverSession(driverID, sessionMetadata)
+		defer h.removeDriverSession(driverID, sessionMetadata)
 	}
 
 	presenceKey := fmt.Sprintf("ws:presence:%s", targetOrderID)
@@ -359,56 +415,42 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 				continue
 			}
 
-			rawSession, found := h.localSessions.Load(ev.OrderID)
-			if !found && msg.Channel == RedisPubSubChannel && ev.DriverID != "" {
-				rawSession, found = h.localSessions.Load(fmt.Sprintf("driver:%s", ev.DriverID))
+			// Resolve delivery targets. Order-keyed events (rider live trip, chat, GPS) go to
+			// the single session registered under that order id. A fresh assignment has no
+			// order-keyed session yet, so it fans out to every dispatch-stream socket the
+			// driver holds — the offer-consumer socket decodes it; presence-only sockets
+			// (e.g. the connection-status chip) ignore it.
+			var targets []*ActiveWebSocketSession
+			if raw, ok := h.localSessions.Load(ev.OrderID); ok {
+				if session, ok := raw.(*ActiveWebSocketSession); ok {
+					targets = append(targets, session)
+				}
+			} else if msg.Channel == RedisPubSubChannel && ev.DriverID != "" {
+				targets = h.driverSessionList(ev.DriverID)
 			}
-			if found {
-				if session, ok := rawSession.(*ActiveWebSocketSession); ok {
-					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"fare_estimate"`) {
-						select {
-						case session.MessageChan <- []byte(msg.Payload):
-						default:
-						}
-						continue
-					}
 
+			if len(targets) > 0 {
+				// Compute the wire payload once, then deliver the same bytes to every target.
+				var payload []byte
+				switch {
+				case msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"fare_estimate"`):
+					// Fare updates forwarded verbatim as JSON.
+					payload = []byte(msg.Payload)
+				case msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"incident_type"`):
 					// SOS / safety incidents carry richer fields than AssignmentFrame, and the
 					// admin terminal (order_id=global-sos) parses them as JSON. Forward verbatim.
-					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"incident_type"`) {
-						select {
-						case session.MessageChan <- []byte(msg.Payload):
-						default:
-						}
-						continue
-					}
-
-					// Rider->driver chat lines are forwarded verbatim as JSON; the driver app
-					// parses {chat_message:{from,text,ts}} directly off the socket.
-					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"chat_message"`) {
-						select {
-						case session.MessageChan <- []byte(msg.Payload):
-						default:
-						}
-						continue
-					}
-
-					// Rider->driver live location (first-mile): forwarded verbatim; the driver
-					// app parses {rider_location:{lat,lng}} off the socket.
-					if msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"rider_location"`) {
-						select {
-						case session.MessageChan <- []byte(msg.Payload):
-						default:
-						}
-						continue
-					}
-
-					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes
-					var binaryBuffer []byte
-					var marshalErr error
-
+					payload = []byte(msg.Payload)
+				case msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"chat_message"`):
+					// Rider->driver chat lines: app parses {chat_message:{from,text,ts}} off the socket.
+					payload = []byte(msg.Payload)
+				case msg.Channel == RedisPubSubChannel && strings.Contains(msg.Payload, `"rider_location"`):
+					// Rider->driver live location (first-mile): app parses {rider_location:{lat,lng}}.
+					payload = []byte(msg.Payload)
+				default:
+					// MILESTONE 31: Encode unstructured payloads into high-density Protobuf envelopes.
+					var envelope *WebSocketBinaryEnvelope
 					if msg.Channel == RedisPubSubChannel {
-						envelope := &WebSocketBinaryEnvelope{
+						envelope = &WebSocketBinaryEnvelope{
 							Type: FrameType_FRAME_TYPE_ASSIGNMENT,
 							Assignment: &AssignmentFrame{
 								OrderId:    ev.OrderID,
@@ -417,9 +459,8 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 								Status:     ev.Status,
 							},
 						}
-						binaryBuffer, marshalErr = proto.Marshal(envelope)
 					} else {
-						envelope := &WebSocketBinaryEnvelope{
+						envelope = &WebSocketBinaryEnvelope{
 							Type: FrameType_FRAME_TYPE_TELEMETRY,
 							Telemetry: &TelemetryFrame{
 								OrderId:      ev.OrderID,
@@ -431,15 +472,19 @@ func (h *GatewayHandler) InternalBackplaneMultiplexer(ctx context.Context) {
 								TimestampUtc: ev.TimestampUtc,
 							},
 						}
-						binaryBuffer, marshalErr = proto.Marshal(envelope)
 					}
+					b, marshalErr := proto.Marshal(envelope)
+					if marshalErr != nil {
+						continue
+					}
+					payload = b
+				}
 
-					if marshalErr == nil {
-						select {
-						case session.MessageChan <- binaryBuffer:
-						default:
-							// Handle channel pressure fallback gracefully
-						}
+				for _, session := range targets {
+					select {
+					case session.MessageChan <- payload:
+					default:
+						// Handle channel pressure fallback gracefully
 					}
 				}
 			} else if msg.Channel == RedisPubSubChannel && ev.DriverID != "" {
