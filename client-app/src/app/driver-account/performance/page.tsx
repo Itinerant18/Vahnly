@@ -77,7 +77,7 @@ export default function DriverPerformancePage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-mono text-xs">
         <div className="bg-background-primary border border-border-opaque p-4 rounded-2xl">
           <span className="text-content-tertiary block text-[8px] uppercase">{t('ratingScore')}</span>
-          <span className="text-xl font-bold text-content-warning block mt-1"><StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> {metrics.rating}</span>
+          <span className="text-xl font-bold text-content-warning block mt-1"><StarIcon size={14} className="text-content-warning fill-current" /> {metrics.rating}</span>
         </div>
         <div className="bg-background-primary border border-border-opaque p-4 rounded-2xl">
           <span className="text-content-tertiary block text-[8px] uppercase">{t('acceptIndex')}</span>
@@ -143,7 +143,7 @@ export default function DriverPerformancePage() {
                   <span className="text-white font-sans font-semibold">{r.name}</span>
                   <span className="text-content-tertiary text-[8px] ml-2">{r.date}</span>
                 </div>
-                <span className="text-content-warning font-bold"><StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> {r.rating}</span>
+                <span className="text-content-warning font-bold"><StarIcon size={14} className="text-content-warning fill-current" /> {r.rating}</span>
               </div>
               <p className="text-content-secondary leading-relaxed font-sans">{r.text}</p>
             </div>

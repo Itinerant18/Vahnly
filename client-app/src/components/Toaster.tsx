@@ -7,8 +7,8 @@ import { useToastStore, type ToastType } from '@/store/useToastStore';
 import { SuccessIcon, ErrorIcon, InfoIcon } from '@/components/ds/Icon';
 
 const TYPE_STYLE: Record<ToastType, { container: string; icon: React.ReactNode }> = {
-  success: { container: 'bg-surface-positive border-positive-200 text-content-positive', icon: <SuccessIcon size={18} className="text-green-500" /> },
-  error: { container: 'bg-surface-negative border-negative-200 text-content-negative', icon: <ErrorIcon size={18} className="text-red-500" /> },
+  success: { container: 'bg-surface-positive border-positive-200 text-content-positive', icon: <SuccessIcon size={18} className="text-content-positive" /> },
+  error: { container: 'bg-surface-negative border-negative-200 text-content-negative', icon: <ErrorIcon size={18} className="text-content-negative" /> },
   info: { container: 'bg-background-secondary border-border-opaque text-content-primary', icon: <InfoIcon size={18} className="text-content-primary" /> },
 };
 

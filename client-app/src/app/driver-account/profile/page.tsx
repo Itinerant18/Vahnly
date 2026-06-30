@@ -194,7 +194,7 @@ export default function DriverProfilePage() {
           <div className="flex justify-center sm:justify-start gap-4 text-xs font-mono pt-1 text-content-secondary">
             <div>
               <span className="text-content-tertiary block text-[9px] uppercase">RATING</span>
-              <span className="font-bold text-content-warning"><StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> 4.92</span>
+              <span className="font-bold text-content-warning"><StarIcon size={14} className="text-content-warning fill-current" /> 4.92</span>
             </div>
             <div className="border-r border-border-opaque h-6"></div>
             <div>

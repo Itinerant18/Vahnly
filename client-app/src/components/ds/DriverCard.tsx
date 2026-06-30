@@ -49,7 +49,7 @@ export function DriverCard({
         <div className="flex items-center gap-2">
           <span className="text-heading-small text-content-primary truncate">{name}</span>
           <span className="font-mono text-mono-small text-content-secondary tabular-nums flex-shrink-0 flex items-center gap-0.5">
-            <StarIcon size={14} className="text-yellow-500 fill-yellow-500" />
+            <StarIcon size={14} className="text-content-warning fill-current" />
             {rating.toFixed(2)}
           </span>
         </div>

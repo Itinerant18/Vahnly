@@ -227,7 +227,7 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
             <span className="text-content-tertiary text-[8px] uppercase block">Rating You Received</span>
             <span className="text-content-warning font-bold text-sm block">
               {Array.from({ length: trip.ratingReceived }).map((_, i) => (
-                <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />
+                <StarIcon key={i} size={14} className="text-content-warning fill-current" />
               ))}
             </span>
             <span className="text-content-secondary block text-[9px] mt-0.5">&quot;{trip.commentReceived}&quot;</span>
@@ -236,7 +236,7 @@ export default function TripDetailClient({ tripId }: { tripId: string }) {
             <span className="text-content-tertiary text-[8px] uppercase block">Rating You Provided</span>
             <span className="text-content-warning font-bold text-sm block">
               {Array.from({ length: trip.ratingGiven }).map((_, i) => (
-                <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />
+                <StarIcon key={i} size={14} className="text-content-warning fill-current" />
               ))}
             </span>
             <span className="text-content-secondary block text-[9px] mt-0.5">Tags: Polite, Safety conscious</span>

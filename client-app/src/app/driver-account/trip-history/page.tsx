@@ -350,7 +350,7 @@ export default function DriverTripHistoryPage() {
               <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-1 text-left">
                 <span className="text-content-tertiary text-[8px] uppercase block">Rating You Received</span>
                 <span className="text-content-warning font-bold text-sm block">
-                  {Array.from({ length: selectedTrip.ratingReceived }).map((_, i) => <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />)}
+                  {Array.from({ length: selectedTrip.ratingReceived }).map((_, i) => <StarIcon key={i} size={14} className="text-content-warning fill-current" />)}
                 </span>
                 <span className="text-content-secondary block text-[9px] mt-0.5">"{selectedTrip.commentReceived}"</span>
               </div>
@@ -358,7 +358,7 @@ export default function DriverTripHistoryPage() {
               <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-1 text-left">
                 <span className="text-content-tertiary text-[8px] uppercase block">Rating You Provided</span>
                 <span className="text-content-warning font-bold text-sm block">
-                  {Array.from({ length: selectedTrip.ratingGiven }).map((_, i) => <StarIcon key={i} size={14} className="text-yellow-500 fill-yellow-500" />)}
+                  {Array.from({ length: selectedTrip.ratingGiven }).map((_, i) => <StarIcon key={i} size={14} className="text-content-warning fill-current" />)}
                 </span>
                 <span className="text-content-secondary block text-[9px] mt-0.5">Tags: Polite, Safety conscious</span>
               </div>

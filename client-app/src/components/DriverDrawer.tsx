@@ -57,7 +57,7 @@ export const DriverDrawer: React.FC<DriverDrawerProps> = ({ isOpen, onClose, dri
             )}
             <div>
               <h3 className="text-xs font-bold text-content-primary uppercase tracking-tight">{driverProfile.name}</h3>
-              <p className="text-[10px] text-content-warning font-bold mt-0.5"><StarIcon size={14} className="text-yellow-500 fill-yellow-500" /> {driverProfile.rating.toFixed(2)}</p>
+              <p className="text-[10px] text-content-warning font-bold mt-0.5"><StarIcon size={14} className="text-content-warning fill-current" /> {driverProfile.rating.toFixed(2)}</p>
             </div>
           </div>
 

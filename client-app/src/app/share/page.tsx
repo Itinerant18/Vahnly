@@ -97,7 +97,7 @@ function PublicShareContent() {
               <UserIcon size={20} />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white flex items-center gap-1">{tripData.driverName} (<StarIcon size={12} className="text-yellow-500 fill-yellow-500" />{tripData.driverRating})</h4>
+              <h4 className="text-xs font-bold text-white flex items-center gap-1">{tripData.driverName} (<StarIcon size={12} className="text-content-warning fill-current" />{tripData.driverRating})</h4>
               <span className="text-[9px] font-mono text-content-tertiary uppercase tracking-wider block mt-0.5">
                 {t('pilotAllocatedBy', { name: tripData.riderName.split(' ')[0] })}
               </span>
