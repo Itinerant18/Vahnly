@@ -747,6 +747,34 @@ func (h *RiderHandler) HandleGetRiderDetail(w http.ResponseWriter, r *http.Reque
 
 	details := projectRider(id)
 
+	// Overlay the real identity from the riders table — projectRider only supplies CRM
+	// demo scaffolding (addresses, devices, etc.). Without this the detail view showed a
+	// fabricated name/phone/email that didn't match the (real) list row.
+	var rName, rPhone, rEmail string
+	var rPhoneVerified, rEmailVerified, rIsActive bool
+	var rKyc int
+	if err := h.dbPool.QueryRow(ctx, `
+		SELECT COALESCE(name, ''), COALESCE(phone, ''), COALESCE(email, ''),
+		       COALESCE(phone_verified, false), COALESCE(email_verified, false),
+		       COALESCE(kyc_level, 0), COALESCE(is_active, true)
+		FROM riders WHERE id = $1::uuid`, id).Scan(
+		&rName, &rPhone, &rEmail, &rPhoneVerified, &rEmailVerified, &rKyc, &rIsActive); err == nil {
+		details.Name = rName
+		details.Phone = rPhone
+		details.Email = rEmail
+		details.PhoneVerified = rPhoneVerified
+		details.EmailVerified = rEmailVerified
+		details.KYCLevel = rKyc
+		details.Overview.Contact.Phone = rPhone
+		details.Overview.Contact.Email = rEmail
+		details.Overview.KYCLevel = rKyc
+		if rIsActive {
+			details.Status = "ACTIVE"
+		} else {
+			details.Status = "SUSPENDED"
+		}
+	}
+
 	var ratingSum float64
 	var completedCount float64
 
