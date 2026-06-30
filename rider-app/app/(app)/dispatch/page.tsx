@@ -421,18 +421,23 @@ function DispatchContent() {
             >
               Try Again
             </button>
-            <button
-              onClick={handleTryAgain}
-              className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-primary"
-            >
-              Increase search radius
-            </button>
-            <button
-              onClick={() => router.push("/home")}
-              className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-secondary"
-            >
-              Schedule for Later
-            </button>
+            {/* Radius/scheduling can't help when dispatch itself is down — hide them. */}
+            {!dispatchDown && (
+              <>
+                <button
+                  onClick={handleTryAgain}
+                  className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-primary"
+                >
+                  Increase search radius
+                </button>
+                <button
+                  onClick={() => router.push("/home")}
+                  className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-secondary"
+                >
+                  Schedule for Later
+                </button>
+              </>
+            )}
             <button
               onClick={handleGoBack}
               className="h-12 w-full text-sm text-content-secondary"
