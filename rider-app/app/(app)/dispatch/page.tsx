@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { useTripStore } from "@/lib/store/tripStore";
 import { ordersApi } from "@/lib/api/orders";
+import { apiClient, ApiError } from "@/lib/api/client";
 import { RiderStreamManager } from "@/lib/websocket/RiderStreamManager";
 import type { RiderWebSocketMessage } from "@/lib/websocket/types";
 import { FareDisplay } from "@/components/ds";
@@ -177,6 +178,9 @@ function DispatchContent() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(orderId);
   const [remainingSecs, setRemainingSecs] = useState(60);
   const [assignedDriver, setAssignedDriver] = useState<AssignedDriver | null>(null);
+  // True when the search timed out *because the dispatch service is down* (503 from
+  // /api/v1/health/dispatch), as opposed to drivers simply being busy. Drives the copy.
+  const [dispatchDown, setDispatchDown] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const goLiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,6 +202,7 @@ function DispatchContent() {
   const startSearching = (oid: string) => {
     setActiveOrderId(oid);
     setState("SEARCHING");
+    setDispatchDown(false);
 
     // Countdown timer
     let secs = 60;
@@ -233,10 +238,17 @@ function DispatchContent() {
       }
     }, POLL_INTERVAL_MS);
 
-    // Hard timeout
-    timeoutRef.current = setTimeout(() => {
+    // Hard timeout. Before giving up, ask the gateway whether dispatch itself is down
+    // (503 from /api/v1/health/dispatch) so the rider sees "matching service unavailable —
+    // contact support" instead of "drivers busy" when the separate dispatch binary is missing.
+    timeoutRef.current = setTimeout(async () => {
       clearInterval(countInterval);
       stopTimers();
+      try {
+        await apiClient.get("/api/v1/health/dispatch");
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 503) setDispatchDown(true);
+      }
       setState("TIMEOUT");
     }, SEARCH_TIMEOUT_MS);
   };
@@ -392,9 +404,13 @@ function DispatchContent() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-content-primary">No drivers available</h1>
+            <h1 className="text-xl font-bold text-content-primary">
+              {dispatchDown ? "We're having trouble right now" : "No drivers available"}
+            </h1>
             <p className="mt-1 text-sm text-content-secondary">
-              All drivers in your area are busy right now. Try again in a few minutes.
+              {dispatchDown
+                ? "We're having trouble finding a driver right now. Please try again or contact support."
+                : "All drivers in your area are busy right now. Try again in a few minutes."}
             </p>
           </div>
 
