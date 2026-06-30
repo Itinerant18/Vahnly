@@ -252,7 +252,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
           <span>Chat</span>
         </button>
         <button
-          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${activeTrip.pickup_lat},${activeTrip.pickup_lng}`, '_blank')}
+          onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeTrip.pickup_lat},${activeTrip.pickup_lng}&travelmode=driving`, '_blank')}
           className="flex flex-col items-center justify-center gap-1 h-16 bg-accent-400 rounded-sm
             text-label-small text-white cursor-pointer transition-base
             hover:bg-accent-500 active:scale-95
