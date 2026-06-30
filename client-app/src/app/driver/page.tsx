@@ -99,7 +99,7 @@ export default function DriverTerminalPage() {
   const [kycPending, setKycPending] = useState(true); // Assume pending until profile loads
   
   // Account settings matching session or sandbox defaults
-  const driverID = user?.id || 'd-placeholder-id';
+  const driverID = user?.id ?? '';
   const driverName = profile?.name || user?.name || 'Driver...';
   const cityPrefix = profile?.city_prefix || 'KOL'; // Regional Hub KOL
 
@@ -494,7 +494,9 @@ export default function DriverTerminalPage() {
   };
 
   const openOnlineStreams = () => {
-    if (!token) return;
+    // Need both an auth token and a real driver id — never open telemetry/dispatch
+    // streams under a placeholder identity.
+    if (!token || !driverID) return;
 
     if (!telemetryStopRef.current) {
       telemetryStopRef.current = startTelemetryStream({
@@ -508,8 +510,12 @@ export default function DriverTerminalPage() {
     }
 
     if (!streamRef.current) {
+      // The order_id this stream sends only needs to be non-empty to clear the gateway's
+      // 400 guard (handler.go:270-271); its value is stored but never looked up. Assignment
+      // is delivered via the backend-generated "driver:{id}" session key derived from the JWT
+      // ticket identity (handler.go:292-293, 364), not from this string.
       streamRef.current = connectDispatchStream(
-        `stream-session-${driverID}`,
+        `driver-session-${driverID}`,
         token,
         {
           onAssignment: (frame) => {
