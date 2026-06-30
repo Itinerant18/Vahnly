@@ -276,15 +276,23 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 	// Calculations
 	totalTripsDelta := percentageDelta(totalTrips, prevTotalTrips)
 
-	// No KPI snapshot/time-series table exists, so there is no real prior value to diff
-	// active-trips / online-drivers against — report 0 rather than inventing an offset.
+	// Real trend deltas from the hourly kpi_snapshots row nearest ~1h ago. Both stay 0
+	// until the first snapshot ages in (or if the table is unavailable) — honest, never
+	// a fabricated offset.
 	activeTripsChange := int64(0)
+	onlineDriversDelta := 0.0
+	var prevActiveTrips, prevOnlineDrivers int64
+	if err := h.dbPool.QueryRow(ctx, `
+		SELECT active_trips, online_drivers FROM kpi_snapshots
+		WHERE captured_at <= now() - interval '1 hour'
+		ORDER BY captured_at DESC LIMIT 1`).Scan(&prevActiveTrips, &prevOnlineDrivers); err == nil {
+		activeTripsChange = activeTrips - prevActiveTrips
+		onlineDriversDelta = percentageDelta(onlineDrivers, prevOnlineDrivers)
+	}
 
 	newSignups := newRiders + newDrivers
 	prevNewSignups := prevNewRiders + prevNewDrivers
 	newSignupsDelta := percentageDelta(newSignups, prevNewSignups)
-
-	onlineDriversDelta := percentageDelta(onlineDrivers, onlineDrivers)
 
 	cancellationDelta := cancellationRate - prevCancellationRate
 	revenueDelta := percentageDelta(grossRevenue, prevGrossRevenue)

@@ -1396,6 +1396,9 @@ func main() {
 	// Periodically sample business gauges (active trips, online drivers) from the DB.
 	go startBusinessMetricsSampler(mainCtx, dbPool)
 
+	// Record hourly KPI snapshots so the dashboard can compute real trend deltas.
+	go startKpiSnapshotWorker(mainCtx, dbPool)
+
 	// Dispatch-presence check, delayed past the concurrent-boot window so a gateway-first
 	// start doesn't false-warn. For continuous detection, poll /api/v1/health/dispatch.
 	// ponytail: one-shot snapshot; upgrade to an edge-triggered monitor if catching a
@@ -1472,6 +1475,35 @@ func startKafkaToRedisFanoutWorker(ctx context.Context, brokers []string, client
 				continue
 			}
 			_ = client.Publish(ctx, gatewayHttp.RedisPubSubChannel, string(msg.Value)).Err()
+		}
+	}
+}
+
+// startKpiSnapshotWorker records one kpi_snapshots row per hour (plus one on boot) so
+// the admin dashboard can compute real active-trips / online-drivers trend deltas
+// against the prior hour, instead of fabricated magic offsets. Best-effort: a failed
+// write just skips that tick.
+func startKpiSnapshotWorker(ctx context.Context, pool *pgxpool.Pool) {
+	snap := func() {
+		sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if _, err := pool.Exec(sctx, `
+			INSERT INTO kpi_snapshots (active_trips, online_drivers)
+			SELECT
+				(SELECT COUNT(*) FROM orders WHERE status::text IN ('ASSIGNED','EN_ROUTE_TO_PICKUP','ARRIVED_AT_PICKUP','DELIVERING')),
+				(SELECT COUNT(*) FROM drivers WHERE current_state::text LIKE 'ONLINE%')`); err != nil {
+			log.Printf("[KPI_SNAPSHOT] write failed: %v", err)
+		}
+	}
+	snap() // one immediately so a delta is available within the first hour of uptime
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			snap()
 		}
 	}
 }
