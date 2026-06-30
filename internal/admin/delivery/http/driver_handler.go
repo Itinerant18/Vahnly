@@ -388,7 +388,9 @@ func (h *DriverHandler) HandleGetDrivers(w http.ResponseWriter, r *http.Request)
 				WHEN d.has_manual_certification AND d.has_automatic_certification THEN 'BOTH'
 				WHEN d.has_manual_certification THEN 'MANUAL'
 				ELSE 'AUTOMATIC'
-			END as transmission_capability
+			END as transmission_capability,
+			COALESCE(d.account_status, 'ACTIVE') as account_status,
+			COALESCE(d.rating, 0)::float as rating
 		FROM drivers d
 		ORDER BY d.created_at DESC
 	`
@@ -404,31 +406,28 @@ func (h *DriverHandler) HandleGetDrivers(w http.ResponseWriter, r *http.Request)
 	var drivers []DriverSummary
 
 	for rows.Next() {
-		var dID, city, name, phone, state, transmission string
+		var dID, city, name, phone, state, transmission, accountStatus string
 		var verified bool
-		var accRate, cancelRate float64
+		var accRate, cancelRate, dbRating float64
 		var totalTrips int64
 		var lastOnline time.Time
 
-		err := rows.Scan(&dID, &city, &name, &phone, &state, &verified, &accRate, &cancelRate, &totalTrips, &lastOnline, &transmission)
+		err := rows.Scan(&dID, &city, &name, &phone, &state, &verified, &accRate, &cancelRate, &totalTrips, &lastOnline, &transmission, &accountStatus, &dbRating)
 		if err != nil {
 			h.logger.Printf("[DRIVERS_ERROR] Row scan failed: %v", err)
 			continue
 		}
 
-		// Baseline default rating
-		baseRating := 4.5
 		proj := projectDriverOverview(dID, name, phone, city, verified, state)
-		h.mergeDriverOverrides(ctx, &proj)
-
-		// Calculate average rating based on rating trend
-		if len(proj.Performance.RatingTrend) > 0 {
-			var sum float64
-			for _, r := range proj.Performance.RatingTrend {
-				sum += r
-			}
-			baseRating = sum / float64(len(proj.Performance.RatingTrend))
+		// Real status (account_status), expertise (certifications) and rating (drivers.rating)
+		// from the drivers row — not the projected hash. PENDING_KYC for an active-but-
+		// unverified driver. Admin Redis overrides still win via mergeDriverOverrides.
+		proj.Status = accountStatus
+		if accountStatus == "ACTIVE" && !verified {
+			proj.Status = "PENDING_KYC"
 		}
+		proj.Expertise = transmission
+		h.mergeDriverOverrides(ctx, &proj)
 
 		item := DriverSummary{
 			DriverID:               dID,
@@ -436,7 +435,7 @@ func (h *DriverHandler) HandleGetDrivers(w http.ResponseWriter, r *http.Request)
 			Phone:                  proj.Phone,
 			CityPrefix:             proj.CityPrefix,
 			Status:                 proj.Status,
-			Rating:                 baseRating,
+			Rating:                 dbRating,
 			TotalTrips:             totalTrips,
 			AcceptanceRate:         accRate,
 			CancellationRate:       cancelRate,
