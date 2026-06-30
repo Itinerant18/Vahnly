@@ -304,7 +304,8 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		SELECT COALESCE(dv.license_plate, ''), COALESCE(dv.make, ''), COALESCE(dv.model, ''),
 		       COALESCE(dv.transmission, ''), COALESCE(dv.rc_status, ''), COALESCE(dv.insurance_status, ''),
 		       COALESCE(dv.puc_status, ''), dv.driver_id::text, COALESCE(d.name, ''),
-		       COALESCE(d.city_prefix, ''), dv.created_at
+		       COALESCE(d.city_prefix, ''), dv.created_at,
+		       COALESCE(dv.car_type, ''), COALESCE(dv.fuel_type, ''), COALESCE(dv.year, 0)
 		FROM driver_vehicles dv
 		JOIN drivers d ON d.id = dv.driver_id
 		WHERE dv.is_active`)
@@ -313,10 +314,11 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		return nil, err
 	}
 	for driverRows.Next() {
-		var plate, make, model, trans, rcS, insS, pucS, driverID, ownerName, city string
+		var plate, make, model, trans, rcS, insS, pucS, driverID, ownerName, city, ctype, fuel string
 		var createdAt time.Time
+		var year int
 		if err := driverRows.Scan(&plate, &make, &model, &trans, &rcS, &insS, &pucS,
-			&driverID, &ownerName, &city, &createdAt); err != nil {
+			&driverID, &ownerName, &city, &createdAt, &ctype, &fuel, &year); err != nil {
 			h.logger.Printf("[VEHICLES_ERROR] driver_vehicles scan: %v", err)
 			continue
 		}
@@ -327,6 +329,9 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		vehicleMap[key] = &Vehicle{
 			Plate:           plate,
 			Model:           strings.TrimSpace(make + " " + model),
+			Type:            ctype,
+			Fuel:            fuel,
+			Year:            year,
 			Transmission:    trans,
 			OwnerID:         driverID,
 			OwnerName:       ownerName,
