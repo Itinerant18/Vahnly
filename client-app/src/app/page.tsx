@@ -13,20 +13,9 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    // If authenticated, perform auto-onboarding redirect checks
+    // client-app serves drivers only; route authenticated users to the driver app.
     if (token && isAuthenticated) {
-      const activeTripId = localStorage.getItem('active_trip_id');
-      if (activeTripId) {
-        router.push('/driver');
-        return;
-      }
-
-      const onboardingCompleted = localStorage.getItem('rider_onboarding_completed') === 'true';
-      if (onboardingCompleted) {
-        router.push('/driver');
-      } else {
-        router.push('/onboarding');
-      }
+      router.push('/driver');
     }
   }, [token, isAuthenticated, router]);
 
