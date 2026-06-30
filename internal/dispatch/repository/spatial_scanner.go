@@ -203,30 +203,42 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	return candidates, nil
 }
 
-// SweepStaleCells walks every drivers:zset:* across the cluster and drops members whose
-// last-seen score is older than staleWindowSec. Cells that see GPS pings or matching scans
-// already self-clean (per-ping ZRem/ZRemRangeByScore in the writers, plus the on-scan GC in
-// ScanNearbyDrivers); this background sweep is the safety net for cells whose drivers all
-// went offline or crashed and which no ping or scan ever revisits, so their entries would
-// otherwise linger until the key TTL. Returns the number of members removed.
+// SweepStaleZSetBelow removes members scored strictly below cutoffUnix from every
+// drivers:zset:* key reachable through client — one cluster node, or a standalone Redis.
+// The cutoff is exclusive (a member scored exactly at it is kept, matching the read
+// filter so a borderline-visible driver isn't churned out). Split out from SweepStaleCells
+// so the removal logic is unit-testable without a cluster. Returns the count removed.
+func SweepStaleZSetBelow(ctx context.Context, client redis.Cmdable, cutoffUnix int64) (int64, error) {
+	maxScore := fmt.Sprintf("(%d", cutoffUnix)
+	var removed int64
+	iter := client.Scan(ctx, 0, "drivers:zset:*", 256).Iterator()
+	for iter.Next(ctx) {
+		n, err := client.ZRemRangeByScore(ctx, iter.Val(), "-inf", maxScore).Result()
+		if err != nil {
+			return removed, err
+		}
+		removed += n
+	}
+	return removed, iter.Err()
+}
+
+// SweepStaleCells fans SweepStaleZSetBelow across every cluster master. Cells that see GPS
+// pings or matching scans already self-clean (per-ping ZRem/ZRemRangeByScore in the writers,
+// plus the on-scan GC in ScanNearbyDrivers); this background sweep is the safety net for
+// cells whose drivers all went offline or crashed and which no ping or scan ever revisits, so
+// their entries would otherwise linger until the key TTL. Returns the number of members
+// removed. SCAN is node-local and any key it surfaces lives on that node, so the
+// ZRemRangeByScore runs locally (no MOVED redirect).
 func (s *SpatialScanner) SweepStaleCells(ctx context.Context, staleWindowSec int64) (int64, error) {
 	if s.clusterClient == nil {
 		return 0, fmt.Errorf("redis_cluster_client_unavailable")
 	}
-	maxScore := fmt.Sprintf("(%d", time.Now().Unix()-staleWindowSec)
+	cutoff := time.Now().Unix() - staleWindowSec
 	var removed atomic.Int64
-	// ForEachMaster fans out across shards concurrently. SCAN is node-local, and any key it
-	// surfaces lives on that node, so the ZRemRangeByScore runs locally (no MOVED redirect).
 	err := s.clusterClient.ForEachMaster(ctx, func(ctx context.Context, node *redis.Client) error {
-		iter := node.Scan(ctx, 0, "drivers:zset:*", 256).Iterator()
-		for iter.Next(ctx) {
-			n, zerr := node.ZRemRangeByScore(ctx, iter.Val(), "-inf", maxScore).Result()
-			if zerr != nil {
-				return zerr
-			}
-			removed.Add(n)
-		}
-		return iter.Err()
+		n, e := SweepStaleZSetBelow(ctx, node, cutoff)
+		removed.Add(n)
+		return e
 	})
 	return removed.Load(), err
 }

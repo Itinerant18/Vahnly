@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/uber/h3-go/v3"
 
@@ -79,5 +80,77 @@ func TestScanNearbyDrivers_InvalidToken(t *testing.T) {
 	_, err := scanner.ScanNearbyDrivers(context.Background(), "NYC", "invalid-token")
 	if err == nil {
 		t.Fatal("Expected error for invalid H3 token, got nil")
+	}
+}
+
+// SweepStaleZSetBelow is the per-node removal primitive SweepStaleCells fans across the
+// cluster. Tested in-process against miniredis (no daemon, no cluster needed).
+func TestSweepStaleZSetBelow_RemovesStaleKeepsFresh(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis start: %v", err)
+	}
+	defer mr.Close()
+
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer client.Close()
+
+	// cutoff = 1000 → members scored < 1000 are stale. cellA has one fresh + one stale;
+	// cellB has only a stale member (and must be emptied).
+	key1 := "drivers:zset:SWEEPTEST:cellA"
+	key2 := "drivers:zset:SWEEPTEST:cellB"
+	client.ZAdd(ctx, key1, redis.Z{Score: 2000, Member: "fresh-driver"})
+	client.ZAdd(ctx, key1, redis.Z{Score: 500, Member: "stale-driver"})
+	client.ZAdd(ctx, key2, redis.Z{Score: 500, Member: "stale-only"})
+
+	removed, err := repository.SweepStaleZSetBelow(ctx, client, 1000)
+	if err != nil {
+		t.Fatalf("SweepStaleZSetBelow: %v", err)
+	}
+	if removed != 2 {
+		t.Fatalf("expected 2 stale members removed, got %d", removed)
+	}
+
+	got1, _ := client.ZRange(ctx, key1, 0, -1).Result()
+	if len(got1) != 1 || got1[0] != "fresh-driver" {
+		t.Errorf("cellA should keep only fresh-driver, got %v", got1)
+	}
+	if card2, _ := client.ZCard(ctx, key2).Result(); card2 != 0 {
+		t.Errorf("cellB (all stale) should be emptied, got card=%d", card2)
+	}
+}
+
+// The cutoff is exclusive: a driver scored exactly at it stays visible, mirroring the
+// scanner's read window so a borderline driver isn't churned out of the index.
+func TestSweepStaleZSetBelow_ExclusiveCutoff(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis start: %v", err)
+	}
+	defer mr.Close()
+
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer client.Close()
+
+	key := "drivers:zset:BOUND:cellA"
+	client.ZAdd(ctx, key, redis.Z{Score: 999, Member: "below"})
+	client.ZAdd(ctx, key, redis.Z{Score: 1000, Member: "at-cutoff"})
+	client.ZAdd(ctx, key, redis.Z{Score: 1001, Member: "above"})
+
+	removed, err := repository.SweepStaleZSetBelow(ctx, client, 1000)
+	if err != nil {
+		t.Fatalf("SweepStaleZSetBelow: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("expected only the score<1000 member removed, got %d", removed)
+	}
+
+	got, _ := client.ZRange(ctx, key, 0, -1).Result()
+	if len(got) != 2 || got[0] != "at-cutoff" || got[1] != "above" {
+		t.Errorf("expected [at-cutoff above] kept (cutoff-inclusive), got %v", got)
 	}
 }
