@@ -750,24 +750,31 @@ func (h *RiderHandler) HandleGetRiderDetail(w http.ResponseWriter, r *http.Reque
 	// Overlay the real identity from the riders table — projectRider only supplies CRM
 	// demo scaffolding (addresses, devices, etc.). Without this the detail view showed a
 	// fabricated name/phone/email that didn't match the (real) list row.
-	var rName, rPhone, rEmail string
+	var rName, rPhone, rEmail, rKyc string
 	var rPhoneVerified, rEmailVerified, rIsActive bool
-	var rKyc int
+	// kyc_level is VARCHAR ('BASIC'/'VERIFIED'), not an int — scan it as text and map.
 	if err := h.dbPool.QueryRow(ctx, `
 		SELECT COALESCE(name, ''), COALESCE(phone, ''), COALESCE(email, ''),
 		       COALESCE(phone_verified, false), COALESCE(email_verified, false),
-		       COALESCE(kyc_level, 0), COALESCE(is_active, true)
+		       COALESCE(kyc_level, 'BASIC'), COALESCE(is_active, true)
 		FROM riders WHERE id = $1::uuid`, id).Scan(
-		&rName, &rPhone, &rEmail, &rPhoneVerified, &rEmailVerified, &rKyc, &rIsActive); err == nil {
+		&rName, &rPhone, &rEmail, &rPhoneVerified, &rEmailVerified, &rKyc, &rIsActive); err != nil {
+		// Don't fail the page — fall back to projected scaffold — but never swallow silently.
+		h.logger.Printf("[RIDERS_ERROR] real-identity overlay failed for %s: %v", id, err)
+	} else {
+		kycInt := 1
+		if strings.EqualFold(rKyc, "VERIFIED") {
+			kycInt = 2
+		}
 		details.Name = rName
 		details.Phone = rPhone
 		details.Email = rEmail
 		details.PhoneVerified = rPhoneVerified
 		details.EmailVerified = rEmailVerified
-		details.KYCLevel = rKyc
+		details.KYCLevel = kycInt
 		details.Overview.Contact.Phone = rPhone
 		details.Overview.Contact.Email = rEmail
-		details.Overview.KYCLevel = rKyc
+		details.Overview.KYCLevel = kycInt
 		if rIsActive {
 			details.Status = "ACTIVE"
 		} else {
