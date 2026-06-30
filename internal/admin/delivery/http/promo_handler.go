@@ -103,80 +103,68 @@ func (h *PromoHandler) HandleGetPromos(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Read promo codes from the index set, then fetch each payload. Avoids the
-	// blocking O(N) KEYS scan (which on a Redis Cluster only hits one node anyway).
-	codes, err := h.redisClient.SMembers(ctx, "promo:index").Result()
+	// Canonical promo_codes table — the same store the booking/fare path reads and
+	// writes. No Redis index, no hardcoded WELCOME50/SAVEMORE fallback.
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT code, discount_type, discount_value, max_discount_paise, min_fare_paise,
+		       max_redemptions, per_rider_limit, total_redeemed, COALESCE(city_prefix, ''),
+		       valid_from, valid_until, is_active, created_at
+		FROM promo_codes
+		ORDER BY created_at DESC`)
 	if err != nil {
-		h.logger.Printf("[PROMOS_ERROR] index fetch failed: %v", err)
-		http.Error(w, "redis_read_failed", http.StatusInternalServerError)
+		h.logger.Printf("[PROMOS_ERROR] promo_codes query failed: %v", err)
+		http.Error(w, "database_query_failed", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
 
-	promos := make([]PromoCode, 0, len(codes))
-	for _, code := range codes {
-		val, err := h.redisClient.Get(ctx, "promo:code:"+code).Result()
-		if err != nil || val == "" {
-			// Payload expired (TTL) but the index entry lingered — self-heal.
-			_ = h.redisClient.SRem(ctx, "promo:index", code).Err()
+	promos := make([]PromoCode, 0)
+	now := time.Now()
+	for rows.Next() {
+		var code, dtype, city string
+		var dvalue, maxDisc, minFare int64
+		var totalRedeemed, perUser int
+		var maxRed *int
+		var validFrom, createdAt time.Time
+		var validUntil *time.Time
+		var isActive bool
+		if err := rows.Scan(&code, &dtype, &dvalue, &maxDisc, &minFare, &maxRed, &perUser,
+			&totalRedeemed, &city, &validFrom, &validUntil, &isActive, &createdAt); err != nil {
 			continue
 		}
-		var p PromoCode
-		if err := json.Unmarshal([]byte(val), &p); err == nil {
-			// Read active redemption counter from Redis
-			countKey := "promo:redemptions:" + p.Code
-			if cVal, err := h.redisClient.Get(ctx, countKey).Result(); err == nil {
-				if cnt, err := strconv.Atoi(cVal); err == nil {
-					p.RedemptionsCount = cnt
-				}
-			}
-			promos = append(promos, p)
+		// discount_value stores paise for FLAT, the percent for PERCENT.
+		value := float64(dvalue)
+		if dtype == "FLAT" {
+			value = float64(dvalue) / 100.0
 		}
-	}
-
-	// Fallback standard defaults if keyspace is empty
-	if len(promos) == 0 {
-		promos = []PromoCode{
-			{
-				Code:             "WELCOME50",
-				PromoType:        "PERCENT",
-				Value:            50.0,
-				MaxDiscountPaise: 10000,
-				MinFarePaise:     8000,
-				TripTypes:        []string{"in-city round", "one-way"},
-				CarTypes:         []string{"Hatchback", "Sedan"},
-				Cities:           []string{"KOL", "BLR"},
-				PaymentMethods:   []string{"Stripe", "Razorpay", "Cash"},
-				UserSegment:      "NEW",
-				UsageCapTotal:    1000,
-				UsageCapPerUser:  1,
-				ValidFrom:        time.Now().Add(-100 * time.Hour),
-				ValidTo:          time.Now().Add(500 * time.Hour),
-				Stackable:        false,
-				Status:           "ACTIVE",
-				RedemptionsCount: 245,
-				CreatedAt:        time.Now().Add(-100 * time.Hour),
-			},
-			{
-				Code:             "SAVEMORE",
-				PromoType:        "FLAT",
-				Value:            100.0, // Rs 100 flat
-				MaxDiscountPaise: 10000,
-				MinFarePaise:     20000,
-				TripTypes:        []string{"outstation"},
-				CarTypes:         []string{"SUV", "Premium"},
-				Cities:           []string{"KOL", "BLR", "DEL"},
-				PaymentMethods:   []string{"Stripe", "Razorpay"},
-				UserSegment:      "ALL",
-				UsageCapTotal:    5000,
-				UsageCapPerUser:  3,
-				ValidFrom:        time.Now().Add(-50 * time.Hour),
-				ValidTo:          time.Now().Add(1000 * time.Hour),
-				Stackable:        true,
-				Status:           "ACTIVE",
-				RedemptionsCount: 88,
-				CreatedAt:        time.Now().Add(-50 * time.Hour),
-			},
+		status := "ACTIVE"
+		if !isActive {
+			status = "PAUSED"
+		} else if validUntil != nil && validUntil.Before(now) {
+			status = "EXPIRED"
 		}
+		cities := []string{}
+		if city != "" {
+			cities = []string{city}
+		}
+		validTo := time.Time{}
+		if validUntil != nil {
+			validTo = *validUntil
+		}
+		capTotal := 0
+		if maxRed != nil {
+			capTotal = *maxRed
+		}
+		// Targeting fields (trip/car/payment/segment/stackable) have no column in
+		// promo_codes yet, so they come back as empty defaults.
+		promos = append(promos, PromoCode{
+			Code: code, PromoType: dtype, Value: value,
+			MaxDiscountPaise: maxDisc, MinFarePaise: minFare,
+			TripTypes: []string{}, CarTypes: []string{}, Cities: cities, PaymentMethods: []string{},
+			UserSegment: "ALL", UsageCapTotal: capTotal, UsageCapPerUser: perUser,
+			ValidFrom: validFrom, ValidTo: validTo, Stackable: false,
+			Status: status, RedemptionsCount: totalRedeemed, CreatedAt: createdAt,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -237,28 +225,40 @@ func (h *PromoHandler) HandlePostPromo(w http.ResponseWriter, r *http.Request) {
 	}
 	req.CreatedAt = time.Now()
 
-	payloadBytes, err := json.Marshal(req)
-	if err != nil {
-		http.Error(w, "failed_to_serialize_promo", http.StatusInternalServerError)
+	discountType := "FLAT"
+	if strings.EqualFold(req.PromoType, "PERCENT") {
+		discountType = "PERCENT"
+	}
+	discountValue := int64(req.Value)
+	if discountType == "FLAT" {
+		discountValue = int64(req.Value * 100) // admin sends flat rupees; promo_codes stores paise
+	}
+	perUser := req.UsageCapPerUser
+	if perUser <= 0 {
+		perUser = 1
+	}
+	isActive := req.Status == "" || strings.EqualFold(req.Status, "ACTIVE")
+
+	// Upsert into the canonical promo_codes table the booking/fare path reads. Targeting
+	// fields (trip/car/payment/segment/stackable) have no column yet and aren't persisted.
+	if _, err := h.dbPool.Exec(ctx, `
+		INSERT INTO promo_codes (code, discount_type, discount_value, max_discount_paise,
+			min_fare_paise, max_redemptions, per_rider_limit, valid_from, valid_until, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (code) DO UPDATE SET
+			discount_type = EXCLUDED.discount_type, discount_value = EXCLUDED.discount_value,
+			max_discount_paise = EXCLUDED.max_discount_paise, min_fare_paise = EXCLUDED.min_fare_paise,
+			max_redemptions = EXCLUDED.max_redemptions, per_rider_limit = EXCLUDED.per_rider_limit,
+			valid_from = EXCLUDED.valid_from, valid_until = EXCLUDED.valid_until,
+			is_active = EXCLUDED.is_active, updated_at = now()`,
+		req.Code, discountType, discountValue, req.MaxDiscountPaise, req.MinFarePaise,
+		req.UsageCapTotal, perUser, req.ValidFrom, req.ValidTo, isActive); err != nil {
+		h.logger.Printf("[PROMOS_ERROR] promo_codes upsert failed: %v", err)
+		http.Error(w, "database_write_failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Expire the cached promo at valid_to so it physically drops after its window even
-	// before fare-time enforcement is wired (see FEAT: promo enforcement).
-	key := "promo:code:" + req.Code
-	promoTTL := time.Until(req.ValidTo)
-	err = h.redisClient.Set(ctx, key, payloadBytes, promoTTL).Err()
-	if err != nil {
-		http.Error(w, "redis_write_failed", http.StatusInternalServerError)
-		return
-	}
-	// Register in the lookup index so HandleGetPromos finds it without a KEYS scan.
-	_ = h.redisClient.SAdd(ctx, "promo:index", req.Code).Err()
-
-	// Initialize usage redemptions count tracker
-	_ = h.redisClient.SetNX(ctx, "promo:redemptions:"+req.Code, req.RedemptionsCount, 0).Err()
-
-	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODE_CREATED", 
+	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_CODE_CREATED",
 		fmt.Sprintf("Created promo code %s type %s value %f status %s", req.Code, req.PromoType, req.Value, req.Status), getClientIP(r))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -322,33 +322,21 @@ func (h *PromoHandler) HandlePostPromosBulk(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		promo := PromoCode{
-			Code:             code,
-			PromoType:        pType,
-			Value:            val,
-			MaxDiscountPaise: 15000,
-			MinFarePaise:     minFare,
-			TripTypes:        []string{"in-city round", "one-way", "mini-outstation", "outstation"},
-			CarTypes:         []string{"Hatchback", "Sedan", "SUV", "Premium"},
-			Cities:           []string{"KOL", "BLR", "DEL", "MUM"},
-			PaymentMethods:   []string{"Stripe", "Razorpay", "Cash"},
-			UserSegment:      "ALL",
-			UsageCapTotal:    1000,
-			UsageCapPerUser:  1,
-			ValidFrom:        time.Now(),
-			ValidTo:          time.Now().AddDate(1, 0, 0),
-			Status:           "ACTIVE",
-			CreatedAt:        time.Now(),
+		discountType := "FLAT"
+		if strings.EqualFold(pType, "PERCENT") {
+			discountType = "PERCENT"
 		}
-
-		bytes, err := json.Marshal(promo)
-		if err == nil {
-			err = h.redisClient.Set(ctx, "promo:code:"+code, bytes, 0).Err()
-			if err == nil {
-				_ = h.redisClient.SAdd(ctx, "promo:index", code).Err()
-				_ = h.redisClient.SetNX(ctx, "promo:redemptions:"+code, 0, 0).Err()
-				successCount++
-			}
+		discountValue := int64(val)
+		if discountType == "FLAT" {
+			discountValue = int64(val * 100)
+		}
+		if _, err := h.dbPool.Exec(ctx, `
+			INSERT INTO promo_codes (code, discount_type, discount_value, min_fare_paise,
+				max_discount_paise, per_rider_limit, valid_from, valid_until, is_active)
+			VALUES ($1, $2, $3, $4, 15000, 1, now(), now() + interval '1 year', true)
+			ON CONFLICT (code) DO NOTHING`,
+			code, discountType, discountValue, minFare); err == nil {
+			successCount++
 		}
 	}
 
@@ -389,20 +377,19 @@ func (h *PromoHandler) HandlePostPromoState(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	key := "promo:code:" + code
-	val, err := h.redisClient.Get(ctx, key).Result()
+	// ACTIVE -> is_active true; PAUSED/EXPIRED -> false. The booking path reads is_active.
+	isActive := strings.EqualFold(req.Status, "ACTIVE")
+	tag, err := h.dbPool.Exec(ctx,
+		`UPDATE promo_codes SET is_active = $1, updated_at = now() WHERE code = $2`,
+		isActive, strings.ToUpper(strings.TrimSpace(code)))
 	if err != nil {
+		http.Error(w, "database_write_failed", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
 		http.Error(w, "promo_not_found", http.StatusNotFound)
 		return
 	}
-
-	var promo PromoCode
-	_ = json.Unmarshal([]byte(val), &promo)
-	promo.Status = req.Status
-
-	updatedBytes, _ := json.Marshal(promo)
-	_ = h.redisClient.Set(ctx, key, updatedBytes, 0).Err()
-	_ = h.redisClient.SAdd(ctx, "promo:index", code).Err()
 
 	h.recordAuditLog(ctx, "00000000-0000-0000-0000-000000000000", adminEmail, "PROMO_STATE_TRANSITION",
 		fmt.Sprintf("Transited promo code %s state to %s", code, req.Status), getClientIP(r))
@@ -426,33 +413,28 @@ func (h *PromoHandler) HandleGetPromoAnalytics(w http.ResponseWriter, r *http.Re
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Get active redemptions count
-	redemptions := 0
-	cVal, err := h.redisClient.Get(ctx, "promo:redemptions:"+code).Result()
-	if err == nil {
-		redemptions, _ = strconv.Atoi(cVal)
+	var promoID string
+	if err := h.dbPool.QueryRow(ctx, `SELECT id::text FROM promo_codes WHERE code = $1`,
+		strings.ToUpper(strings.TrimSpace(code))).Scan(&promoID); err != nil {
+		http.Error(w, "promo_not_found", http.StatusNotFound)
+		return
 	}
 
-	// Generate realistic analytic metrics deterministically based on code hash
-	var hash uint32 = 2166136261
-	for i := 0; i < len(code); i++ {
-		hash ^= uint32(code[i])
-		hash *= 16777619
-	}
+	// Real redemptions + GMV from the orders those redemptions belong to.
+	var redemptions int
+	var gmvImpactPaise int64
+	_ = h.dbPool.QueryRow(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(o.base_fare_paise), 0)
+		FROM promo_redemptions pr
+		LEFT JOIN orders o ON o.id = pr.order_id
+		WHERE pr.promo_code_id = $1::uuid`, promoID).Scan(&redemptions, &gmvImpactPaise)
 
-	if redemptions == 0 {
-		redemptions = int((hash % 400) + 10)
-	}
-
-	avgFarePaise := int64(22000) // ₹220 avg
-	gmvImpactPaise := int64(redemptions) * avgFarePaise
-	roi := float64((hash % 150) + 120) // e.g. 120% to 270% ROI
-
+	// MarketingROI has no cost/attribution source — report 0 rather than a hash invention.
 	analytics := PromoAnalytics{
 		Code:         code,
 		Redemptions:  redemptions,
 		GMVImpact:    gmvImpactPaise,
-		MarketingROI: roi,
+		MarketingROI: 0,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
