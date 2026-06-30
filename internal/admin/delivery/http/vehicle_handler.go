@@ -220,84 +220,126 @@ func (h *VehicleHandler) mergeVehicleOverrides(ctx context.Context, v *Vehicle) 
 	}
 }
 
-// buildVehicles reconstructs the full vehicle fleet (trip vehicles + rider garage
-// cars) from orders, projects deterministic properties, and applies stored overrides.
-// Shared by the list and detail endpoints.
+// docStatusFromExpiry maps an expiry date to a compliance status. A nil date means
+// the document was never uploaded.
+func docStatusFromExpiry(exp *time.Time) (string, time.Time) {
+	if exp == nil {
+		return "PENDING", time.Time{}
+	}
+	now := time.Now()
+	switch {
+	case exp.Before(now):
+		return "EXPIRED", *exp
+	case exp.Before(now.AddDate(0, 0, 30)):
+		return "EXPIRING_SOON", *exp
+	default:
+		return "VERIFIED", *exp
+	}
+}
+
+// buildVehicles lists the real vehicle fleet from the source-of-truth tables:
+// rider_garage (rider-owned cars) and driver_vehicles (driver cars). Every active,
+// non-deleted vehicle appears with its real plate / make / model and real document
+// state — not the previous orders-derived, hash-fabricated placeholders (which hid any
+// car that had no trip). Shared by the list and detail endpoints.
+// ponytail: per-vehicle trip counts aren't reliably modelled (orders don't link to a
+// specific plate), so TripsCount stays 0 here; wire it if the directory needs it.
 func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
-	// 1. Query distinct drivers and orders to construct trip vehicles
-	sqlOrders := `
-		SELECT
-			o.id::text,
-			o.assigned_driver_id::text,
-			COALESCE(d.name, 'Unknown Driver') as driver_name,
-			COALESCE(d.city_prefix, o.city_prefix) as city,
-			o.customer_id::text
-		FROM orders o
-		LEFT JOIN drivers d ON o.assigned_driver_id = d.id
-	`
-	rows, err := h.dbPool.Query(ctx, sqlOrders)
+	vehicleMap := make(map[string]*Vehicle)
+
+	// 1. Rider garage cars.
+	riderRows, err := h.dbPool.Query(ctx, `
+		SELECT COALESCE(g.registration_plate, ''), COALESCE(g.make, ''), COALESCE(g.model, ''),
+		       COALESCE(g.year, 0), COALESCE(g.car_type, ''), COALESCE(g.transmission, ''),
+		       COALESCE(g.fuel_type, ''), g.rider_id::text, COALESCE(r.name, ''),
+		       g.insurance_expiry, g.puc_expiry, g.rc_document_url, g.created_at
+		FROM rider_garage g
+		JOIN riders r ON r.id = g.rider_id
+		WHERE g.is_active AND r.deleted_at IS NULL`)
 	if err != nil {
-		h.logger.Printf("[VEHICLES_ERROR] Failed to query orders: %v", err)
+		h.logger.Printf("[VEHICLES_ERROR] Failed to query rider_garage: %v", err)
 		return nil, err
 	}
-	defer rows.Close()
-
-	vehicleMap := make(map[string]*Vehicle)
-	riderCustomerIDs := make(map[string]string) // customer_id -> city_prefix
-
-	for rows.Next() {
-		var orderID, driverName, city, customerID string
-		var driverIDOpt sql.NullString
-		err := rows.Scan(&orderID, &driverIDOpt, &driverName, &city, &customerID)
-		if err != nil {
-			h.logger.Printf("[VEHICLES_ERROR] Failed to scan row: %v", err)
+	for riderRows.Next() {
+		var plate, make, model, ctype, trans, fuel, riderID, ownerName string
+		var year int
+		var insExp, pucExp *time.Time
+		var rcURL *string
+		var createdAt time.Time
+		if err := riderRows.Scan(&plate, &make, &model, &year, &ctype, &trans, &fuel,
+			&riderID, &ownerName, &insExp, &pucExp, &rcURL, &createdAt); err != nil {
+			h.logger.Printf("[VEHICLES_ERROR] rider_garage scan: %v", err)
 			continue
 		}
-
-		if customerID != "" {
-			riderCustomerIDs[customerID] = city
+		key := plate
+		if key == "" {
+			key = "rider:" + riderID
 		}
+		v := &Vehicle{
+			Plate:         plate,
+			Model:         strings.TrimSpace(make + " " + model),
+			Type:          ctype,
+			Transmission:  trans,
+			Fuel:          fuel,
+			Year:          year,
+			OwnerID:       riderID,
+			OwnerName:     ownerName,
+			OwnerType:     "RIDER",
+			LastServiced:  createdAt,
+			FlaggedIssues: []string{},
+		}
+		v.InsuranceStatus, v.InsuranceExpiryDate = docStatusFromExpiry(insExp)
+		v.PUCStatus, v.PUCExpiryDate = docStatusFromExpiry(pucExp)
+		if rcURL != nil && *rcURL != "" {
+			v.RCStatus = "VERIFIED"
+		} else {
+			v.RCStatus = "PENDING"
+		}
+		vehicleMap[key] = v
+	}
+	riderRows.Close()
 
-		if driverIDOpt.Valid && driverIDOpt.String != "" && driverIDOpt.String != "00000000-0000-0000-0000-000000000000" {
-			// Compute trip vehicle plate using order ID hash
-			val := hashUUID(orderID)
-			plate := fmt.Sprintf("WB-02-%c%c-%04d", 'A'+(val%26), 'A'+((val/26)%26), val%10000)
-
-			v, exists := vehicleMap[plate]
-			if !exists {
-				v = &Vehicle{
-					Plate:      plate,
-					OwnerID:    driverIDOpt.String,
-					OwnerName:  driverName,
-					OwnerType:  "DRIVER",
-					City:       city,
-					TripsCount: 0,
-				}
-				projectVehicleProperties(plate, v)
-				vehicleMap[plate] = v
-			}
-			v.TripsCount++
+	// 2. Driver vehicles (carry their own real document statuses).
+	driverRows, err := h.dbPool.Query(ctx, `
+		SELECT COALESCE(dv.license_plate, ''), COALESCE(dv.make, ''), COALESCE(dv.model, ''),
+		       COALESCE(dv.transmission, ''), COALESCE(dv.rc_status, ''), COALESCE(dv.insurance_status, ''),
+		       COALESCE(dv.puc_status, ''), dv.driver_id::text, COALESCE(d.name, ''),
+		       COALESCE(d.city_prefix, ''), dv.created_at
+		FROM driver_vehicles dv
+		JOIN drivers d ON d.id = dv.driver_id
+		WHERE dv.is_active`)
+	if err != nil {
+		h.logger.Printf("[VEHICLES_ERROR] Failed to query driver_vehicles: %v", err)
+		return nil, err
+	}
+	for driverRows.Next() {
+		var plate, make, model, trans, rcS, insS, pucS, driverID, ownerName, city string
+		var createdAt time.Time
+		if err := driverRows.Scan(&plate, &make, &model, &trans, &rcS, &insS, &pucS,
+			&driverID, &ownerName, &city, &createdAt); err != nil {
+			h.logger.Printf("[VEHICLES_ERROR] driver_vehicles scan: %v", err)
+			continue
+		}
+		key := plate
+		if key == "" {
+			key = "driver:" + driverID
+		}
+		vehicleMap[key] = &Vehicle{
+			Plate:           plate,
+			Model:           strings.TrimSpace(make + " " + model),
+			Transmission:    trans,
+			OwnerID:         driverID,
+			OwnerName:       ownerName,
+			OwnerType:       "DRIVER",
+			City:            city,
+			LastServiced:    createdAt,
+			RCStatus:        rcS,
+			InsuranceStatus: insS,
+			PUCStatus:       pucS,
+			FlaggedIssues:   []string{},
 		}
 	}
-
-	// 2. Project Rider Garage Vehicles
-	for customerID, city := range riderCustomerIDs {
-		val := hashUUID(customerID)
-		plate := fmt.Sprintf("WB-02-%c%c-%04d", 'A'+(val%26), 'A'+((val/26)%26), val%10000)
-
-		if _, exists := vehicleMap[plate]; !exists {
-			v := &Vehicle{
-				Plate:      plate,
-				OwnerID:    customerID,
-				OwnerName:  projectRiderName(customerID),
-				OwnerType:  "RIDER",
-				City:       city,
-				TripsCount: 0, // Garage cars have 0 recorded trips by default unless matches trip vehicle
-			}
-			projectVehicleProperties(plate, v)
-			vehicleMap[plate] = v
-		}
-	}
+	driverRows.Close()
 
 	// Apply overrides and build result array
 	var vehicles []Vehicle
