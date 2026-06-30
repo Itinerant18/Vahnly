@@ -509,29 +509,37 @@ func (h *RiderHandler) HandleGetRiders(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Base SQL Query aggregating distinct riders
+	// List every registered rider (the riders table is the source of truth), not only
+	// those who have placed an order. LEFT JOIN orders so zero-trip riders still appear,
+	// and surface their real name/phone/email instead of projected placeholders.
 	sqlQuery := `
-		SELECT 
-			o.customer_id::text,
-			MIN(o.created_at) as signup_date,
-			string_agg(DISTINCT o.city_prefix, ',') as cities,
+		SELECT
+			r.id::text,
+			COALESCE(r.name, ''),
+			COALESCE(r.phone, ''),
+			COALESCE(r.email, ''),
+			r.created_at as signup_date,
+			COALESCE(string_agg(DISTINCT o.city_prefix, ','), '') as cities,
 			COUNT(o.id) as total_trips,
 			COALESCE(AVG(
-				CASE 
+				CASE
 					WHEN o.status = 'COMPLETED'::order_status_enum THEN (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) + 1)::float
-					ELSE NULL 
+					ELSE NULL
 				END
 			), 0.0) as avg_rating,
 			COALESCE(SUM(
-				CASE 
+				CASE
 					WHEN o.status = 'COMPLETED'::order_status_enum THEN o.base_fare_paise
-					ELSE 0 
+					ELSE 0
 				END
 			), 0)::bigint as ltv_paise,
-			MAX(o.created_at) as last_trip_at
-		FROM orders o
-		GROUP BY o.customer_id
-		ORDER BY last_trip_at DESC
+			COALESCE(MAX(o.created_at), r.created_at) as last_trip_at,
+			r.is_active
+		FROM riders r
+		LEFT JOIN orders o ON o.customer_id = r.id
+		WHERE r.deleted_at IS NULL
+		GROUP BY r.id, r.name, r.phone, r.email, r.created_at, r.is_active
+		ORDER BY r.created_at DESC
 	`
 
 	rows, err := h.dbPool.Query(ctx, sqlQuery)
@@ -545,21 +553,35 @@ func (h *RiderHandler) HandleGetRiders(w http.ResponseWriter, r *http.Request) {
 	var riders []RiderSummary
 
 	for rows.Next() {
-		var customerID, citiesStr string
+		var customerID, dbName, dbPhone, dbEmail, citiesStr string
 		var signupDate, lastTripDate time.Time
 		var totalTrips int64
 		var avgRating float64
 		var ltvPaise int64
+		var isActive bool
 
-		if err := rows.Scan(&customerID, &signupDate, &citiesStr, &totalTrips, &avgRating, &ltvPaise, &lastTripDate); err != nil {
+		if err := rows.Scan(&customerID, &dbName, &dbPhone, &dbEmail, &signupDate, &citiesStr, &totalTrips, &avgRating, &ltvPaise, &lastTripDate, &isActive); err != nil {
 			h.logger.Printf("[RIDERS_ERROR] Scanning row failed: %v", err)
 			continue
 		}
 
-		cities := strings.Split(citiesStr, ",")
+		cities := []string{}
+		if citiesStr != "" {
+			cities = strings.Split(citiesStr, ",")
+		}
 
-		// Generate default projections
+		// Projection supplies CRM-only scaffold (tags, referral source, wallet); real
+		// identity comes from the riders table and status from is_active. Redis overrides
+		// (admin edits / suspend / block) still win via mergeRiderOverrides.
 		proj := projectRider(customerID)
+		proj.Name = dbName
+		proj.Phone = dbPhone
+		proj.Email = dbEmail
+		if isActive {
+			proj.Status = "ACTIVE"
+		} else {
+			proj.Status = "SUSPENDED"
+		}
 		h.mergeRiderOverrides(ctx, &proj)
 
 		riderItem := RiderSummary{
