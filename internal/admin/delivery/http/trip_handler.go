@@ -130,48 +130,20 @@ func (h *AdminTripHandler) HandleAdminGetOrders(w http.ResponseWriter, r *http.R
 		       ST_Y(o.dropoff_location::geometry) as dropoff_lat, ST_X(o.dropoff_location::geometry) as dropoff_lng,
 		       o.pickup_h3_cell, o.assigned_driver_id, o.surge_multiplier, o.base_fare_paise, o.created_at, o.assigned_at,
 		       COALESCE(d.name, 'Unassigned') as driver_name,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 0 THEN 'in-city round' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 1 THEN 'one-way' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 2 THEN 'mini-outstation' 
-		         ELSE 'outstation' 
-		       END as trip_type,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 0 THEN 'Hatchback' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 1 THEN 'Sedan' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 4) = 2 THEN 'SUV' 
-		         ELSE 'Premium' 
-		       END as car_type,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 2) = 0 THEN 'Manual' 
-		         ELSE 'Automatic' 
-		       END as transmission,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 3) = 0 THEN 'Stripe' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 3) = 1 THEN 'Razorpay' 
-		         ELSE 'Cash' 
-		       END as payment_method,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) = 0 THEN 'WELCOME50' 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) = 1 THEN 'SAVEMORE' 
-		         ELSE 'None' 
-		       END as promo_applied,
-		       CASE 
-		         WHEN MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 2) = 0 THEN true 
-		         ELSE false 
-		       END as d4m_care,
-		       CASE 
-		         WHEN o.status = 'COMPLETED'::order_status_enum THEN (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 5) + 1)::int 
-		         ELSE 0 
+		       COALESCE(o.trip_type, '') as trip_type,
+		       COALESCE(o.one_time_car_type, rg.car_type, '') as car_type,
+		       COALESCE(o.one_time_car_transmission, rg.transmission, '') as transmission,
+		       COALESCE(o.payment_method, '') as payment_method,
+		       COALESCE(o.promo_code, 'None') as promo_applied,
+		       COALESCE(o.d4m_care_opted, false) as d4m_care,
+		       CASE
+		         WHEN o.status = 'COMPLETED'::order_status_enum THEN COALESCE(o.rider_rating_for_driver, 0)
+		         ELSE 0
 		       END as rating,
-		       CASE 
-		         WHEN o.assigned_driver_id IS NULL THEN 'N/A' 
-		         ELSE 'WB-02-' || CHR(65 + (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 26)::int)) || 
-		                          CHR(65 + (MOD(('x'||right(o.id::text, 8))::bit(32)::bigint/26, 26)::int)) || '-' || 
-		                          LPAD((MOD(('x'||right(o.id::text, 8))::bit(32)::bigint, 10000)::text), 4, '0') 
-		       END as plate
+		       COALESCE(rg.registration_plate, 'N/A') as plate
 		FROM orders o
 		LEFT JOIN drivers d ON o.assigned_driver_id = d.id
+		LEFT JOIN rider_garage rg ON rg.id = o.garage_car_id
 	`
 
 	var conditions []string
@@ -233,61 +205,36 @@ func (h *AdminTripHandler) HandleAdminGetOrders(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	hashExpr := "('x'||right(o.id::text, 8))::bit(32)::bigint"
-
+	// Filters match the real columns shown above (rg = rider_garage joined on garage_car_id).
 	if tripType != "" {
-		addCond(`CASE 
-			WHEN MOD(`+hashExpr+`, 4) = 0 THEN 'in-city round' 
-			WHEN MOD(`+hashExpr+`, 4) = 1 THEN 'one-way' 
-			WHEN MOD(`+hashExpr+`, 4) = 2 THEN 'mini-outstation' 
-			ELSE 'outstation' 
-		END = $%d`, tripType)
+		addCond("COALESCE(o.trip_type, '') = $%d", tripType)
 	}
 
 	if carType != "" {
-		addCond(`CASE 
-			WHEN MOD(`+hashExpr+`, 4) = 0 THEN 'Hatchback' 
-			WHEN MOD(`+hashExpr+`, 4) = 1 THEN 'Sedan' 
-			WHEN MOD(`+hashExpr+`, 4) = 2 THEN 'SUV' 
-			ELSE 'Premium' 
-		END = $%d`, carType)
+		addCond("COALESCE(o.one_time_car_type, rg.car_type, '') = $%d", carType)
 	}
 
 	if transmission != "" {
-		addCond(`CASE 
-			WHEN MOD(`+hashExpr+`, 2) = 0 THEN 'Manual' 
-			ELSE 'Automatic' 
-		END = $%d`, transmission)
+		addCond("COALESCE(o.one_time_car_transmission, rg.transmission, '') = $%d", transmission)
 	}
 
 	if paymentMethod != "" {
-		addCond(`CASE 
-			WHEN MOD(`+hashExpr+`, 3) = 0 THEN 'Stripe' 
-			WHEN MOD(`+hashExpr+`, 3) = 1 THEN 'Razorpay' 
-			ELSE 'Cash' 
-		END = $%d`, paymentMethod)
+		addCond("COALESCE(o.payment_method, '') = $%d", paymentMethod)
 	}
 
 	if promoApplied != "" {
-		addCond(`CASE 
-			WHEN MOD(`+hashExpr+`, 5) = 0 THEN 'WELCOME50' 
-			WHEN MOD(`+hashExpr+`, 5) = 1 THEN 'SAVEMORE' 
-			ELSE 'None' 
-		END = $%d`, promoApplied)
+		addCond("COALESCE(o.promo_code, 'None') = $%d", promoApplied)
 	}
 
 	if d4mCare != "" {
 		if careVal, err := strconv.ParseBool(d4mCare); err == nil {
-			addCond(`CASE 
-				WHEN MOD(`+hashExpr+`, 2) = 0 THEN true 
-				ELSE false 
-			END = $%d`, careVal)
+			addCond("COALESCE(o.d4m_care_opted, false) = $%d", careVal)
 		}
 	}
 
 	if ratingLess3 == "true" {
 		conditions = append(conditions, "o.status = 'COMPLETED'::order_status_enum")
-		conditions = append(conditions, fmt.Sprintf("(MOD(%s, 5) + 1) < 3", hashExpr))
+		conditions = append(conditions, "o.rider_rating_for_driver IS NOT NULL AND o.rider_rating_for_driver < 3")
 	}
 
 	if searchFilter != "" {
