@@ -67,9 +67,13 @@ function UnifiedLoginContent() {
     }
   };
 
-  // Real-time phone input formatting (9999988888 -> 99999 88888)
+  // Real-time phone input formatting (9999988888 -> 99999 88888).
+  // Take the LAST 10 digits so a number entered with a country code or trunk prefix
+  // (+91 / 91 / leading 0) collapses to the bare 10-digit form instead of silently
+  // keeping the wrong first 10 (which produced "registered but NOT_FOUND" logins).
   const handlePhoneChange = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 10);
+    let digits = val.replace(/\D/g, '');
+    if (digits.length > 10) digits = digits.slice(-10);
     if (digits.length > 5) {
       setPhone(`${digits.slice(0, 5)} ${digits.slice(5)}`);
     } else {

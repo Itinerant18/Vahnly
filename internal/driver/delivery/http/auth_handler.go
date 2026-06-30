@@ -320,12 +320,24 @@ func (h *DriverAuthHandler) HandleDriverLogin(w http.ResponseWriter, r *http.Req
 	var dbOnboardingStep int
 	var dbPhoneVerified bool
 
+	// Match on the trailing 10 digits so login works regardless of how the number was
+	// typed or stored (+91, leading 0, spaces). Existing rows hold the bare 10-digit
+	// form; this also matches any +91-prefixed rows without a data migration.
+	phoneKey := lastTenDigits(req.Phone)
+	if len(phoneKey) < 10 {
+		h.recordAuditLog(ctx, "", "LOGIN_FAILURE_NOT_FOUND", deviceID, ip, appVersion, geoLocation)
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// ponytail: functional match is unindexed — the drivers table is small. Add a
+	// normalized-phone column + index if it grows enough to matter.
 	query := `
 		SELECT id, name, phone, password_hash, city_prefix, verification_status, onboarding_step, phone_verified
 		FROM drivers
-		WHERE phone = $1
+		WHERE right(regexp_replace(phone, '\D', '', 'g'), 10) = $1
 	`
-	err := h.dbPool.QueryRow(ctx, query, req.Phone).Scan(
+	err := h.dbPool.QueryRow(ctx, query, phoneKey).Scan(
 		&dbDriverID, &dbName, &dbPhone, &dbPasswordHash, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep, &dbPhoneVerified,
 	)
 
@@ -582,6 +594,23 @@ func normalizePhone(phone string) string {
 	phone = strings.ReplaceAll(phone, " ", "")
 	phone = strings.ReplaceAll(phone, "-", "")
 	return phone
+}
+
+// lastTenDigits strips every non-digit and returns the trailing 10 digits, so any
+// entry format for an Indian mobile ("+919832520886", "09832520886", "98325 20886")
+// collapses to the bare 10-digit "9832520886" used for format-agnostic phone matching.
+func lastTenDigits(phone string) string {
+	var b strings.Builder
+	for _, r := range phone {
+		if r >= '0' && r <= '9' {
+			b.WriteByte(byte(r))
+		}
+	}
+	d := b.String()
+	if len(d) > 10 {
+		d = d[len(d)-10:]
+	}
+	return d
 }
 
 // generateOTP returns a cryptographically-random 6-digit numeric OTP.
