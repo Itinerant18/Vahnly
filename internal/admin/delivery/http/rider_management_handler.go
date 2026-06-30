@@ -759,7 +759,30 @@ func (h *AdminRiderHandler) HandleRiderMetrics(w http.ResponseWriter, r *http.Re
 		"trips_booked_today":   tripsToday,
 		"avg_fare_paise_today": int64(avgFareToday),
 		"daily_bookings":       series,
+		"retention": map[string]any{
+			"d1":  h.riderRetention(ctx, 1),
+			"d7":  h.riderRetention(ctx, 7),
+			"d30": h.riderRetention(ctx, 30),
+		},
 	})
+}
+
+// riderRetention returns the percentage of the cohort that signed up `days` ago
+// and placed an order today, or nil when that cohort is empty.
+func (h *AdminRiderHandler) riderRetention(ctx context.Context, days int) interface{} {
+	var cohort, retained int64
+	err := h.dbPool.QueryRow(ctx, `
+		SELECT
+			COUNT(*),
+			COUNT(*) FILTER (WHERE EXISTS (
+				SELECT 1 FROM orders o
+				WHERE o.customer_id = r.id AND o.created_at::date = CURRENT_DATE))
+		FROM riders r
+		WHERE r.created_at::date = CURRENT_DATE - $1::int`, days).Scan(&cohort, &retained)
+	if err != nil || cohort == 0 {
+		return nil
+	}
+	return int64(float64(retained) / float64(cohort) * 100.0)
 }
 
 // ---- shared helpers ----

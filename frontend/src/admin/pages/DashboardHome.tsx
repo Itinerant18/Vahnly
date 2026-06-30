@@ -22,6 +22,7 @@ interface RiderMetrics {
   trips_booked_today:   number;
   avg_fare_paise_today: number;
   daily_bookings: { label: string; value: number }[];
+  retention?: { d1: number | null; d7: number | null; d30: number | null };
 }
 
 const RiderMetricsSection: React.FC = () => {
@@ -61,7 +62,11 @@ const RiderMetricsSection: React.FC = () => {
         <div className="card">
           <div className="text-label-medium text-content-primary uppercase tracking-wider mb-4">Rider retention</div>
           <div className="grid grid-cols-3 gap-3 text-center">
-            {[{ k: 'Day 1', v: '62%' }, { k: 'Day 7', v: '38%' }, { k: 'Day 30', v: '21%' }].map((c) => (
+            {[
+              { k: 'Day 1', v: m?.retention?.d1 },
+              { k: 'Day 7', v: m?.retention?.d7 },
+              { k: 'Day 30', v: m?.retention?.d30 },
+            ].map((c) => ({ k: c.k, v: c.v == null ? '—' : `${c.v}%` })).map((c) => (
               <div key={c.k} className="bg-background-secondary rounded-sm p-3">
                 <div className="text-heading-medium font-mono text-content-primary">{c.v}</div>
                 <div className="text-label-small text-content-tertiary uppercase tracking-wider mt-0.5">{c.k}</div>
