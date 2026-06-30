@@ -451,22 +451,11 @@ func (h *PromoHandler) HandleGetBanners(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 
 	val, err := h.redisClient.Get(ctx, "promo:banners").Result()
-	var banners []BannerOffer
+	banners := []BannerOffer{}
 	if err == nil && val != "" {
 		_ = json.Unmarshal([]byte(val), &banners)
-	} else {
-		// Mock defaults
-		banners = []BannerOffer{
-			{
-				ID:         "banner-1",
-				BannerText: "Monsoon Surge deflated: Get 20% off auto-applied on all Premium trips in Kolkata shard this weekend!",
-				CityPrefix: "KOL",
-				IsActive:   true,
-				ValidFrom:  time.Now(),
-				ValidTo:    time.Now().AddDate(0, 0, 5),
-			},
-		}
 	}
+	// No mock fallback — an empty list honestly means no banners are configured.
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(banners)
@@ -521,34 +510,11 @@ func (h *PromoHandler) HandleGetReferralSettings(w http.ResponseWriter, r *http.
 	defer cancel()
 
 	val, err := h.redisClient.Get(ctx, "promo:referral:settings").Result()
-	var settings ReferralSettings
+	settings := ReferralSettings{Rules: []ReferralRule{}}
 	if err == nil && val != "" {
 		_ = json.Unmarshal([]byte(val), &settings)
-	} else {
-		// Mock defaults
-		settings = ReferralSettings{
-			BlockSameDevice: true,
-			BlockIPCluster:  true,
-			Rules: []ReferralRule{
-				{
-					ReferrerRole: "RIDER",
-					RefereeRole:  "RIDER",
-					TriggerType:  "FIRST_TRIP",
-					TriggerCount: 1,
-					RewardType:   "WALLET_CREDIT",
-					RewardAmount: 10000, // ₹100
-				},
-				{
-					ReferrerRole: "RIDER",
-					RefereeRole:  "DRIVER",
-					TriggerType:  "NTH_TRIP",
-					TriggerCount: 5,
-					RewardType:   "CASH",
-					RewardAmount: 50000, // ₹500
-				},
-			},
-		}
 	}
+	// No mock rules — empty means referral rewards are not configured yet.
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(settings)
@@ -603,19 +569,11 @@ func (h *PromoHandler) HandleGetLoyaltySettings(w http.ResponseWriter, r *http.R
 	defer cancel()
 
 	val, err := h.redisClient.Get(ctx, "promo:loyalty:settings").Result()
-	var settings LoyaltySettings
+	settings := LoyaltySettings{Tiers: []LoyaltyTier{}}
 	if err == nil && val != "" {
 		_ = json.Unmarshal([]byte(val), &settings)
-	} else {
-		// Mock defaults
-		settings = LoyaltySettings{
-			Tiers: []LoyaltyTier{
-				{TierName: "SILVER", MinTrips: 10, PerkDiscountPct: 5.0, PerkPriorityDisp: false, PerkFreeCare: false},
-				{TierName: "GOLD", MinTrips: 25, PerkDiscountPct: 10.0, PerkPriorityDisp: true, PerkFreeCare: false},
-				{TierName: "PLATINUM", MinTrips: 50, PerkDiscountPct: 15.0, PerkPriorityDisp: true, PerkFreeCare: true},
-			},
-		}
 	}
+	// No mock tiers — empty means loyalty tiers are not configured yet.
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(settings)
