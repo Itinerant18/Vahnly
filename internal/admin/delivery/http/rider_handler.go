@@ -825,6 +825,56 @@ func (h *RiderHandler) HandleGetRiderDetail(w http.ResponseWriter, r *http.Reque
 		details.Ratings.AverageGiven = ratingSum / completedCount
 	}
 
+	// Real Overview sub-sections (replace projectRider placeholders). Empty slices when
+	// the rider has none — honest blanks, not fabricated entries.
+	if aRows, aerr := h.dbPool.Query(ctx, `
+		SELECT label, address_text FROM rider_saved_places
+		WHERE rider_id = $1::uuid AND is_active ORDER BY created_at`, id); aerr == nil {
+		addrs := make([]RiderAddress, 0)
+		for aRows.Next() {
+			var label, text string
+			if aRows.Scan(&label, &text) == nil {
+				t := "Home"
+				switch label {
+				case "WORK":
+					t = "Work"
+				case "CUSTOM":
+					t = "Saved"
+				}
+				addrs = append(addrs, RiderAddress{Type: t, Address: text})
+			}
+		}
+		aRows.Close()
+		details.Overview.Addresses = addrs
+	}
+	if eRows, eerr := h.dbPool.Query(ctx, `
+		SELECT name, phone, COALESCE(relationship, '') FROM rider_emergency_contacts
+		WHERE rider_id = $1::uuid ORDER BY display_order, created_at`, id); eerr == nil {
+		ecs := make([]RiderEmergencyContact, 0)
+		for eRows.Next() {
+			var n, p, rel string
+			if eRows.Scan(&n, &p, &rel) == nil {
+				ecs = append(ecs, RiderEmergencyContact{Name: n, Phone: p, Relationship: rel})
+			}
+		}
+		eRows.Close()
+		details.Overview.EmergencyContacts = ecs
+	}
+	// Riders only store platform + token (no model/OS/app version), so surface the platform.
+	if dRows, derr := h.dbPool.Query(ctx, `
+		SELECT platform FROM rider_device_tokens
+		WHERE rider_id = $1::uuid AND is_active ORDER BY created_at DESC`, id); derr == nil {
+		devs := make([]RiderDeviceInfo, 0)
+		for dRows.Next() {
+			var plat string
+			if dRows.Scan(&plat) == nil {
+				devs = append(devs, RiderDeviceInfo{DeviceName: plat})
+			}
+		}
+		dRows.Close()
+		details.Overview.Devices = devs
+	}
+
 	// 2. Fetch admin audits
 	auditQuery := `
 		SELECT id::text, admin_email, action, details, ip_address, created_at

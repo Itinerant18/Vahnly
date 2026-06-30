@@ -207,11 +207,12 @@ func (h *AdminRiderHandler) HandleGetRiderWallet(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	var walletID string
+	// Canonical rider wallet (rider_wallet / rider_wallet_transactions), the store the
+	// rider app actually writes — not the generic `wallets` table (seeded/stale).
 	var balance int64
 	err := h.dbPool.QueryRow(ctx,
-		`SELECT id::text, balance_paise FROM wallets WHERE user_id = $1::uuid AND user_type = 'RIDER'`, id).
-		Scan(&walletID, &balance)
+		`SELECT COALESCE(balance_paise, 0) FROM rider_wallet WHERE rider_id = $1::uuid`, id).
+		Scan(&balance)
 	if err != nil && err != pgx.ErrNoRows {
 		http.Error(w, "database_query_failed", http.StatusInternalServerError)
 		return
@@ -225,18 +226,16 @@ func (h *AdminRiderHandler) HandleGetRiderWallet(w http.ResponseWriter, r *http.
 		CreatedAt   time.Time `json:"created_at"`
 	}
 	transactions := make([]txn, 0)
-	if walletID != "" {
-		rows, qErr := h.dbPool.Query(ctx, `
-			SELECT amount_paise, entry_type, reason_code, description, created_at
-			FROM wallet_ledger_entries WHERE wallet_id = $1::uuid
-			ORDER BY created_at DESC LIMIT 200`, walletID)
-		if qErr == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var t txn
-				if err := rows.Scan(&t.AmountPaise, &t.EntryType, &t.ReasonCode, &t.Description, &t.CreatedAt); err == nil {
-					transactions = append(transactions, t)
-				}
+	rows, qErr := h.dbPool.Query(ctx, `
+		SELECT amount_paise, type, COALESCE(reference_type, ''), COALESCE(description, ''), created_at
+		FROM rider_wallet_transactions WHERE rider_id = $1::uuid
+		ORDER BY created_at DESC LIMIT 200`, id)
+	if qErr == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var t txn
+			if err := rows.Scan(&t.AmountPaise, &t.EntryType, &t.ReasonCode, &t.Description, &t.CreatedAt); err == nil {
+				transactions = append(transactions, t)
 			}
 		}
 	}
@@ -258,21 +257,34 @@ func (h *AdminRiderHandler) HandleAdjustRiderWallet(w http.ResponseWriter, r *ht
 		return
 	}
 	var req struct {
-		Type        string `json:"type"` // CREDIT | DEBIT
-		AmountPaise int64  `json:"amount_paise"`
+		Type        string `json:"type"`          // optional: CREDIT | DEBIT
+		AmountPaise int64  `json:"amount_paise"`   // signed when type omitted (UI sends negative = debit)
 		Reason      string `json:"reason"`
+		Description string `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "malformed_json_payload", http.StatusBadRequest)
 		return
 	}
-	req.Type = strings.ToUpper(strings.TrimSpace(req.Type))
-	if req.Type != "CREDIT" && req.Type != "DEBIT" {
-		http.Error(w, "invalid_type: must be CREDIT or DEBIT", http.StatusBadRequest)
-		return
+	desc := strings.TrimSpace(req.Reason)
+	if desc == "" {
+		desc = strings.TrimSpace(req.Description)
 	}
-	if req.AmountPaise <= 0 {
-		http.Error(w, "invalid_amount: must be greater than zero", http.StatusBadRequest)
+	// Normalise to a signed delta. The admin UI posts a signed amount_paise (negative =
+	// debit); an explicit type, when present, wins over the sign.
+	delta := req.AmountPaise
+	switch strings.ToUpper(strings.TrimSpace(req.Type)) {
+	case "CREDIT":
+		if delta < 0 {
+			delta = -delta
+		}
+	case "DEBIT":
+		if delta > 0 {
+			delta = -delta
+		}
+	}
+	if delta == 0 {
+		http.Error(w, "invalid_amount: must be non-zero", http.StatusBadRequest)
 		return
 	}
 
@@ -286,24 +298,19 @@ func (h *AdminRiderHandler) HandleAdjustRiderWallet(w http.ResponseWriter, r *ht
 	}
 	defer tx.Rollback(ctx)
 
-	// Ensure a wallet row exists, then lock it.
+	// Ensure the canonical rider wallet row exists, then lock it.
 	_, _ = tx.Exec(ctx, `
-		INSERT INTO wallets (user_id, user_type, balance_paise) VALUES ($1::uuid, 'RIDER', 0)
-		ON CONFLICT (user_id) DO NOTHING`, id)
+		INSERT INTO rider_wallet (rider_id, balance_paise) VALUES ($1::uuid, 0)
+		ON CONFLICT (rider_id) DO NOTHING`, id)
 
-	var walletID string
 	var balance int64
 	if err := tx.QueryRow(ctx,
-		`SELECT id::text, balance_paise FROM wallets WHERE user_id = $1::uuid FOR UPDATE`, id).
-		Scan(&walletID, &balance); err != nil {
+		`SELECT balance_paise FROM rider_wallet WHERE rider_id = $1::uuid FOR UPDATE`, id).
+		Scan(&balance); err != nil {
 		http.Error(w, "wallet_lookup_failed", http.StatusInternalServerError)
 		return
 	}
 
-	delta := req.AmountPaise
-	if req.Type == "DEBIT" {
-		delta = -req.AmountPaise
-	}
 	newBalance := balance + delta
 	if newBalance < 0 {
 		http.Error(w, "insufficient_balance", http.StatusConflict)
@@ -311,14 +318,14 @@ func (h *AdminRiderHandler) HandleAdjustRiderWallet(w http.ResponseWriter, r *ht
 	}
 
 	if _, err := tx.Exec(ctx,
-		`UPDATE wallets SET balance_paise = $1, updated_at = now() WHERE id = $2::uuid`, newBalance, walletID); err != nil {
+		`UPDATE rider_wallet SET balance_paise = $1, updated_at = now() WHERE rider_id = $2::uuid`, newBalance, id); err != nil {
 		http.Error(w, "wallet_update_failed", http.StatusInternalServerError)
 		return
 	}
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO wallet_ledger_entries (wallet_id, amount_paise, entry_type, reason_code, description)
-		VALUES ($1::uuid, $2, $3, 'ADMIN_ADJUSTMENT', $4)`,
-		walletID, req.AmountPaise, req.Type, req.Reason); err != nil {
+		INSERT INTO rider_wallet_transactions (rider_id, type, amount_paise, balance_after_paise, reference_type, description)
+		VALUES ($1::uuid, 'ADJUSTMENT', $2, $3, 'ADMIN_ADJUSTMENT', $4)`,
+		id, delta, newBalance, desc); err != nil {
 		http.Error(w, "ledger_write_failed", http.StatusInternalServerError)
 		return
 	}
@@ -327,8 +334,12 @@ func (h *AdminRiderHandler) HandleAdjustRiderWallet(w http.ResponseWriter, r *ht
 		return
 	}
 
+	dir := "CREDIT"
+	if delta < 0 {
+		dir = "DEBIT"
+	}
 	h.audit(ctx, adminEmailOf(r), "RIDER_WALLET_ADJUSTED",
-		fmt.Sprintf("Admin %s rider %s wallet by %d paise. Reason: %s", req.Type, id, req.AmountPaise, req.Reason), getClientIP(r))
+		fmt.Sprintf("Admin %s rider %s wallet by %d paise. Reason: %s", dir, id, delta, desc), getClientIP(r))
 
 	writeRiderJSON(w, map[string]any{"status": "SUCCESS", "balance_paise": newBalance})
 }
