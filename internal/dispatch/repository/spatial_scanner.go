@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/platform/driver-delivery/internal/dispatch/matcher"
@@ -78,7 +79,8 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 			// vanished (app crash / network drop), for cells under active matching, in the
 			// same pipeline — no extra round-trip. The exclusive "(" upper bound keeps a
 			// driver scored exactly at the threshold visible to the read above.
-			// ponytail: only scanned cells are GC'd; idle cells age out via the zset's 24h TTL.
+			// ponytail: only scanned cells are GC'd here; cells no ping or scan ever revisits
+			// are handled by the periodic SweepStaleCells sweep (cmd/dispatch) and the 1h TTL.
 			surgePipe.ZRemRangeByScore(ctx, zsetKey, "0", fmt.Sprintf("(%d", staleThreshold))
 		}
 
@@ -199,6 +201,34 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 	}
 
 	return candidates, nil
+}
+
+// SweepStaleCells walks every drivers:zset:* across the cluster and drops members whose
+// last-seen score is older than staleWindowSec. Cells that see GPS pings or matching scans
+// already self-clean (per-ping ZRem/ZRemRangeByScore in the writers, plus the on-scan GC in
+// ScanNearbyDrivers); this background sweep is the safety net for cells whose drivers all
+// went offline or crashed and which no ping or scan ever revisits, so their entries would
+// otherwise linger until the key TTL. Returns the number of members removed.
+func (s *SpatialScanner) SweepStaleCells(ctx context.Context, staleWindowSec int64) (int64, error) {
+	if s.clusterClient == nil {
+		return 0, fmt.Errorf("redis_cluster_client_unavailable")
+	}
+	maxScore := fmt.Sprintf("(%d", time.Now().Unix()-staleWindowSec)
+	var removed atomic.Int64
+	// ForEachMaster fans out across shards concurrently. SCAN is node-local, and any key it
+	// surfaces lives on that node, so the ZRemRangeByScore runs locally (no MOVED redirect).
+	err := s.clusterClient.ForEachMaster(ctx, func(ctx context.Context, node *redis.Client) error {
+		iter := node.Scan(ctx, 0, "drivers:zset:*", 256).Iterator()
+		for iter.Next(ctx) {
+			n, zerr := node.ZRemRangeByScore(ctx, iter.Val(), "-inf", maxScore).Result()
+			if zerr != nil {
+				return zerr
+			}
+			removed.Add(n)
+		}
+		return iter.Err()
+	})
+	return removed.Load(), err
 }
 
 func (s *SpatialScanner) EvictDriverFromCell(ctx context.Context, cityPrefix, h3Cell, driverID string) error {

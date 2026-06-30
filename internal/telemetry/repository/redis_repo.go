@@ -77,7 +77,7 @@ func (r *redisRepo) SetDriverLocation(ctx context.Context, loc *domain.DriverLoc
 	}
 
 	pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: loc.DriverID})
-	pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+	pipe.Expire(ctx, spatialZSetKey, 1*time.Hour)
 
 	if _, err = pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("spatial index scatter pipeline failed: %w", err)

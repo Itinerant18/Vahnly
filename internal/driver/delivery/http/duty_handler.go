@@ -182,7 +182,7 @@ func (h *DutyHandler) HandleDutyStateToggle(w http.ResponseWriter, r *http.Reque
 
 				pipe := h.clusterClient.Pipeline()
 				pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: driverID})
-				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+				pipe.Expire(ctx, spatialZSetKey, 1*time.Hour)
 				pipe.Set(ctx, trackerKey, h3CellStr, 24*time.Hour)
 				pipe.Set(ctx, statusKey, "ONLINE_AVAILABLE", 24*time.Hour)
 				// Pre-warm the profile hash for Hungarian matcher. can_drive_manual gates

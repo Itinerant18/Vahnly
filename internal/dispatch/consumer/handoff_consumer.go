@@ -137,7 +137,7 @@ func (hc *HandoffConsumer) Start(ctx context.Context) {
 
 				pipe := hc.redisClient.Pipeline()
 				pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: event.DriverID})
-				pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+				pipe.Expire(ctx, spatialZSetKey, 1*time.Hour)
 
 				// Also write status, current cell, and profile to completely hydrate driver state
 				statusKey := fmt.Sprintf("driver:{%s:%s}:status", cityPrefix, event.DriverID)

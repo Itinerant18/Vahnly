@@ -2811,7 +2811,7 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 	}
 	pipe.ZAdd(ctx, spatialZSetKey, redis.Z{Score: nowEpoch, Member: req.DriverID})
 	// Evict drivers in this cell that stopped reporting GPS long ago, so the set
-	// doesn't accumulate stale members until the 24h key TTL. The matching scan
+	// doesn't accumulate stale members until the 1h key TTL. The matching scan
 	// already ignores anything past its 30s stale window, so this only bounds
 	// memory — never matchability. Window is deliberately well past 30s so a
 	// briefly-lagging driver isn't churned out; they'd re-add on the next ping
@@ -2819,7 +2819,7 @@ func (h *GatewayHandler) HandleDriverLocationUpdate(w http.ResponseWriter, r *ht
 	const staleEvictWindowSec = 120
 	staleEvictCutoff := int64(nowEpoch) - staleEvictWindowSec
 	pipe.ZRemRangeByScore(ctx, spatialZSetKey, "-inf", fmt.Sprintf("(%d", staleEvictCutoff))
-	pipe.Expire(ctx, spatialZSetKey, 24*time.Hour)
+	pipe.Expire(ctx, spatialZSetKey, 1*time.Hour)
 	// City-free last-seen mirror so GET /api/v1/driver/location/status can report GPS
 	// recency without a per-poll DB lookup. 60s TTL outlives the 30s stale window.
 	pipe.Set(ctx, "driver:lastseen:"+req.DriverID, time.Now().Unix(), 60*time.Second)

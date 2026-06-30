@@ -219,6 +219,30 @@ func main() {
 		}
 	}()
 
+	// Spatial GC safety net: cells with traffic self-clean (per-ping writers + on-scan GC),
+	// but a cell whose drivers all went offline/crashed and which no ping or scan revisits
+	// keeps its stale members until the key TTL. Sweep all drivers:zset:* every 5 min.
+	go func() {
+		const sweepStaleWindowSec = 120 // matches the per-ping evict window in the writers
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sweepCtx, sweepCancel := context.WithTimeout(ctx, 30*time.Second)
+				removed, err := spatialScanner.SweepStaleCells(sweepCtx, sweepStaleWindowSec)
+				sweepCancel()
+				if err != nil {
+					log.Printf("[SPATIAL_SWEEP_WARN] stale-cell sweep failed: %v", err)
+				} else if removed > 0 {
+					log.Printf("[SPATIAL_SWEEP] removed %d stale driver entries", removed)
+				}
+			}
+		}
+	}()
+
 	// 9. System Signal Intercept and Graceful Shutdown Protocol
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
