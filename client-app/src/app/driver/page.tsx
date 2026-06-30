@@ -686,6 +686,16 @@ export default function DriverTerminalPage() {
         special_notes: currentOffer.notes,
         backend_offer: currentOffer,
       });
+      // Auto-launch turn-by-turn navigation to pickup the moment the job is accepted
+      // (DriveU-style). On mobile (Capacitor) this opens the Google Maps app; on web it
+      // opens a new tab. Fires once — clearOffer below flips offerStatus so the guard
+      // above won't re-run.
+      if (currentOffer.pickup.lat && currentOffer.pickup.lng) {
+        window.open(
+          `https://www.google.com/maps/dir/?api=1&destination=${currentOffer.pickup.lat},${currentOffer.pickup.lng}&travelmode=driving`,
+          '_blank',
+        );
+      }
       // Clear offer from store now that it is active
       useOfferStore.getState().clearOffer();
     }

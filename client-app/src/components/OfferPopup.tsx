@@ -184,150 +184,137 @@ export function OfferPopup() {
 
   return (
     <>
-      {/* ── Full-screen backdrop ── */}
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end">
+      {/* ── Full-screen incoming-job takeover (DriveU-style) ── */}
+      <div className="fixed inset-0 z-50 bg-background-primary flex flex-col animate-enter">
 
-        {/* ── Sheet ── */}
-        <div
-          className="w-full bg-background-primary rounded-t-lg shadow-elevation-3 animate-enter"
-          style={{ maxHeight: '92dvh', overflowY: 'auto' }}
-        >
-          {/* Drag handle */}
-          <div className="flex justify-center pt-300 pb-400">
-            <div className="w-9 h-1 rounded-pill bg-border-opaque" />
+        {/* ── Top banner: rider + countdown ── */}
+        <div className="flex-shrink-0 bg-surface-positive border-b border-positive-300 px-500 pb-400 pt-[calc(var(--space-500)+env(safe-area-inset-top,0px))]">
+          <div className="flex items-start justify-between gap-400">
+            <div className="flex-1 min-w-0">
+              <span className="text-label-small text-content-positive uppercase tracking-wider">
+                Incoming Job — slide to accept
+              </span>
+              <h2 className="text-heading-xl text-content-primary mt-1 flex items-center gap-300">
+                {currentOffer.riderName}
+                <span className="font-mono text-mono-small text-content-secondary tabular-nums">
+                  ★ {currentOffer.riderRating.toFixed(2)}
+                </span>
+              </h2>
+            </div>
+            <CountdownRing remaining={remaining} />
+          </div>
+        </div>
+
+        {/* ── Scrollable details ── */}
+        <div className="flex-1 overflow-y-auto px-500 py-500 space-y-500">
+
+          {/* ── Prominent payout / distance / type strip ── */}
+          <div className="grid grid-cols-3 gap-300">
+            <div className="bg-background-secondary rounded-md p-400 text-center">
+              <span className="text-label-small text-content-tertiary block mb-1">Est. Payout</span>
+              <FareDisplay
+                amount={currentOffer.fareEstimate}
+                size="display"
+                className="text-content-primary font-bold"
+              />
+            </div>
+            <div className="bg-background-secondary rounded-md p-400 text-center">
+              <span className="text-label-small text-content-tertiary block mb-1">Pickup</span>
+              <span className="font-mono text-mono-medium text-content-primary tabular-nums">
+                {currentOffer.distanceKm ? `${currentOffer.distanceKm.toFixed(1)} km` : '—'}
+              </span>
+            </div>
+            <div className="bg-background-secondary rounded-md p-400 text-center">
+              <span className="text-label-small text-content-tertiary block mb-1">Type</span>
+              <span className="text-label-medium text-content-primary break-words">{currentOffer.tripType}</span>
+            </div>
           </div>
 
-          <div className="px-500 pb-500 space-y-500">
+          {/* Insured-trip chip */}
+          {currentOffer.d4mCareOptIn && (
+            <span className="badge badge-accent text-label-small inline-flex items-center gap-1">
+              <ShieldIcon size={12} /> Insured Trip
+            </span>
+          )}
 
-            {/* ── Header row: rider info + countdown ── */}
-            <div className="flex items-start justify-between gap-400">
-              <div className="flex-1 min-w-0">
-                <span className="text-label-small text-content-tertiary uppercase tracking-wider">
-                  Incoming Job Match
-                </span>
-                <h2 className="text-heading-xl text-content-primary mt-1 flex items-center gap-300">
-                  {currentOffer.riderName}
-                  <span className="font-mono text-mono-small text-content-secondary tabular-nums">
-                    ★ {currentOffer.riderRating.toFixed(2)}
-                  </span>
-                </h2>
+          {/* ── Car context card ── */}
+          {(currentOffer.carMake || currentOffer.carModel) && (
+            <div className="bg-background-secondary rounded-md p-500 space-y-200">
+              <p className="text-heading-small text-content-primary">
+                {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel].filter(Boolean).join(' ')}
+              </p>
+              <p className="text-paragraph-small text-content-secondary">
+                {currentOffer.carType || 'Car'} · {currentOffer.carTransmission || 'Any'}
+              </p>
 
-                {/* Chips row */}
-                <div className="flex flex-wrap gap-200 mt-300">
-                  <span className="badge badge-neutral text-label-small">
-                    {currentOffer.tripType}
-                  </span>
-                  {currentOffer.d4mCareOptIn && (
-                    <span className="badge badge-accent text-label-small inline-flex items-center gap-1">
-                      <ShieldIcon size={12} /> Insured Trip
-                    </span>
-                  )}
+              {/* Transmission mismatch warning */}
+              {currentOffer.transmissionMatch === false && (
+                <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
+                  <span className="flex items-center text-content-warning"><AlertIcon size={16} /></span>
+                  <p className="text-paragraph-small text-content-warning">
+                    Car needs {currentOffer.carTransmission || 'Manual'} — check your expertise match
+                  </p>
                 </div>
-              </div>
+              )}
 
-              <CountdownRing remaining={remaining} />
+              {/* Owner not riding along */}
+              {currentOffer.ownerNotInCar && (
+                <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
+                  <span className="flex items-center text-content-warning"><CarIcon size={16} /></span>
+                  <p className="text-paragraph-small text-content-warning">
+                    Owner won&apos;t be in the car — you drive it solo.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Addresses + duration ── */}
+          <div className="grid grid-cols-2 gap-300">
+            {/* Est. duration */}
+            <div className="col-span-2 bg-background-secondary rounded-sm p-400">
+              <span className="text-label-small text-content-tertiary block mb-1">Est. duration</span>
+              <span className="font-mono text-mono-medium text-content-primary tabular-nums">
+                {currentOffer.durationMinutes ? `${currentOffer.durationMinutes} min` : '—'}
+              </span>
             </div>
 
-            {/* ── Car context card ── */}
-            {(currentOffer.carMake || currentOffer.carModel) && (
-              <div className="bg-background-secondary rounded-md p-500 space-y-200">
-                <p className="text-heading-small text-content-primary">
-                  {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel].filter(Boolean).join(' ')}
-                </p>
-                <p className="text-paragraph-small text-content-secondary">
-                  {currentOffer.carType || 'Car'} · {currentOffer.carTransmission || 'Any'}
-                </p>
-
-                {/* Transmission mismatch warning */}
-                {currentOffer.transmissionMatch === false && (
-                  <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
-                    <span className="flex items-center text-content-warning"><AlertIcon size={16} /></span>
-                    <p className="text-paragraph-small text-content-warning">
-                      Car needs {currentOffer.carTransmission || 'Manual'} — check your expertise match
-                    </p>
-                  </div>
-                )}
-
-                {/* Owner not riding along */}
-                {currentOffer.ownerNotInCar && (
-                  <div className="flex items-center gap-300 bg-surface-warning rounded-sm p-300 mt-200">
-                    <span className="flex items-center text-content-warning"><CarIcon size={16} /></span>
-                    <p className="text-paragraph-small text-content-warning">
-                      Owner won&apos;t be in the car — you drive it solo.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Trip details grid ── */}
-            <div className="grid grid-cols-2 gap-300">
-              {/* Pickup distance */}
-              <div className="bg-background-secondary rounded-sm p-400">
-                <span className="text-label-small text-content-tertiary block mb-1">Pickup distance</span>
-                <span className="font-mono text-mono-medium text-content-primary tabular-nums">
-                  {currentOffer.distanceKm ? `${currentOffer.distanceKm.toFixed(1)} km` : '—'}
-                </span>
-              </div>
-
-              {/* ETA */}
-              <div className="bg-background-secondary rounded-sm p-400">
-                <span className="text-label-small text-content-tertiary block mb-1">Est. duration</span>
-                <span className="font-mono text-mono-medium text-content-primary tabular-nums">
-                  {currentOffer.durationMinutes ? `${currentOffer.durationMinutes} min` : '—'}
-                </span>
-              </div>
-
-              {/* Pickup address */}
-              <div className="col-span-2 bg-background-secondary rounded-sm p-400">
-                <span className="text-label-small text-content-tertiary block mb-1">Pickup</span>
-                <p className="text-paragraph-medium text-content-primary truncate">
-                  {currentOffer.pickup.address}
-                </p>
-              </div>
-
-              {/* Drop address */}
-              <div className="col-span-2 bg-background-secondary rounded-sm p-400">
-                <span className="text-label-small text-content-tertiary block mb-1">Drop</span>
-                <p className="text-paragraph-medium text-content-primary truncate">
-                  {currentOffer.drop.address}
-                </p>
-              </div>
+            {/* Pickup address */}
+            <div className="col-span-2 bg-background-secondary rounded-sm p-400">
+              <span className="text-label-small text-content-tertiary block mb-1">Pickup</span>
+              <p className="text-paragraph-medium text-content-primary truncate">
+                {currentOffer.pickup.address}
+              </p>
             </div>
 
-            {/* Special notes */}
-            {currentOffer.notes && (
-              <div className="bg-surface-warning rounded-sm p-400">
-                <span className="text-label-small text-content-warning block mb-1">Client notes</span>
-                <p className="text-paragraph-small text-content-primary">&quot;{currentOffer.notes}&quot;</p>
-              </div>
-            )}
-
-            {/* ── Fare row ── */}
-            <div className="flex items-center justify-between border-t border-border-opaque pt-400">
-              <div>
-                <span className="text-label-small text-content-tertiary block">Est. Payout</span>
-                <FareDisplay
-                  amount={currentOffer.fareEstimate}
-                  size="display"
-                  className="text-content-primary font-bold"
-                />
-              </div>
-              <span className="badge badge-neutral">{currentOffer.tripType}</span>
+            {/* Drop address */}
+            <div className="col-span-2 bg-background-secondary rounded-sm p-400">
+              <span className="text-label-small text-content-tertiary block mb-1">Drop</span>
+              <p className="text-paragraph-medium text-content-primary truncate">
+                {currentOffer.drop.address}
+              </p>
             </div>
-
-            {/* ── Slide to accept ── */}
-            <SlideToAccept onAccept={handleAccept} />
-
-            {/* ── Decline ── */}
-            <button
-              type="button"
-              onClick={() => setShowDeclinePicker(true)}
-              className="w-full text-center text-label-medium text-content-tertiary py-300 min-h-[44px] cursor-pointer hover:text-content-secondary transition-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
-            >
-              Decline
-            </button>
           </div>
+
+          {/* Special notes */}
+          {currentOffer.notes && (
+            <div className="bg-surface-warning rounded-sm p-400">
+              <span className="text-label-small text-content-warning block mb-1">Client notes</span>
+              <p className="text-paragraph-small text-content-primary">&quot;{currentOffer.notes}&quot;</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Pinned action footer (always visible) ── */}
+        <div className="flex-shrink-0 border-t border-border-opaque bg-background-primary px-500 pt-400 pb-[calc(var(--space-500)+env(safe-area-inset-bottom,0px))] space-y-300">
+          <SlideToAccept onAccept={handleAccept} />
+          <button
+            type="button"
+            onClick={() => setShowDeclinePicker(true)}
+            className="w-full text-center text-label-medium text-content-tertiary py-300 min-h-[44px] cursor-pointer hover:text-content-secondary transition-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
+          >
+            Decline
+          </button>
         </div>
       </div>
 
