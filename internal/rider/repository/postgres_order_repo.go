@@ -27,6 +27,7 @@ type RiderOrderRepository interface {
 	GetActiveOrderID(ctx context.Context, riderID string) (string, error)
 	InsertRiderOrder(ctx context.Context, p InsertOrderParams) (string, error)
 	EnqueueScheduledDispatch(ctx context.Context, orderID string, scheduledAt time.Time, payload []byte) error
+	InsertFareBreakdown(ctx context.Context, orderID string, basePaise, distancePaise, nightPaise, totalPaise int64) error
 	GetAssignedDriver(ctx context.Context, orderID, riderID string) (string, error)
 	GetOrderForRider(ctx context.Context, orderID, riderID string) (*domain.RiderOrder, error)
 	GetOrderByID(ctx context.Context, orderID string) (*domain.RiderOrder, error)
@@ -147,6 +148,19 @@ func (r *postgresOrderRepo) EnqueueScheduledDispatch(ctx context.Context, orderI
 		INSERT INTO scheduled_dispatch_queue (order_id, scheduled_at, payload)
 		VALUES ($1::uuid, $2, $3::jsonb)
 		ON CONFLICT (order_id) DO NOTHING`, orderID, scheduledAt, payload)
+	return err
+}
+
+// InsertFareBreakdown persists the per-order fare component split for the admin trip
+// detail. Called best-effort after the order insert — its failure never blocks a booking.
+func (r *postgresOrderRepo) InsertFareBreakdown(ctx context.Context, orderID string, basePaise, distancePaise, nightPaise, totalPaise int64) error {
+	_, err := r.dbPool.Exec(ctx, `
+		INSERT INTO order_fare_breakdowns (order_id, base_paise, distance_paise, night_paise, total_paise)
+		VALUES ($1::uuid, $2, $3, $4, $5)
+		ON CONFLICT (order_id) DO UPDATE SET
+			base_paise = EXCLUDED.base_paise, distance_paise = EXCLUDED.distance_paise,
+			night_paise = EXCLUDED.night_paise, total_paise = EXCLUDED.total_paise`,
+		orderID, basePaise, distancePaise, nightPaise, totalPaise)
 	return err
 }
 

@@ -529,6 +529,13 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		return nil, err
 	}
 
+	// Persist the fare component breakdown (best-effort, never blocks a booking) so the
+	// admin trip detail shows the real base/distance/night/total split instead of a
+	// derived 40/50/10 guess.
+	_ = s.orders.InsertFareBreakdown(ctx, orderID,
+		est.FareBreakdown.BaseFarePaise, est.FareBreakdown.DistanceChargePaise,
+		est.FareBreakdown.NightChargePaise, est.FareBreakdown.EstimatedTotalPaise)
+
 	// 8. Build the dispatch payload (same shape dispatch consumes). Instant bookings — and
 	// any scheduled within the lead window — publish to order.created now. A far-future
 	// booking is stored verbatim instead; the dispatch scheduler replays it ~lead before

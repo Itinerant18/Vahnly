@@ -384,11 +384,13 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		       COALESCE(rd.name, '') as rider_name,
 		       COALESCE(rd.phone, '') as rider_phone,
 		       TRIM(COALESCE(o.one_time_car_make, rg.make, '') || ' ' || COALESCE(o.one_time_car_model, rg.model, '')) as car_model,
-		       COALESCE(o.promo_discount_paise, 0) as promo_discount_paise
+		       COALESCE(o.promo_discount_paise, 0) as promo_discount_paise,
+		       ofb.base_paise, ofb.distance_paise, ofb.night_paise, ofb.total_paise
 		FROM orders o
 		LEFT JOIN drivers d ON o.assigned_driver_id = d.id
 		LEFT JOIN rider_garage rg ON rg.id = o.garage_car_id
 		LEFT JOIN riders rd ON rd.id = o.customer_id
+		LEFT JOIN order_fare_breakdowns ofb ON ofb.order_id = o.id
 		WHERE o.id = $1::uuid
 	`
 
@@ -399,6 +401,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	var driverVerified bool
 	var riderName, riderPhone, carModel string
 	var promoDiscountPaise int64
+	var fbBase, fbDistance, fbNight, fbTotal *int64
 
 	err := h.dbPool.QueryRow(ctx, query, id).Scan(
 		&rec.ID, &rec.CityPrefix, &rec.CustomerID, &rec.Status,
@@ -407,6 +410,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		&driverName, &driverPhone, &driverVerified,
 		&rec.TripType, &rec.CarType, &rec.Transmission, &rec.PaymentMethod, &rec.PromoApplied, &rec.D4MCare, &rec.Rating, &rec.Plate,
 		&riderName, &riderPhone, &carModel, &promoDiscountPaise,
+		&fbBase, &fbDistance, &fbNight, &fbTotal,
 	)
 	if err != nil {
 		http.Error(w, "order_not_found", http.StatusNotFound)
@@ -546,6 +550,16 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		Promo:    promo,
 		Tax:      tax,
 		Total:    total,
+	}
+	// Prefer the persisted real component split (order_fare_breakdowns); columns are
+	// NOT NULL, so a present base implies the whole row is present. Falls back to the
+	// derived split above for orders booked before this was captured.
+	if fbBase != nil {
+		fareBreakdown.Base = float64(*fbBase) / 100.0
+		fareBreakdown.Distance = float64(*fbDistance) / 100.0
+		fareBreakdown.Time = 0
+		fareBreakdown.Night = float64(*fbNight) / 100.0
+		fareBreakdown.Total = float64(*fbTotal) / 100.0
 	}
 
 	type PaymentAttempt struct {
