@@ -81,13 +81,13 @@ jobs:
         run: |
           # Strip 'v' prefix from tag for SemVer compliance in Helm
           TAG_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-          sed -i "s/^version: .*/version: ${TAG_VERSION}/" deploy/charts/drivers-for-u/Chart.yaml
-          sed -i "s/^appVersion: .*/appVersion: \"${{ github.ref_name }}\"/" deploy/charts/drivers-for-u/Chart.yaml
+          sed -i "s/^version: .*/version: ${TAG_VERSION}/" deploy/charts/vahnly/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ github.ref_name }}\"/" deploy/charts/vahnly/Chart.yaml
 
       - name: Package Helm Chart
         run: |
           mkdir dist
-          helm package deploy/charts/drivers-for-u/ --destination dist/
+          helm package deploy/charts/vahnly/ --destination dist/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
