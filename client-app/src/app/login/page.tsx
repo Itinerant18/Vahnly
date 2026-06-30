@@ -49,7 +49,7 @@ function UnifiedLoginContent() {
   const [newPassword, setNewPassword] = useState('');
 
   // Logs state
-  const [logs, setLogs] = useState<string[]>([]);
+  const [, setLogs] = useState<string[]>([]);
 
   const isFirebaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && !(window as any).__E2E__;
 
@@ -62,7 +62,7 @@ function UnifiedLoginContent() {
       const storedLogs = JSON.parse(sessionStorage.getItem('audit_logs') || '[]');
       storedLogs.push({ timestamp: new Date().toISOString(), action, metadata });
       sessionStorage.setItem('audit_logs', JSON.stringify(storedLogs));
-    } catch (e) {
+    } catch {
       // Ignored
     }
   };

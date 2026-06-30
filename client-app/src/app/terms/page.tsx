@@ -107,7 +107,7 @@ export default function TermsOfService() {
             <div className="prose prose-invert max-w-none text-content-secondary space-y-6 text-paragraph-medium leading-relaxed">
               <p>
                 Welcome to <strong>Vahnly</strong>. By accessing or using our unified dispatch ride matching 
-                ecosystem, including our mobile and web applications (the "Service"), you agree to be bound by these 
+                ecosystem, including our mobile and web applications (the &quot;Service&quot;), you agree to be bound by these 
                 Terms of Service. If you do not agree to all terms, you are prohibited from utilizing the Service.
               </p>
 
@@ -167,7 +167,7 @@ export default function TermsOfService() {
               <div>
                 <h2 className="text-heading-large text-white mb-3">5. Disclaimer and Limitation of Liability</h2>
                 <p>
-                  VAHNLY PROVIDES THE SERVICE ON AN "AS IS" AND "AS AVAILABLE" BASIS. WE DISCLAIM ALL WARRANTIES, EXPRESS 
+                  VAHNLY PROVIDES THE SERVICE ON AN &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; BASIS. WE DISCLAIM ALL WARRANTIES, EXPRESS 
                   OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
                 </p>
                 <p className="mt-2">

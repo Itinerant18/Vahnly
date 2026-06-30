@@ -32,8 +32,6 @@ interface DashboardHomeProps {
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
   dutyState,
   profile,
-  activeVehicle,
-  setActiveVehicle,
   preferredTripFilter,
   setPreferredTripFilter,
   handleToggleDutySwitch,
@@ -223,7 +221,7 @@ export const NavigationPane: React.FC<NavigationPaneProps> = ({
         <p className="text-label-large text-content-primary">{activeTrip.pickup_address}</p>
         {activeTrip.special_notes && (
           <p className="text-paragraph-small text-content-warning mt-2">
-            "{activeTrip.special_notes}"
+            &quot;{activeTrip.special_notes}&quot;
           </p>
         )}
       </div>

@@ -299,7 +299,7 @@ export function OfferPopup() {
             {currentOffer.notes && (
               <div className="bg-surface-warning rounded-sm p-400">
                 <span className="text-label-small text-content-warning block mb-1">Client notes</span>
-                <p className="text-paragraph-small text-content-primary">"{currentOffer.notes}"</p>
+                <p className="text-paragraph-small text-content-primary">&quot;{currentOffer.notes}&quot;</p>
               </div>
             )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useDriverDutyStore, DutyState } from '@/store/useDriverDutyStore';
+import { DutyState } from '@/store/useDriverDutyStore';
 import { verifyTripOTP, addOrderEvent, ApiClientError } from '@/api/client';
 import { useToastStore } from '@/store/useToastStore';
 import { FareDisplay, CheckIcon, SirenIcon, ClockIcon, CrossIcon, CameraIcon } from '@/components/ds';
@@ -267,7 +267,7 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
       // Mirror the cancel/reset path: clear the active trip and return to idle.
       setActiveTrip(null);
       setDutyState('ONLINE');
-    } catch (err) {
+    } catch {
       showToast('Could not report no-show. Please try again.', 'error');
     } finally {
       setNoShowSubmitting(false);

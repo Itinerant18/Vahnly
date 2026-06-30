@@ -352,7 +352,7 @@ export default function DriverTripHistoryPage() {
                 <span className="text-content-warning font-bold text-sm block">
                   {Array.from({ length: selectedTrip.ratingReceived }).map((_, i) => <StarIcon key={i} size={14} className="text-content-warning fill-current" />)}
                 </span>
-                <span className="text-content-secondary block text-[9px] mt-0.5">"{selectedTrip.commentReceived}"</span>
+                <span className="text-content-secondary block text-[9px] mt-0.5">&quot;{selectedTrip.commentReceived}&quot;</span>
               </div>
 
               <div className="bg-background-secondary/40 p-4 border border-border-opaque rounded-xl space-y-1 text-left">

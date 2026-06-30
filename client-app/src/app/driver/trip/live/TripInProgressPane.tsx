@@ -56,8 +56,6 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
   endFuel,
   setEndFuel,
   startOdometer,
-  endOdoPhoto,
-  setEndOdoPhoto,
   handleSlideToEndTrip,
   triggerSOS,
   logAudit,

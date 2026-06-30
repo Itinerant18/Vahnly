@@ -108,7 +108,7 @@ export default function PrivacyPolicy() {
               <p>
                 At <strong>Vahnly</strong>, we prioritize the protection and confidentiality of your personal data. 
                 This Privacy Policy explains how our unified dispatch matching platform collects, stores, uses, and protects 
-                information when you access our mobile and web applications (the "Service").
+                information when you access our mobile and web applications (the &quot;Service&quot;).
               </p>
 
               <div>
@@ -164,8 +164,8 @@ export default function PrivacyPolicy() {
                 <p>We do not sell your personal data. Your information is shared only under strict conditions:</p>
                 <ul className="list-disc pl-5 space-y-2 mt-2">
                   <li>
-                    <strong>Rider-Driver Matching:</strong> Drivers see a rider's name, pickup location, and destination 
-                    to execute a dispatch. Riders see the matching driver's profile, phone number, and location.
+                    <strong>Rider-Driver Matching:</strong> Drivers see a rider&apos;s name, pickup location, and destination 
+                    to execute a dispatch. Riders see the matching driver&apos;s profile, phone number, and location.
                   </li>
                   <li>
                     <strong>Firebase and Google Services:</strong> We integrate Google Maps API and Firebase Authentication 

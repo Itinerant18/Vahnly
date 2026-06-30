@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverDutyStore } from '@/store/useDriverDutyStore';
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket';
-import { SlideToConfirm } from '../../components/SlideToConfirm';
 import { DriverTripManager } from '../../components/DriverTripManager';
 import { SentryErrorBoundary } from '../../components/SentryErrorBoundary';
 import dynamic from 'next/dynamic';
@@ -21,17 +19,12 @@ import { DevLocationSpoof } from '../../components/DevLocationSpoof';
 import { SosModal } from '../../components/SosModal';
 import { useSafetyStore } from '../../store/useSafetyStore';
 import {
-  completeTrip,
   getDriverProfile,
   getPendingOffer,
-  OdometerCheckpointPayload,
   OrderOffer,
-  submitOdometerCheckpoint,
   setDriverDutyState,
   getDriverDutyStats,
   driverArriveAtPickup,
-  driverStartTrip,
-  ApiClientError,
   addOrderEvent,
   driverEndTrip,
   driverConfirmPayment,
@@ -46,14 +39,12 @@ import {
   resumeTrip,
   abandonTrip,
 } from '@/api/client';
-import { StartTripPayload } from '../../types/trip';
 import { connectDispatchStream } from '@/services/dispatchStream';
 import { connectHeatmapStream, HeatmapData } from '@/services/heatmapStream';
 import { startTelemetryStream, TelemetryStreamHandle } from '@/services/telemetryStream';
 import { OfferPopup } from '@/components/OfferPopup';
 import { RefreshIcon, MenuIcon, SirenIcon, NavigateIcon, SignalIcon, FlameIcon, PauseIcon, ChatIcon, OctagonAlertIcon, ClockIcon } from '@/components/ds';
 import { useOfferStore } from '@/store/useOfferStore';
-import { cellToBoundary } from 'h3-js';
 
 interface ActiveOrderAssignment {
   order_id: string;
@@ -72,24 +63,6 @@ interface ActiveOrderAssignment {
   trip_type: string; // "In-city" | "Outstation" | "Mini-outstation"
   special_notes?: string;
   backend_offer?: OrderOffer;
-}
-
-function clampPercent(value: number): number {
-  return Math.max(0, Math.min(100, value));
-}
-
-function h3CellToSvgPoints(cell: string): string {
-  try {
-    return cellToBoundary(cell)
-      .map(([lat, lng]) => {
-        const x = clampPercent(((lng - 88.25) / (88.5 - 88.25)) * 100);
-        const y = clampPercent(((22.7 - lat) / (22.7 - 22.45)) * 100);
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(' ');
-  } catch {
-    return '';
-  }
 }
 
 export default function DriverTerminalPage() {
@@ -178,7 +151,6 @@ export default function DriverTerminalPage() {
   
   // Navigation states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(3);
   
 
   
@@ -202,7 +174,6 @@ export default function DriverTerminalPage() {
   // Extra billable inputs added mid-trip
   const [tollCharges, setTollCharges] = useState(0);
   const [parkingCharges, setParkingCharges] = useState(0);
-  const [overtimeHours, setOvertimeHours] = useState(0);
   
   // Post-trip ratings
   const [riderRating, setRiderRating] = useState(5);
@@ -216,7 +187,6 @@ export default function DriverTerminalPage() {
   
   // Map visualization state: simulated marker position along route (0 to 100%)
   const [mapGlideProgress, setMapGlideProgress] = useState(0);
-  const [mapIntervalActive, setMapIntervalActive] = useState(false);
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
 
   // Live Audit Telemetry Log Vault
@@ -288,7 +258,7 @@ export default function DriverTerminalPage() {
       const stored = JSON.parse(sessionStorage.getItem('driver_trip_logs') || '[]');
       stored.push({ ts: timestamp, event, meta });
       sessionStorage.setItem('driver_trip_logs', JSON.stringify(stored));
-    } catch (e) {}
+    } catch {}
   };
 
   // Setup initial session storage logs cleanup or load
@@ -739,100 +709,6 @@ export default function DriverTerminalPage() {
     }
   };
 
-  // Exponential backoff retry helper for odometer checkpoint submission
-  const submitCheckpointWithRetry = async (
-    orderId: string,
-    payload: OdometerCheckpointPayload,
-    maxAttempts = 3,
-  ): Promise<boolean> => {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        if (token) {
-          await submitOdometerCheckpoint(token, orderId, payload);
-          logAudit('ODOMETER_CHECKPOINT_SYNCED', { orderId, type: payload.checkpoint_type, attempt });
-          return true;
-        }
-      } catch (err) {
-        const backoffMs = Math.min(1000 * Math.pow(2, attempt), 8000);
-        logAudit('ODOMETER_CHECKPOINT_RETRY', { orderId, type: payload.checkpoint_type, attempt, backoffMs });
-        await new Promise((resolve) => setTimeout(resolve, backoffMs));
-      }
-    }
-    return false;
-  };
-
-  // Queue failed checkpoint for offline sync when connectivity resumes
-  const queueOfflineCheckpoint = (orderId: string, payload: OdometerCheckpointPayload) => {
-    try {
-      const queue = JSON.parse(sessionStorage.getItem('offline_odometer_queue') || '[]');
-      queue.push({ orderId, payload, queuedAt: new Date().toISOString() });
-      sessionStorage.setItem('offline_odometer_queue', JSON.stringify(queue));
-      logAudit('ODOMETER_CHECKPOINT_QUEUED_OFFLINE', { orderId, type: payload.checkpoint_type });
-    } catch (e) {
-      console.warn('[OFFLINE_QUEUE] Storage write failed:', e);
-    }
-  };
-
-  const handleVerifyOtpAndStart = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpVerificationCode) {
-      setOtpError('Please request and input the 4-digit code from the passenger.');
-      return;
-    }
-    if (!startOdometer) {
-      setOtpError('A valid start Odometer KM reading is required.');
-      return;
-    }
-
-    logAudit('TRIP_START_ATTEMPT', {
-      orderId: activeTrip?.order_id,
-      startOdometer,
-      startFuel,
-      otpEntered: otpVerificationCode
-    });
-
-    if (activeTrip?.order_id && token) {
-      try {
-        const res = await driverStartTrip(token, activeTrip.order_id, {
-          odometerReading: parseInt(startOdometer, 10),
-          fuelPercentage: startFuel,
-          otp: otpVerificationCode,
-          photoUrl: startOdoPhoto || '',
-          carPlate: carPlate,
-        });
-
-        if (res.success) {
-          setOtpError('');
-          logAudit('TRIP_STARTED', { orderId: activeTrip.order_id });
-          setDutyState('DELIVERING');
-        }
-      } catch (err: any) {
-        if (err instanceof ApiClientError) {
-          if (err.body.includes('car_plate_mismatch')) {
-            setOtpError("Wrong car — this plate doesn't match the rider's registered vehicle.");
-          } else {
-            try {
-              const errorJson = JSON.parse(err.body);
-              setOtpError(errorJson.message || errorJson.error || 'OTP verification failed.');
-            } catch {
-              if (err.status === 403 || err.body.includes('too_many_otp_attempts')) {
-                setOtpError('OTP locked: Too many failed attempts. Trip is locked.');
-              } else {
-                setOtpError(err.body || 'OTP verification failed.');
-              }
-            }
-          }
-        } else {
-          setOtpError(err.message || 'OTP verification failed.');
-        }
-      }
-    } else {
-      // No client-side OTP bypass: the trip can only start on a server-verified OTP.
-      // Without an authenticated session, force re-auth rather than advancing state.
-      setOtpError('Session expired. Please re-authenticate before starting the trip.');
-    }
-  };
-
   const handleTollAddition = async () => {
     if (activeTrip?.order_id && token) {
       try {
@@ -843,7 +719,7 @@ export default function DriverTerminalPage() {
         });
         setTollCharges((prev) => prev + 50);
         logAudit('BILLING_MODIFIER_ADDED', { type: 'TOLL', amount: 50 });
-      } catch (err) {
+      } catch {
         alert('Failed to record toll event on server. Please try again.');
       }
     } else {
@@ -861,7 +737,7 @@ export default function DriverTerminalPage() {
         });
         setParkingCharges((prev) => prev + 30);
         logAudit('BILLING_MODIFIER_ADDED', { type: 'PARKING', amount: 30 });
-      } catch (err) {
+      } catch {
         alert('Failed to record parking event on server. Please try again.');
       }
     } else {
@@ -961,7 +837,7 @@ export default function DriverTerminalPage() {
       try {
         sessionStorage.setItem(`final_bill_${activeTrip.order_id}`, JSON.stringify(finalBillData));
         sessionStorage.setItem('current_final_bill', JSON.stringify(finalBillData));
-      } catch (e) {}
+      } catch {}
       setDutyState('COMPLETED');
       router.push(`/driver/trip/bill?order_id=${activeTrip.order_id}`);
     } else {

@@ -55,7 +55,7 @@ export default function RateRiderPage() {
       try {
         sessionStorage.removeItem(`final_bill_${orderID}`);
         sessionStorage.removeItem('current_final_bill');
-      } catch (e) {}
+      } catch {}
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to rate rider:', err);

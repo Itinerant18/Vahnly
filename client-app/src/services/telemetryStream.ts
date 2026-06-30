@@ -34,7 +34,7 @@ export function startTelemetryStream(options: TelemetryStreamOptions): Telemetry
       try {
         const battery = await nav.getBattery();
         batteryLevel = Math.round(battery.level * 100);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

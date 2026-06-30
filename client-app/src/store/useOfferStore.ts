@@ -70,7 +70,7 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     }
   },
 
-  acceptOffer: async (token, driverID) => {
+  acceptOffer: async (token) => {
     const { currentOffer, offerReceivedTs } = get();
     if (!currentOffer) return false;
 

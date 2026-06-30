@@ -41,7 +41,7 @@ export default function FinalBillPage() {
       setIssueDone(true);
       setShowIssueForm(false);
       setIssueDesc('');
-    } catch (e) {
+    } catch {
       alert('Failed to report car issue. Please try again.');
     } finally {
       setIssueSubmitting(false);
@@ -105,7 +105,6 @@ export default function FinalBillPage() {
   const waitingCharge = bill.wait_charge_paise / 100;
   const tolls = bill.tolls_paise / 100;
   const parking = bill.parking_charges_paise / 100;
-  const surge = bill.night_surge_paise / 100; // night surge
   const d4mCareFee = bill.care_surcharge_paise / 100;
   const totalAmount = bill.total_fare_paise / 100;
 

@@ -12,7 +12,7 @@ interface TripState {
   logMidTripEvent: (orderId: string, type: 'TOLL' | 'PARKING', amount: number) => Promise<void>;
 }
 
-export const useTripStore = create<TripState>((set, get) => ({
+export const useTripStore = create<TripState>((set) => ({
   waitTimerSeconds: 0,
   isOTPValidating: false,
   activeRoutePolyline: null,

@@ -945,7 +945,7 @@ export async function syncOfflineOnboarding(): Promise<void> {
           token,
           body: item.data,
         });
-      } catch (err) {
+      } catch {
         // Keep in queue if it failed due to network again
         remaining.push(item);
       }
