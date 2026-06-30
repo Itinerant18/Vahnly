@@ -66,3 +66,4 @@ In `README.md` (or create one at repo root if missing), add a section:
 - Do NOT touch actual `.env` or `.env.local` files — only `.env.example` and `README.md`
 - Do NOT commit real API keys — only placeholder values like `your-firebase-api-key`
 - Note the leaked Google Maps API key `AIzaSyBmZK4B5kuqxrLd3ZU8p-qcH378YChR2ZE` in root `.env` — add a comment `# ROTATE THIS KEY — was committed to git` next to it but do not remove the line (so the developer knows to rotate it)
+
