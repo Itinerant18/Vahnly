@@ -771,12 +771,15 @@ func (h *DriverAuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Reque
 	var dbVerificationStatus string
 	var dbOnboardingStep int
 
+	// Match on trailing 10 digits so an existing driver (stored bare 10-digit) is found
+	// even though this path normalizes to +91 — otherwise they'd be misread as a brand
+	// new registration. The driver_otp_sessions lookups above stay on the normalized phone.
 	queryDriver := `
 		SELECT id, name, city_prefix, verification_status, onboarding_step
 		FROM drivers
-		WHERE phone = $1
+		WHERE right(regexp_replace(phone, '\D', '', 'g'), 10) = $1
 	`
-	err := h.dbPool.QueryRow(ctx, queryDriver, phone).Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
+	err := h.dbPool.QueryRow(ctx, queryDriver, lastTenDigits(phone)).Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Driver does not exist yet. Issue a short-lived signed registration phone_token
@@ -879,7 +882,7 @@ func (h *DriverAuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.
 
 	// Only proceed for a registered driver — but never reveal which.
 	var exists bool
-	if err := h.dbPool.QueryRow(ctx, "SELECT true FROM drivers WHERE phone = $1", phone).Scan(&exists); err != nil || !exists {
+	if err := h.dbPool.QueryRow(ctx, "SELECT true FROM drivers WHERE right(regexp_replace(phone, '\\D', '', 'g'), 10) = $1", lastTenDigits(phone)).Scan(&exists); err != nil || !exists {
 		respondOK()
 		return
 	}
@@ -977,7 +980,7 @@ func (h *DriverAuthHandler) HandleResetPassword(w http.ResponseWriter, r *http.R
 	var dbOnboardingStep int
 	err = h.dbPool.QueryRow(ctx, `
 		SELECT id, name, city_prefix, verification_status, onboarding_step
-		FROM drivers WHERE phone = $1`, phone).
+		FROM drivers WHERE right(regexp_replace(phone, '\D', '', 'g'), 10) = $1`, lastTenDigits(phone)).
 		Scan(&dbDriverID, &dbName, &dbCityPrefix, &dbVerificationStatus, &dbOnboardingStep)
 	if err != nil {
 		http.Error(w, "Account not found", http.StatusUnauthorized)
