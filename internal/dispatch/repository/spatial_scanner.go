@@ -71,6 +71,15 @@ func (s *SpatialScanner) ScanNearbyDrivers(ctx context.Context, cityPrefix strin
 				supplyCmd: surgePipe.ZCard(ctx, supplyKey),
 				demandCmd: surgePipe.ZCard(ctx, demandKey),
 			}
+
+			// Opportunistic GC of crash/disconnect leftovers: drop members scored below the
+			// stale window. Graceful offline and cell-moves already ZRem elsewhere
+			// (duty_handler.go:204-214, handler.go ~2770); this covers a driver who simply
+			// vanished (app crash / network drop), for cells under active matching, in the
+			// same pipeline — no extra round-trip. The exclusive "(" upper bound keeps a
+			// driver scored exactly at the threshold visible to the read above.
+			// ponytail: only scanned cells are GC'd; idle cells age out via the zset's 24h TTL.
+			surgePipe.ZRemRangeByScore(ctx, zsetKey, "0", fmt.Sprintf("(%d", staleThreshold))
 		}
 
 		if _, err := surgePipe.Exec(ctx); err != nil && err != redis.Nil {
