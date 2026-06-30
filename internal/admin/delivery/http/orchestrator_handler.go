@@ -495,22 +495,27 @@ func (h *MarketplaceOrchestratorHandler) HandleGetFraudAnomalies(w http.Response
 		return
 	}
 
-	// High-fidelity active monitoring dataset
-	alerts := []FraudAnomaly{
-		{
-			DriverID:      "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01",
-			DriverName:    "Subhabrata Pal",
-			ViolationType: "GPS_SPOOFING",
-			VarianceScore: 98.4,
-			LastPingText:  "Jumped 4.2km inside 1.2 seconds over Howrah Bridge segment context.",
-		},
-		{
-			DriverID:      "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02",
-			DriverName:    "Arjun Das",
-			ViolationType: "SIMULATOR_DETECTED",
-			VarianceScore: 87.1,
-			LastPingText:  "Zero sensor bearing oscillation detected across 4 consecutive logs.",
-		},
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// Real open driver fraud events. Empty until a detector writes fraud_events — an
+	// honest empty list, not a fabricated demo dataset.
+	alerts := []FraudAnomaly{}
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT f.entity_id, COALESCE(d.name, ''), f.fraud_type, f.score::float,
+		       COALESCE(f.evidence->>'detail', f.evidence::text)
+		FROM fraud_events f
+		LEFT JOIN drivers d ON d.id::text = f.entity_id
+		WHERE f.entity_type = 'DRIVER' AND f.status = 'OPEN'
+		ORDER BY f.created_at DESC LIMIT 100`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var a FraudAnomaly
+			if rows.Scan(&a.DriverID, &a.DriverName, &a.ViolationType, &a.VarianceScore, &a.LastPingText) == nil {
+				alerts = append(alerts, a)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

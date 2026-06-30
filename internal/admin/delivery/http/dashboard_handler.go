@@ -271,30 +271,20 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
-	if promoCost == 0 && grossRevenue > 0 {
-		promoCost = int64(float64(grossRevenue) * 0.05)
-	}
+	// promoCost is the real query value above; no 5%-of-revenue fabrication fallback.
 
 	// Calculations
 	totalTripsDelta := percentageDelta(totalTrips, prevTotalTrips)
 
-	activeTripsChange := activeTrips - 15
-	if activeTripsChange < 0 {
-		activeTripsChange = 0
-	}
-	if activeTrips > 0 && activeTripsChange == 0 {
-		activeTripsChange = 1
-	}
+	// No KPI snapshot/time-series table exists, so there is no real prior value to diff
+	// active-trips / online-drivers against — report 0 rather than inventing an offset.
+	activeTripsChange := int64(0)
 
 	newSignups := newRiders + newDrivers
 	prevNewSignups := prevNewRiders + prevNewDrivers
 	newSignupsDelta := percentageDelta(newSignups, prevNewSignups)
 
-	prevOnlineDrivers := onlineDrivers - 8
-	if prevOnlineDrivers <= 0 {
-		prevOnlineDrivers = onlineDrivers
-	}
-	onlineDriversDelta := percentageDelta(onlineDrivers, prevOnlineDrivers)
+	onlineDriversDelta := percentageDelta(onlineDrivers, onlineDrivers)
 
 	cancellationDelta := cancellationRate - prevCancellationRate
 	revenueDelta := percentageDelta(grossRevenue, prevGrossRevenue)
@@ -311,6 +301,9 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 		`SELECT COUNT(*) FROM support_tickets WHERE status IN ('OPEN','PENDING') AND sla_deadline < NOW()`).Scan(&slaBreaches)
 	_ = h.dbPool.QueryRow(ctx,
 		`SELECT COALESCE(SUM(promo_discount_paise), 0) FROM orders WHERE created_at >= $1`, currentStart).Scan(&promoCostPaise)
+	var avgRating float64
+	_ = h.dbPool.QueryRow(ctx,
+		`SELECT COALESCE(AVG(rating), 0) FROM drivers WHERE rating > 0`).Scan(&avgRating)
 
 	kpis := KPIResponse{
 		TotalTrips:          totalTrips,
@@ -321,7 +314,7 @@ func (h *DashboardHandler) HandleGetDashboardKPIs(w http.ResponseWriter, r *http
 		TotalDrivers:        totalDrivers,
 		CancellationRate:    cancellationRate,
 		AvgEtaMinutes:       avgEtaMinutes,
-		AvgRating:           4.72,
+		AvgRating:           avgRating,
 		GrossRevenue:        grossRevenue,
 		NetRevenue:          netRevenue,
 		PromoCost:           promoCost,
