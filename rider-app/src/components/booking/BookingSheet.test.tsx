@@ -69,6 +69,22 @@ describe('BookingSheet', () => {
     expect(screen.getByRole('button', { name: 'Book Driver' })).toBeEnabled();
   });
 
+  it('tapping Book opens a review sheet — only Confirm dispatches', async () => {
+    storeState = baseStore({
+      pickup: { lat: 22.5, lng: 88.3, address: 'Home' },
+      selectedCarId: 'car-1',
+      fareEstimate: {
+        fare_breakdown: { estimated_total_paise: 48000, surge_multiplier: 1, promo_discount_paise: 0 },
+        surge_active: false, driver_availability: 'HIGH', estimated_pickup_eta_minutes: 5,
+      },
+    });
+    render(<BookingSheet />);
+    await userEvent.click(screen.getByRole('button', { name: 'Book Driver' }));
+    expect(bookDriver).not.toHaveBeenCalled(); // review shown, not booked yet
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm booking' }));
+    expect(bookDriver).toHaveBeenCalled();
+  });
+
   it('changing the trip type updates the store', async () => {
     render(<BookingSheet />);
     await userEvent.click(screen.getByRole('button', { name: 'One-Way' }));

@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { bookingBlocker, tripNeedsDropoff } from './bookingStore';
+import { describe, it, expect, vi } from 'vitest';
+import { bookingBlocker, tripNeedsDropoff, useBookingStore } from './bookingStore';
 import type { FareEstimate, LocationPoint, TripType } from '../api/types';
+
+vi.mock('../api/fare', () => ({
+  fareApi: { estimate: vi.fn(async () => ({ fare_breakdown: {} })) },
+}));
 
 const pickup: LocationPoint = { lat: 22.5, lng: 88.3, address: 'Home' };
 const dropoff: LocationPoint = { lat: 22.6, lng: 88.4, address: 'Work' };
@@ -44,6 +48,14 @@ describe('bookingBlocker', () => {
     expect(bookingBlocker(state({ pickup, dropoff, selectedCarId: 'c1', fareEstimate: fare }))).toBeNull();
     // one-time car satisfies the car requirement too
     expect(bookingBlocker(state({ pickup, dropoff, oneTimeCar: {} as never, fareEstimate: fare }))).toBeNull();
+  });
+});
+
+describe('fare freshness (Phase 4)', () => {
+  it('clears the fare estimate the moment a fare input changes', () => {
+    useBookingStore.setState({ pickup, fareEstimate: fare });
+    useBookingStore.getState().setDropoff(dropoff);
+    expect(useBookingStore.getState().fareEstimate).toBeNull();
   });
 });
 

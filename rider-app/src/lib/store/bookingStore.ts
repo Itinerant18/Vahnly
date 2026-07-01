@@ -195,6 +195,10 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   fetchFareEstimate: () => {
     const { pickup } = get();
     if (!pickup) return;
+    // Phase 4 — fare freshness: drop the previous quote the moment a fare input
+    // changes so readiness re-blocks (CTA → "Getting fare…") and the rider can
+    // never confirm a stale price. isSearching keeps the shimmer up meanwhile.
+    set({ fareEstimate: null, isSearching: true });
     if (fareDebounceTimer) clearTimeout(fareDebounceTimer);
     fareDebounceTimer = setTimeout(async () => {
       const s = get();

@@ -151,6 +151,16 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
+// ── ReviewRow — one label/value line in the confirm sheet ─────────────────────
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="shrink-0 text-label-medium text-content-secondary">{label}</span>
+      <span className="text-right text-label-medium text-content-primary">{value}</span>
+    </div>
+  );
+}
+
 // ── PlaceInput — debounced Nominatim search with a results dropdown ───────────
 function PlaceInput({
   value,
@@ -257,6 +267,7 @@ export function BookingSheet() {
   const [cars, setCars] = useState<GarageCar[]>([]);
   const [showCarPicker, setShowCarPicker] = useState(false);
   const [showFareModal, setShowFareModal] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const [showD4mInfo, setShowD4mInfo] = useState(false);
   const [promoInput, setPromoInput] = useState("");
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "err">("idle");
@@ -392,7 +403,15 @@ export function BookingSheet() {
   };
 
   // ── Book ───────────────────────────────────────────────────────────────────
-  const onBook = async () => {
+  // Tapping the CTA opens a review sheet — it does NOT dispatch. Booking only
+  // happens from the explicit Confirm inside the review (Phase 3).
+  const openReview = () => {
+    if (blocker) return;
+    setBookingError(null);
+    setShowReview(true);
+  };
+
+  const confirmBooking = async () => {
     if (blocker) return;
     setBookingError(null);
     setBookingState("loading");
@@ -403,6 +422,7 @@ export function BookingSheet() {
       setBookingError(e instanceof Error ? e.message : "Booking failed. Please try again.");
       useToastStore.getState().show(friendlyError(e), "error");
       setBookingState("idle");
+      setShowReview(false);
     }
   };
 
@@ -852,7 +872,7 @@ export function BookingSheet() {
               <RainbowButton
                 type="button"
                 disabled={!!blocker || isMonthly || bookingState === "loading"}
-                onClick={onBook}
+                onClick={openReview}
                 aria-live="polite"
                 className="h-14 w-full text-label-large font-medium text-content-inverse cursor-pointer
                   shadow-[0_4px_16px_rgba(0,0,0,0.24)]
@@ -921,6 +941,63 @@ export function BookingSheet() {
               )}
             </div>
             <div className="h-6" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Review & confirm sheet (Phase 3) ───────────────────────────────── */}
+      {showReview && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
+          onClick={() => setShowReview(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowReview(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Review booking"
+        >
+          <div
+            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
+            <h3 className="mb-4 text-heading-medium text-content-primary">Review &amp; confirm</h3>
+            <div className="space-y-3">
+              <ReviewRow label="Pickup" value={pickup?.address ?? "—"} />
+              {(needsDrop || dropoff) && <ReviewRow label="Drop-off" value={dropoff?.address ?? "—"} />}
+              <ReviewRow label="Trip" value={TRIP_TYPES.find((t) => t.value === tripType)?.label ?? tripType} />
+              <ReviewRow
+                label="Car"
+                value={selectedCar ? `${selectedCar.make} ${selectedCar.model} · ${selectedCar.registration_plate}` : "One-time car"}
+              />
+              <ReviewRow label="Payment" value={PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod} />
+              <ReviewRow label="When" value={scheduledAt ? new Date(scheduledAt).toLocaleString() : "Now"} />
+              <div className="flex items-center justify-between border-t border-border-opaque pt-3">
+                <span className="text-label-medium text-content-secondary">Estimated fare</span>
+                <FareDisplay amount={fareBreakdown?.estimated_total_paise ?? 0} size="lg" />
+              </div>
+            </div>
+            {bookingError && (
+              <p role="alert" className="mt-3 text-label-small text-content-negative">{bookingError}</p>
+            )}
+            <button
+              type="button"
+              onClick={confirmBooking}
+              disabled={bookingState === "loading"}
+              className="mt-4 h-14 w-full rounded-sm bg-secondary text-content-inverse text-label-large font-medium
+                cursor-pointer transition-transform active:scale-[0.99]
+                disabled:opacity-50 disabled:cursor-not-allowed
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
+            >
+              {bookingState === "loading" ? "Finding drivers…" : "Confirm booking"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReview(false)}
+              className="mt-2 h-11 w-full rounded-sm text-label-medium text-content-secondary hover:text-content-primary cursor-pointer"
+            >
+              Back
+            </button>
+            <div className="h-2" />
           </div>
         </div>
       )}
