@@ -104,7 +104,7 @@ export default function IndexPage() {
         <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
           {/* Brand */}
           <Link href="#" className="flex items-center gap-2 cursor-pointer group">
-            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-bold text-lg group-hover:scale-95 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-[#0040e0] flex items-center justify-center text-white font-bold text-lg group-hover:scale-95 transition-transform">
               V
             </div>
             <span className="font-extrabold text-black text-xl tracking-tight">Vahnly</span>
@@ -140,24 +140,24 @@ export default function IndexPage() {
 
         {/* Hero Section */}
         <section className="w-full max-w-3xl mx-auto text-center mb-20 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-low text-secondary font-semibold text-xs mb-6 mx-auto shadow-sm border border-secondary/10">
-            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0040e0]/10 text-[#0040e0] font-semibold text-xs mb-6 mx-auto shadow-sm border border-[#0040e0]/20">
+            <span className="w-2 h-2 rounded-full bg-[#0040e0] animate-pulse"></span>
             Verified Professional Driver Dispatch
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-content-primary mb-6 tracking-tight leading-tight">
             Hire a Professional <br className="hidden md:block" />
             <span className="text-black">Driver</span> <br className="hidden md:block" />
-            <span className="text-secondary bg-clip-text">For Your Own Car</span>
+            <span className="bg-gradient-to-r from-[#0040e0] via-[#2563eb] to-[#4f46e5] bg-clip-text text-transparent">For Your Own Car</span>
           </h1>
           <p className="text-base md:text-lg text-content-secondary mb-10 max-w-2xl mx-auto leading-relaxed">
             Vahnly provides a premium, safe, and dynamic ride matching ecosystem. Connect instantly with verified, highly trained independent drivers to navigate your car, whether for daily commutes, road trips, or late-night events.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login/" className="w-full sm:w-auto bg-black text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-95 transition-all flex items-center justify-center gap-2">
+            <Link href="/login/" className="w-full sm:w-auto bg-[#0040e0] text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[#0035be] shadow-[0_4px_24px_rgba(0,64,224,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2">
               Get Started Now
               <ForwardIcon size={16} />
             </Link>
-            <a href="#features" className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center">
+            <a href="#features" className="w-full sm:w-auto bg-white border border-[#0040e0]/30 text-[#0040e0] px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[#0040e0]/5 active:scale-95 transition-all flex items-center justify-center">
               Learn More
             </a>
           </div>
@@ -169,8 +169,8 @@ export default function IndexPage() {
 
             {/* Feature 1: Large Span */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group md:col-span-2 lg:col-span-2">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <ShieldIcon size={24} className="text-secondary" />
+              <div className="w-12 h-12 rounded-xl bg-[#0040e0]/10 text-[#0040e0] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <ShieldIcon size={24} className="text-[#0040e0]" />
               </div>
               <div>
                 <h3 className="font-bold text-content-primary text-lg mb-2">Verified Drivers</h3>
@@ -182,8 +182,8 @@ export default function IndexPage() {
 
             {/* Feature 2 */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-100 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <BoltIcon size={24} className="text-secondary" />
+              <div className="w-12 h-12 rounded-xl bg-[#0040e0]/10 text-[#0040e0] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <BoltIcon size={24} className="text-[#0040e0]" />
               </div>
               <div>
                 <h3 className="font-bold text-content-primary text-lg mb-2">Instant Dispatch</h3>
@@ -195,8 +195,8 @@ export default function IndexPage() {
 
             {/* Feature 3 */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-200 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <WalletIcon size={24} className="text-secondary" />
+              <div className="w-12 h-12 rounded-xl bg-[#0040e0]/10 text-[#0040e0] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <WalletIcon size={24} className="text-[#0040e0]" />
               </div>
               <div>
                 <h3 className="font-bold text-content-primary text-lg mb-2">Transparent Pricing</h3>
@@ -208,8 +208,8 @@ export default function IndexPage() {
 
             {/* Feature 4: Wide layout */}
             <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 animate-fade-in-up delay-300 md:col-span-2 lg:col-span-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
-              <div className="w-14 h-14 shrink-0 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
-                <HeadsetIcon size={28} className="text-secondary" />
+              <div className="w-14 h-14 shrink-0 rounded-xl bg-[#0040e0]/10 text-[#0040e0] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <HeadsetIcon size={28} className="text-[#0040e0]" />
               </div>
               <div>
                 <h3 className="font-bold text-content-primary text-lg mb-2">24/7 Premium Support</h3>

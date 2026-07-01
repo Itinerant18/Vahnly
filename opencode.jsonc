@@ -1,8 +1,14 @@
 {
-  "mcpServers": {
-    "magicuidesign-mcp": {
-      "command": "npx",
-      "args": ["-y", "@magicuidesign/mcp@latest"]
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "my-server": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "my-mcp-server"
+      ],
+      "enabled": true
     }
   }
 }

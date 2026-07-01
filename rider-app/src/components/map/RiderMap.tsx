@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
-import type L from "leaflet";
+import L from "leaflet";
 import type { LocationPoint } from "@/lib/api/types";
 
 interface NearbyDriver {
@@ -49,51 +49,41 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
     const container = mapRef.current;
     if (!container) return;
 
-    // Dynamic import to avoid SSR issues (this component is only loaded client-side)
-    import("leaflet")
-      .then((L) => {
-        if (isCancelled || !mapRef.current) return;
+    // A previous map (StrictMode re-invoke / HMR) may still own this DOM
+    // node. Bail rather than let L.map throw "already initialized".
+    if (leafletMap.current || (container as any)._leaflet_id != null) return;
 
-        // A previous map (StrictMode re-invoke / HMR) may still own this DOM
-        // node. Bail rather than let L.map throw "already initialized".
-        if (leafletMap.current || (container as any)._leaflet_id != null) return;
-
-        let map: L.Map;
-        try {
-          map = L.map(container, {
-            center: [defaultCenter.lat, defaultCenter.lng],
-            zoom: 15,
-            zoomControl: false,
-            attributionControl: false,
-          });
-        } catch {
-          // Container still bound to a stale Leaflet instance — skip this pass.
-          return;
-        }
-
-        L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-          { subdomains: "abcd", maxZoom: 19 }
-        ).addTo(map);
-
-        // User location marker
-        const userIcon = L.divIcon({
-          html: USER_ICON_HTML,
-          className: "",
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        });
-
-        const uMarker = L.marker([defaultCenter.lat, defaultCenter.lng], { icon: userIcon }).addTo(map);
-        userMarker.current = uMarker;
-
-        createdMap = map;
-        leafletMap.current = map;
-      })
-      .catch(() => {
-        // Swallow dynamic-import / init races so they never surface as an
-        // unhandledRejection in dev (StrictMode double-mount, fast-refresh).
+    let map: L.Map;
+    try {
+      map = L.map(container, {
+        center: [defaultCenter.lat, defaultCenter.lng],
+        zoom: 15,
+        zoomControl: false,
+        attributionControl: false,
       });
+    } catch {
+      // Container still bound to a stale Leaflet instance — skip this pass.
+      return;
+    }
+
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19 }
+    ).addTo(map);
+
+    // User location marker
+    const userIcon = L.divIcon({
+      html: USER_ICON_HTML,
+      className: "",
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+
+    const uMarker = L.marker([defaultCenter.lat, defaultCenter.lng], { icon: userIcon }).addTo(map);
+    userMarker.current = uMarker;
+
+    createdMap = map;
+    leafletMap.current = map;
 
     return () => {
       isCancelled = true;
@@ -120,22 +110,20 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
   // Update nearby driver markers
   useEffect(() => {
     if (!leafletMap.current) return;
-    import("leaflet").then((L) => {
-      // Remove old markers
-      driverMarkers.current.forEach((m) => m.remove());
-      driverMarkers.current = [];
+    // Remove old markers
+    driverMarkers.current.forEach((m) => m.remove());
+    driverMarkers.current = [];
 
-      const driverIcon = L.divIcon({
-        html: DRIVER_ICON_HTML,
-        className: "",
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      });
+    const driverIcon = L.divIcon({
+      html: DRIVER_ICON_HTML,
+      className: "",
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
 
-      nearbyDrivers.forEach((d) => {
-        const m = L.marker([d.lat, d.lng], { icon: driverIcon }).addTo(leafletMap.current!);
-        driverMarkers.current.push(m);
-      });
+    nearbyDrivers.forEach((d) => {
+      const m = L.marker([d.lat, d.lng], { icon: driverIcon }).addTo(leafletMap.current!);
+      driverMarkers.current.push(m);
     });
   }, [nearbyDrivers]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { getGoogleIdToken } from "@/lib/googleAuth";
@@ -21,12 +22,27 @@ function Spinner({ size = 20 }: { size?: number }) {
 // ── Logo SVG ─────────────────────────────────────────────────────────────────
 function Logo() {
   return (
-    <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-interactive-primary shadow-elevation-2">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2L3 8v13h6v-5h6v5h6V8L12 2z" fill="white" strokeLinejoin="round" />
-        <circle cx="12" cy="11" r="2" fill="white" opacity="0.8" />
-      </svg>
-    </div>
+    <motion.div
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="relative flex h-20 w-20 items-center justify-center rounded-xl bg-interactive-primary shadow-elevation-2"
+    >
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-0 flex items-center justify-center"
+      >
+        <svg width="44" height="44" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="20" stroke="white" strokeWidth="2.5" fill="none" />
+          <circle cx="24" cy="24" r="6" fill="white" />
+          <rect x="22.5" y="4" width="3" height="12" rx="1.5" fill="white" />
+          <rect x="22.5" y="32" width="3" height="12" rx="1.5" fill="white" />
+          <rect x="4" y="22.5" width="12" height="3" rx="1.5" fill="white" />
+          <rect x="32" y="22.5" width="12" height="3" rx="1.5" fill="white" />
+        </svg>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -61,7 +77,7 @@ function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
           autoFocus={i === 0}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          className="h-14 w-full rounded-sm border border-border-opaque bg-background-secondary
+          className="h-14 w-10 rounded-sm border border-border-opaque bg-background-secondary
             text-center font-mono text-display-small text-content-primary
             caret-accent-400 outline-none
             focus:border-2 focus:border-border-accent
@@ -235,25 +251,34 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col bg-background-primary">
 
-      {/* ── Top hero (40%) ── */}
-      <div className="flex flex-[2] flex-col items-center justify-center gap-4 px-6 pt-safe-top">
+      {/* ── Top hero ── */}
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 pt-safe-top">
         <Logo />
-        <div className="text-center">
-          <h1 className="text-display-small text-content-primary mt-4">Vahnly</h1>
+        <motion.div
+          initial={{ y: 12, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="text-center"
+        >
+          <h1 className="text-display-small text-content-primary mt-4" style={{ letterSpacing: "-0.02em" }}>Vahnly</h1>
           <TypingAnimation
             className="text-paragraph-large text-content-secondary mt-2 block"
-            duration={40}
-            delay={300}
+            duration={25}
+            delay={500}
             startOnView={false}
           >
             Your car. Our driver.
           </TypingAnimation>
-        </div>
+        </motion.div>
       </div>
 
-      {/* ── Bottom card (60%) ── */}
-      <div className="flex-[3] bg-background-secondary rounded-t-lg shadow-elevation-3 px-6 pt-8 pb-safe-bottom overflow-y-auto">
-
+      {/* ── Bottom card ── */}
+      <motion.div
+        initial={{ y: 30, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="flex-[4] bg-background-secondary rounded-t-lg shadow-elevation-3 px-6 pt-8 pb-safe-bottom overflow-y-auto"
+      >
         {/* Error banner */}
         {error && (
           <div className="mb-4 rounded-sm bg-surface-negative border border-negative-200 px-4 py-3">
@@ -262,8 +287,19 @@ export default function LoginPage() {
         )}
 
         {step === "choose" && (
-          <div className="space-y-5">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={{
+              visible: { transition: { staggerChildren: 0.04 } },
+            }}
+            className="space-y-5"
+          >
             {/* Log In / Sign Up segmented toggle */}
+            <motion.div
+              variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
             <div className="flex gap-1 rounded-sm border border-border-opaque bg-background-primary p-1">
               <button
                 type="button"
@@ -288,10 +324,15 @@ export default function LoginPage() {
                 Sign Up
               </button>
             </div>
+            </motion.div>
 
             {mode === "login" ? (
               /* ── Returning user: phone + password (no OTP / no SMS) ── */
-              <div className="space-y-3">
+              <motion.div
+                variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-3"
+              >
                 <h2 className="text-heading-medium text-content-primary">Welcome back</h2>
                 <div className="flex gap-2">
                   <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
@@ -321,8 +362,8 @@ export default function LoginPage() {
                   disabled={isLoading}
                   onClick={handlePasswordLogin}
                   shimmerColor="rgba(255,255,255,0.3)"
-                  background="#1a5cff"
-                  borderRadius="4px"
+                  background="var(--accent-400)"
+                  borderRadius="8px"
                   className="h-14 text-label-large font-medium shadow-elevation-1"
                 >
                   {isLoading ? <Spinner /> : "Log In"}
@@ -331,15 +372,19 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleForgotSend}
                   disabled={isLoading}
-                  className="w-full text-center text-label-small text-content-secondary py-1 min-h-[36px] hover:text-content-primary transition-base"
+                  className="w-full text-center text-label-small text-content-secondary py-2 min-h-[44px] hover:text-content-primary transition-base"
                 >
                   Forgot password?
                 </button>
-              </div>
-            ) : (
-              /* ── New user: verify number once, then set a password ── */
-              <div className="space-y-3">
-                <h2 className="text-heading-medium text-content-primary">Create your account</h2>
+                </motion.div>
+              ) : (
+                /* ── New user: verify number once, then set a password ── */
+                <motion.div
+                  variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-3"
+                >
+                  <h2 className="text-heading-medium text-content-primary">Create your account</h2>
                 <p className="text-paragraph-small text-content-secondary">
                   Verify your number once with an OTP, then set a password. After that,
                   just log in with your password — no OTP, no SMS.
@@ -348,8 +393,8 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => { setError(""); setStep("phone_verify"); }}
                   shimmerColor="rgba(255,255,255,0.3)"
-                  background="#1a5cff"
-                  borderRadius="4px"
+                  background="var(--accent-400)"
+                  borderRadius="8px"
                   className="h-14 text-label-large font-medium shadow-elevation-1"
                 >
                   Sign up with phone number
@@ -371,17 +416,26 @@ export default function LoginPage() {
                     onChange={(e) => setReferral(e.target.value.toUpperCase())}
                   />
                 </div>
-              </div>
-            )}
+                </motion.div>
+              )}
 
             {/* Divider */}
+            <motion.div
+              variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
             <div className="flex items-center gap-3">
               <div className="flex-1 border-t border-border-opaque" />
-              <span className="text-label-small text-content-tertiary">or</span>
+              <span className="text-label-small text-content-secondary">or</span>
               <div className="flex-1 border-t border-border-opaque" />
             </div>
+            </motion.div>
 
             {/* Social buttons (sign in OR sign up) */}
+            <motion.div
+              variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -418,11 +472,17 @@ export default function LoginPage() {
                 </span>
               </button>
             </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {step === "google-register" && (
-          <div className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-5"
+          >
             <div>
               <h2 className="text-heading-medium text-content-primary mb-1">Complete Registration</h2>
               <p className="text-paragraph-small text-content-secondary">
@@ -525,8 +585,8 @@ export default function LoginPage() {
               disabled={isLoading || googlePhone.length !== 10 || googleOtp.length !== 6}
               onClick={onCompleteGoogleRegistration}
               shimmerColor="rgba(255,255,255,0.3)"
-              background="#1a5cff"
-              borderRadius="4px"
+              background="var(--accent-400)"
+              borderRadius="8px"
               className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {isLoading ? <Spinner /> : "Complete Registration"}
@@ -539,11 +599,16 @@ export default function LoginPage() {
             >
               Cancel
             </button>
-          </div>
+          </motion.div>
         )}
 
         {step === "reset" && (
-          <div className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-5"
+          >
             <div>
               <h2 className="text-heading-medium text-content-primary mb-1">Reset password</h2>
               <p className="text-paragraph-small text-content-secondary">
@@ -571,8 +636,8 @@ export default function LoginPage() {
               disabled={isLoading}
               onClick={handleResetSubmit}
               shimmerColor="rgba(255,255,255,0.3)"
-              background="#1a5cff"
-              borderRadius="4px"
+              background="var(--accent-400)"
+              borderRadius="8px"
               className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {isLoading ? <Spinner /> : "Reset & Log In"}
@@ -583,11 +648,16 @@ export default function LoginPage() {
             >
               Back
             </button>
-          </div>
+          </motion.div>
         )}
 
         {step === "set_password" && (
-          <div className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-5"
+          >
             <div>
               <h2 className="text-heading-medium text-content-primary mb-1">Create a password</h2>
               <p className="text-paragraph-small text-content-secondary">
@@ -607,8 +677,8 @@ export default function LoginPage() {
               disabled={savingPw}
               onClick={handleCreatePassword}
               shimmerColor="rgba(255,255,255,0.3)"
-              background="#1a5cff"
-              borderRadius="4px"
+              background="var(--accent-400)"
+              borderRadius="8px"
               className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {savingPw ? <Spinner /> : "Create password & continue"}
@@ -619,17 +689,17 @@ export default function LoginPage() {
             >
               Skip for now
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* Terms */}
-        <p className="mt-8 pb-4 text-center text-label-small text-content-tertiary">
+        <p className="mt-8 pb-4 text-center text-label-small text-content-secondary">
           By continuing, you agree to our{" "}
           <span className="text-content-accent cursor-pointer hover:underline">Terms of Service</span>{" "}
           and{" "}
           <span className="text-content-accent cursor-pointer hover:underline">Privacy Policy</span>
         </p>
-      </div>
+      </motion.div>
     </main>
   );
 }

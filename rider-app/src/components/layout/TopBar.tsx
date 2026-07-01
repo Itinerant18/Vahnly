@@ -21,7 +21,10 @@ export function TopBar() {
       <div className="relative">
         <button
           onClick={() => setCityOpen((o) => !o)}
-          className="flex items-center gap-1.5 rounded-full bg-background-tertiary px-3 py-1.5 text-sm font-semibold text-content-primary"
+          onKeyDown={(e) => { if (e.key === "Escape") setCityOpen(false); }}
+          aria-expanded={cityOpen}
+          aria-haspopup="listbox"
+          className="flex items-center gap-1.5 rounded-full bg-background-tertiary px-4 py-2 text-sm font-semibold text-content-primary"
         >
           <span className="h-2 w-2 rounded-full bg-positive-400" />
           {city}
@@ -30,10 +33,12 @@ export function TopBar() {
           </svg>
         </button>
         {cityOpen && (
-          <div className="absolute left-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background-tertiary shadow-lg">
+          <div role="listbox" className="absolute left-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background-tertiary shadow-lg">
             {CITIES.map((c) => (
               <button
                 key={c}
+                role="option"
+                aria-selected={c === city}
                 onClick={() => { setCity(c); setCityOpen(false); }}
                 className={`block w-full px-4 py-2.5 text-left text-sm ${c === city ? "text-content-accent" : "text-content-primary"}`}
               >
@@ -48,11 +53,11 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         {/* Notification bell */}
         <div className="relative">
-          <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="flex h-10 w-10 items-center justify-center rounded-full bg-background-tertiary">
+          <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="flex h-11 w-11 items-center justify-center rounded-full bg-background-tertiary">
             <BellIcon size={20} className="text-content-primary" />
           </button>
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-400 text-[9px] font-bold text-content-primary">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-400 text-[9px] font-bold text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -62,7 +67,7 @@ export function TopBar() {
         <button
           onClick={() => { if (activeOrder) router.push("/trip/live"); }}
           disabled={!activeOrder}
-          className={`flex h-10 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-content-primary transition-opacity ${
+          className={`flex h-11 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-white transition-opacity ${
             activeOrder ? "animate-pulse bg-negative-400" : "bg-surface-negative opacity-60"
           }`}
         >
