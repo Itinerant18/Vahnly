@@ -23,6 +23,38 @@ const TRIP_TO_PACKAGE: Partial<Record<TripType, string>> = {
 };
 const packageTypeFor = (t: TripType): string | undefined => TRIP_TO_PACKAGE[t];
 
+// ── Booking readiness ─────────────────────────────────────────────────────────
+// A booking may only be dispatched once every field REQUIRED for the chosen trip
+// type is set and a fare estimate has actually been produced. Point-to-point and
+// outstation trips need a drop-off; round/hourly/monthly are time-based and don't
+// (mirrors `needsDrop` in BookingSheet). Every trip needs a car (it's a
+// drive-your-car service) and a fare the rider has seen.
+export const tripNeedsDropoff = (t: TripType): boolean =>
+  t === "IN_CITY_ONE_WAY" || t === "MINI_OUTSTATION" || t === "OUTSTATION";
+
+export type BookingBlocker = "pickup" | "dropoff" | "car" | "fare" | null;
+
+type ReadinessInput = Pick<
+  BookingState,
+  "pickup" | "dropoff" | "tripType" | "selectedCarId" | "oneTimeCar" | "fareEstimate"
+>;
+
+/** First unmet requirement blocking dispatch, or null when ready to book. */
+export function bookingBlocker(s: ReadinessInput): BookingBlocker {
+  if (!s.pickup) return "pickup";
+  if (tripNeedsDropoff(s.tripType) && !s.dropoff) return "dropoff";
+  if (!s.selectedCarId && !s.oneTimeCar) return "car";
+  if (!s.fareEstimate) return "fare";
+  return null;
+}
+
+const BLOCKER_MESSAGE: Record<Exclude<BookingBlocker, null>, string> = {
+  pickup: "Set a pickup location",
+  dropoff: "Add a drop-off location",
+  car: "Choose your car",
+  fare: "Get a fare estimate first",
+};
+
 export interface BookingState {
   pickup: LocationPoint | null;
   dropoff: LocationPoint | null;
@@ -191,7 +223,9 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
   bookDriver: async () => {
     const s = get();
-    if (!s.pickup) throw new Error("pickup required");
+    const blocker = bookingBlocker(s);
+    if (blocker) throw new Error(BLOCKER_MESSAGE[blocker]);
+    const pickup = s.pickup!; // bookingBlocker returns "pickup" when unset, so it's non-null here
     // Stable idempotency key for THIS booking attempt: generated once, reused on a retry, and
     // cleared on success — so a double-tap / network retry replays the first order rather than
     // creating a second one.
@@ -205,9 +239,9 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }
     const res = await ordersApi.create(
       {
-        pickup_lat: s.pickup.lat,
-        pickup_lng: s.pickup.lng,
-        pickup_address: s.pickup.address,
+        pickup_lat: pickup.lat,
+        pickup_lng: pickup.lng,
+        pickup_address: pickup.address,
         dropoff_lat: s.dropoff?.lat,
         dropoff_lng: s.dropoff?.lng,
         dropoff_address: s.dropoff?.address,

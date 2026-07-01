@@ -17,7 +17,10 @@ const bookDriver = vi.fn(async () => ({ order: { id: 'order-9' } }));
 
 type Store = Record<string, unknown>;
 let storeState: Store;
-vi.mock('@/lib/store/bookingStore', () => ({
+// Keep the real bookingBlocker/tripNeedsDropoff (pure gating logic the CTA relies
+// on); only the store hook is stubbed so tests can drive state.
+vi.mock('@/lib/store/bookingStore', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/store/bookingStore')>()),
   useBookingStore: () => storeState,
 }));
 
@@ -41,13 +44,27 @@ beforeEach(() => {
 });
 
 describe('BookingSheet', () => {
-  it('disables "Book Driver" until a pickup is set', () => {
+  it('prompts for a pickup and disables the CTA when nothing is set', () => {
     render(<BookingSheet />);
-    expect(screen.getByRole('button', { name: 'Book Driver' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Set pickup location' })).toBeDisabled();
   });
 
-  it('enables "Book Driver" once a pickup exists', () => {
+  it('a bare pickup pin does NOT enable booking — a car is still required', () => {
     storeState = baseStore({ pickup: { lat: 22.5, lng: 88.3, address: 'Home' } });
+    render(<BookingSheet />);
+    // Round trip needs no drop-off, so the next unmet requirement is the car.
+    expect(screen.getByRole('button', { name: 'Choose your car' })).toBeDisabled();
+  });
+
+  it('enables "Book Driver" only once pickup, car and fare are all present', () => {
+    storeState = baseStore({
+      pickup: { lat: 22.5, lng: 88.3, address: 'Home' },
+      selectedCarId: 'car-1',
+      fareEstimate: {
+        fare_breakdown: { estimated_total_paise: 48000, surge_multiplier: 1, promo_discount_paise: 0 },
+        surge_active: false, driver_availability: 'HIGH', estimated_pickup_eta_minutes: 5,
+      },
+    });
     render(<BookingSheet />);
     expect(screen.getByRole('button', { name: 'Book Driver' })).toBeEnabled();
   });

@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useBookingStore } from "@/lib/store/bookingStore";
+import { useBookingStore, bookingBlocker, tripNeedsDropoff } from "@/lib/store/bookingStore";
 import { useToastStore } from "@/lib/store/useToastStore";
 import { friendlyError } from "@/lib/ui/errorMessage";
 import { garageApi } from "@/lib/api/garage";
@@ -279,7 +279,7 @@ export function BookingSheet() {
     promoCode, paymentMethod, fareEstimate, isSearching, scheduledAt,
     setPickup, setDropoff, setTripType, setDurationHours, setPersonsCount,
     setScheduledAt, setD4mCare, setOwnerNotInCar, setPromoCode, setPaymentMethod,
-    validatePromo, bookDriver, selectedCarId, setSelectedCar,
+    validatePromo, bookDriver, selectedCarId, oneTimeCar, setSelectedCar,
   } = useBookingStore();
 
   // Fetch garage cars (single call, pick default car from result)
@@ -312,10 +312,21 @@ export function BookingSheet() {
     tripType === "IN_CITY_ROUND" || tripType === "OUTSTATION" ||
     tripType === "MINI_OUTSTATION" || tripType === "IN_CITY_HOURLY";
   // Time-based tiers (round trip, hourly, monthly) don't take a destination.
-  const needsDrop =
-    tripType === "IN_CITY_ONE_WAY" || tripType === "MINI_OUTSTATION" || tripType === "OUTSTATION";
+  const needsDrop = tripNeedsDropoff(tripType);
   // Monthly/permanent is estimate-only until recurring billing lands (backend blocks it).
   const isMonthly = tripType === "MONTHLY";
+
+  // First unmet requirement blocking dispatch (null = ready). Drives the CTA's
+  // disabled state and label so a rider can't book on a pickup pin alone.
+  const blocker = bookingBlocker({ pickup, dropoff, tripType, selectedCarId, oneTimeCar, fareEstimate });
+  // CTA label names the next step so the button guides the rider to completion.
+  const ctaLabel = isMonthly
+    ? "Monthly — coming soon"
+    : blocker === "pickup" ? "Set pickup location"
+    : blocker === "dropoff" ? "Add drop-off"
+    : blocker === "car" ? "Choose your car"
+    : blocker === "fare" ? "Getting fare…"
+    : "Book Driver";
 
   // ── Drag/snap logic (3 snaps: peek ~120px, half ~55%, full ~92%) ─────────────
   // Values are "px from the top of the viewport" where the sheet's top edge sits.
@@ -382,7 +393,7 @@ export function BookingSheet() {
 
   // ── Book ───────────────────────────────────────────────────────────────────
   const onBook = async () => {
-    if (!pickup) return;
+    if (blocker) return;
     setBookingError(null);
     setBookingState("loading");
     try {
@@ -840,9 +851,10 @@ export function BookingSheet() {
             <CoolMode>
               <RainbowButton
                 type="button"
-                disabled={!pickup || isMonthly || bookingState === "loading"}
+                disabled={!!blocker || isMonthly || bookingState === "loading"}
                 onClick={onBook}
-                className="h-14 w-full text-label-large font-medium cursor-pointer
+                aria-live="polite"
+                className="h-14 w-full text-label-large font-medium text-content-inverse cursor-pointer
                   shadow-[0_4px_16px_rgba(0,0,0,0.24)]
                   active:scale-[0.99]
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -855,10 +867,8 @@ export function BookingSheet() {
                     </svg>
                     Finding drivers…
                   </span>
-                ) : isMonthly ? (
-                  <span>Monthly — coming soon</span>
                 ) : (
-                  <span>Book Driver</span>
+                  <span>{ctaLabel}</span>
                 )}
               </RainbowButton>
             </CoolMode>
