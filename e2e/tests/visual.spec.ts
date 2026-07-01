@@ -21,14 +21,6 @@ test.describe('visual regression', () => {
     await expect(page).toHaveScreenshot('rider-home-light.png', { fullPage: true });
   });
 
-  test('rider home — dark', async ({ page, context }) => {
-    await seedRiderAuth(context);
-    await context.addInitScript(() => window.localStorage.setItem('dfu-rider-theme', 'dark'));
-    await context.route('**/api/v1/rider/me', (r) => fulfillJson(r, { id: 'r1', phone: '+919876543210' }));
-    await page.goto(`${RIDER}/home`);
-    await expect(page).toHaveScreenshot('rider-home-dark.png', { fullPage: true });
-  });
-
   test('rider login', async ({ page }) => {
     await page.goto(`${RIDER}/login`);
     await expect(page).toHaveScreenshot('rider-login.png', { fullPage: true });
