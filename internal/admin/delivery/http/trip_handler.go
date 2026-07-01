@@ -523,7 +523,7 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 	surge := base * (rec.SurgeMultiplier - 1.0)
 	care := 0.0
 	if rec.D4MCare {
-		care = 15.0
+		care = 49.0 // real D4M Care add-on (₹49), matching the booking fare engine
 	}
 	promo := -float64(promoDiscountPaise) / 100.0
 	tax := (base + surge + care + promo) * 0.05
@@ -559,6 +559,9 @@ func (h *AdminTripHandler) HandleAdminGetTripDetail(w http.ResponseWriter, r *ht
 		fareBreakdown.Distance = float64(*fbDistance) / 100.0
 		fareBreakdown.Time = 0
 		fareBreakdown.Night = float64(*fbNight) / 100.0
+		// Surge applies to the pre-surge base+distance; derive from the real components.
+		fareBreakdown.Surge = float64(*fbBase+*fbDistance) * (rec.SurgeMultiplier - 1.0) / 100.0
+		fareBreakdown.Tax = 0 // the fare engine adds no separate tax line; total is tax-exclusive
 		fareBreakdown.Total = float64(*fbTotal) / 100.0
 	}
 

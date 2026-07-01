@@ -242,8 +242,9 @@ func docStatusFromExpiry(exp *time.Time) (string, time.Time) {
 // non-deleted vehicle appears with its real plate / make / model and real document
 // state — not the previous orders-derived, hash-fabricated placeholders (which hid any
 // car that had no trip). Shared by the list and detail endpoints.
-// ponytail: per-vehicle trip counts aren't reliably modelled (orders don't link to a
-// specific plate), so TripsCount stays 0 here; wire it if the directory needs it.
+// TripsCount is real: rider cars count orders by garage_car_id; driver vehicles count
+// the driver's assigned orders (this is a drive-the-rider's-car model, so a driver's own
+// vehicle isn't the trip subject — its count reflects the driver's trips).
 func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 	vehicleMap := make(map[string]*Vehicle)
 
@@ -252,7 +253,8 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		SELECT COALESCE(g.registration_plate, ''), COALESCE(g.make, ''), COALESCE(g.model, ''),
 		       COALESCE(g.year, 0), COALESCE(g.car_type, ''), COALESCE(g.transmission, ''),
 		       COALESCE(g.fuel_type, ''), g.rider_id::text, COALESCE(r.name, ''),
-		       g.insurance_expiry, g.puc_expiry, g.rc_document_url, g.created_at
+		       g.insurance_expiry, g.puc_expiry, g.rc_document_url, g.created_at,
+		       (SELECT COUNT(*) FROM orders o WHERE o.garage_car_id = g.id)
 		FROM rider_garage g
 		JOIN riders r ON r.id = g.rider_id
 		WHERE g.is_active AND r.deleted_at IS NULL`)
@@ -266,8 +268,9 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		var insExp, pucExp *time.Time
 		var rcURL *string
 		var createdAt time.Time
+		var tripsCount int64
 		if err := riderRows.Scan(&plate, &make, &model, &year, &ctype, &trans, &fuel,
-			&riderID, &ownerName, &insExp, &pucExp, &rcURL, &createdAt); err != nil {
+			&riderID, &ownerName, &insExp, &pucExp, &rcURL, &createdAt, &tripsCount); err != nil {
 			h.logger.Printf("[VEHICLES_ERROR] rider_garage scan: %v", err)
 			continue
 		}
@@ -285,6 +288,8 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 			OwnerID:       riderID,
 			OwnerName:     ownerName,
 			OwnerType:     "RIDER",
+			City:          "",
+			TripsCount:    tripsCount,
 			LastServiced:  createdAt,
 			FlaggedIssues: []string{},
 		}
@@ -305,7 +310,8 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		       COALESCE(dv.transmission, ''), COALESCE(dv.rc_status, ''), COALESCE(dv.insurance_status, ''),
 		       COALESCE(dv.puc_status, ''), dv.driver_id::text, COALESCE(d.name, ''),
 		       COALESCE(d.city_prefix, ''), dv.created_at,
-		       COALESCE(dv.car_type, ''), COALESCE(dv.fuel_type, ''), COALESCE(dv.year, 0)
+		       COALESCE(dv.car_type, ''), COALESCE(dv.fuel_type, ''), COALESCE(dv.year, 0),
+		       (SELECT COUNT(*) FROM orders o WHERE o.assigned_driver_id = dv.driver_id)
 		FROM driver_vehicles dv
 		JOIN drivers d ON d.id = dv.driver_id
 		WHERE dv.is_active`)
@@ -317,8 +323,9 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 		var plate, make, model, trans, rcS, insS, pucS, driverID, ownerName, city, ctype, fuel string
 		var createdAt time.Time
 		var year int
+		var tripsCount int64
 		if err := driverRows.Scan(&plate, &make, &model, &trans, &rcS, &insS, &pucS,
-			&driverID, &ownerName, &city, &createdAt, &ctype, &fuel, &year); err != nil {
+			&driverID, &ownerName, &city, &createdAt, &ctype, &fuel, &year, &tripsCount); err != nil {
 			h.logger.Printf("[VEHICLES_ERROR] driver_vehicles scan: %v", err)
 			continue
 		}
@@ -337,6 +344,7 @@ func (h *VehicleHandler) buildVehicles(ctx context.Context) ([]Vehicle, error) {
 			OwnerName:       ownerName,
 			OwnerType:       "DRIVER",
 			City:            city,
+			TripsCount:      tripsCount,
 			LastServiced:    createdAt,
 			RCStatus:        rcS,
 			InsuranceStatus: insS,

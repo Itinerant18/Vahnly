@@ -422,19 +422,24 @@ func (h *PromoHandler) HandleGetPromoAnalytics(w http.ResponseWriter, r *http.Re
 
 	// Real redemptions + GMV from the orders those redemptions belong to.
 	var redemptions int
-	var gmvImpactPaise int64
+	var gmvImpactPaise, discountPaise int64
 	_ = h.dbPool.QueryRow(ctx, `
-		SELECT COUNT(*), COALESCE(SUM(o.base_fare_paise), 0)
+		SELECT COUNT(*), COALESCE(SUM(o.base_fare_paise), 0), COALESCE(SUM(pr.discount_paise), 0)
 		FROM promo_redemptions pr
 		LEFT JOIN orders o ON o.id = pr.order_id
-		WHERE pr.promo_code_id = $1::uuid`, promoID).Scan(&redemptions, &gmvImpactPaise)
+		WHERE pr.promo_code_id = $1::uuid`, promoID).Scan(&redemptions, &gmvImpactPaise, &discountPaise)
 
-	// MarketingROI has no cost/attribution source — report 0 rather than a hash invention.
+	// Return on discount spend: (GMV generated − discount given) / discount given, as a
+	// percent. Real numbers from promo_redemptions.discount_paise; 0 before any discount.
+	roi := 0.0
+	if discountPaise > 0 {
+		roi = float64(gmvImpactPaise-discountPaise) / float64(discountPaise) * 100.0
+	}
 	analytics := PromoAnalytics{
 		Code:         code,
 		Redemptions:  redemptions,
 		GMVImpact:    gmvImpactPaise,
-		MarketingROI: 0,
+		MarketingROI: roi,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
