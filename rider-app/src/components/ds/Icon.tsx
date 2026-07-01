@@ -38,6 +38,7 @@ export { IconMapPin as PinIcon }            from '@tabler/icons-react';
 export { IconUser as UserIcon }             from '@tabler/icons-react';
 export { IconSearch as SearchIcon }         from '@tabler/icons-react';
 export { IconArrowLeft as BackIcon }        from '@tabler/icons-react';
+export { IconArrowRight as ForwardIcon }    from '@tabler/icons-react';
 
 // ─── NEW ICONS (emoji replacements) ────────────────────────────────────────
 export { IconStar as StarIcon }             from '@tabler/icons-react';
@@ -69,6 +70,8 @@ export { IconDownload as DownloadIcon }     from '@tabler/icons-react';
 export { IconExternalLink as LinkIcon }     from '@tabler/icons-react';
 export { IconPhoto as PhotoIcon }           from '@tabler/icons-react';
 export { IconBriefcase as WorkBriefcaseIcon } from '@tabler/icons-react';
+export { IconBolt as BoltIcon }             from '@tabler/icons-react';
+export { IconHeadset as HeadsetIcon }       from '@tabler/icons-react';
 
 // ─── ICON PROPS TYPE ────────────────────────────────────────────────────────
 export interface IconProps {

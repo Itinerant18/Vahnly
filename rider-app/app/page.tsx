@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { ordersApi } from '@/lib/api/orders';
 import Link from 'next/link';
 import WebGLShaderBackground from '@/components/ui/WebGLShaderBackground';
+import { ShieldIcon, BoltIcon, WalletIcon, HeadsetIcon, ForwardIcon } from '@/components/ds/Icon';
 
 // Statuses for which an in-progress trip should send the rider straight to the
 // live screen instead of the home tab.
@@ -93,12 +94,11 @@ export default function IndexPage() {
       </div>
 
       {/* TopNavBar */}
-      <nav 
-        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-          scrolled 
-            ? 'bg-white/95 shadow-md border-b border-slate-200/50' 
-            : 'bg-white/80 backdrop-blur-xl border-b border-slate-200/20 md:bg-transparent md:border-none md:backdrop-blur-none'
-        }`} 
+      <nav
+        className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled
+          ? 'bg-white/95 shadow-md border-b border-slate-200/50'
+          : 'bg-white/80 backdrop-blur-xl border-b border-slate-200/20 md:bg-transparent md:border-none md:backdrop-blur-none'
+          }`}
         id="mainNav"
       >
         <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
@@ -109,9 +109,9 @@ export default function IndexPage() {
             </div>
             <span className="font-extrabold text-black text-xl tracking-tight">Vahnly</span>
           </Link>
-          
+
           {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* <div className="hidden md:flex items-center gap-8">
             <Link href="#" className="text-sm text-secondary font-bold border-b-2 border-secondary pb-0.5 hover:opacity-90 transition-all">
               Fleet
             </Link>
@@ -124,15 +124,12 @@ export default function IndexPage() {
             <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
               Business
             </Link>
-          </div>
+          </div> */}
 
           {/* Trailing Action */}
           <div className="flex items-center gap-4">
             <Link href="/login/" className="text-sm font-semibold text-slate-700 hover:text-secondary transition-colors">
               Log In
-            </Link>
-            <Link href="/login/" className="bg-black text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-slate-900 hover:shadow-md active:scale-95 transition-all">
-              Sign In
             </Link>
           </div>
         </div>
@@ -140,7 +137,7 @@ export default function IndexPage() {
 
       {/* Main Content */}
       <main className="flex-grow pt-32 pb-24 px-6 max-w-7xl mx-auto w-full flex flex-col items-center relative z-10">
-        
+
         {/* Hero Section */}
         <section className="w-full max-w-3xl mx-auto text-center mb-20 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-low text-secondary font-semibold text-xs mb-6 mx-auto shadow-sm border border-secondary/10">
@@ -158,7 +155,7 @@ export default function IndexPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/login/" className="w-full sm:w-auto bg-black text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-95 transition-all flex items-center justify-center gap-2">
               Get Started Now
-              <span aria-hidden="true" className="material-symbols-outlined text-sm">arrow_forward</span>
+              <ForwardIcon size={16} />
             </Link>
             <a href="#features" className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center">
               Learn More
@@ -169,13 +166,11 @@ export default function IndexPage() {
         {/* Bento Grid Features */}
         <section id="features" className="w-full max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
+
             {/* Feature 1: Large Span */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group md:col-span-2 lg:col-span-2">
               <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  shield
-                </span>
+                <ShieldIcon size={24} className="text-secondary" />
               </div>
               <div>
                 <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Verified Drivers</h3>
@@ -188,9 +183,7 @@ export default function IndexPage() {
             {/* Feature 2 */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-100 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
               <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  bolt
-                </span>
+                <BoltIcon size={24} className="text-secondary" />
               </div>
               <div>
                 <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Instant Dispatch</h3>
@@ -203,9 +196,7 @@ export default function IndexPage() {
             {/* Feature 3 */}
             <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-200 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
               <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  account_balance_wallet
-                </span>
+                <WalletIcon size={24} className="text-secondary" />
               </div>
               <div>
                 <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Transparent Pricing</h3>
@@ -218,9 +209,7 @@ export default function IndexPage() {
             {/* Feature 4: Wide layout */}
             <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 animate-fade-in-up delay-300 md:col-span-2 lg:col-span-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
               <div className="w-14 h-14 shrink-0 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
-                <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  headset_mic
-                </span>
+                <HeadsetIcon size={28} className="text-secondary" />
               </div>
               <div>
                 <h3 className="font-bold text-[#0b1c30] text-lg mb-2">24/7 Premium Support</h3>
