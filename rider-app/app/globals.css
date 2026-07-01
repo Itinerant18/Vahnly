@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
 /* ─────────────────────────────────────────────
    Vahnly · Rider App · Global Styles
    Tailwind v4 (CSS-first) + Design System Tokens
@@ -113,6 +115,15 @@
   --duration-base:     var(--duration-base);
   --duration-moderate: var(--duration-moderate);
   --duration-slow:     var(--duration-slow);
+
+  /* ── Custom Bento Colors ── */
+  --color-secondary: #0040e0;
+  --color-secondary-hover: #0035be;
+  --color-surface-dim: #cbdbf5;
+  --color-surface-container-highest: #d3e4fe;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-bright: #ffffff;
 }
 
 /* ─────────────────────────────────────────────
@@ -362,6 +373,37 @@ body {
   min-width: 44px;
   min-height: 44px;
 }
+
+/* ─────────────────────────────────────────────
+   LUMINOUS BENTO GRID & LANDING UTILITIES
+   ───────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.dark .glass-card {
+  background: rgba(11, 28, 48, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
 
 /* ─────────────────────────────────────────────
    DS5 REDUCED MOTION (must be last)

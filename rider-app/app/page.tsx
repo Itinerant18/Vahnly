@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { ordersApi } from '@/lib/api/orders';
 import Link from 'next/link';
-import { AnimatedIcon } from "@/components/ds/Icon";
-import { AnimShield, AnimCar, AnimWallet } from "@/assets/icons/animated";
+import WebGLShaderBackground from '@/components/ui/WebGLShaderBackground';
 
 // Statuses for which an in-progress trip should send the rider straight to the
 // live screen instead of the home tab.
@@ -21,6 +20,7 @@ export default function IndexPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [mounted, setMounted] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -47,6 +47,18 @@ export default function IndexPage() {
     };
   }, [token, router]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   if (!mounted) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-400">
@@ -71,116 +83,173 @@ export default function IndexPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between selection:bg-slate-900 selection:text-white">
-      {/* Subtle grid pattern background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-40 pointer-events-none" />
-
-      {/* Header */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto px-6 py-6 flex justify-between items-center border-b border-slate-200/60">
-        <div className="flex items-center gap-2">
-          <span className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-            V
-          </span>
-          <span className="font-extrabold text-slate-900 tracking-tight text-lg">
-            Vahnly
-          </span>
+    <div className="bg-[#f8f9ff] text-[#0b1c30] relative min-h-screen overflow-x-hidden selection:bg-secondary selection:text-white flex flex-col font-sans">
+      {/* Background Shader & Overlay Grid */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 w-full h-full opacity-60">
+          <WebGLShaderBackground />
         </div>
-        
-        <Link
-          href="/login/"
-          className="flex items-center justify-center h-10 px-5 rounded-lg bg-slate-900 text-white font-semibold text-sm hover:bg-slate-800 transition-all shadow-sm"
-        >
-          Sign In
-        </Link>
-      </header>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] opacity-20" />
+      </div>
 
-      {/* Main Hero & Purpose Details */}
-      <main className="relative z-10 w-full max-w-4xl mx-auto px-6 py-12 md:py-20 flex-grow flex flex-col justify-center gap-12 text-center md:text-left">
-        <div className="space-y-6 max-w-2xl animate-enter-up">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
-            Verified Professional Driver Dispatch
-          </span>
+      {/* TopNavBar */}
+      <nav 
+        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+          scrolled 
+            ? 'bg-white/95 shadow-md border-b border-slate-200/50' 
+            : 'bg-white/80 backdrop-blur-xl border-b border-slate-200/20 md:bg-transparent md:border-none md:backdrop-blur-none'
+        }`} 
+        id="mainNav"
+      >
+        <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
+          {/* Brand */}
+          <Link href="#" className="flex items-center gap-2 cursor-pointer group">
+            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-bold text-lg group-hover:scale-95 transition-transform">
+              V
+            </div>
+            <span className="font-extrabold text-black text-xl tracking-tight">Vahnly</span>
+          </Link>
           
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-950 leading-tight">
-            Hire a Professional Driver <br />
-            <span className="bg-gradient-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent">
-              For Your Own Car
-            </span>
-          </h1>
-          
-          <p className="text-slate-600 text-base md:text-lg leading-relaxed">
-            Vahnly provides a premium, safe, and dynamic ride matching ecosystem. 
-            Connect instantly with verified, highly trained independent drivers to navigate your car, 
-            whether for daily commutes, road trips, or late-night events.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
-            <Link
-              href="/login/"
-              className="flex items-center justify-center h-12 px-8 rounded-lg bg-slate-900 text-white font-semibold text-base hover:bg-indigo-700 transition-all shadow-md hover:-translate-y-0.5"
-            >
-              Get Started Now
+          {/* Desktop Nav Links */}
+          <div className="hidden md:flex items-center gap-8">
+            <Link href="#" className="text-sm text-secondary font-bold border-b-2 border-secondary pb-0.5 hover:opacity-90 transition-all">
+              Fleet
             </Link>
-            <a
-              href="#features"
-              className="flex items-center justify-center h-12 px-8 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold text-base hover:bg-slate-50 transition-all shadow-sm"
-            >
+            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+              Services
+            </Link>
+            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+              Safety
+            </Link>
+            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+              Business
+            </Link>
+          </div>
+
+          {/* Trailing Action */}
+          <div className="flex items-center gap-4">
+            <Link href="/login/" className="text-sm font-semibold text-slate-700 hover:text-secondary transition-colors">
+              Log In
+            </Link>
+            <Link href="/login/" className="bg-black text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-slate-900 hover:shadow-md active:scale-95 transition-all">
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="flex-grow pt-32 pb-24 px-6 max-w-7xl mx-auto w-full flex flex-col items-center relative z-10">
+        
+        {/* Hero Section */}
+        <section className="w-full max-w-3xl mx-auto text-center mb-20 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-low text-secondary font-semibold text-xs mb-6 mx-auto shadow-sm border border-secondary/10">
+            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+            Verified Professional Driver Dispatch
+          </div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#0b1c30] mb-6 tracking-tight leading-tight">
+            Hire a Professional <br className="hidden md:block" />
+            <span className="text-black">Driver</span> <br className="hidden md:block" />
+            <span className="text-secondary bg-clip-text">For Your Own Car</span>
+          </h1>
+          <p className="text-base md:text-lg text-[#45474b] mb-10 max-w-2xl mx-auto leading-relaxed">
+            Vahnly provides a premium, safe, and dynamic ride matching ecosystem. Connect instantly with verified, highly trained independent drivers to navigate your car, whether for daily commutes, road trips, or late-night events.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login/" className="w-full sm:w-auto bg-black text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-95 transition-all flex items-center justify-center gap-2">
+              Get Started Now
+              <span aria-hidden="true" className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Link>
+            <a href="#features" className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center">
               Learn More
             </a>
           </div>
-        </div>
+        </section>
 
-        {/* Features / Purpose Outline Grid */}
-        <section id="features" className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 border-t border-slate-200/80">
-          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              <AnimatedIcon src={AnimShield} size={64} trigger="loop-on-hover" colors="primary:#1A73E8,secondary:#4FC3F7" />
+        {/* Bento Grid Features */}
+        <section id="features" className="w-full max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Feature 1: Large Span */}
+            <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group md:col-span-2 lg:col-span-2">
+              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  shield
+                </span>
+              </div>
+              <div>
+                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Verified Drivers</h3>
+                <p className="text-sm text-[#45474b] leading-relaxed">
+                  Every driver undergoes rigorous background verification, identity matching, and driving assessments to guarantee your absolute safety and peace of mind on every journey.
+                </p>
+              </div>
             </div>
-            <h3 className="font-bold text-slate-900 text-base">Verified Drivers</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Every driver undergoes rigorous background verification, identity matching, and driving assessments to guarantee your absolute safety.
-            </p>
-          </div>
 
-          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              <AnimatedIcon src={AnimCar} size={64} trigger="loop-on-hover" colors="primary:#FF6B35,secondary:#FFB74D" />
+            {/* Feature 2 */}
+            <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-100 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
+              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  bolt
+                </span>
+              </div>
+              <div>
+                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Instant Dispatch</h3>
+                <p className="text-sm text-[#45474b] leading-relaxed">
+                  Our advanced matching algorithm pairs you with the closest qualified driver within minutes, minimizing wait times.
+                </p>
+              </div>
             </div>
-            <h3 className="font-bold text-slate-900 text-base">Instant Dispatch</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Our advanced matching algorithm pairs you with the closest qualified driver in Kolkata or Bengaluru within minutes.
-            </p>
-          </div>
 
-          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm space-y-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg mb-2">
-              <AnimatedIcon src={AnimWallet} size={64} trigger="loop-on-hover" colors="primary:#10B981,secondary:#6EE7B7" />
+            {/* Feature 3 */}
+            <div className="glass-card rounded-2xl p-6 flex flex-col gap-4 animate-fade-in-up delay-200 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
+              <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  account_balance_wallet
+                </span>
+              </div>
+              <div>
+                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Transparent Pricing</h3>
+                <p className="text-sm text-[#45474b] leading-relaxed">
+                  Standardized fares calculated dynamically using precise distance routing, ensuring absolutely no hidden charges.
+                </p>
+              </div>
             </div>
-            <h3 className="font-bold text-slate-900 text-base">Transparent Pricing</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Standardized fares calculated dynamically using precise distance routing, ensuring no hidden charges or surprises.
-            </p>
+
+            {/* Feature 4: Wide layout */}
+            <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 animate-fade-in-up delay-300 md:col-span-2 lg:col-span-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
+              <div className="w-14 h-14 shrink-0 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  headset_mic
+                </span>
+              </div>
+              <div>
+                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">24/7 Premium Support</h3>
+                <p className="text-sm text-[#45474b] leading-relaxed">
+                  Dedicated concierge-level support available around the clock. Whether you need route adjustments or have special requests, our team is always ready to assist.
+                </p>
+              </div>
+            </div>
+
           </div>
         </section>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 w-full border-t border-slate-200 bg-white/80 backdrop-blur-sm py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-4">
-            <Link href="/privacy/" className="hover:text-slate-950 font-semibold transition-colors">
+      <footer className="w-full py-12 bg-white border-t border-slate-200 mt-20 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex flex-col items-center md:items-start gap-2">
+            <span className="text-2xl font-extrabold text-black">Vahnly</span>
+            <p className="text-xs text-slate-500">© 2026 Vahnly Premium Services. All rights reserved.</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-500 font-semibold">
+            <Link href="/privacy/" className="hover:text-secondary transition-colors">
               Privacy Policy
             </Link>
-            <span className="text-slate-300">|</span>
-            <Link href="/terms/" className="hover:text-slate-950 font-semibold transition-colors">
+            <Link href="/terms/" className="hover:text-secondary transition-colors">
               Terms of Service
             </Link>
-          </div>
-          <div>
-            <span>Vahnly © 2026. Admin Contact: </span>
-            <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-slate-950 underline font-mono">
-              karmakaraniket018@gmail.com
+            <a href="mailto:karmakaraniket018@gmail.com" className="hover:text-secondary transition-colors font-mono">
+              Contact Us
             </a>
           </div>
         </div>
