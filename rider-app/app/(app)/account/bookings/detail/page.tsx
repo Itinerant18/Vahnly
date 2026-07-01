@@ -8,6 +8,8 @@ import { ordersApi } from "@/lib/api/orders";
 import { FareDisplay } from "@/components/ds";
 import { StarIcon } from "@/components/ds/Icon";
 import type { Order } from "@/lib/api/types";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 function DetailBody() {
   const router = useRouter();
@@ -43,77 +45,85 @@ function DetailBody() {
   return (
     <div className="space-y-4">
       {/* Map snapshot placeholder */}
-      <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-background-secondary">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 30% 40%, var(--accent-400) 0, transparent 8px), radial-gradient(circle at 70% 70%, var(--positive-400) 0, transparent 8px)",
-          }}
-        />
-        <span className="z-10 text-xs text-content-secondary">Route map</span>
-      </div>
+      <BlurFade delay={0.1}>
+        <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-background-secondary">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 30% 40%, var(--accent-400) 0, transparent 8px), radial-gradient(circle at 70% 70%, var(--positive-400) 0, transparent 8px)",
+            }}
+          />
+          <span className="z-10 text-xs text-content-secondary">Route map</span>
+        </div>
+      </BlurFade>
 
       {/* Timeline */}
-      <div className="rounded-2xl bg-background-secondary p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Timeline</p>
-        <div className="space-y-3">
-          <Point color="var(--positive-400)" label="Pickup" sub={`${order.pickup_lat.toFixed(4)}, ${order.pickup_lng.toFixed(4)}`} />
-          {order.dropoff_lat != null && order.dropoff_lng != null && (
-            <Point
-              color="var(--negative-400)"
-              label="Drop-off"
-              sub={`${order.dropoff_lat.toFixed(4)}, ${order.dropoff_lng.toFixed(4)}`}
-            />
-          )}
+      <BlurFade delay={0.15}>
+        <div className="rounded-2xl bg-background-secondary p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Timeline</p>
+          <div className="space-y-3">
+            <Point color="var(--positive-400)" label="Pickup" sub={`${order.pickup_lat.toFixed(4)}, ${order.pickup_lng.toFixed(4)}`} />
+            {order.dropoff_lat != null && order.dropoff_lng != null && (
+              <Point
+                color="var(--negative-400)"
+                label="Drop-off"
+                sub={`${order.dropoff_lat.toFixed(4)}, ${order.dropoff_lng.toFixed(4)}`}
+              />
+            )}
+          </div>
+          <p className="mt-3 text-xs text-content-tertiary">
+            {date.toLocaleString("en-IN")} · {order.status}
+          </p>
         </div>
-        <p className="mt-3 text-xs text-content-tertiary">
-          {date.toLocaleString("en-IN")} · {order.status}
-        </p>
-      </div>
+      </BlurFade>
 
       {/* Bill */}
-      <div className="rounded-2xl bg-background-secondary px-4">
-        <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
-          Bill
-        </p>
-        <Row label="Base fare" value={<FareDisplay amount={order.base_fare_paise} size="sm" />} />
-        {order.promo_discount_paise > 0 && (
-          <Row label="Promo discount" value={<>−<FareDisplay amount={order.promo_discount_paise} size="sm" /></>} accent />
-        )}
-        {order.rider_tip_paise > 0 && <Row label="Tip" value={<FareDisplay amount={order.rider_tip_paise} size="sm" />} />}
-        <div className="border-t border-border-opaque">
-          <Row
-            label="Total"
-            value={<FareDisplay amount={order.base_fare_paise - order.promo_discount_paise + order.rider_tip_paise} size="sm" />}
-            bold
-          />
+      <BlurFade delay={0.2}>
+        <div className="rounded-2xl bg-background-secondary px-4">
+          <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
+            Bill
+          </p>
+          <Row label="Base fare" value={<FareDisplay amount={order.base_fare_paise} size="sm" />} />
+          {order.promo_discount_paise > 0 && (
+            <Row label="Promo discount" value={<>−<FareDisplay amount={order.promo_discount_paise} size="sm" /></>} accent />
+          )}
+          {order.rider_tip_paise > 0 && <Row label="Tip" value={<FareDisplay amount={order.rider_tip_paise} size="sm" />} />}
+          <div className="border-t border-border-opaque">
+            <Row
+              label="Total"
+              value={<FareDisplay amount={order.base_fare_paise - order.promo_discount_paise + order.rider_tip_paise} size="sm" />}
+              bold
+            />
+          </div>
         </div>
-      </div>
+      </BlurFade>
 
       {/* Actions */}
-      <div className="space-y-3">
-        {order.status === "COMPLETED" && !rated && (
+      <BlurFade delay={0.25}>
+        <div className="space-y-3">
+          {order.status === "COMPLETED" && !rated && (
+            <button
+              onClick={() => router.push("/trip/rate")}
+              className="w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            >
+              ⭐ Rate this trip
+            </button>
+          )}
           <button
-            onClick={() => router.push("/trip/rate")}
-            className="w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
+            onClick={() => router.push(`/trip/receipt?orderId=${order.id}`)}
+            className="w-full rounded-2xl bg-background-secondary py-3.5 text-sm font-semibold text-content-primary ring-1 ring-border-opaque active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
           >
-            ⭐ Rate this trip
+            Invoice & Receipt
           </button>
-        )}
-        <button
-          onClick={() => router.push(`/trip/receipt?orderId=${order.id}`)}
-          className="w-full rounded-2xl bg-background-secondary py-3.5 text-sm font-semibold text-content-primary ring-1 ring-border-opaque"
-        >
-          Invoice & Receipt
-        </button>
-        <button
-          onClick={() => router.push(`/account/support?orderId=${order.id}`)}
-          className="w-full rounded-2xl bg-background-secondary py-3.5 text-sm font-semibold text-content-negative ring-1 ring-negative-400"
-        >
-          Report an Issue
-        </button>
-      </div>
+          <button
+            onClick={() => router.push(`/account/support?orderId=${order.id}`)}
+            className="w-full rounded-2xl bg-background-secondary py-3.5 text-sm font-semibold text-content-negative ring-1 ring-negative-400 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+          >
+            Report an Issue
+          </button>
+        </div>
+      </BlurFade>
     </div>
   );
 }
@@ -143,7 +153,7 @@ function Row({ label, value, accent, bold }: { label: string; value: React.React
 
 export default function BookingDetailPage() {
   return (
-    <AccountScaffold title="Trip Detail">
+    <AccountScaffold title={<WordRotate words={["Trip Detail", "Journey Info", "Ride Details"]} duration={3000} />}>
       <Suspense fallback={<Shimmer className="h-40 w-full" />}>
         <DetailBody />
       </Suspense>

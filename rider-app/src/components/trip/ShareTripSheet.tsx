@@ -38,8 +38,8 @@ export function ShareTripSheet({ onClose }: ShareTripSheetProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-background-secondary p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
+        <div className="w-full rounded-t-3xl bg-background-secondary p-4 animate-spring-up" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
         <h3 className="mb-1 text-base font-semibold text-content-primary">Share Trip</h3>
         {shareUrl && (

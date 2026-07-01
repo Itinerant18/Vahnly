@@ -5,6 +5,8 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { cmsApi } from "@/lib/api/cms";
 import type { CMSDocument, CMSDocumentType } from "@/lib/api/types";
 import { Capacitor } from "@capacitor/core";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 // "LICENSES" is a local, static tab — it has no CMS document behind it.
 type TabKey = CMSDocumentType | "LICENSES";
@@ -163,72 +165,76 @@ export default function LegalPage() {
   const showPlaceholder = !loading && !doc && errored;
 
   return (
-    <AccountScaffold title="Legal">
+    <AccountScaffold title={<WordRotate words={["Legal", "Policies", "Documents"]} duration={3000} />}>
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((tab) => {
-            const isActive = tab.type === active;
-            return (
-              <button
-                key={tab.type}
-                onClick={() => setActive(tab.type)}
-                className={
-                  "rounded-xl px-3 py-2 text-sm font-medium transition-colors " +
-                  (isActive
-                    ? "bg-accent-400 text-content-primary"
-                    : "bg-background-tertiary text-content-secondary hover:text-content-primary")
-                }
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <BlurFade delay={0.1}>
+          <div className="flex flex-wrap gap-2">
+            {TABS.map((tab) => {
+              const isActive = tab.type === active;
+              return (
+                <button
+                  key={tab.type}
+                  onClick={() => setActive(tab.type)}
+                  className={
+                    "rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 " +
+                    (isActive
+                      ? "bg-accent-400 text-content-primary"
+                      : "bg-background-tertiary text-content-secondary hover:text-content-primary")
+                  }
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </BlurFade>
 
-        <div className="rounded-2xl bg-background-secondary p-4">
-          {doc && (
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-bold text-content-primary">{doc.title}</h2>
-                {updated && (
-                  <p className="mt-1 text-xs text-content-tertiary">Last updated {updated}</p>
-                )}
+        <BlurFade delay={0.15}>
+          <div className="rounded-2xl bg-background-secondary p-4">
+            {doc && (
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-content-primary">{doc.title}</h2>
+                  {updated && (
+                    <p className="mt-1 text-xs text-content-tertiary">Last updated {updated}</p>
+                  )}
+                </div>
+                <button
+                  onClick={onDownload}
+                  disabled={!doc}
+                  className="shrink-0 rounded-xl bg-background-tertiary px-3 py-2 text-xs font-medium text-content-primary disabled:opacity-40 active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                >
+                  Download as PDF
+                </button>
               </div>
-              <button
-                onClick={onDownload}
-                disabled={!doc}
-                className="shrink-0 rounded-xl bg-background-tertiary px-3 py-2 text-xs font-medium text-content-primary disabled:opacity-40"
-              >
-                Download as PDF
-              </button>
-            </div>
-          )}
+            )}
 
-          {showShimmer && (
-            <div className="h-40 animate-pulse rounded-2xl bg-background-tertiary" />
-          )}
+            {showShimmer && (
+              <div className="h-40 animate-pulse rounded-2xl bg-background-tertiary" />
+            )}
 
-          {showPlaceholder && (
-            <div className="rounded-2xl bg-background-tertiary p-6 text-center">
-              <p className="text-sm text-content-secondary">Document loading…</p>
-              <button
-                onClick={() => void loadDoc(active, { force: true })}
-                className="mt-4 rounded-xl bg-interactive-primary px-4 py-2 text-sm font-medium text-interactive-primary-text"
-              >
-                Retry
-              </button>
-            </div>
-          )}
+            {showPlaceholder && (
+              <div className="rounded-2xl bg-background-tertiary p-6 text-center">
+                <p className="text-sm text-content-secondary">Document loading…</p>
+                <button
+                  onClick={() => void loadDoc(active, { force: true })}
+                  className="mt-4 rounded-xl bg-interactive-primary px-4 py-2 text-sm font-medium text-interactive-primary-text active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
-          {doc && doc.html && (
-            <div className="max-h-[60vh] overflow-y-auto pr-1">
-              <div
-                className="text-sm leading-relaxed text-content-secondary space-y-3 [&_h2]:text-content-primary [&_h2]:font-bold [&_h3]:text-content-primary [&_h3]:font-semibold [&_a]:text-content-accent [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: doc.html }}
-              />
-            </div>
-          )}
-        </div>
+            {doc && doc.html && (
+              <div className="max-h-[60vh] overflow-y-auto pr-1">
+                <div
+                  className="text-sm leading-relaxed text-content-secondary space-y-3 [&_h2]:text-content-primary [&_h2]:font-bold [&_h3]:text-content-primary [&_h3]:font-semibold [&_a]:text-content-accent [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                  dangerouslySetInnerHTML={{ __html: doc.html }}
+                />
+              </div>
+            )}
+          </div>
+        </BlurFade>
       </div>
     </AccountScaffold>
   );

@@ -6,6 +6,8 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
 import { accountApi, type SavePlaceInput } from "@/lib/api/account";
 import type { SavedPlace } from "@/lib/api/types";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 import { HomeAddressIcon, WorkBriefcaseIcon, LocationIcon } from "@/components/ds/Icon";
 
@@ -42,37 +44,43 @@ export default function PlacesPage() {
   const iconFor = (label: string) => LABELS.find((l) => l.value === label)?.icon ?? <LocationIcon size={20} />;
 
   return (
-    <AccountScaffold title="Saved Places">
-      {error ? (
-        <ErrorState onRetry={load} />
-      ) : places === null ? (
-        <SkeletonList rows={3} height="h-16" />
-      ) : (
-        <div className="space-y-3">
-          {places.length === 0 && (
-            <EmptyState icon={<LocationIcon size={40} className="text-content-secondary" />} title="No saved places" message="Save Home & Work for one-tap booking." />
-          )}
-          {places.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4">
-              <span className="text-2xl">{iconFor(p.label)}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-content-primary">{p.display_name}</p>
-                <p className="truncate text-xs text-content-secondary">{p.address_text}</p>
-              </div>
-              <button onClick={() => remove(p.id)} className="text-xs font-semibold text-content-negative">
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+    <AccountScaffold title={<WordRotate words={["Saved Places", "Addresses", "My Locations"]} duration={3000} />}>
+      <BlurFade delay={0.1}>
+        {error ? (
+          <ErrorState onRetry={load} />
+        ) : places === null ? (
+          <SkeletonList rows={3} height="h-16" />
+        ) : (
+          <div className="space-y-3">
+            {places.length === 0 && (
+              <EmptyState icon={<LocationIcon size={40} className="text-content-secondary" />} title="No saved places" message="Save Home & Work for one-tap booking." />
+            )}
+            {places.map((p) => (
+              <BlurFade key={p.id} delay={0.1}>
+                <div className="flex items-center gap-3 rounded-2xl bg-background-secondary p-4 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.01]">
+                  <span className="text-2xl">{iconFor(p.label)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-content-primary">{p.display_name}</p>
+                    <p className="truncate text-xs text-content-secondary">{p.address_text}</p>
+                  </div>
+                  <button onClick={() => remove(p.id)} className="text-xs font-semibold text-content-negative active:scale-90 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
+                    Delete
+                  </button>
+                </div>
+              </BlurFade>
+            ))}
+          </div>
+        )}
+      </BlurFade>
 
-      <button
-        onClick={() => setEditing(true)}
-        className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
-      >
-        + Add Place
-      </button>
+      <BlurFade delay={0.2}>
+        <button
+          onClick={() => setEditing(true)}
+          className="mt-4 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+        >
+          + Add Place
+        </button>
+      </BlurFade>
 
       {editing && (
         <AddPlaceSheet

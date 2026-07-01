@@ -7,6 +7,8 @@ import { authApi } from "@/lib/api/auth";
 import { accountApi } from "@/lib/api/account";
 import type { NotificationPreferences, NotifChannelPrefs } from "@/lib/api/types";
 import { Capacitor } from "@capacitor/core";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 const APP_VERSION = "1.0.0";
 
@@ -232,155 +234,169 @@ export default function SettingsPage() {
   };
 
   return (
-    <AccountScaffold title="Settings">
+    <AccountScaffold title={<WordRotate words={["Settings", "Preferences", "Options"]} duration={3000} />}>
       {/* Language */}
-      <Group title="Language">
-        <div className="flex gap-2">
-          {LANGS.map((l) => (
-            <button
-              key={l.code}
-              onClick={() => selectLang(l.code)}
-              className={`flex-1 rounded-xl py-2.5 text-sm ${
-                lang === l.code ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-      </Group>
-
-
-
-      {/* Distance */}
-      <Group title="Distance Unit">
-        <div className="flex gap-2">
-          {UNITS.map((u) => (
-            <button
-              key={u}
-              onClick={() => {
-                setUnit(u);
-                persist("dfu_unit", u);
-              }}
-              className={`flex-1 rounded-xl py-2.5 text-sm ${
-                unit === u ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
-              }`}
-            >
-              {u}
-            </button>
-          ))}
-        </div>
-      </Group>
-
-      {/* Notification prefs */}
-      <Group title="Notification Preferences">
-        <div className="overflow-hidden rounded-2xl bg-background-secondary">
-          <div className="flex items-center border-b border-border-opaque px-4 py-2.5 text-xs text-content-tertiary">
-            <span className="flex-1">Category</span>
-            {CHANNELS.map((ch) => (
-              <span key={ch} className="w-12 text-center capitalize">
-                {ch}
-              </span>
+      <BlurFade delay={0.1}>
+        <Group title="Language">
+          <div className="flex gap-2">
+            {LANGS.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => selectLang(l.code)}
+                className={`flex-1 rounded-xl py-2.5 text-sm active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                  lang === l.code ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
+                }`}
+              >
+                {l.label}
+              </button>
             ))}
           </div>
-          {NOTIF_ROWS.map((row) => (
-            <div key={row.key} className="flex items-center px-4 py-3">
-              <span className="flex-1 text-sm text-content-primary">{row.label}</span>
+        </Group>
+      </BlurFade>
+
+      {/* Distance */}
+      <BlurFade delay={0.15}>
+        <Group title="Distance Unit">
+          <div className="flex gap-2">
+            {UNITS.map((u) => (
+              <button
+                key={u}
+                onClick={() => {
+                  setUnit(u);
+                  persist("dfu_unit", u);
+                }}
+                className={`flex-1 rounded-xl py-2.5 text-sm active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                  unit === u ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
+                }`}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </Group>
+      </BlurFade>
+
+      {/* Notification prefs */}
+      <BlurFade delay={0.2}>
+        <Group title="Notification Preferences">
+          <div className="overflow-hidden rounded-2xl bg-background-secondary">
+            <div className="flex items-center border-b border-border-opaque px-4 py-2.5 text-xs text-content-tertiary">
+              <span className="flex-1">Category</span>
               {CHANNELS.map((ch) => (
-                <div key={ch} className="flex w-12 justify-center">
-                  <button
-                    onClick={() => togglePref(row.key, ch)}
-                    aria-label={`${row.label} via ${ch}`}
-                    className={`flex h-5 w-5 items-center justify-center rounded-md ${
-                      prefs[row.key]?.[ch] ? "bg-accent-400" : "bg-background-tertiary"
-                    }`}
-                  >
-                    {prefs[row.key]?.[ch] && <span className="text-xs text-content-primary">✓</span>}
-                  </button>
-                </div>
+                <span key={ch} className="w-12 text-center capitalize">
+                  {ch}
+                </span>
               ))}
             </div>
-          ))}
-        </div>
-      </Group>
+            {NOTIF_ROWS.map((row) => (
+              <div key={row.key} className="flex items-center px-4 py-3">
+                <span className="flex-1 text-sm text-content-primary">{row.label}</span>
+                {CHANNELS.map((ch) => (
+                  <div key={ch} className="flex w-12 justify-center">
+                    <button
+                      onClick={() => togglePref(row.key, ch)}
+                      aria-label={`${row.label} via ${ch}`}
+                      className={`flex h-5 w-5 items-center justify-center rounded-md active:scale-90 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                        prefs[row.key]?.[ch] ? "bg-accent-400" : "bg-background-tertiary"
+                      }`}
+                    >
+                      {prefs[row.key]?.[ch] && <span className="text-xs text-content-primary">✓</span>}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Group>
+      </BlurFade>
 
       {/* Permissions */}
-      <Group title="App Permissions">
-        <div className="space-y-2">
-          <PermissionRow
-            label="Location"
-            state={locationPerm}
-            onRequest={requestLocation}
-            onOpenSettings={openDeviceSettings}
-          />
-          <PermissionRow
-            label="Notifications"
-            state={notifPerm}
-            onRequest={requestNotifications}
-            onOpenSettings={openDeviceSettings}
-          />
-        </div>
-      </Group>
+      <BlurFade delay={0.25}>
+        <Group title="App Permissions">
+          <div className="space-y-2">
+            <PermissionRow
+              label="Location"
+              state={locationPerm}
+              onRequest={requestLocation}
+              onOpenSettings={openDeviceSettings}
+            />
+            <PermissionRow
+              label="Notifications"
+              state={notifPerm}
+              onRequest={requestNotifications}
+              onOpenSettings={openDeviceSettings}
+            />
+          </div>
+        </Group>
+      </BlurFade>
 
       {/* Safety */}
-      <Group title="Safety">
-        <div className="rounded-2xl bg-background-secondary p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-sm text-content-primary">Women Safety Mode</span>
-              <span className="text-xs text-content-secondary">Prioritise verified drivers and extra safety checks</span>
+      <BlurFade delay={0.3}>
+        <Group title="Safety">
+          <div className="rounded-2xl bg-background-secondary p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm text-content-primary">Women Safety Mode</span>
+                <span className="text-xs text-content-secondary">Prioritise verified drivers and extra safety checks</span>
+              </div>
+              <button
+                onClick={toggleWomenSafety}
+                role="switch"
+                aria-checked={womenSafety}
+                aria-label="Women Safety Mode"
+                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90 ${womenSafety ? "bg-accent-400" : "bg-background-tertiary"}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${womenSafety ? "translate-x-5" : "translate-x-0.5"}`}
+                />
+              </button>
             </div>
-            <button
-              onClick={toggleWomenSafety}
-              role="switch"
-              aria-checked={womenSafety}
-              aria-label="Women Safety Mode"
-              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${womenSafety ? "bg-accent-400" : "bg-background-tertiary"}`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${womenSafety ? "translate-x-5" : "translate-x-0.5"}`}
-              />
-            </button>
           </div>
-        </div>
-      </Group>
+        </Group>
+      </BlurFade>
 
       {/* Connected accounts */}
-      <Group title="Connected Accounts">
-        <div className="space-y-2">
-          {["Google", "Apple"].map((provider) => (
-            <button
-              key={provider}
-              disabled
-              className="flex w-full cursor-not-allowed items-center justify-between rounded-2xl bg-background-secondary px-4 py-3.5 opacity-50"
-            >
-              <span className="text-sm text-content-primary">{provider}</span>
-              <span className="text-xs text-content-tertiary">Coming soon</span>
-            </button>
-          ))}
-        </div>
-      </Group>
+      <BlurFade delay={0.35}>
+        <Group title="Connected Accounts">
+          <div className="space-y-2">
+            {["Google", "Apple"].map((provider) => (
+              <button
+                key={provider}
+                disabled
+                className="flex w-full cursor-not-allowed items-center justify-between rounded-2xl bg-background-secondary px-4 py-3.5 opacity-50"
+              >
+                <span className="text-sm text-content-primary">{provider}</span>
+                <span className="text-xs text-content-tertiary">Coming soon</span>
+              </button>
+            ))}
+          </div>
+        </Group>
+      </BlurFade>
 
       {/* Version */}
-      <Group title="About">
-        <div className="flex items-center justify-between rounded-2xl bg-background-secondary px-4 py-3.5">
-          <span className="text-sm text-content-primary">Version {APP_VERSION}</span>
-          <button
-            onClick={() => alert("You're on the latest version.")}
-            className="text-xs font-semibold text-content-accent"
-          >
-            Check for updates
-          </button>
-        </div>
-      </Group>
+      <BlurFade delay={0.4}>
+        <Group title="About">
+          <div className="flex items-center justify-between rounded-2xl bg-background-secondary px-4 py-3.5">
+            <span className="text-sm text-content-primary">Version {APP_VERSION}</span>
+            <button
+              onClick={() => alert("You're on the latest version.")}
+              className="text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            >
+              Check for updates
+            </button>
+          </div>
+        </Group>
+      </BlurFade>
 
       {/* Delete account */}
-      <button
-        onClick={() => setShowDelete(true)}
-        className="mt-2 w-full rounded-2xl border border-negative-400 py-3.5 text-sm font-semibold text-content-negative"
-      >
-        Delete Account
-      </button>
+      <BlurFade delay={0.45}>
+        <button
+          onClick={() => setShowDelete(true)}
+          className="mt-2 w-full rounded-2xl border border-negative-400 py-3.5 text-sm font-semibold text-content-negative active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+        >
+          Delete Account
+        </button>
+      </BlurFade>
 
       {showDelete && (
         <DeleteAccountSheet
@@ -421,11 +437,11 @@ function PermissionRow({
         <span className={`text-xs ${stateColor}`}>{stateLabel}</span>
       </div>
       {state === "denied" ? (
-        <button onClick={onOpenSettings} className="text-xs font-semibold text-content-accent">
+        <button onClick={onOpenSettings} className="text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
           Open Settings
         </button>
       ) : (
-        <button onClick={onRequest} className="text-xs font-semibold text-content-accent">
+        <button onClick={onRequest} className="text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
           {state === "granted" ? "Granted" : "Allow →"}
         </button>
       )}
@@ -469,13 +485,13 @@ function DeleteAccountSheet({ onClose, onConfirm }: { onClose: () => void; onCon
           className="w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary"
         />
         <div className="mt-4 flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-xl bg-background-tertiary py-3.5 text-sm font-semibold text-content-secondary">
+          <button onClick={onClose} className="flex-1 rounded-xl bg-background-tertiary py-3.5 text-sm font-semibold text-content-secondary active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={!ok}
-            className="flex-1 rounded-xl bg-negative-400 py-3.5 text-sm font-bold text-content-primary disabled:opacity-40"
+            className="flex-1 rounded-xl bg-negative-400 py-3.5 text-sm font-bold text-content-primary disabled:opacity-40 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
           >
             Delete Forever
           </button>

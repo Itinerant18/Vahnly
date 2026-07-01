@@ -18,6 +18,9 @@ import { RideCheckModal } from "@/components/trip/RideCheckModal";
 import { ShareTripSheet } from "@/components/trip/ShareTripSheet";
 import { TripTimeline } from "@/components/trip/TripTimeline";
 import { FareDisplay } from "@/components/ds/FareDisplay";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 const TripMap = dynamic(() => import("@/components/trip/TripMap"), {
   ssr: false,
@@ -37,22 +40,24 @@ function FAB({
   danger?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "flex flex-col items-center gap-1 rounded-md px-3 py-3 min-h-[56px] min-w-[48px] cursor-pointer transition-base",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
-        danger
-          ? "bg-negative-400 text-white shadow-elevation-2"
-          : "bg-background-primary/90 border border-border-opaque backdrop-blur-sm",
-      ].join(" ")}
-    >
-      <span className="flex h-5 w-5 items-center justify-center leading-none">{icon}</span>
-      <span className={`text-label-small ${danger ? "text-white" : "text-content-secondary"}`}>
-        {label}
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        className={[
+          "flex flex-col items-center gap-1 rounded-md px-3 py-3 min-h-[56px] min-w-[48px] cursor-pointer",
+          "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+          "active:scale-90",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
+          danger
+            ? "bg-negative-400 text-white shadow-elevation-2 glow-negative"
+            : "bg-background-primary/90 border border-border-opaque backdrop-blur-sm",
+        ].join(" ")}
+      >
+        <span className="flex h-5 w-5 items-center justify-center leading-none">{icon}</span>
+        <span className={`text-label-small ${danger ? "text-white" : "text-content-secondary"}`}>
+          {label}
+        </span>
+      </button>
   );
 }
 
@@ -124,10 +129,10 @@ function CancelConfirmSheet({
       onClick={onClose}
     >
       <div
-        className="w-full rounded-t-lg bg-background-primary p-6 shadow-elevation-3"
+        className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
         <h3 className="text-heading-small text-content-primary">Cancel trip?</h3>
         {fee > 0 ? (
           <div className="mt-2 space-y-2">
@@ -185,10 +190,10 @@ function ExtendSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
       <div
-        className="w-full rounded-t-lg bg-background-primary p-6 shadow-elevation-3"
+        className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
         <h3 className="text-heading-small text-content-primary">Extend trip</h3>
         <p className="mt-2 text-paragraph-medium text-content-secondary">
           Add more hours to your booking. Extra time is charged at your trip&apos;s hourly rate.
@@ -591,13 +596,18 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
       </div>
 
       {/* Status banner — top */}
-      <div className="absolute inset-x-4 top-4 z-20">
-        <StatusBanner status={tripStatus} />
-        {tripStatus === "WAITING" && <WaitingMeter />}
-      </div>
+      <BlurFade className="absolute inset-x-4 top-4 z-20">
+        <div className="relative overflow-hidden rounded-md">
+          {tripStatus && ["EN_ROUTE_TO_PICKUP", "ARRIVED_AT_PICKUP", "DELIVERING"].includes(tripStatus) && (
+            <BorderBeam size={80} duration={8} colorFrom="#22c55e" colorTo="rgba(34,197,94,0.1)" borderWidth={1.5} />
+          )}
+          <StatusBanner status={tripStatus} />
+          {tripStatus === "WAITING" && <WaitingMeter />}
+        </div>
+      </BlurFade>
 
       {/* Right-side FABs */}
-      <div className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2">
+      <BlurFade direction="right" offset={8} className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2">
         {inTrip && (
           <>
             <FAB
@@ -618,14 +628,15 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l9 16H3L12 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><path d="M12 10v4M12 17h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>}
           label="SOS" onClick={() => setShowSOS(true)} danger
         />
-      </div>
+      </BlurFade>
 
       {/* Bottom panel */}
-      <div className="absolute inset-x-0 bottom-0 z-20 space-y-2 pb-[80px] pt-2 px-4">
+      <BlurFade direction="up" offset={8} className="absolute inset-x-0 bottom-0 z-20 space-y-2 pb-[80px] pt-2 px-4">
         {/* In-trip estimated fare strip */}
         {inTrip && activeOrder && (
-          <div className="flex items-center justify-between rounded-md bg-background-primary/90
-            border border-border-opaque px-4 py-2.5 backdrop-blur-sm shadow-elevation-1">
+          <div className="relative flex items-center justify-between rounded-md bg-background-primary/90
+            border border-border-opaque px-4 py-2.5 backdrop-blur-sm shadow-elevation-1 overflow-hidden">
+            <BorderBeam size={50} duration={10} colorFrom="#1a5cff" colorTo="rgba(26,92,255,0.05)" borderWidth={1} delay={1} />
             <span className="text-label-small text-content-secondary">Est. fare</span>
             <FareDisplay amount={fareEstimate ?? activeOrder.base_fare_paise} size="sm" />
           </div>
@@ -671,11 +682,18 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
                     </p>
                   )}
                   {chat.map((m, i) => (
-                    <div key={i} className={`flex ${m.from === "RIDER" ? "justify-end" : "justify-start"}`}>
+                    <BlurFade
+                      key={i}
+                      delay={0.05}
+                      duration={0.2}
+                      offset={4}
+                      direction={m.from === "RIDER" ? "right" : "left"}
+                      className={`flex ${m.from === "RIDER" ? "justify-end" : "justify-start"}`}
+                    >
                       <span className={`inline-block max-w-[80%] rounded-md px-3 py-1.5 text-paragraph-small ${
                         m.from === "RIDER" ? "bg-accent-400 text-white" : "bg-background-primary text-content-primary border border-border-opaque"
                       }`}>{m.text}</span>
-                    </div>
+                    </BlurFade>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -683,7 +701,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
                     <button
                       key={q}
                       onClick={() => sendChat(q)}
-                      className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary"
+                      className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary hover:bg-background-primary transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95"
                     >
                       {q}
                     </button>
@@ -709,7 +727,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
             )}
           </div>
         )}
-      </div>
+      </BlurFade>
 
       {/* Add Stop input */}
       {addStopInput && (

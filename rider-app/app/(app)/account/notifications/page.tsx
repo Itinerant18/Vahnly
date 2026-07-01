@@ -6,6 +6,9 @@ import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { SkeletonList, EmptyState, ErrorState } from "@/components/account/States";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import type { RiderNotificationItem } from "@/lib/api/types";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { ShineBorder } from "@/components/ui/shine-border";
 
 import { AnimatedIcon } from "@/components/ds/Icon";
 import { AnimBell } from "@/assets/icons/animated";
@@ -53,10 +56,10 @@ export default function NotificationsPage() {
 
   return (
     <AccountScaffold
-      title="Notifications"
+      title={<WordRotate words={["Notifications", "Updates", "Alerts"]} duration={3000} />}
       action={
         unreadCount > 0 ? (
-          <button onClick={markAll} className="text-xs font-semibold text-content-accent">
+          <button onClick={markAll} className="text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
             Mark all read
           </button>
         ) : undefined
@@ -66,49 +69,58 @@ export default function NotificationsPage() {
         <ErrorState onRetry={load} />
       ) : loading ? (
         <SkeletonList rows={5} height="h-16" />
-      ) : notifications.length === 0 ? (
-        <EmptyState icon={<AnimatedIcon src={AnimBell} size={64} trigger="loop-on-hover" colors="primary:#F59E0B,secondary:#FCD34D" />} title="No notifications yet" message="Trip updates and offers will appear here." />
       ) : (
-        <div className="space-y-5">
-          {ORDER.filter((b) => groups[b]?.length).map((b) => (
-            <div key={b}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-content-tertiary">{b}</p>
-              <div className="space-y-2">
-                {groups[b].map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => !n.is_read && markRead(n.id)}
-                    className={`block w-full rounded-2xl p-4 text-left ${
-                      n.is_read ? "bg-background-secondary" : "bg-background-tertiary ring-1 ring-border-accent"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {!n.is_read && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent-400" />}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-content-primary">{n.title}</p>
-                        <p className="mt-0.5 text-xs text-content-secondary">{n.body}</p>
-                        <p className="mt-1 text-[10px] text-content-tertiary">
-                          {new Date(n.created_at).toLocaleTimeString("en-IN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
+        <>
+          {notifications.length === 0 ? (
+            <EmptyState icon={<AnimatedIcon src={AnimBell} size={64} trigger="loop-on-hover" colors="primary:#F59E0B,secondary:#FCD34D" />} title="No notifications yet" message="Trip updates and offers will appear here." />
+          ) : (
+            <div className="space-y-5">
+              {ORDER.filter((b) => groups[b]?.length).map((b) => (
+                <BlurFade key={b} delay={0.1}>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-content-tertiary">{b}</p>
+                    <div className="space-y-2">
+                      {groups[b].map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => !n.is_read && markRead(n.id)}
+                          className={`group relative block w-full rounded-2xl p-4 overflow-hidden text-left active:scale-[0.99] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                            n.is_read ? "bg-background-secondary" : "bg-background-tertiary ring-1 ring-border-accent"
+                          }`}
+                        >
+                          <ShineBorder borderWidth={1} duration={8} shineColor="#4A6FA5" className="opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          <div className="flex items-start gap-2">
+                            {!n.is_read && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent-400" />}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-content-primary">{n.title}</p>
+                              <p className="mt-0.5 text-xs text-content-secondary">{n.body}</p>
+                              <p className="mt-1 text-[10px] text-content-tertiary">
+                                {new Date(n.created_at).toLocaleTimeString("en-IN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </BlurFade>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      <Link
-        href="/account/settings"
-        className="mt-6 block rounded-2xl bg-background-secondary py-3.5 text-center text-sm font-semibold text-content-accent"
-      >
-        Notification Preferences →
-      </Link>
+          <BlurFade delay={0.2}>
+            <Link
+              href="/account/settings"
+              className="mt-6 block rounded-2xl bg-background-secondary py-3.5 text-center text-sm font-semibold text-content-accent active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            >
+              Notification Preferences →
+            </Link>
+          </BlurFade>
+        </>
+      )}
     </AccountScaffold>
   );
 }

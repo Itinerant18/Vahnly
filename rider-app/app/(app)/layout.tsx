@@ -79,7 +79,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background-primary pb-[68px]">
       {children}
-      <nav className="fixed inset-x-0 bottom-0 z-50 flex h-[68px] items-center border-t border-border-opaque bg-background-secondary" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex h-[68px] items-center border-t border-border-opaque/50 bg-background-primary/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.04)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {NAV.map((n) => {
           const active = pathname === n.href || (n.href !== "/account" && pathname.startsWith(n.href + "/"));
           const isAccount = n.href === "/account";

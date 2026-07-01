@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ordersApi } from "@/lib/api/orders";
 import { LinkIcon } from "@/components/ds/Icon";
+import { AnimatedBeam } from "@/components/ui/animated-beam";
 
 // Public (no-auth) live trip tracking page. Lives outside the (app) route group
 // so it has no auth guard — anyone with the share link can view it. The token is
@@ -43,6 +44,10 @@ function TripShareView() {
   const [data, setData] = useState<TripShareData | null>(null);
   const [expired, setExpired] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const routeContainerRef = useRef<HTMLDivElement>(null);
+  const pickupRef = useRef<HTMLDivElement>(null);
+  const dropoffRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!token) {
@@ -141,10 +146,24 @@ function TripShareView() {
             </div>
 
             {/* Route */}
-            <div className="rounded-2xl bg-background-secondary px-4 py-3">
+            <div ref={routeContainerRef} className="relative rounded-2xl bg-background-secondary px-4 py-3">
+              <AnimatedBeam
+                containerRef={routeContainerRef}
+                fromRef={pickupRef}
+                toRef={dropoffRef}
+                curvature={-40}
+                duration={6}
+                pathColor="#4A6FA5"
+                pathWidth={2}
+                pathOpacity={0.15}
+                gradientStartColor="#4A6FA5"
+                gradientStopColor="#1a5cff"
+                startYOffset={8}
+                endYOffset={8}
+              />
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Route</p>
               <div className="space-y-3">
-                <div className="flex items-start gap-3">
+                <div ref={pickupRef} className="flex items-start gap-3">
                   <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-positive-400">
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   </div>
@@ -155,7 +174,7 @@ function TripShareView() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
+                <div ref={dropoffRef} className="flex items-start gap-3">
                   <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-negative-400">
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   </div>

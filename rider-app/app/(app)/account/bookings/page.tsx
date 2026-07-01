@@ -10,6 +10,10 @@ import { ordersApi } from "@/lib/api/orders";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { FareDisplay } from "@/components/ds";
 import type { Order, TripStatus } from "@/lib/api/types";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { ShineBorder } from "@/components/ui/shine-border";
+import { AnimatedList, AnimatedListItem } from "@/components/ui/animated-list";
 
 type Tab = "Upcoming" | "Completed" | "Cancelled";
 const TABS: Tab[] = ["Upcoming", "Completed", "Cancelled"];
@@ -38,6 +42,7 @@ function bucket(status: TripStatus): Tab {
 function TripCard({ order, onRebook, onCancel }: { order: Order; onRebook: () => void; onCancel?: () => void }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const isScheduled = !!order.scheduled_at;
   const terminal = order.status === "COMPLETED" || order.status === "CANCELLED";
   // Scheduled bookings show their real future pickup time; past trips show the
@@ -49,7 +54,11 @@ function TripCard({ order, onRebook, onCancel }: { order: Order; onRebook: () =>
       ? new Date(order.created_at)
       : null;
   return (
-    <div className="rounded-2xl bg-background-secondary p-4">
+    <div className="relative rounded-2xl bg-background-secondary p-4 overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.01]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {hovered && <ShineBorder borderWidth={1} duration={8} shineColor="#4A6FA5" />}
       <button
         onClick={() => router.push(`/account/bookings/detail?orderId=${order.id}`)}
         className="block w-full text-left"
@@ -98,13 +107,13 @@ function TripCard({ order, onRebook, onCancel }: { order: Order; onRebook: () =>
           <div className="mt-2 flex gap-2">
             <button
               onClick={() => setConfirming(false)}
-              className="flex-1 rounded-xl bg-background-tertiary py-2 text-xs font-semibold text-content-primary min-h-[44px]"
+              className="flex-1 rounded-xl bg-background-tertiary py-2 text-xs font-semibold text-content-primary min-h-[44px] active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Keep booking
             </button>
             <button
               onClick={() => { setConfirming(false); onCancel?.(); }}
-              className="flex-1 rounded-xl bg-negative-400 py-2 text-xs font-semibold text-white min-h-[44px]"
+              className="flex-1 rounded-xl bg-negative-400 py-2 text-xs font-semibold text-white min-h-[44px] active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Cancel booking
             </button>
@@ -114,21 +123,21 @@ function TripCard({ order, onRebook, onCancel }: { order: Order; onRebook: () =>
         <div className="mt-3 flex gap-2">
           <button
             onClick={onRebook}
-            className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent min-h-[44px]"
+            className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent min-h-[44px] active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
           >
             Rebook
           </button>
           {onCancel ? (
             <button
               onClick={() => setConfirming(true)}
-              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-negative min-h-[44px]"
+              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-negative min-h-[44px] active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Cancel
             </button>
           ) : (
             <button
               onClick={() => router.push(`/account/bookings/detail?orderId=${order.id}`)}
-              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary min-h-[44px]"
+              className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary min-h-[44px] active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Details
             </button>
@@ -187,43 +196,48 @@ export default function BookingsPage() {
   };
 
   return (
-    <AccountScaffold title="My Trips">
+    <AccountScaffold title={<WordRotate words={["My Trips", "Ride History", "Your Journeys"]} duration={3000} />}>
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 rounded-xl bg-background-secondary p-1">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-              tab === t ? "bg-accent-400 text-content-primary" : "text-content-secondary"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <BlurFade delay={0.1}>
+        <div className="mb-4 flex gap-1 rounded-xl bg-background-secondary p-1">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 ${
+                tab === t ? "bg-accent-400 text-content-primary" : "text-content-secondary"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </BlurFade>
 
       {error ? (
         <ErrorState onRetry={load} />
       ) : orders === null ? (
         <SkeletonList rows={4} height="h-28" />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={<AnimatedIcon src={AnimEmptyBox} size={64} trigger="in" />} title={`No ${tab.toLowerCase()} trips`} message="Your trips will show up here." />
+        <BlurFade delay={0.2}>
+          <EmptyState icon={<AnimatedIcon src={AnimEmptyBox} size={64} trigger="in" />} title={`No ${tab.toLowerCase()} trips`} message="Your trips will show up here." />
+        </BlurFade>
       ) : (
-        <div className="space-y-3">
+        <AnimatedList delay={500} className="space-y-3">
           {filtered.map((o) => (
-            <TripCard
-              key={o.id}
-              order={o}
-              onRebook={() => rebook(o)}
-              onCancel={
-                tab === "Upcoming" && (o.status === "CREATED" || o.status === "ASSIGNED")
-                  ? () => cancelBooking(o)
-                  : undefined
-              }
-            />
+            <AnimatedListItem key={o.id}>
+              <TripCard
+                order={o}
+                onRebook={() => rebook(o)}
+                onCancel={
+                  tab === "Upcoming" && (o.status === "CREATED" || o.status === "ASSIGNED")
+                    ? () => cancelBooking(o)
+                    : undefined
+                }
+              />
+            </AnimatedListItem>
           ))}
-        </div>
+        </AnimatedList>
       )}
     </AccountScaffold>
   );

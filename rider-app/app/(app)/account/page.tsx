@@ -6,6 +6,9 @@ import { useAuthStore } from "@/lib/store/authStore";
 import { ordersApi } from "@/lib/api/orders";
 import { FareDisplay } from "@/components/ds";
 import { Shimmer } from "@/components/account/States";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 import {
   UserIcon,
@@ -74,78 +77,91 @@ export default function AccountPage() {
   return (
     <main className="min-h-screen bg-background-primary pb-24">
       <div className="px-4 pt-12">
-        <h1 className="mb-4 text-2xl font-bold text-content-primary">Account</h1>
+        <BlurFade delay={0.1}>
+          <h1 className="mb-4 text-2xl font-bold text-content-primary">
+            <WordRotate words={["Account", "Profile", "You"]} duration={3000} className="text-2xl font-bold" />
+          </h1>
+        </BlurFade>
 
         {/* Profile card */}
-        <div className="flex items-center gap-4 rounded-2xl bg-background-secondary p-4">
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-accent text-2xl font-bold text-content-accent">
-            {rider?.profile_photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={rider.profile_photo_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              initials
-            )}
+        <BlurFade delay={0.15}>
+          <div className="relative flex items-center gap-4 rounded-2xl bg-background-secondary p-4 overflow-hidden">
+            <BorderBeam size={80} duration={8} colorFrom="#1a5cff" colorTo="rgba(26,92,255,0.1)" borderWidth={1.5} />
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-accent text-2xl font-bold text-content-accent">
+              {rider?.profile_photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={rider.profile_photo_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-base font-bold text-content-primary">{rider?.name ?? "Add your name"}</p>
+              <p className="text-sm text-content-secondary">{rider?.phone ?? ""}</p>
+            </div>
+            <span
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                rider?.kyc_level && rider.kyc_level !== "NONE"
+                  ? "bg-surface-positive text-content-positive"
+                  : "bg-surface-neutral text-content-secondary"
+              }`}
+            >
+              {rider?.kyc_level && rider.kyc_level !== "NONE" ? "✓ KYC" : "Unverified"}
+            </span>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold text-content-primary">{rider?.name ?? "Add your name"}</p>
-            <p className="text-sm text-content-secondary">{rider?.phone ?? ""}</p>
-          </div>
-          <span
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
-              rider?.kyc_level && rider.kyc_level !== "NONE"
-                ? "bg-surface-positive text-content-positive"
-                : "bg-surface-neutral text-content-secondary"
-            }`}
-          >
-            {rider?.kyc_level && rider.kyc_level !== "NONE" ? "✓ KYC" : "Unverified"}
-          </span>
-        </div>
+        </BlurFade>
 
         {/* Stats row */}
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-background-secondary p-3 text-center">
-            <p className="text-xs text-content-secondary">Trips</p>
-            {stats ? (
-              <p className="mt-1 text-lg font-bold text-content-primary">{stats.trips}</p>
-            ) : (
-              <Shimmer className="mx-auto mt-1 h-6 w-10" />
-            )}
+        <BlurFade delay={0.2}>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl bg-background-secondary p-3 text-center">
+              <p className="text-xs text-content-secondary">Trips</p>
+              {stats ? (
+                <p className="mt-1 text-lg font-bold text-content-primary">{stats.trips}</p>
+              ) : (
+                <Shimmer className="mx-auto mt-1 h-6 w-10" />
+              )}
+            </div>
+            <div className="rounded-2xl bg-background-secondary p-3 text-center">
+              <p className="text-xs text-content-secondary">Spent</p>
+              {stats ? (
+                <FareDisplay amount={stats.spent} size="md" className="mt-1 block font-bold text-content-primary" />
+              ) : (
+                <Shimmer className="mx-auto mt-1 h-6 w-14" />
+              )}
+            </div>
+            <div className="rounded-2xl bg-background-secondary p-3 text-center">
+              <p className="text-xs text-content-secondary">Tier</p>
+              <p className={`mt-1 text-lg font-bold ${tier.color}`}>{tier.name}</p>
+            </div>
           </div>
-          <div className="rounded-2xl bg-background-secondary p-3 text-center">
-            <p className="text-xs text-content-secondary">Spent</p>
-            {stats ? (
-              <FareDisplay amount={stats.spent} size="md" className="mt-1 block font-bold text-content-primary" />
-            ) : (
-              <Shimmer className="mx-auto mt-1 h-6 w-14" />
-            )}
-          </div>
-          <div className="rounded-2xl bg-background-secondary p-3 text-center">
-            <p className="text-xs text-content-secondary">Tier</p>
-            <p className={`mt-1 text-lg font-bold ${tier.color}`}>{tier.name}</p>
-          </div>
-        </div>
+        </BlurFade>
 
         {/* Quick links grid */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="flex flex-col items-center gap-2 rounded-2xl bg-background-secondary py-4 active:bg-background-tertiary"
-            >
-              <span className="text-2xl">{l.icon}</span>
-              <span className="text-center text-xs text-content-secondary">{l.label}</span>
-            </Link>
-          ))}
-        </div>
+        <BlurFade delay={0.25}>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {LINKS.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="flex flex-col items-center gap-2 rounded-2xl bg-background-secondary py-4 active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:bg-background-secondary/80"
+              >
+                <span className="text-2xl">{l.icon}</span>
+                <span className="text-center text-xs text-content-secondary">{l.label}</span>
+              </Link>
+            ))}
+          </div>
+        </BlurFade>
 
         {/* Logout */}
-        <button
-          onClick={logout}
-          className="mt-6 w-full rounded-2xl border border-border-opaque py-3.5 text-sm font-semibold text-content-negative active:bg-surface-negative"
-        >
-          Log Out
-        </button>
+        <BlurFade delay={0.3}>
+          <button
+            onClick={logout}
+            className="mt-6 w-full rounded-2xl border border-border-opaque py-3.5 text-sm font-semibold text-content-negative active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+          >
+            Log Out
+          </button>
+        </BlurFade>
       </div>
     </main>
   );

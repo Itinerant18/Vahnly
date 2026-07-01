@@ -16,7 +16,7 @@ export function TopBar() {
   const activeOrder = useTripStore((s) => s.activeOrder);
 
   return (
-    <div className="flex items-center justify-between px-4 py-3">
+    <div className="flex items-center justify-between px-4 py-3 glass-solid">
       {/* City selector */}
       <div className="relative">
         <button

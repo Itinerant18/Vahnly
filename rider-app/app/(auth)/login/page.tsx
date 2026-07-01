@@ -6,6 +6,8 @@ import { useAuthStore } from "@/lib/store/authStore";
 import { getGoogleIdToken } from "@/lib/googleAuth";
 import PhoneVerifyScreen from "@/components/auth/PhoneVerifyScreen";
 import { authApi } from "@/lib/api/auth";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { TypingAnimation } from "@/components/ui/typing-animation";
 
 // ── Spinner ──────────────────────────────────────────────────────────────────
 function Spinner({ size = 20 }: { size?: number }) {
@@ -238,9 +240,14 @@ export default function LoginPage() {
         <Logo />
         <div className="text-center">
           <h1 className="text-display-small text-content-primary mt-4">Vahnly</h1>
-          <p className="text-paragraph-large text-content-secondary mt-2">
+          <TypingAnimation
+            className="text-paragraph-large text-content-secondary mt-2 block"
+            duration={40}
+            delay={300}
+            startOnView={false}
+          >
             Your car. Our driver.
-          </p>
+          </TypingAnimation>
         </div>
       </div>
 
@@ -309,13 +316,17 @@ export default function LoginPage() {
                   onChange={(e) => setLoginPassword(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handlePasswordLogin(); }}
                 />
-                <button
-                  className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                <ShimmerButton
+                  type="button"
                   disabled={isLoading}
                   onClick={handlePasswordLogin}
+                  shimmerColor="rgba(255,255,255,0.3)"
+                  background="#1a5cff"
+                  borderRadius="4px"
+                  className="h-14 text-label-large font-medium shadow-elevation-1"
                 >
                   {isLoading ? <Spinner /> : "Log In"}
-                </button>
+                </ShimmerButton>
                 <button
                   type="button"
                   onClick={handleForgotSend}
@@ -333,16 +344,16 @@ export default function LoginPage() {
                   Verify your number once with an OTP, then set a password. After that,
                   just log in with your password — no OTP, no SMS.
                 </p>
-                <button
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-sm
-                    bg-interactive-primary text-interactive-primary-text
-                    text-label-large font-medium shadow-elevation-1 transition-base
-                    hover:opacity-90 active:scale-[0.98]
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                <ShimmerButton
+                  type="button"
                   onClick={() => { setError(""); setStep("phone_verify"); }}
+                  shimmerColor="rgba(255,255,255,0.3)"
+                  background="#1a5cff"
+                  borderRadius="4px"
+                  className="h-14 text-label-large font-medium shadow-elevation-1"
                 >
                   Sign up with phone number
-                </button>
+                </ShimmerButton>
 
                 {/* Referral code (new users only) */}
                 <div className="pt-1">
@@ -509,17 +520,17 @@ export default function LoginPage() {
               />
             </div>
 
-            <button
-              className="flex h-14 w-full items-center justify-center rounded-sm
-                bg-interactive-primary text-interactive-primary-text
-                text-label-large font-medium shadow-elevation-1 transition-base
-                hover:opacity-90 active:scale-[0.98]
-                disabled:opacity-50 disabled:cursor-not-allowed"
+            <ShimmerButton
+              type="button"
               disabled={isLoading || googlePhone.length !== 10 || googleOtp.length !== 6}
               onClick={onCompleteGoogleRegistration}
+              shimmerColor="rgba(255,255,255,0.3)"
+              background="#1a5cff"
+              borderRadius="4px"
+              className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {isLoading ? <Spinner /> : "Complete Registration"}
-            </button>
+            </ShimmerButton>
 
             <button
               className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px]
@@ -555,13 +566,17 @@ export default function LoginPage() {
               value={resetPw}
               onChange={(e) => setResetPw(e.target.value)}
             />
-            <button
-              className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+            <ShimmerButton
+              type="button"
               disabled={isLoading}
               onClick={handleResetSubmit}
+              shimmerColor="rgba(255,255,255,0.3)"
+              background="#1a5cff"
+              borderRadius="4px"
+              className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {isLoading ? <Spinner /> : "Reset & Log In"}
-            </button>
+            </ShimmerButton>
             <button
               className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base"
               onClick={() => { setStep("choose"); setError(""); }}
@@ -587,13 +602,17 @@ export default function LoginPage() {
               onChange={(e) => setNewPw(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleCreatePassword(); }}
             />
-            <button
-              className="flex h-14 w-full items-center justify-center rounded-sm bg-interactive-primary text-interactive-primary-text text-label-large font-medium shadow-elevation-1 transition-base hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+            <ShimmerButton
+              type="button"
               disabled={savingPw}
               onClick={handleCreatePassword}
+              shimmerColor="rgba(255,255,255,0.3)"
+              background="#1a5cff"
+              borderRadius="4px"
+              className="h-14 text-label-large font-medium shadow-elevation-1"
             >
               {savingPw ? <Spinner /> : "Create password & continue"}
-            </button>
+            </ShimmerButton>
             <button
               className="w-full text-center text-label-medium text-content-secondary py-3 min-h-[44px] hover:text-content-primary transition-base"
               onClick={() => router.replace("/onboarding")}

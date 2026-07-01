@@ -9,6 +9,10 @@ import { insuranceApi, type FileClaimInput } from "@/lib/api/insurance";
 import { ordersApi } from "@/lib/api/orders";
 import type { InsuranceClaim, InsuranceCoverage, Order } from "@/lib/api/types";
 import { formatRupeesWhole } from "@/lib/utils/formatCurrency";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { HyperText } from "@/components/ui/hyper-text";
 
 type ClaimType = FileClaimInput["claim_type"];
 
@@ -342,52 +346,68 @@ export default function InsurancePage() {
   const showEmpty = !loading && (failed || claims.length === 0);
 
   return (
-    <AccountScaffold title="Insurance & Care">
+    <AccountScaffold title={<WordRotate words={["D4M Care", "Insurance", "Protection"]} duration={3000} />}>
       <div className="space-y-6">
-        <section>
-          <h2 className="text-sm font-bold text-content-primary mb-3">D4M Care</h2>
-          <div className="rounded-2xl bg-background-secondary p-4">
-            <p className="text-sm text-content-secondary">
-              Per-trip opt-in is <span className="font-semibold text-content-primary">₹49</span> at booking.
-            </p>
-            <p className="mt-3 rounded-xl bg-surface-accent px-4 py-3 text-sm font-semibold text-content-accent">
-              Your next trip is covered with D4M Care when you toggle it at booking.
-            </p>
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-background-tertiary px-4 py-3 opacity-60">
-              <span className="text-sm font-medium text-content-secondary">Monthly plan</span>
-              <span className="text-xs font-medium text-content-tertiary">Coming soon</span>
+        <BlurFade delay={0.1}>
+          <section>
+            <h2 className="text-sm font-bold text-content-primary mb-3">D4M Care</h2>
+            <div className="rounded-2xl bg-background-secondary p-4">
+              <p className="text-sm text-content-secondary">
+                Per-trip opt-in is <span className="font-semibold text-content-primary">₹49</span> at booking.
+              </p>
+              <HyperText
+                as="p"
+                className="mt-3 rounded-xl bg-surface-accent px-4 py-3 text-sm font-semibold text-content-accent"
+                duration={1200}
+                delay={500}
+                animateOnHover={false}
+                startOnView={true}
+              >
+                Your next trip is covered with D4M Care when you toggle it at booking.
+              </HyperText>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-background-tertiary px-4 py-3 opacity-60">
+                <span className="text-sm font-medium text-content-secondary">Monthly plan</span>
+                <span className="text-xs font-medium text-content-tertiary">Coming soon</span>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </BlurFade>
 
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-content-primary">Past claims</h2>
-            <button
-              type="button"
-              onClick={() => setSheetOpen(true)}
-              className="rounded-xl bg-interactive-primary px-4 py-2 text-sm font-bold text-interactive-primary-text"
-            >
-              File a Claim
-            </button>
-          </div>
-
-          {loading ? (
-            <SkeletonList rows={3} />
-          ) : showEmpty ? (
-            <EmptyState
-              icon={<ShieldIcon size={28} />}
-              title="No claims yet"
-              message="File a claim for a covered trip and track its status here."
-            />
-          ) : (
-            <div className="space-y-3">
-              {claims.map((c) => (
-                <ClaimCard key={c.id} claim={c} />
-              ))}
+        <BlurFade delay={0.15}>
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-content-primary">Past claims</h2>
+              <ShimmerButton
+                type="button"
+                onClick={() => setSheetOpen(true)}
+                shimmerColor="rgba(255,255,255,0.3)"
+                background="#1a5cff"
+                borderRadius="12px"
+                className="px-4 py-2 text-sm font-bold"
+              >
+                File a Claim
+              </ShimmerButton>
             </div>
-          )}
-        </section>
+
+            {loading ? (
+              <SkeletonList rows={3} />
+            ) : showEmpty ? (
+              <EmptyState
+                icon={<ShieldIcon size={28} />}
+                title="No claims yet"
+                message="File a claim for a covered trip and track its status here."
+              />
+            ) : (
+              <div className="space-y-3">
+                {claims.map((c) => (
+                  <BlurFade key={c.id} delay={0.1}>
+                    <ClaimCard claim={c} />
+                  </BlurFade>
+                ))}
+              </div>
+            )}
+          </section>
+        </BlurFade>
       </div>
 
       {sheetOpen && (

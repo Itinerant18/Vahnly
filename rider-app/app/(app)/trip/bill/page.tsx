@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 import { FareDisplay } from "@/components/ds";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { TypingAnimation } from "@/components/ui/typing-animation";
 import type { PaymentMethod } from "@/lib/api/types";
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -139,7 +142,9 @@ export default function BillPage() {
     <div className="flex min-h-screen flex-col bg-background-primary">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pb-4 pt-12">
-        <h1 className="text-xl font-bold text-content-primary">Trip Summary</h1>
+        <h1 className="text-xl font-bold text-content-primary">
+          <WordRotate words={["Trip Summary", "Your Ride", "Journey Complete"]} duration={3000} className="text-xl font-bold" />
+        </h1>
         {fare && (
           <span className="ml-auto rounded-lg bg-surface-positive px-2.5 py-1 text-xs font-semibold text-content-positive">
             Completed
@@ -227,20 +232,26 @@ export default function BillPage() {
                 <circle cx="17" cy="13" r="1.4" fill="currentColor" />
               </svg>
             </span>
-            <span className="text-sm font-medium text-content-secondary">Processing wallet payment…</span>
+            <TypingAnimation className="text-sm font-medium text-content-secondary" duration={30} delay={100} startOnView={false}>
+              Processing wallet payment…
+            </TypingAnimation>
           </div>
         )}
       </div>
 
       {/* Pay CTA */}
       <div className="px-4 pb-8">
-        <button
-          onClick={handlePay}
+        <ShimmerButton
+          type="button"
           disabled={paying}
-          className="w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text shadow-elevation-2 transition-transform active:scale-[0.98] disabled:opacity-60"
+          onClick={handlePay}
+          shimmerColor="rgba(255,255,255,0.3)"
+          background="#1a5cff"
+          borderRadius="16px"
+          className="w-full py-4 text-base font-bold shadow-elevation-2 disabled:opacity-60"
         >
           {method === "CASH" ? "Mark as Paid" : `Pay ${formatCurrency(displayTotal)}`}
-        </button>
+        </ShimmerButton>
       </div>
 
       {paid && <CheckmarkAnimation onDone={() => router.replace("/trip/rate")} />}

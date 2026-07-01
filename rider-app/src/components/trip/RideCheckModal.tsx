@@ -23,7 +23,7 @@ export function RideCheckModal({ message, onOk, onSOS }: RideCheckModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/70">
-      <div className="w-full rounded-t-3xl bg-background-secondary p-6">
+      <div className="w-full rounded-t-3xl bg-background-secondary p-6 animate-spring-up">
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
 
         <div className="mb-4 flex items-center justify-between">

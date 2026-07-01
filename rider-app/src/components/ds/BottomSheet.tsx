@@ -123,7 +123,7 @@ export function BottomSheet({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 z-40 animate-fade-in"
+        className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -131,13 +131,13 @@ export function BottomSheet({
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background-primary rounded-t-lg shadow-elevation-3 will-change-transform"
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background-primary/95 backdrop-blur-xl rounded-t-[20px] shadow-elevation-3 will-change-transform border-t border-white/20"
         style={{
           height: `${currentHeight}px`,
           transform: `translateY(${translateY}px)`,
           transition: isDragging.current
             ? 'none'
-            : 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)',
+            : 'transform 400ms cubic-bezier(0.32, 0.72, 0, 1)',
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -145,10 +145,10 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
       >
-        {/* Handle */}
+        {/* Handle — larger, softer */}
         {showHandle && (
           <div className="flex-shrink-0 flex justify-center pt-300 pb-500 cursor-grab active:cursor-grabbing">
-            <div className="w-9 h-1 rounded-pill bg-gray-300" />
+            <div className="w-10 h-1.5 rounded-pill bg-gray-300/60" />
           </div>
         )}
 
@@ -163,7 +163,7 @@ export function BottomSheet({
 
         {/* Pinned footer (primary CTA) */}
         {pinnedFooter && (
-          <div className="flex-shrink-0 px-500 pb-[calc(var(--space-500)+env(safe-area-inset-bottom,0px))] pt-300 border-t border-border-opaque bg-background-primary">
+          <div className="flex-shrink-0 px-500 pb-[calc(var(--space-500)+env(safe-area-inset-bottom,0px))] pt-300 border-t border-border-opaque/50 bg-background-primary/95 backdrop-blur-xl">
             {pinnedFooter}
           </div>
         )}

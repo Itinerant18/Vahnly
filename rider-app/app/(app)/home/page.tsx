@@ -10,6 +10,8 @@ import { useNotificationStore } from "@/lib/store/notificationStore";
 import { useTripStore } from "@/lib/store/tripStore";
 import { nearbyApi, type NearbyDriver } from "@/lib/api/nearby";
 import { cityConfigApi } from "@/lib/api/cityConfig";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ScrollVelocityRow } from "@/components/ui/scroll-based-velocity";
 
 // Leaflet must be lazily loaded — no SSR
 const RiderMap = dynamic(() => import("@/components/map/RiderMap"), {
@@ -75,7 +77,7 @@ export default function HomePage() {
   }, [userLocation]);
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary">
+    <BlurFade duration={0.5} className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary">
       {/* Map — full screen behind everything */}
       <div className="absolute inset-0 z-0">
         <RiderMap
@@ -90,10 +92,17 @@ export default function HomePage() {
         <TopBar />
       </div>
 
+      {/* Marquee tagline */}
+      <div className="absolute inset-x-0 z-10" style={{ top: "64px" }}>
+        <ScrollVelocityRow baseVelocity={0.8} className="text-[10px] text-content-tertiary/30 tracking-[0.2em] uppercase">
+          Driver on demand · Safe rides · 24/7 support · Cashless payments ·
+        </ScrollVelocityRow>
+      </div>
+
       {/* Booking bottom sheet — floats above map */}
       <SentryErrorBoundary name="rider-booking">
         <BookingSheet />
       </SentryErrorBoundary>
-    </div>
+    </BlurFade>
   );
 }

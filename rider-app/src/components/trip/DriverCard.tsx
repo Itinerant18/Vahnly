@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTripStore } from "@/lib/store/tripStore";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 import { PhoneIcon, ChatIcon, ShareIcon, UserIcon, CrossIcon } from "@/components/ds/Icon";
 
@@ -57,7 +58,8 @@ export function DriverCard({
                                      "badge badge-accent";
 
   return (
-    <div className="relative rounded-md bg-background-primary border border-border-opaque shadow-elevation-2">
+    <div className="relative rounded-md bg-background-primary border border-border-opaque shadow-elevation-2 overflow-hidden">
+      <BorderBeam size={80} duration={8} colorFrom="#22c55e" colorTo="rgba(34,197,94,0.1)" borderWidth={1.5} delay={2} />
       {/* Collapsed strip */}
       <button
         type="button"
@@ -65,15 +67,18 @@ export function DriverCard({
         className="flex w-full items-center gap-3 px-4 py-3 min-h-[56px]
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 rounded-md"
       >
-        {/* Avatar */}
-        <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-pill bg-background-secondary border border-border-opaque">
-          {driverInfo?.photo ? (
-            <img src={driverInfo.photo} alt={driverInfo.name ?? "Driver"} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-content-secondary select-none">
-              <UserIcon size={32} className="text-content-secondary" />
-            </div>
-          )}
+        {/* Avatar with pulse ring */}
+        <div className="relative h-10 w-10 flex-shrink-0">
+          <div className="absolute inset-0 rounded-pill bg-positive-400/30 animate-ping" />
+          <div className="relative h-full w-full overflow-hidden rounded-pill bg-background-secondary border-2 border-positive-400">
+            {driverInfo?.photo ? (
+              <img src={driverInfo.photo} alt={driverInfo.name ?? "Driver"} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-content-secondary select-none">
+                <UserIcon size={32} className="text-content-secondary" />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 text-left">
@@ -96,9 +101,14 @@ export function DriverCard({
         </svg>
       </button>
 
-      {/* Expanded details */}
+      {/* Expanded details — spring reveal */}
       {expanded && (
-        <div className="border-t border-border-opaque px-4 pb-4">
+        <div
+          className="border-t border-border-opaque px-4 pb-4"
+          style={{
+            animation: "enterUp 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          }}
+        >
           {driverInfo?.vehicleContext && (
             <p className="py-2 text-paragraph-small text-content-secondary">
               {driverInfo.vehicleContext}
@@ -125,7 +135,9 @@ export function DriverCard({
                 onClick={onClick}
                 className="flex flex-1 flex-col items-center gap-1.5 rounded-sm
                   bg-background-secondary border border-border-opaque py-3 min-h-[56px]
-                  hover:bg-background-tertiary transition-base cursor-pointer
+                  hover:bg-background-tertiary cursor-pointer
+                  transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                  active:scale-95
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
                 {icon}

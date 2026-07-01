@@ -7,6 +7,11 @@ import { WalletIcon, BookingIcon } from "@/components/ds/Icon";
 import { walletApi } from "@/lib/api/wallet";
 import { FareDisplay } from "@/components/ds";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { WordRotate } from "@/components/ui/word-rotate";
 import type { Wallet, WalletTransaction } from "@/lib/api/types";
 
 const PRESETS = [10000, 50000, 100000]; // paise
@@ -61,36 +66,47 @@ export default function WalletPage() {
   }, [loadTxns]);
 
   return (
-    <AccountScaffold title="Wallet">
+    <AccountScaffold title={<WordRotate words={["Wallet", "Balance", "Payments"]} duration={3000} />}>
       {/* Balance card */}
       {wallet === null ? (
         <Shimmer className="h-32 w-full" />
       ) : wallet === "error" ? (
         <ErrorState message="Could not load wallet." onRetry={loadWallet} />
       ) : (
-        <div className="rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 p-5">
+        <BlurFade className="relative rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 p-5 shadow-lg overflow-hidden">
+          <BorderBeam size={120} duration={8} colorFrom="#ffffff" colorTo="rgba(255,255,255,0.1)" borderWidth={2} />
           <div className="flex items-center justify-between">
             <p className="text-xs text-white/80">Wallet Balance</p>
             <WalletIcon size={22} className="text-white/80" />
           </div>
-          <FareDisplay amount={wallet.balance_paise} size="lg" className="mt-2 block font-bold text-content-primary" />
+          <p className="mt-2 block text-3xl font-bold text-white tabular-nums">
+            ₹<NumberTicker value={wallet.balance_paise / 100} decimalPlaces={2} className="text-white" />
+          </p>
           {wallet.locked_paise > 0 && (
-            <span className="mt-3 inline-block rounded-lg bg-black/20 px-2.5 py-1 text-xs text-content-primary">
-              🔒 <FareDisplay amount={wallet.locked_paise} size="sm" /> locked
+            <span className="mt-3 inline-block rounded-lg bg-black/20 px-2.5 py-1 text-xs text-white/80">
+              <NumberTicker value={wallet.locked_paise / 100} decimalPlaces={2} className="text-white/80" /> locked
             </span>
           )}
-        </div>
+        </BlurFade>
       )}
 
-      <button
-        onClick={() => setShowAdd(true)}
-        className="mt-3 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text"
-      >
-        + Add Money
-      </button>
+      <BlurFade delay={0.1}>
+        <ShimmerButton
+          type="button"
+          onClick={() => setShowAdd(true)}
+          shimmerColor="rgba(255,255,255,0.3)"
+          background="#1a5cff"
+          borderRadius="16px"
+          className="mt-3 py-3.5 text-sm font-bold"
+        >
+          + Add Money
+        </ShimmerButton>
+      </BlurFade>
 
       {/* Transactions */}
-      <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Transactions</h2>
+      <BlurFade delay={0.15}>
+        <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Transactions</h2>
+      </BlurFade>
       {txns.length === 0 && loadingMore ? (
         <SkeletonList rows={5} height="h-16" />
       ) : txns.length === 0 && txError ? (
@@ -99,10 +115,11 @@ export default function WalletPage() {
         <EmptyState icon={<BookingIcon size={28} />} title="No transactions yet" message="Add money to get started." />
       ) : (
         <div className="space-y-2">
-          {txns.map((t) => {
+          {txns.map((t, i) => {
             const credit = t.amount_paise >= 0;
             return (
-              <div key={t.id} className="flex items-center gap-3 rounded-xl bg-background-secondary p-3">
+              <BlurFade key={t.id} delay={0.2 + i * 0.03} inView inViewMargin="-20px">
+              <div className="flex items-center gap-3 rounded-xl bg-background-secondary p-3">
                 <div
                   className={`flex h-9 w-9 items-center justify-center rounded-full text-sm ${
                     credit ? "bg-surface-positive text-content-positive" : "bg-surface-negative text-content-negative"
@@ -121,6 +138,7 @@ export default function WalletPage() {
                   <FareDisplay amount={Math.abs(t.amount_paise)} size="md" />
                 </p>
               </div>
+            </BlurFade>
             );
           })}
           <div ref={sentinelRef} className="h-8" />
@@ -163,7 +181,7 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-background-secondary p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl bg-background-secondary p-6 animate-spring-up" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
 
         {phase === "amount" && (
@@ -195,13 +213,17 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
                 className="flex-1 bg-transparent py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary"
               />
             </div>
-            <button
-              onClick={pay}
+            <ShimmerButton
+              type="button"
               disabled={paise <= 0}
-              className="mt-5 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40"
+              onClick={pay}
+              shimmerColor="rgba(255,255,255,0.3)"
+              background="#1a5cff"
+              borderRadius="16px"
+              className="py-4 text-base font-bold disabled:opacity-40"
             >
               Add {formatCurrency(paise > 0 ? paise : 0)}
-            </button>
+            </ShimmerButton>
           </>
         )}
 

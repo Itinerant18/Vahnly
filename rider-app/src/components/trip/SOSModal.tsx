@@ -25,8 +25,8 @@ export function SOSModal({ onClose }: SOSModalProps) {
 
   if (phase === "active") {
     return (
-      <div role="alert" aria-live="assertive" className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface-negative backdrop-blur-sm">
-        <div className="mx-6 w-full max-w-sm rounded-2xl bg-background-secondary p-6 ring-2 ring-negative-400">
+      <div role="alert" aria-live="assertive" className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface-negative/95 backdrop-blur-sm">
+        <div className="mx-6 w-full max-w-sm rounded-2xl bg-background-secondary p-6 ring-2 ring-negative-400 animate-spring-up">
           <div className="mb-4 flex items-center justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-negative ring-2 ring-negative-400 animate-pulse">
               <SirenIcon size={32} className="text-content-negative" />
@@ -48,8 +48,8 @@ export function SOSModal({ onClose }: SOSModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-background-secondary p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
+        <div className="w-full rounded-t-3xl bg-background-secondary p-6 animate-spring-up" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-white/20" />
         <div className="mb-5 mt-3 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-negative">

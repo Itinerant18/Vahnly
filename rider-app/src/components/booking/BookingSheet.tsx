@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useBookingStore } from "@/lib/store/bookingStore";
 import { useToastStore } from "@/lib/store/useToastStore";
@@ -11,6 +11,12 @@ import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
 import { CrossIcon, PinIcon, CarIcon, FlameIcon, CheckIcon } from "@/components/ds/Icon";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { AnimatedBeam } from "@/components/ui/animated-beam";
+import { CoolMode } from "@/components/ui/cool-mode";
+import { RainbowButton } from "@/components/ui/rainbow-button";
 import type { GarageCar, LocationPoint, PaymentMethod, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
@@ -71,13 +77,14 @@ function defaultSlot(openH: number, closeH: number) {
 }
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
-function Section({ children }: { children: React.ReactNode }) {
+const Section = forwardRef<HTMLDivElement, { children: React.ReactNode }>(({ children }, ref) => {
   return (
-    <div className="border-b border-border-opaque px-4 py-3">
+    <div ref={ref} className="border-b border-border-opaque px-4 py-3">
       {children}
     </div>
   );
-}
+});
+Section.displayName = "Section";
 
 // ── Shimmer: exact same width as the loaded fare strip ────────────────────────
 function FareShimmer() {
@@ -107,11 +114,13 @@ function Chip({
       type="button"
       onClick={onClick}
       className={[
-        "flex-shrink-0 rounded-pill px-4 py-1.5 text-label-medium transition-base cursor-pointer",
+        "flex-shrink-0 rounded-pill px-4 py-1.5 text-label-medium cursor-pointer",
+        "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+        "active:scale-95",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
         active
-          ? "bg-background-inverse text-content-inverse"
-          : "bg-background-secondary text-content-secondary border border-border-opaque hover:text-content-primary",
+          ? "bg-background-inverse text-content-inverse shadow-elevation-2"
+          : "bg-background-secondary text-content-secondary border border-border-opaque hover:text-content-primary hover:bg-background-tertiary",
       ].join(" ")}
     >
       {children}
@@ -253,6 +262,11 @@ export function BookingSheet() {
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "err">("idle");
   const [bookingState, setBookingState] = useState<"idle" | "loading">("idle");
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const bookingFormRef = useRef<HTMLDivElement>(null);
+  const tripTypeRef = useRef<HTMLDivElement>(null);
+  const pickupRef = useRef<HTMLDivElement>(null);
+  const dropoffRef = useRef<HTMLDivElement>(null);
 
   // City config drives the picker's hours + which tiers are offered. Defaults hold
   // until the fetch resolves, and on any failure.
@@ -412,10 +426,36 @@ export function BookingSheet() {
         </div>
 
         {/* Scrollable booking form */}
-        <div className="flex-1 overflow-y-auto overscroll-contain pb-44">
+        <div ref={bookingFormRef} className="relative flex-1 overflow-y-auto overscroll-contain pb-44">
+
+          <AnimatedBeam
+            containerRef={bookingFormRef}
+            fromRef={tripTypeRef}
+            toRef={pickupRef}
+            curvature={-30}
+            duration={6}
+            pathColor="#4A6FA5"
+            pathWidth={2}
+            pathOpacity={0.12}
+            gradientStartColor="#4A6FA5"
+            gradientStopColor="#1a5cff"
+          />
+          <AnimatedBeam
+            containerRef={bookingFormRef}
+            fromRef={pickupRef}
+            toRef={dropoffRef}
+            curvature={-30}
+            duration={6}
+            pathColor="#4A6FA5"
+            pathWidth={2}
+            pathOpacity={0.12}
+            gradientStartColor="#4A6FA5"
+            gradientStopColor="#1a5cff"
+            reverse
+          />
 
           {/* [1] Trip Type Selector */}
-          <Section>
+          <Section ref={tripTypeRef}>
             <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
               {tripTypes.map((t) => (
                 <Chip key={t.value} active={tripType === t.value} onClick={() => setTripType(t.value)}>
@@ -426,7 +466,7 @@ export function BookingSheet() {
           </Section>
 
           {/* [2] Pickup — current location prefilled by home page; type to search */}
-          <Section>
+          <Section ref={pickupRef}>
             <PlaceInput
               value={pickup?.address ?? ""}
               placeholder="Pickup location"
@@ -438,7 +478,7 @@ export function BookingSheet() {
 
           {/* [3] Drop — hidden for Round Trip */}
           {needsDrop && (
-            <Section>
+            <Section ref={dropoffRef}>
               <PlaceInput
                 value={dropoff?.address ?? ""}
                 placeholder="Where to?"
@@ -614,7 +654,8 @@ export function BookingSheet() {
             {isSearching && !fareEstimate ? (
               <FareShimmer />
             ) : fareEstimate ? (
-              <div className="space-y-2">
+              <div className="relative space-y-2 overflow-hidden rounded-sm">
+                <BorderBeam size={60} duration={8} colorFrom="#1a5cff" colorTo="rgba(26,92,255,0.05)" borderWidth={1} delay={0.5} />
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2">
@@ -772,35 +813,31 @@ export function BookingSheet() {
                 {bookingError}
               </p>
             )}
-            <button
-              type="button"
-              disabled={!pickup || isMonthly || bookingState === "loading"}
-              onClick={onBook}
-              className="relative flex h-14 w-full items-center justify-center overflow-hidden
-                rounded-sm bg-interactive-primary text-interactive-primary-text
-                text-label-large font-medium
-                transition-base cursor-pointer
-                hover:opacity-90 active:scale-[0.99]
-                disabled:opacity-50 disabled:cursor-not-allowed
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
-              style={{
-                boxShadow: "0 4px 16px rgba(0,0,0,0.24)",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {bookingState === "loading" ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
-                  </svg>
-                  Finding drivers…
-                </span>
-              ) : isMonthly ? (
-                "Monthly — coming soon"
-              ) : (
-                "Book Driver"
-              )}
-            </button>
+            <CoolMode>
+              <RainbowButton
+                type="button"
+                disabled={!pickup || isMonthly || bookingState === "loading"}
+                onClick={onBook}
+                className="h-14 w-full text-label-large font-medium cursor-pointer
+                  shadow-[0_4px_16px_rgba(0,0,0,0.24)]
+                  active:scale-[0.99]
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
+              >
+                {bookingState === "loading" ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
+                    </svg>
+                    Finding drivers…
+                  </span>
+                ) : isMonthly ? (
+                  <span>Monthly — coming soon</span>
+                ) : (
+                  <span>Book Driver</span>
+                )}
+              </RainbowButton>
+            </CoolMode>
           </div>
         </div>
       </div>
@@ -812,10 +849,10 @@ export function BookingSheet() {
           onClick={() => setShowCarPicker(false)}
         >
           <div
-            className="rounded-t-lg bg-background-primary p-4 shadow-elevation-3"
+            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
             <h3 className="mb-3 text-heading-small text-content-primary">Select your car</h3>
             <div className="space-y-2">
               {cars.map((car) => (
@@ -860,10 +897,10 @@ export function BookingSheet() {
           onClick={() => setShowFareModal(false)}
         >
           <div
-            className="rounded-t-lg bg-background-primary p-4 shadow-elevation-3"
+            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
             <h3 className="mb-4 text-heading-medium text-content-primary">Fare breakdown</h3>
             <div className="space-y-3">
               {[
@@ -912,10 +949,10 @@ export function BookingSheet() {
           onClick={() => setShowD4mInfo(false)}
         >
           <div
-            className="rounded-t-lg bg-background-primary p-4 shadow-elevation-3"
+            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
             <h3 className="mb-2 text-heading-small text-content-primary">D4M Care — ₹49/trip</h3>
             <p className="text-paragraph-medium text-content-secondary">
               D4M Care provides accident insurance coverage during your trip — up to ₹1 lakh

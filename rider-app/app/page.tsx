@@ -84,7 +84,7 @@ export default function IndexPage() {
   }
 
   return (
-    <div className="bg-[#f8f9ff] text-[#0b1c30] relative min-h-screen overflow-x-hidden selection:bg-secondary selection:text-white flex flex-col font-sans">
+    <div className="bg-background-primary text-content-primary relative min-h-screen overflow-x-hidden selection:bg-secondary selection:text-white flex flex-col font-sans">
       {/* Background Shader & Overlay Grid */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 w-full h-full opacity-60">
@@ -115,13 +115,13 @@ export default function IndexPage() {
             <Link href="#" className="text-sm text-secondary font-bold border-b-2 border-secondary pb-0.5 hover:opacity-90 transition-all">
               Fleet
             </Link>
-            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+            <Link href="#" className="text-sm text-content-secondary hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
               Services
             </Link>
-            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+            <Link href="#" className="text-sm text-content-secondary hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
               Safety
             </Link>
-            <Link href="#" className="text-sm text-[#45474b] hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
+            <Link href="#" className="text-sm text-content-secondary hover:text-secondary hover:bg-slate-100/50 px-2 py-1 rounded transition-all duration-300">
               Business
             </Link>
           </div> */}
@@ -144,12 +144,12 @@ export default function IndexPage() {
             <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
             Verified Professional Driver Dispatch
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#0b1c30] mb-6 tracking-tight leading-tight">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-content-primary mb-6 tracking-tight leading-tight">
             Hire a Professional <br className="hidden md:block" />
             <span className="text-black">Driver</span> <br className="hidden md:block" />
             <span className="text-secondary bg-clip-text">For Your Own Car</span>
           </h1>
-          <p className="text-base md:text-lg text-[#45474b] mb-10 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base md:text-lg text-content-secondary mb-10 max-w-2xl mx-auto leading-relaxed">
             Vahnly provides a premium, safe, and dynamic ride matching ecosystem. Connect instantly with verified, highly trained independent drivers to navigate your car, whether for daily commutes, road trips, or late-night events.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -173,8 +173,8 @@ export default function IndexPage() {
                 <ShieldIcon size={24} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Verified Drivers</h3>
-                <p className="text-sm text-[#45474b] leading-relaxed">
+                <h3 className="font-bold text-content-primary text-lg mb-2">Verified Drivers</h3>
+                <p className="text-sm text-content-secondary leading-relaxed">
                   Every driver undergoes rigorous background verification, identity matching, and driving assessments to guarantee your absolute safety and peace of mind on every journey.
                 </p>
               </div>
@@ -186,8 +186,8 @@ export default function IndexPage() {
                 <BoltIcon size={24} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Instant Dispatch</h3>
-                <p className="text-sm text-[#45474b] leading-relaxed">
+                <h3 className="font-bold text-content-primary text-lg mb-2">Instant Dispatch</h3>
+                <p className="text-sm text-content-secondary leading-relaxed">
                   Our advanced matching algorithm pairs you with the closest qualified driver within minutes, minimizing wait times.
                 </p>
               </div>
@@ -199,8 +199,8 @@ export default function IndexPage() {
                 <WalletIcon size={24} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">Transparent Pricing</h3>
-                <p className="text-sm text-[#45474b] leading-relaxed">
+                <h3 className="font-bold text-content-primary text-lg mb-2">Transparent Pricing</h3>
+                <p className="text-sm text-content-secondary leading-relaxed">
                   Standardized fares calculated dynamically using precise distance routing, ensuring absolutely no hidden charges.
                 </p>
               </div>
@@ -212,8 +212,8 @@ export default function IndexPage() {
                 <HeadsetIcon size={28} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-bold text-[#0b1c30] text-lg mb-2">24/7 Premium Support</h3>
-                <p className="text-sm text-[#45474b] leading-relaxed">
+                <h3 className="font-bold text-content-primary text-lg mb-2">24/7 Premium Support</h3>
+                <p className="text-sm text-content-secondary leading-relaxed">
                   Dedicated concierge-level support available around the clock. Whether you need route adjustments or have special requests, our team is always ready to assist.
                 </p>
               </div>

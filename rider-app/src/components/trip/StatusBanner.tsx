@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { TripStatus } from "@/lib/api/types";
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 
 const CheckCircle = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -61,7 +62,9 @@ export function StatusBanner({ status }: { status: TripStatus | null }) {
   return (
     <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 ${cfg.cls}`}>
       {cfg.icon}
-      <span className="text-label-medium font-semibold">{cfg.label}</span>
+      <AnimatedShinyText shimmerWidth={60} className="!text-inherit !max-w-none">
+        {cfg.label}
+      </AnimatedShinyText>
     </div>
   );
 }

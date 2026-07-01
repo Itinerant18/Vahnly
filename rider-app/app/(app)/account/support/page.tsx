@@ -7,6 +7,12 @@ import { ordersApi } from "@/lib/api/orders";
 import { supportApi } from "@/lib/api/support";
 import { CarIcon, CardIcon, UserIcon, DocumentIcon, ShieldIcon, SuccessIcon, ChatIcon, PhoneIcon } from "@/components/ds/Icon";
 import type { Order, SupportTicket, SupportTicketMessage } from "@/lib/api/types";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { TypingAnimation } from "@/components/ui/typing-animation";
+import { ShineBorder } from "@/components/ui/shine-border";
+import { Highlighter } from "@/components/ui/highlighter";
 
 const CATEGORIES: { key: string; label: string; icon: React.ReactNode; needsTrip: boolean }[] = [
   { key: "trip", label: "Trip", icon: <CarIcon size={20} />, needsTrip: true },
@@ -203,7 +209,7 @@ function SupportBody() {
       <div>
         <button
           onClick={() => setOpenTicket(null)}
-          className="mb-4 flex items-center gap-1 text-sm font-semibold text-content-secondary"
+          className="mb-4 flex items-center gap-1 text-sm font-semibold text-content-secondary active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         >
           <span>←</span> Back to support
         </button>
@@ -315,24 +321,26 @@ function SupportBody() {
   return (
     <>
       {/* Category grid */}
-      <p className="mb-3 text-sm font-bold text-content-primary">What do you need help with?</p>
-      <div className="grid grid-cols-3 gap-3">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => {
-              setCategory(c.key);
-              setSelectedTrip(null);
-            }}
-            className={`flex flex-col items-center gap-2 rounded-2xl py-4 ${
-              category === c.key ? "bg-surface-accent ring-1 ring-border-accent" : "bg-background-secondary"
-            }`}
-          >
-            <span className="text-2xl">{c.icon}</span>
-            <span className="text-center text-xs text-content-secondary">{c.label}</span>
-          </button>
-        ))}
-      </div>
+      <BlurFade delay={0.1}>
+        <p className="mb-3 text-sm font-bold text-content-primary">What do you need help with?</p>
+        <div className="grid grid-cols-3 gap-3">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => {
+                setCategory(c.key);
+                setSelectedTrip(null);
+              }}
+              className={`flex flex-col items-center gap-2 rounded-2xl py-4 active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                category === c.key ? "bg-surface-accent ring-1 ring-border-accent" : "bg-background-secondary"
+              }`}
+            >
+              <span className="text-2xl">{c.icon}</span>
+              <span className="text-center text-xs text-content-secondary">{c.label}</span>
+            </button>
+          ))}
+        </div>
+      </BlurFade>
 
       {/* Trip selector */}
       {needsTrip && (
@@ -376,34 +384,40 @@ function SupportBody() {
             placeholder="Tell us what happened…"
             className="w-full resize-none rounded-xl bg-background-tertiary p-4 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent"
           />
-          <button
-            onClick={submit}
+          <ShimmerButton
+            type="button"
             disabled={!canSubmit || submitting}
-            className="mt-3 w-full rounded-2xl bg-interactive-primary py-3.5 text-sm font-bold text-interactive-primary-text disabled:opacity-40"
+            onClick={submit}
+            shimmerColor="rgba(255,255,255,0.3)"
+            background="#1a5cff"
+            borderRadius="16px"
+            className="mt-3 py-3.5 text-sm font-bold disabled:opacity-40"
           >
             {submitting ? "Submitting…" : "Submit Ticket"}
-          </button>
+          </ShimmerButton>
           {submitError && <p className="mt-2 text-sm text-content-negative">{submitError}</p>}
         </div>
       )}
 
       {/* Quick contact */}
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button
-          onClick={chatAvailable ? startChat : undefined}
-          disabled={!chatAvailable}
-          className="rounded-2xl bg-background-secondary py-4 text-sm font-semibold text-content-primary disabled:opacity-40"
-        >
-          <ChatIcon size={16} className="mr-1.5 inline-block" /> {chatAvailable ? "Start Live Chat" : "Live Chat"}
-        </button>
-        <a
-          href="tel:+918000000000"
-          className="rounded-2xl bg-background-secondary py-4 text-center text-sm font-semibold text-content-primary"
-        >
-          <PhoneIcon size={16} className="mr-1.5 inline-block" /> Call Support
-        </a>
-      </div>
-      <p className="mt-2 text-center text-xs text-content-tertiary">Chat available 9AM–9PM IST</p>
+      <BlurFade delay={0.2}>
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            onClick={chatAvailable ? startChat : undefined}
+            disabled={!chatAvailable}
+            className="rounded-2xl bg-background-secondary py-4 text-sm font-semibold text-content-primary disabled:opacity-40 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+          >
+            <ChatIcon size={16} className="mr-1.5 inline-block" /> {chatAvailable ? "Start Live Chat" : "Live Chat"}
+          </button>
+          <a
+            href="tel:+918000000000"
+            className="rounded-2xl bg-background-secondary py-4 text-center text-sm font-semibold text-content-primary active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+          >
+            <PhoneIcon size={16} className="mr-1.5 inline-block" /> Call Support
+          </a>
+        </div>
+        <p className="mt-2 text-center text-xs text-content-tertiary">Chat available 9AM–9PM IST</p>
+      </BlurFade>
 
       {/* Live chat stub */}
       {chatOpen && (
@@ -415,7 +429,7 @@ function SupportBody() {
                 setChatOpen(false);
                 setChatMessages([]);
               }}
-              className="text-xs font-semibold text-content-secondary"
+              className="text-xs font-semibold text-content-secondary active:scale-90 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Close
             </button>
@@ -433,50 +447,58 @@ function SupportBody() {
       )}
 
       {/* FAQ */}
-      <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">FAQ</h2>
-      <div className="space-y-2">
-        {FAQS.map((f, i) => (
-          <div key={i} className="overflow-hidden rounded-2xl bg-background-secondary">
-            <button
-              onClick={() => setFaqOpen(faqOpen === i ? null : i)}
-              className="flex w-full items-center justify-between p-4 text-left"
-            >
-              <span className="text-sm text-content-primary">{f.q}</span>
-              <span
-                className={`text-content-secondary transition-transform ${faqOpen === i ? "rotate-180" : ""}`}
+      <BlurFade delay={0.25}>
+        <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">FAQ</h2>
+        <div className="space-y-2">
+          {FAQS.map((f, i) => (
+            <div key={i} className="overflow-hidden rounded-2xl bg-background-secondary">
+              <button
+                onClick={() => setFaqOpen(faqOpen === i ? null : i)}
+                className="flex w-full items-center justify-between p-4 text-left active:scale-[0.99] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
               >
-                ▾
-              </span>
-            </button>
-            {faqOpen === i && <p className="px-4 pb-4 text-xs text-content-secondary">{f.a}</p>}
-          </div>
-        ))}
-      </div>
+                <span className="text-sm text-content-primary">{f.q}</span>
+                <span
+                  className={`text-content-secondary transition-transform ${faqOpen === i ? "rotate-180" : ""}`}
+                >
+                  ▾
+                </span>
+              </button>
+              {faqOpen === i && <p className="px-4 pb-4 text-xs text-content-secondary"><Highlighter color="#4A6FA5" action="underline" animationDuration={800}>{f.a}</Highlighter></p>}
+            </div>
+          ))}
+        </div>
+      </BlurFade>
 
       {/* Ticket history */}
-      <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Your Tickets</h2>
+      <BlurFade delay={0.3}>
+        <h2 className="mb-3 mt-6 text-sm font-bold text-content-primary">Your Tickets</h2>
+      </BlurFade>
       {tickets.length === 0 ? (
-        <p className="text-xs text-content-secondary">No tickets yet.</p>
+        <TypingAnimation className="text-xs text-content-secondary" duration={30} delay={400} startOnView={true}>
+          No tickets yet.
+        </TypingAnimation>
       ) : (
         <div className="space-y-2">
           {tickets.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => openThread(t)}
-              className="flex w-full items-center justify-between rounded-2xl bg-background-secondary p-4 text-left"
-            >
-              <div>
-                <p className="text-sm text-content-primary">{t.subject}</p>
-                <p className="font-mono text-xs text-content-tertiary">{t.id.slice(0, 12)}</p>
-              </div>
-              <span
-                className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${statusChipClass(
-                  t.status,
-                )}`}
+            <BlurFade key={t.id} delay={0.1}>
+              <button
+                onClick={() => openThread(t)}
+                className="group relative flex w-full items-center justify-between rounded-2xl bg-background-secondary p-4 overflow-hidden text-left active:scale-[0.99] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
               >
-                {t.status}
-              </span>
-            </button>
+                <ShineBorder borderWidth={1} duration={8} shineColor="#4A6FA5" className="opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div>
+                  <p className="text-sm text-content-primary">{t.subject}</p>
+                  <p className="font-mono text-xs text-content-tertiary">{t.id.slice(0, 12)}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${statusChipClass(
+                    t.status,
+                  )}`}
+                >
+                  {t.status}
+                </span>
+              </button>
+            </BlurFade>
           ))}
         </div>
       )}
@@ -486,7 +508,7 @@ function SupportBody() {
 
 export default function SupportPage() {
   return (
-    <AccountScaffold title="Support">
+    <AccountScaffold title={<WordRotate words={["Support", "Help Center", "Contact Us"]} duration={3000} />}>
       <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-background-tertiary" />}>
         <SupportBody />
       </Suspense>

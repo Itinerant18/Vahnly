@@ -9,6 +9,13 @@ import { apiClient, ApiError } from "@/lib/api/client";
 import { RiderStreamManager } from "@/lib/websocket/RiderStreamManager";
 import type { RiderWebSocketMessage } from "@/lib/websocket/types";
 import { FareDisplay } from "@/components/ds";
+import { Ripple } from "@/components/ui/ripple";
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { Particles } from "@/components/ui/particles";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { MorphingText } from "@/components/ui/morphing-text";
 
 type DispatchState = "BOOKING" | "SEARCHING" | "TIMEOUT";
 
@@ -29,29 +36,11 @@ interface AssignedDriver {
 const SEARCH_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 3_000;
 
-function RadarRing({ delay, size }: { delay: string; size: string }) {
-  return (
-    <div
-      className="absolute rounded-full border border-border-accent"
-      style={{
-        width: size,
-        height: size,
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        animation: `ping 2s ${delay} ease-out infinite`,
-      }}
-    />
-  );
-}
-
 function RadarAnimation() {
   return (
     <div className="relative flex h-48 w-48 items-center justify-center">
-      <RadarRing delay="0s" size="192px" />
-      <RadarRing delay="0.5s" size="148px" />
-      <RadarRing delay="1s" size="104px" />
-      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-surface-accent ring-2 ring-border-accent">
+      <Ripple mainCircleSize={90} mainCircleOpacity={0.2} numCircles={5} />
+      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-surface-accent ring-2 ring-border-accent glow-accent">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="var(--accent-400)" strokeWidth="1.5" />
           <path d="M12 7v5l3 3" stroke="var(--accent-400)" strokeWidth="1.5" strokeLinecap="round" />
@@ -97,8 +86,8 @@ function DriverAssignedModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60">
-      <div className="w-full rounded-t-2xl bg-background-primary p-6 shadow-elevation-3">
-        <div className="mx-auto mb-4 h-1 w-9 rounded-pill bg-border-opaque" />
+      <div className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
 
         <p className="text-center text-sm font-medium text-content-accent">Driver assigned</p>
 
@@ -148,13 +137,16 @@ function DriverAssignedModal({
           >
             Call
           </a>
-          <button
+          <ShimmerButton
             type="button"
             onClick={onGoToTrip}
-            className="h-12 flex-[2] rounded-2xl bg-interactive-primary text-base font-bold text-interactive-primary-text shadow-elevation-2"
+            shimmerColor="rgba(255,255,255,0.3)"
+            background="#1a5cff"
+            borderRadius="16px"
+            className="h-12 flex-[2] text-base font-bold shadow-elevation-2"
           >
             Go to trip
-          </button>
+          </ShimmerButton>
         </div>
         <div className="h-4" />
       </div>
@@ -344,20 +336,29 @@ function DispatchContent() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background-primary px-6">
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-background-primary px-6 overflow-hidden">
+      <Particles className="absolute inset-0 z-0" quantity={30} color="#4A6FA5" size={0.3} staticity={30} />
+      <div className="relative z-10 flex w-full flex-col items-center">
       {state === "BOOKING" && (
-        <div className="flex flex-col items-center gap-6 text-center">
+        <BlurFade className="flex flex-col items-center gap-6 text-center">
           <div className="h-16 w-16 animate-pulse rounded-full bg-surface-accent ring-2 ring-border-accent" />
           <p className="text-content-secondary">Preparing your booking…</p>
-        </div>
+        </BlurFade>
       )}
 
       {state === "SEARCHING" && (
-        <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
+        <BlurFade className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
           <RadarAnimation />
 
           <div>
-            <h1 className="text-xl font-bold text-content-primary">Finding a driver near you…</h1>
+            <MorphingText
+              texts={[
+                "Finding a driver near you…",
+                "Scanning nearby drivers…",
+                "Matching with the best…",
+              ]}
+              className="h-8 text-xl font-bold leading-none text-content-primary"
+            />
             <p className="mt-1 text-sm text-content-secondary">Usually takes 30–60 seconds</p>
           </div>
 
@@ -392,11 +393,11 @@ function DispatchContent() {
           {remainingSecs <= 30 && (
             <p className="text-xs text-content-secondary">Cancellation fee may apply</p>
           )}
-        </div>
+        </BlurFade>
       )}
 
       {state === "TIMEOUT" && (
-        <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
+        <BlurFade className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-background-tertiary">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="var(--negative-400)" strokeWidth="1.5" />
@@ -404,9 +405,18 @@ function DispatchContent() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-content-primary">
-              {dispatchDown ? "We're having trouble right now" : "No drivers available"}
-            </h1>
+            {dispatchDown ? (
+              <h1 className="text-xl font-bold text-content-primary">We&apos;re having trouble right now</h1>
+            ) : (
+              <MorphingText
+                texts={[
+                  "No drivers available",
+                  "All drivers busy",
+                  "Try again soon",
+                ]}
+                className="h-8 text-xl font-bold leading-none text-content-primary"
+              />
+            )}
             <p className="mt-1 text-sm text-content-secondary">
               {dispatchDown
                 ? "We're having trouble finding a driver right now. Please try again or contact support."
@@ -415,12 +425,16 @@ function DispatchContent() {
           </div>
 
           <div className="flex w-full flex-col gap-3">
-            <button
+            <ShimmerButton
+              type="button"
               onClick={handleTryAgain}
-              className="h-14 w-full rounded-2xl bg-interactive-primary text-base font-bold text-interactive-primary-text shadow-elevation-2"
+              shimmerColor="rgba(255,255,255,0.3)"
+              background="#1a5cff"
+              borderRadius="16px"
+              className="h-14 w-full text-base font-bold shadow-elevation-2"
             >
               Try Again
-            </button>
+            </ShimmerButton>
             {/* Radius/scheduling can't help when dispatch itself is down — hide them. */}
             {!dispatchDown && (
               <>
@@ -445,12 +459,13 @@ function DispatchContent() {
               Go Back
             </button>
           </div>
-        </div>
+        </BlurFade>
       )}
 
       {assignedDriver && (
         <DriverAssignedModal driver={assignedDriver} onGoToTrip={goLive} />
       )}
+      </div>
     </main>
   );
 }

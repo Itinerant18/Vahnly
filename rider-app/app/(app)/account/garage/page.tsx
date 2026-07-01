@@ -7,6 +7,8 @@ import { SuccessIcon, CameraIcon } from "@/components/ds/Icon";
 import { garageApi, type GarageCarInput } from "@/lib/api/garage";
 import type { CarType, GarageCar, Transmission } from "@/lib/api/types";
 import { compressImage } from "@/lib/utils/imageCompress";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
 
 import { AnimatedIcon, StarIcon, WarningIcon, CarIcon } from "@/components/ds/Icon";
 import { AnimCar } from "@/assets/icons/animated";
@@ -94,20 +96,20 @@ function CarCard({
           </div>
           <p className="mb-3 text-xs text-content-tertiary">Plate: {car.registration_plate}</p>
           <div className="flex gap-2">
-            <button onClick={onEdit} className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary">
+            <button onClick={onEdit} className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-primary active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
               Edit
             </button>
             {!car.is_default && (
               <button
                 onClick={onSetDefault}
-                className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent"
+                className="flex-1 rounded-xl bg-background-tertiary py-2.5 text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
               >
                 Set Default
               </button>
             )}
             <button
               onClick={onDelete}
-              className="flex-1 rounded-xl bg-surface-negative py-2.5 text-xs font-semibold text-content-negative"
+              className="flex-1 rounded-xl bg-surface-negative py-2.5 text-xs font-semibold text-content-negative active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             >
               Delete
             </button>
@@ -157,43 +159,46 @@ export default function GaragePage() {
   };
 
   return (
-    <AccountScaffold title="My Garage">
-      {error ? (
-        <ErrorState onRetry={load} />
-      ) : cars === null ? (
-        <SkeletonList rows={3} />
-      ) : cars.length === 0 ? (
-        <EmptyState
-          icon={<AnimatedIcon src={AnimCar} size={64} trigger="in" colors="primary:#1A73E8,secondary:#FF6B35" />}
-          title="No cars yet"
-          message="Add the car you want a driver for."
-          action={
-            <button
-              onClick={() => setShowForm(true)}
-              className="rounded-xl bg-interactive-primary px-5 py-2.5 text-sm font-bold text-interactive-primary-text"
-            >
-              Add Car
-            </button>
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {cars.map((car) => (
-            <CarCard
-              key={car.id}
-              car={car}
-              onEdit={() => setEditing(car)}
-              onDelete={() => handleDelete(car.id)}
-              onSetDefault={() => handleSetDefault(car.id)}
-            />
-          ))}
-        </div>
-      )}
+    <AccountScaffold title={<WordRotate words={["My Garage", "My Cars", "Vehicle Fleet"]} duration={3000} />}>
+      <BlurFade delay={0.1}>
+        {error ? (
+          <ErrorState onRetry={load} />
+        ) : cars === null ? (
+          <SkeletonList rows={3} />
+        ) : cars.length === 0 ? (
+          <EmptyState
+            icon={<AnimatedIcon src={AnimCar} size={64} trigger="in" colors="primary:#1A73E8,secondary:#FF6B35" />}
+            title="No cars yet"
+            message="Add the car you want a driver for."
+            action={
+              <button
+                onClick={() => setShowForm(true)}
+                className="rounded-xl bg-interactive-primary px-5 py-2.5 text-sm font-bold text-interactive-primary-text active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              >
+                Add Car
+              </button>
+            }
+          />
+        ) : (
+          <div className="space-y-3">
+            {cars.map((car) => (
+              <BlurFade key={car.id} delay={0.1}>
+                <CarCard
+                  car={car}
+                  onEdit={() => setEditing(car)}
+                  onDelete={() => handleDelete(car.id)}
+                  onSetDefault={() => handleSetDefault(car.id)}
+                />
+              </BlurFade>
+            ))}
+          </div>
+        )}
+      </BlurFade>
 
       {/* Add FAB */}
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-interactive-primary text-2xl text-interactive-primary-text shadow-elevation-2"
+        className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-interactive-primary text-2xl text-interactive-primary-text shadow-elevation-2 active:scale-90 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         aria-label="Add car"
       >
         +
@@ -365,7 +370,7 @@ function CarFormSheet({
         <button
           onClick={save}
           disabled={!valid || saving}
-          className="mt-5 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40"
+          className="mt-5 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         >
           {saving ? "Saving…" : car ? "Save Changes" : "Add Car"}
         </button>

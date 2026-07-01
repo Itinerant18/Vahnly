@@ -6,6 +6,10 @@ import { authApi } from "@/lib/api/auth";
 import { API_BASE_URL, TOKEN_STORAGE_KEY } from "@/lib/api/client";
 import { AccountScaffold } from "@/components/account/AccountScaffold";
 import { compressImage, blobToDataUrl } from "@/lib/utils/imageCompress";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { AvatarCircles } from "@/components/ui/avatar-circles";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 const INPUT =
   "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none placeholder:text-content-tertiary focus:ring-1 focus:ring-border-accent";
@@ -148,160 +152,191 @@ export default function ProfilePage() {
   const initials = (name || "?").trim().slice(0, 1).toUpperCase();
 
   return (
-    <AccountScaffold title="Profile">
+    <AccountScaffold title={<WordRotate words={["Profile", "Personal Info", "My Details"]} duration={3000} />}>
       {/* Avatar */}
-      <div className="flex flex-col items-center">
-        <button
-          onClick={() => fileRef.current?.click()}
-          aria-label="Change profile photo"
-          className="relative h-24 w-24 overflow-hidden rounded-full bg-surface-accent"
-        >
-          {photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-content-accent">
-              {initials}
+      <BlurFade delay={0.1}>
+        <div className="flex flex-col items-center">
+          <button
+            onClick={() => fileRef.current?.click()}
+            aria-label="Change profile photo"
+            className="relative h-24 w-24 overflow-hidden rounded-full bg-surface-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+          >
+            {photo ? (
+              <PixelImage
+                src={photo}
+                grid="4x6"
+                pixelFadeInDuration={800}
+                maxAnimationDelay={600}
+                colorRevealDelay={900}
+              />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-content-accent">
+                {initials}
+              </span>
+            )}
+            <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent-400 text-sm ring-2 ring-background-primary">
+              ✎
             </span>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={handlePhoto}
+          />
+          {uploadPct !== null && (
+            <div className="mt-3 h-1.5 w-32 overflow-hidden rounded-full bg-background-tertiary">
+              <div className="h-full bg-accent-400 transition-all" style={{ width: `${uploadPct}%` }} />
+            </div>
           )}
-          <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent-400 text-sm ring-2 ring-background-primary">
-            ✎
-          </span>
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="user"
-          className="hidden"
-          onChange={handlePhoto}
-        />
-        {uploadPct !== null && (
-          <div className="mt-3 h-1.5 w-32 overflow-hidden rounded-full bg-background-tertiary">
-            <div className="h-full bg-accent-400 transition-all" style={{ width: `${uploadPct}%` }} />
-          </div>
-        )}
-      </div>
+        </div>
+      </BlurFade>
 
       {/* KYC banner */}
-      <div
-        className={`mt-5 flex items-center justify-between rounded-2xl p-4 ${
-          kycVerified ? "bg-surface-positive" : "bg-surface-accent"
-        }`}
-      >
-        <div>
-          <p className={`text-sm font-semibold ${kycVerified ? "text-content-positive" : "text-content-accent"}`}>
-            {kycVerified ? "KYC Verified" : "Identity not verified"}
-          </p>
-          <p className="text-xs text-content-secondary">Level: {rider?.kyc_level ?? "NONE"}</p>
+      <BlurFade delay={0.2}>
+        <div
+          className={`mt-5 flex items-center justify-between rounded-2xl p-4 ${
+            kycVerified ? "bg-surface-positive" : "bg-surface-accent"
+          }`}
+        >
+          <div>
+            <p className={`text-sm font-semibold ${kycVerified ? "text-content-positive" : "text-content-accent"}`}>
+              {kycVerified ? "KYC Verified" : "Identity not verified"}
+            </p>
+            <p className="text-xs text-content-secondary">Level: {rider?.kyc_level ?? "NONE"}</p>
+          </div>
+          {!kycVerified && (
+            <button className="rounded-xl bg-interactive-primary px-4 py-2 text-xs font-semibold text-interactive-primary-text active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]">
+              Get Verified
+            </button>
+          )}
         </div>
-        {!kycVerified && (
-          <button className="rounded-xl bg-interactive-primary px-4 py-2 text-xs font-semibold text-interactive-primary-text">
-            Get Verified
-          </button>
-        )}
-      </div>
+      </BlurFade>
+
+      {/* Connected accounts */}
+      <BlurFade delay={0.25}>
+        <div className="mt-5 flex items-center justify-between rounded-2xl bg-background-secondary p-4">
+          <div>
+            <p className="text-sm font-semibold text-content-primary">Connected Accounts</p>
+            <p className="text-xs text-content-secondary">Google, Apple & Email</p>
+          </div>
+          <AvatarCircles
+            avatarUrls={[
+              { imageUrl: "https://ui-avatars.com/api/?name=G&background=4A6FA5&color=fff", profileUrl: "#" },
+              { imageUrl: "https://ui-avatars.com/api/?name=A&background=1a5cff&color=fff", profileUrl: "#" },
+              { imageUrl: "https://ui-avatars.com/api/?name=E&background=6B8EC4&color=fff", profileUrl: "#" },
+            ]}
+            numPeople={1}
+          />
+        </div>
+      </BlurFade>
 
       {/* Fields */}
-      <div className="mt-5 space-y-4">
-        <Field label="Name">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={(e) => onBlur("name", e.target.value)}
-            className={INPUT}
-            placeholder="Full name"
-          />
-          {errors.name && <FieldError msg={errors.name} />}
-        </Field>
-
-        <Field label="Email">
-          <div className="flex gap-2">
+      <BlurFade delay={0.3}>
+        <div className="mt-5 space-y-4">
+          <Field label="Name">
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={(e) => onBlur("email", e.target.value)}
-              className={`${INPUT} flex-1`}
-              placeholder="you@example.com"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={(e) => onBlur("name", e.target.value)}
+              className={INPUT}
+              placeholder="Full name"
             />
-            {email && !rider?.email_verified && (
+            {errors.name && <FieldError msg={errors.name} />}
+          </Field>
+
+          <Field label="Email">
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={(e) => onBlur("email", e.target.value)}
+                className={`${INPUT} flex-1`}
+                placeholder="you@example.com"
+              />
+              {email && !rider?.email_verified && (
+                <button
+                  onClick={() => setEmailOtpSent(true)}
+                  className="whitespace-nowrap rounded-xl bg-background-tertiary px-3 text-xs font-semibold text-content-accent ring-1 ring-border-opaque active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                >
+                  {emailOtpSent ? "OTP Sent" : "Verify"}
+                </button>
+              )}
+            </div>
+            {errors.email && <FieldError msg={errors.email} />}
+            {rider?.email_verified && <p className="mt-1 text-xs text-content-positive">✓ Verified</p>}
+          </Field>
+
+          <Field label="Date of Birth">
+            <input
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              onBlur={(e) => onBlur("dob", e.target.value)}
+              className={INPUT}
+            />
+            {errors.dob && <FieldError msg={errors.dob} />}
+          </Field>
+
+          <Field label="Gender">
+            <div className="flex flex-wrap gap-2">
+              {GENDERS.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setGender(g)}
+                  className={`rounded-xl px-3.5 py-2 text-sm active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                    gender === g ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Language">
+            <div className="flex gap-2">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLang(l.code)}
+                  className={`flex-1 rounded-xl py-2.5 text-sm active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                    lang === l.code ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Phone">
+            <div className="flex items-center justify-between rounded-xl bg-background-tertiary px-4 py-3">
+              <span className="text-sm text-content-primary">{rider?.phone}</span>
               <button
-                onClick={() => setEmailOtpSent(true)}
-                className="whitespace-nowrap rounded-xl bg-background-tertiary px-3 text-xs font-semibold text-content-accent ring-1 ring-border-opaque"
+                onClick={() => setShowPhoneFlow(true)}
+                className="text-xs font-semibold text-content-accent active:scale-95 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
               >
-                {emailOtpSent ? "OTP Sent" : "Verify"}
+                Change
               </button>
-            )}
-          </div>
-          {errors.email && <FieldError msg={errors.email} />}
-          {rider?.email_verified && <p className="mt-1 text-xs text-content-positive">✓ Verified</p>}
-        </Field>
-
-        <Field label="Date of Birth">
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            onBlur={(e) => onBlur("dob", e.target.value)}
-            className={INPUT}
-          />
-          {errors.dob && <FieldError msg={errors.dob} />}
-        </Field>
-
-        <Field label="Gender">
-          <div className="flex flex-wrap gap-2">
-            {GENDERS.map((g) => (
-              <button
-                key={g}
-                onClick={() => setGender(g)}
-                className={`rounded-xl px-3.5 py-2 text-sm ${
-                  gender === g ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="Language">
-          <div className="flex gap-2">
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                className={`flex-1 rounded-xl py-2.5 text-sm ${
-                  lang === l.code ? "bg-accent-400 text-content-primary" : "bg-background-tertiary text-content-secondary"
-                }`}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="Phone">
-          <div className="flex items-center justify-between rounded-xl bg-background-tertiary px-4 py-3">
-            <span className="text-sm text-content-primary">{rider?.phone}</span>
-            <button
-              onClick={() => setShowPhoneFlow(true)}
-              className="text-xs font-semibold text-content-accent"
-            >
-              Change
-            </button>
-          </div>
-        </Field>
-      </div>
+            </div>
+          </Field>
+        </div>
+      </BlurFade>
 
       {/* Save */}
-      <button
-        onClick={handleSave}
-        disabled={!canSave || saving}
-        className="mt-6 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40"
-      >
-        {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
-      </button>
+      <BlurFade delay={0.4}>
+        <button
+          onClick={handleSave}
+          disabled={!canSave || saving}
+          className="mt-6 w-full rounded-2xl bg-interactive-primary py-4 text-base font-bold text-interactive-primary-text disabled:opacity-40 active:scale-[0.98] transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+        >
+          {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
+        </button>
+      </BlurFade>
 
       {showPhoneFlow && (
         <PhoneChangeSheet phone={rider?.phone ?? ""} onClose={() => setShowPhoneFlow(false)} />
