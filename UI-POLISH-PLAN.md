@@ -5,6 +5,7 @@
 **Files:** `home/page.tsx`, `RiderMap.tsx`, `TopBar.tsx` + marquee
 
 ### Issues
+
 - Marquee `top: 64px` hardcoded to TopBar height — brittle
 - RiderMap receives `pickup`/`dropoff` props but never renders them (dead props)
 - Recenter FAB `bottom-[136px]` hardcoded to BookingSheet peek height
@@ -34,6 +35,7 @@
 **Files:** `BookingSheet.tsx`, `dispatch/page.tsx`
 
 ### Issues
+
 - Two duplicate `garageApi.list()` calls on mount
 - "Monthly — coming soon" is selectable but disabled — misleading
 - "Add Stop" button does nothing (placeholder)
@@ -65,6 +67,7 @@
 **Files:** `trip/live/page.tsx` → `LiveTripView.tsx` (778 lines)
 
 ### Issues
+
 - DriverCard Chat button shows "coming soon" toast but chat panel below is fully functional — confusing
 - Two simultaneous `BorderBeam` components (status banner + fare strip) — visual busyness
 - `WaitingMeter` timer resets on remount, doesn't track server-side start time
@@ -94,6 +97,7 @@
 **Files:** `trip/bill/page.tsx`
 
 ### Issues
+
 - "Mark as Paid" for Cash has no confirmation step — one tap books it
 - UPI payment is purely optimistic (800ms timeout, no verification)
 - Wallet payment has hardcoded 1200ms artificial delay
@@ -124,6 +128,7 @@
 **Files:** `trip/rate/page.tsx`
 
 ### Issues
+
 - No back button — only "Skip" which goes to `/home`
 - Unicode ★ characters instead of styled SVG stars (rendering varies by platform)
 - Tags are polarity-exclusive (4-star user can't also report "Rash Driving")
@@ -153,6 +158,7 @@
 **Files:** `trip/receipt/page.tsx`
 
 ### Issues
+
 - No animations — statically renders all content (inconsistent with bill page)
 - Fare details uses raw `<div>`+`<span>` markup instead of shared `<RowItem>` component
 - "Email Receipt" permanently disabled with no timeline
@@ -180,6 +186,7 @@
 **Files:** `account/page.tsx`
 
 ### Issues
+
 - Loyalty tier thresholds hardcoded (5/15 trips for Gold/Platinum)
 - Total spent uses `base_fare_paise` only — under-reports actual spend
 - Stats API uses `limit: 100` — inaccurate for power users
@@ -210,6 +217,7 @@
 **Files:** `login/page.tsx`
 
 ### Issues
+
 - Hero/card ratio `flex-1` vs `flex-[4]` pushes hero off-screen on large devices
 - OTP auto-advance skips fields on fast paste
 - Apple sign-in permanently disabled with no timeline

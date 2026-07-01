@@ -91,10 +91,10 @@ function FareShimmer() {
   return (
     <div className="flex items-center justify-between">
       <div className="space-y-1.5">
-        <div className="h-6 w-28 animate-pulse rounded-sm bg-gray-100" />
-        <div className="h-3.5 w-40 animate-pulse rounded-sm bg-gray-100" />
+        <div className="h-6 w-28 animate-pulse rounded-sm bg-surface-neutral" />
+        <div className="h-3.5 w-40 animate-pulse rounded-sm bg-surface-neutral" />
       </div>
-      <div className="h-5 w-12 animate-pulse rounded-sm bg-gray-100" />
+      <div className="h-5 w-12 animate-pulse rounded-sm bg-surface-neutral" />
     </div>
   );
 }
@@ -282,10 +282,10 @@ export function BookingSheet() {
     validatePromo, bookDriver, selectedCarId, setSelectedCar,
   } = useBookingStore();
 
-  // Fetch garage cars
+  // Fetch garage cars (single call, pick default car from result)
   useEffect(() => {
-    garageApi.list().then(setCars).catch(() => {});
     garageApi.list().then((list) => {
+      setCars(list);
       const def = list.find((c) => c.is_default);
       if (def && !selectedCarId) setSelectedCar(def.id, def.car_type);
     }).catch(() => {});
@@ -457,11 +457,35 @@ export function BookingSheet() {
           {/* [1] Trip Type Selector */}
           <Section ref={tripTypeRef}>
             <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-              {tripTypes.map((t) => (
-                <Chip key={t.value} active={tripType === t.value} onClick={() => setTripType(t.value)}>
-                  {t.label}
-                </Chip>
-              ))}
+              {tripTypes.map((t) => {
+                const disabled = t.value === "MONTHLY";
+                return (
+                  <div key={t.value} className="relative">
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setTripType(t.value)}
+                      className={[
+                        "flex-shrink-0 rounded-pill px-4 py-1.5 text-label-medium cursor-pointer",
+                        "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+                        "active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
+                        tripType === t.value
+                          ? "bg-background-inverse text-content-inverse shadow-elevation-2"
+                          : "bg-background-secondary text-content-secondary border border-border-opaque hover:text-content-primary hover:bg-background-tertiary",
+                        disabled && "opacity-40 cursor-not-allowed",
+                      ].join(" ")}
+                    >
+                      {t.label}
+                    </button>
+                    {disabled && (
+                      <span className="absolute -right-1 -top-1 rounded-full bg-surface-warning px-1.5 py-0.5 text-[9px] font-semibold text-content-warning leading-none">
+                        Soon
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
 
@@ -552,14 +576,14 @@ export function BookingSheet() {
                 <div className="flex items-center justify-between">
                   <span className="text-paragraph-medium text-content-primary">Duration</span>
                   <span className="font-mono text-mono-medium text-content-primary tabular-nums">
-                    {durationHours || 4}h
+                    {durationHours != null ? durationHours : 4}h
                   </span>
                 </div>
                 {/* Custom slider track */}
                 <div className="relative h-2 rounded-pill bg-background-tertiary">
                   <div
                     className="absolute left-0 top-0 h-full rounded-pill bg-background-inverse transition-all"
-                    style={{ width: `${(((durationHours || 4) - 1) / 11) * 100}%` }}
+                    style={{ width: `${(((durationHours ?? 4) - 1) / 11) * 100}%` }}
                   />
                 </div>
                 <input
@@ -567,7 +591,7 @@ export function BookingSheet() {
                   min={1}
                   max={12}
                   step={1}
-                  value={durationHours || 4}
+                  value={durationHours ?? 4}
                   onChange={(e) => setDurationHours(Number(e.target.value))}
                   className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
                   aria-label="Trip duration in hours"
@@ -770,7 +794,7 @@ export function BookingSheet() {
                 </span>
               )}
               {promoStatus === "err" && (
-                <span className="text-content-negative text-label-small">Invalid</span>
+                <span className="text-content-negative text-label-small" role="status">Invalid</span>
               )}
               <button
                 type="button"
@@ -847,6 +871,7 @@ export function BookingSheet() {
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
           onClick={() => setShowCarPicker(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowCarPicker(false); }}
         >
           <div
             className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
@@ -895,6 +920,10 @@ export function BookingSheet() {
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
           onClick={() => setShowFareModal(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowFareModal(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Fare breakdown"
         >
           <div
             className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
@@ -947,6 +976,10 @@ export function BookingSheet() {
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
           onClick={() => setShowD4mInfo(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowD4mInfo(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="D4M Care information"
         >
           <div
             className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"

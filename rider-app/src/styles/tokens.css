@@ -166,4 +166,12 @@
   /* Inverse */
   --background-inverse: var(--gray-1000);
   --content-inverse:    var(--gray-0);
+
+  /* ─────────────────────────────────────────────
+     LAYOUT METRICS
+     Single source of truth for fixed-height chrome so overlaying
+     components (marquee, FABs) can reference these without magic numbers.
+     ───────────────────────────────────────────── */
+  --topbar-height: 56px;        /* TopBar row height (py-3 + 32px content) */
+  --booking-peek-height: 120px; /* BookingSheet peek snap — visible content */
 }

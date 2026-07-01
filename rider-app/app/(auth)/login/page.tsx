@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/authStore";
 import { getGoogleIdToken } from "@/lib/googleAuth";
@@ -64,8 +64,20 @@ function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
     if (e.key === "Backspace" && !digits[i] && i > 0) refs.current[i - 1]?.focus();
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    e.preventDefault();
+    const next = [...digits];
+    for (let i = 0; i < pasted.length; i++) next[i] = pasted[i];
+    setDigits(next);
+    const focusIdx = Math.min(pasted.length, 5);
+    refs.current[focusIdx]?.focus();
+    if (next.every((d) => d !== "")) onComplete(next.join(""));
+  };
+
   return (
-    <div className="flex gap-2" role="group" aria-label="OTP code">
+    <div className="flex gap-2" role="group" aria-label="OTP code" onPaste={handlePaste}>
       {digits.map((d, i) => (
         <input
           key={i}
@@ -77,7 +89,7 @@ function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
           autoFocus={i === 0}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          className="h-14 w-10 rounded-sm border border-border-opaque bg-background-secondary
+          className="h-14 w-10 rounded-md border border-border-opaque bg-background-secondary
             text-center font-mono text-display-small text-content-primary
             caret-accent-400 outline-none
             focus:border-2 focus:border-border-accent
@@ -277,19 +289,22 @@ export default function LoginPage() {
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="flex-[4] bg-background-secondary rounded-t-lg shadow-elevation-3 px-6 pt-8 pb-safe-bottom overflow-y-auto"
+        className="flex-[3] bg-background-secondary rounded-t-lg shadow-elevation-3 px-6 pt-8 pb-safe-bottom overflow-y-auto"
       >
         {/* Error banner */}
         {error && (
-          <div className="mb-4 rounded-sm bg-surface-negative border border-negative-200 px-4 py-3">
+          <div className="mb-4 rounded-md bg-surface-negative border border-negative-200 px-4 py-3">
             <p className="text-paragraph-small text-content-negative">{error}</p>
           </div>
         )}
 
+        <AnimatePresence mode="wait">
         {step === "choose" && (
           <motion.div
+            key="choose"
             initial="hidden"
             animate="visible"
+            exit={{ opacity: 0, y: -12, transition: { duration: 0.15 } }}
             variants={{
               visible: { transition: { staggerChildren: 0.04 } },
             }}
@@ -300,11 +315,11 @@ export default function LoginPage() {
               variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
-            <div className="flex gap-1 rounded-sm border border-border-opaque bg-background-primary p-1">
+            <div className="flex gap-1 rounded-md border border-border-opaque bg-background-primary p-1">
               <button
                 type="button"
                 onClick={() => { setMode("login"); setError(""); }}
-                className={`flex-1 h-10 rounded-sm text-label-medium font-medium transition-base ${
+                className={`flex-1 h-10 rounded-md text-label-medium font-medium transition-base ${
                   mode === "login"
                     ? "bg-interactive-primary text-interactive-primary-text shadow-elevation-1"
                     : "text-content-secondary hover:text-content-primary"
@@ -315,7 +330,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setMode("signup"); setError(""); }}
-                className={`flex-1 h-10 rounded-sm text-label-medium font-medium transition-base ${
+                className={`flex-1 h-10 rounded-md text-label-medium font-medium transition-base ${
                   mode === "signup"
                     ? "bg-interactive-primary text-interactive-primary-text shadow-elevation-1"
                     : "text-content-secondary hover:text-content-primary"
@@ -335,12 +350,12 @@ export default function LoginPage() {
               >
                 <h2 className="text-heading-medium text-content-primary">Welcome back</h2>
                 <div className="flex gap-2">
-                  <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
+                  <div className="flex h-12 items-center gap-1.5 rounded-md border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
                     <span className="text-lg">🇮🇳</span>
                     <span className="text-label-medium text-content-primary">+91</span>
                   </div>
                   <input
-                    className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                    className="h-12 flex-1 rounded-md border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
                     placeholder="98765 43210"
                     inputMode="numeric"
                     type="tel"
@@ -350,7 +365,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <input
-                  className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+                  className="h-12 w-full rounded-md border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
                   placeholder="Password"
                   type="password"
                   value={loginPassword}
@@ -406,7 +421,7 @@ export default function LoginPage() {
                     Referral Code (optional)
                   </label>
                   <input
-                    className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary
+                    className="h-12 w-full rounded-md border border-border-opaque bg-background-primary
                       px-4 font-mono text-mono-small text-content-primary uppercase
                       placeholder:text-content-tertiary
                       outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400
@@ -440,7 +455,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                className="flex h-12 items-center justify-center gap-2 rounded-sm
+                className="flex h-12 items-center justify-center gap-2 rounded-md
                   bg-background-primary border border-border-opaque
                   text-label-medium text-content-primary
                   cursor-pointer hover:bg-background-secondary active:scale-[0.98] transition-base
@@ -457,7 +472,7 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                className="flex h-12 items-center justify-center gap-2 rounded-sm
+                className="flex h-12 items-center justify-center gap-2 rounded-md
                   bg-background-primary border border-border-opaque
                   text-label-medium text-content-primary
                   opacity-50 cursor-not-allowed relative"
@@ -478,8 +493,10 @@ export default function LoginPage() {
 
         {step === "google-register" && (
           <motion.div
+            key="google-register"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12, transition: { duration: 0.15 } }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="space-y-5"
           >
@@ -494,7 +511,7 @@ export default function LoginPage() {
             <div>
               <label className="text-label-small text-content-secondary block mb-1">Email</label>
               <input
-                className="h-12 w-full rounded-sm border border-border-opaque bg-background-tertiary
+                className="h-12 w-full rounded-md border border-border-opaque bg-background-tertiary
                   px-4 text-content-secondary cursor-not-allowed outline-none"
                 value={googleRegInfo?.email ?? ""}
                 disabled readOnly
@@ -505,7 +522,7 @@ export default function LoginPage() {
             <div>
               <label className="text-label-small text-content-secondary block mb-1">Full Name</label>
               <input
-                className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary
+                className="h-12 w-full rounded-md border border-border-opaque bg-background-primary
                   px-4 font-sans text-content-primary placeholder:text-content-tertiary
                   outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
                 placeholder="Full Name"
@@ -521,12 +538,12 @@ export default function LoginPage() {
             <div>
               <label className="text-label-small text-content-secondary block mb-1">Mobile Number</label>
               <div className="flex gap-2">
-                <div className="flex h-12 items-center gap-1.5 rounded-sm border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
+                <div className="flex h-12 items-center gap-1.5 rounded-md border border-border-opaque bg-background-tertiary px-3 flex-shrink-0">
                   <span className="text-lg">🇮🇳</span>
                   <span className="text-label-medium text-content-primary">+91</span>
                 </div>
                 <input
-                  className="h-12 flex-1 rounded-sm border border-border-opaque bg-background-primary
+                  className="h-12 flex-1 rounded-md border border-border-opaque bg-background-primary
                     px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary
                     outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
                   placeholder="98765 43210"
@@ -546,7 +563,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={sendGoogleOtp}
                   disabled={isLoading || googlePhone.length !== 10}
-                  className="mt-2 flex h-11 w-full items-center justify-center rounded-sm
+                  className="mt-2 flex h-11 w-full items-center justify-center rounded-md
                     border border-border-opaque bg-background-primary
                     text-label-medium text-content-primary
                     disabled:opacity-50 disabled:cursor-not-allowed
@@ -570,7 +587,7 @@ export default function LoginPage() {
                 Referral Code (optional)
               </label>
               <input
-                className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary
+                className="h-12 w-full rounded-md border border-border-opaque bg-background-primary
                   px-4 font-mono text-mono-small text-content-primary uppercase
                   placeholder:text-content-tertiary
                   outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
@@ -604,8 +621,10 @@ export default function LoginPage() {
 
         {step === "reset" && (
           <motion.div
+            key="reset"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12, transition: { duration: 0.15 } }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="space-y-5"
           >
@@ -616,7 +635,7 @@ export default function LoginPage() {
               </p>
             </div>
             <input
-              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              className="h-12 w-full rounded-md border border-border-opaque bg-background-primary px-4 font-mono text-mono-medium text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
               placeholder="6-digit code"
               inputMode="numeric"
               type="tel"
@@ -625,7 +644,7 @@ export default function LoginPage() {
               onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
             />
             <input
-              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              className="h-12 w-full rounded-md border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
               placeholder="New password (min 8 chars)"
               type="password"
               value={resetPw}
@@ -653,8 +672,10 @@ export default function LoginPage() {
 
         {step === "set_password" && (
           <motion.div
+            key="set_password"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12, transition: { duration: 0.15 } }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="space-y-5"
           >
@@ -665,7 +686,7 @@ export default function LoginPage() {
               </p>
             </div>
             <input
-              className="h-12 w-full rounded-sm border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
+              className="h-12 w-full rounded-md border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
               placeholder="Password (min 8 chars)"
               type="password"
               value={newPw}
@@ -691,13 +712,18 @@ export default function LoginPage() {
             </button>
           </motion.div>
         )}
+        </AnimatePresence>
 
         {/* Terms */}
-        <p className="mt-8 pb-4 text-center text-label-small text-content-secondary">
+        <p className="mt-8 pb-4 text-center text-label-small text-content-secondary leading-10">
           By continuing, you agree to our{" "}
-          <span className="text-content-accent cursor-pointer hover:underline">Terms of Service</span>{" "}
+          <button type="button" className="inline-flex items-center min-h-[44px] text-content-accent hover:underline px-1">
+            Terms of Service
+          </button>{" "}
           and{" "}
-          <span className="text-content-accent cursor-pointer hover:underline">Privacy Policy</span>
+          <button type="button" className="inline-flex items-center min-h-[44px] text-content-accent hover:underline px-1">
+            Privacy Policy
+          </button>
         </p>
       </motion.div>
     </main>

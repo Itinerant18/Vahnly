@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import type { LocationPoint } from "@/lib/api/types";
 
@@ -28,17 +28,38 @@ const USER_ICON_HTML = `
 `;
 
 const DRIVER_ICON_HTML = `
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" role="img" aria-label="nearby driver">
     <circle cx="14" cy="14" r="13" fill="var(--accent-400)" fill-opacity="0.15" stroke="var(--accent-400)" stroke-width="1"/>
     <circle cx="14" cy="14" r="5" fill="var(--accent-400)"/>
   </svg>
 `;
 
-export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecenter }: RiderMapProps) {
+const PICKUP_ICON_HTML = `
+  <div style="position:relative;width:28px;height:36px;transition:opacity 0.3s">
+    <svg width="28" height="36" viewBox="0 0 28 36" fill="none" role="img" aria-label="pickup location">
+      <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.27 21.73 0 14 0z" fill="var(--positive-400)"/>
+      <circle cx="14" cy="14" r="5" fill="white"/>
+    </svg>
+  </div>
+`;
+
+const DROPOFF_ICON_HTML = `
+  <div style="position:relative;width:28px;height:36px;transition:opacity 0.3s">
+    <svg width="28" height="36" viewBox="0 0 28 36" fill="none" role="img" aria-label="drop-off location">
+      <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.27 21.73 0 14 0z" fill="var(--negative-400)"/>
+      <circle cx="14" cy="14" r="5" fill="white"/>
+    </svg>
+  </div>
+`;
+
+export default function RiderMap({ center, pickup, dropoff, nearbyDrivers = [], onRecenter }: RiderMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const userMarker = useRef<L.Marker | null>(null);
+  const pickupMarker = useRef<L.Marker | null>(null);
+  const dropoffMarker = useRef<L.Marker | null>(null);
   const driverMarkers = useRef<L.Marker[]>([]);
+  const [recenterSpin, setRecenterSpin] = useState(false);
 
   const defaultCenter = center ?? { lat: 22.5726, lng: 88.3639 };
 
@@ -95,6 +116,8 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
       delete (container as any)._leaflet_id;
       leafletMap.current = null;
       userMarker.current = null;
+      pickupMarker.current = null;
+      dropoffMarker.current = null;
       driverMarkers.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,6 +129,36 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
     leafletMap.current.setView([center.lat, center.lng], leafletMap.current.getZoom(), { animate: true });
     userMarker.current?.setLatLng([center.lat, center.lng]);
   }, [center?.lat, center?.lng]);
+
+  // Update pickup marker
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    if (pickupMarker.current) pickupMarker.current.remove();
+    if (pickup) {
+      const pickupIcon = L.divIcon({
+        html: PICKUP_ICON_HTML,
+        className: "",
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+      });
+      pickupMarker.current = L.marker([pickup.lat, pickup.lng], { icon: pickupIcon }).addTo(leafletMap.current);
+    }
+  }, [pickup?.lat, pickup?.lng]);
+
+  // Update dropoff marker
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    if (dropoffMarker.current) dropoffMarker.current.remove();
+    if (dropoff) {
+      const dropoffIcon = L.divIcon({
+        html: DROPOFF_ICON_HTML,
+        className: "",
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+      });
+      dropoffMarker.current = L.marker([dropoff.lat, dropoff.lng], { icon: dropoffIcon }).addTo(leafletMap.current);
+    }
+  }, [dropoff?.lat, dropoff?.lng]);
 
   // Update nearby driver markers
   useEffect(() => {
@@ -145,11 +198,15 @@ export default function RiderMap({ center, pickup, nearbyDrivers = [], onRecente
 
       {/* Recenter FAB */}
       <button
-        onClick={onRecenter}
+        onClick={() => { setRecenterSpin(true); setTimeout(() => setRecenterSpin(false), 400); onRecenter?.(); }}
         aria-label="Recenter map"
-        className="absolute bottom-[136px] right-4 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary shadow-lg ring-1 ring-border-opaque"
+        className="absolute bottom-[136px] right-4 flex h-12 w-12 items-center justify-center rounded-full bg-background-tertiary shadow-lg ring-1 ring-border-opaque active:scale-90 transition-transform"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <svg
+          width="20" height="20" viewBox="0 0 24 24" fill="none"
+          className={recenterSpin ? "animate-spin" : ""}
+          style={{ animationDuration: "400ms" }}
+        >
           <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
           <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>

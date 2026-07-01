@@ -6,6 +6,8 @@ import { TOKEN_STORAGE_KEY } from "@/lib/api/client";
 import { ordersApi } from "@/lib/api/orders";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { FareDisplay } from "@/components/ds";
 
 function ReceiptContent() {
   const router = useRouter();
@@ -68,150 +70,172 @@ function ReceiptContent() {
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
         {/* Order ID */}
-        {targetId && (
-          <div className="rounded-2xl bg-background-secondary px-4 py-3">
-            <p className="text-xs text-content-secondary">Order ID</p>
-            <p className="mt-0.5 font-mono text-sm text-content-primary">{targetId}</p>
-          </div>
-        )}
-
-        {/* Stats */}
-        {fare && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-background-secondary p-4">
-              <p className="text-xs text-content-secondary">Distance</p>
-              <p className="mt-1 text-lg font-bold text-content-primary">{fare.distanceKm.toFixed(1)} km</p>
-            </div>
-            <div className="rounded-2xl bg-background-secondary p-4">
-              <p className="text-xs text-content-secondary">Duration</p>
-              <p className="mt-1 text-lg font-bold text-content-primary">{fare.durationMinutes} min</p>
-            </div>
-          </div>
-        )}
-
-        {/* Fare breakdown */}
-        <div className="rounded-2xl bg-background-secondary px-4">
-          <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
-            Fare Details
-          </p>
-          {breakdown ? (
-            <>
-              <div className="flex justify-between py-2.5">
-                <span className="text-sm text-content-secondary">Base fare</span>
-                <span className="text-sm text-content-primary">{formatCurrency(breakdown.base_fare_paise)}</span>
-              </div>
-              <div className="flex justify-between py-2.5">
-                <span className="text-sm text-content-secondary">Distance charge</span>
-                <span className="text-sm text-content-primary">{formatCurrency(breakdown.distance_charge_paise)}</span>
-              </div>
-              {breakdown.night_charge_paise > 0 && (
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-content-secondary">Night charge</span>
-                  <span className="text-sm text-content-primary">{formatCurrency(breakdown.night_charge_paise)}</span>
-                </div>
-              )}
-              {breakdown.promo_discount_paise > 0 && (
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-content-secondary">Promo discount</span>
-                  <span className="text-sm text-content-negative">−{formatCurrency(breakdown.promo_discount_paise)}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t border-border-opaque py-3">
-                <span className="text-sm font-semibold text-content-primary">Total Paid</span>
-                <span className="text-sm font-bold text-content-accent">{formatCurrency(total)}</span>
-              </div>
-            </>
-          ) : (
-            <div className="flex justify-between py-3">
-              <span className="text-sm font-semibold text-content-primary">Total</span>
-              <span className="text-sm font-bold text-content-accent">{formatCurrency(total)}</span>
+        <BlurFade delay={0.1} offset={8}>
+          {targetId && (
+            <div className="rounded-2xl bg-background-secondary px-4 py-3">
+              <p className="text-xs text-content-secondary">Order ID</p>
+              <p className="mt-0.5 font-mono text-sm text-content-primary">{targetId}</p>
             </div>
           )}
-        </div>
+        </BlurFade>
+
+        {/* Stats */}
+        <BlurFade delay={0.15} offset={8}>
+          {fare && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-background-secondary p-4">
+                <p className="text-xs text-content-secondary">Distance</p>
+                <p className="mt-1 text-lg font-bold text-content-primary">{fare.distanceKm.toFixed(1)} km</p>
+              </div>
+              <div className="rounded-2xl bg-background-secondary p-4">
+                <p className="text-xs text-content-secondary">Duration</p>
+                <p className="mt-1 text-lg font-bold text-content-primary">{fare.durationMinutes} min</p>
+              </div>
+            </div>
+          )}
+        </BlurFade>
+
+        {/* Fare breakdown */}
+        <BlurFade delay={0.2} offset={8}>
+          <div className="rounded-2xl bg-background-secondary px-4">
+            <p className="border-b border-border-opaque py-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">
+              Fare Details
+            </p>
+            {breakdown ? (
+              <>
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-content-secondary">Base fare</span>
+                  <span className="text-sm font-semibold text-content-primary">{formatCurrency(breakdown.base_fare_paise)}</span>
+                </div>
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-content-secondary">Distance charge</span>
+                  <span className="text-sm font-semibold text-content-primary">{formatCurrency(breakdown.distance_charge_paise)}</span>
+                </div>
+                {breakdown.night_charge_paise > 0 && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-content-secondary">Night charge</span>
+                    <span className="text-sm font-semibold text-content-primary">{formatCurrency(breakdown.night_charge_paise)}</span>
+                  </div>
+                )}
+                {breakdown.d4m_care_paise > 0 && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-content-secondary">D4M Care</span>
+                    <span className="text-sm font-semibold text-content-primary">{formatCurrency(breakdown.d4m_care_paise)}</span>
+                  </div>
+                )}
+                {breakdown.surge_multiplier > 1 && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-content-secondary">Surge ({breakdown.surge_multiplier}×)</span>
+                    <span className="text-sm font-semibold text-content-primary">Included</span>
+                  </div>
+                )}
+                {breakdown.promo_discount_paise > 0 && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-content-secondary">Promo discount</span>
+                    <span className="text-sm font-semibold text-content-negative">−{formatCurrency(breakdown.promo_discount_paise)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-border-opaque py-3">
+                  <span className="text-sm font-semibold text-content-primary">Total Paid</span>
+                  <span className="text-base font-bold text-content-accent">{formatCurrency(total)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between py-3">
+                <span className="text-sm font-semibold text-content-primary">Total</span>
+                <span className="text-sm font-bold text-content-accent">{formatCurrency(total)}</span>
+              </div>
+            )}
+          </div>
+        </BlurFade>
 
         {/* Timeline */}
-        {order && (
-          <div className="rounded-2xl bg-background-secondary px-4 py-3">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Timeline</p>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-positive-400">
-                  <div className="h-1.5 w-1.5 rounded-full bg-white" />
-                </div>
-                <div>
-                  <p className="text-sm text-content-primary">Pickup</p>
-                  <p className="text-xs text-content-secondary">
-                    {order.pickup_lat.toFixed(4)}, {order.pickup_lng.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-              {order.dropoff_lat != null && order.dropoff_lng != null && (
+        <BlurFade delay={0.25} offset={8}>
+          {order && (
+            <div className="rounded-2xl bg-background-secondary px-4 py-3">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-content-secondary">Timeline</p>
+              <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-negative-400">
+                  <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-positive-400">
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-content-primary">Drop-off</p>
+                    <p className="text-sm text-content-primary">Pickup</p>
                     <p className="text-xs text-content-secondary">
-                      {order.dropoff_lat.toFixed(4)}, {order.dropoff_lng.toFixed(4)}
+                      {order.pickup_lat.toFixed(4)}, {order.pickup_lng.toFixed(4)}
                     </p>
                   </div>
                 </div>
-              )}
+                {order.dropoff_lat != null && order.dropoff_lng != null && (
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-negative-400">
+                      <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-content-primary">Drop-off</p>
+                      <p className="text-xs text-content-secondary">
+                        {order.dropoff_lat.toFixed(4)}, {order.dropoff_lng.toFixed(4)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </BlurFade>
 
         {/* Actions */}
-        <div className="space-y-3">
-          <button
-            onClick={handleDownloadPDF}
-            className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary"
-          >
-            <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-content-primary">Download PDF</p>
-              <p className="text-xs text-content-secondary">Print or save receipt to device</p>
-            </div>
-          </button>
+        <BlurFade delay={0.3} offset={8}>
+          <div className="space-y-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque active:bg-background-tertiary"
+            >
+              <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-content-primary">Download PDF</p>
+                <p className="text-xs text-content-secondary">Print or save receipt to device</p>
+              </div>
+            </button>
 
-          <button
-            disabled
-            className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque opacity-50"
-          >
-            <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-content-primary">Email Receipt</p>
-              <p className="text-xs text-content-secondary">Send to registered email</p>
-            </div>
-            <span className="text-xs text-content-tertiary">Coming soon</span>
-          </button>
+            <button
+              disabled
+              className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-border-opaque opacity-50"
+            >
+              <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-content-primary">Email Receipt</p>
+                <p className="text-xs text-content-secondary">Send to registered email</p>
+              </div>
+              <span className="text-xs text-content-tertiary">Coming soon</span>
+            </button>
 
-          <button
-            onClick={handleReportProblem}
-            className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-negative-400 active:bg-background-tertiary"
-          >
-            <span className="flex h-5 w-5 items-center justify-center text-content-negative">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M5 21V4M5 4h11l-2 4 2 4H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-content-negative">Report a Problem</p>
-              <p className="text-xs text-content-secondary">Something went wrong with this trip</p>
-            </div>
-          </button>
-        </div>
+            <button
+              onClick={handleReportProblem}
+              className="flex w-full items-center gap-3 rounded-2xl bg-background-secondary px-4 py-4 text-left ring-1 ring-negative-400 active:bg-background-tertiary"
+            >
+              <span className="flex h-5 w-5 items-center justify-center text-content-negative">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 21V4M5 4h11l-2 4 2 4H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-content-negative">Report a Problem</p>
+                <p className="text-xs text-content-secondary">Something went wrong with this trip</p>
+              </div>
+            </button>
+          </div>
+        </BlurFade>
       </div>
     </div>
   );

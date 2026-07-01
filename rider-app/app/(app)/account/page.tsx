@@ -45,7 +45,7 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
 ];
 
 function loyaltyTier(trips: number): { name: string; color: string } {
-  if (trips >= 15) return { name: "Platinum", color: "text-content-secondary" };
+  if (trips >= 15) return { name: "Platinum", color: "text-content-accent" };
   if (trips >= 5) return { name: "Gold", color: "text-content-warning" };
   return { name: "Silver", color: "text-content-secondary" };
 }
@@ -100,11 +100,10 @@ export default function AccountPage() {
               <p className="text-sm text-content-secondary">{rider?.phone ?? ""}</p>
             </div>
             <span
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                rider?.kyc_level && rider.kyc_level !== "NONE"
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${rider?.kyc_level && rider.kyc_level !== "NONE"
                   ? "bg-surface-positive text-content-positive"
                   : "bg-surface-neutral text-content-secondary"
-              }`}
+                }`}
             >
               {rider?.kyc_level && rider.kyc_level !== "NONE" ? "✓ KYC" : "Unverified"}
             </span>

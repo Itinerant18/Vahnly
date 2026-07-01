@@ -127,6 +127,7 @@ function CancelConfirmSheet({
     <div
       className="fixed inset-0 z-50 flex items-end bg-black/60"
       onClick={onClose}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
       <div
         className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up"
@@ -188,7 +189,11 @@ function ExtendSheet({
 }) {
   const OPTIONS = [1, 2, 4];
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/60"
+      onClick={onClose}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+    >
       <div
         className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up"
         onClick={(e) => e.stopPropagation()}
@@ -634,9 +639,8 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
       <BlurFade direction="up" offset={8} className="absolute inset-x-0 bottom-0 z-20 space-y-2 pb-[80px] pt-2 px-4">
         {/* In-trip estimated fare strip */}
         {inTrip && activeOrder && (
-          <div className="relative flex items-center justify-between rounded-md bg-background-primary/90
-            border border-border-opaque px-4 py-2.5 backdrop-blur-sm shadow-elevation-1 overflow-hidden">
-            <BorderBeam size={50} duration={10} colorFrom="#1a5cff" colorTo="rgba(26,92,255,0.05)" borderWidth={1} delay={1} />
+          <div className="flex items-center justify-between rounded-md bg-background-primary/90
+            border border-border-opaque px-4 py-2.5 backdrop-blur-sm shadow-elevation-1">
             <span className="text-label-small text-content-secondary">Est. fare</span>
             <FareDisplay amount={fareEstimate ?? activeOrder.base_fare_paise} size="sm" />
           </div>
@@ -656,6 +660,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           }}
           onShare={() => setShowShare(true)}
           onCancel={() => setShowCancel(true)}
+          onChat={() => setChatOpen(true)}
         />
 
         {/* In-app chat with the driver (pickup coordination) */}

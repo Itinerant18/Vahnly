@@ -1,6 +1,6 @@
 "use client";
+import { useState, useEffect, useMemo, memo, type ReactNode } from "react";
 
-import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTripStore } from "@/lib/store/tripStore";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
@@ -70,7 +70,7 @@ function CheckmarkAnimation({ onDone }: { onDone: () => void }) {
   );
 }
 
-function RowItem({ label, value, accent, bold }: { label: string; value: React.ReactNode; accent?: boolean; bold?: boolean }) {
+const RowItem = memo(function RowItem({ label, value, accent, bold }: { label: string; value: React.ReactNode; accent?: boolean; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2.5">
       <span className={`text-sm ${bold ? "text-content-primary font-semibold" : "text-content-secondary"}`}>{label}</span>
@@ -79,7 +79,7 @@ function RowItem({ label, value, accent, bold }: { label: string; value: React.R
       </span>
     </div>
   );
-}
+});
 
 export default function BillPage() {
   const router = useRouter();
@@ -92,11 +92,12 @@ export default function BillPage() {
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [walletAnim, setWalletAnim] = useState(false);
+  const [confirmCash, setConfirmCash] = useState(false);
 
   const clientTotal = useMemo(() => {
     if (!completedFare) return 0;
     const b = completedFare.fareBreakdown;
-    return (
+    return Math.max(0,
       b.base_fare_paise +
       b.distance_charge_paise +
       b.night_charge_paise +
@@ -113,6 +114,11 @@ export default function BillPage() {
 
   const handlePay = async () => {
     if (paying) return;
+    if (method === "CASH" && !confirmCash) {
+      setConfirmCash(true);
+      return;
+    }
+    setConfirmCash(false);
     setPaying(true);
     if (method === "CASH") {
       setPaid(true);
@@ -208,12 +214,13 @@ export default function BillPage() {
             {(["CASH", "UPI", "WALLET", "CARD"] as PaymentMethod[]).map((m) => (
               <button
                 key={m}
-                onClick={() => setMethod(m)}
-                className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                  method === m
-                    ? "bg-accent-400 text-white"
-                    : "bg-background-tertiary text-content-secondary ring-1 ring-border-opaque"
-                }`}
+                onClick={() => { if (!paying) setMethod(m); }}
+                disabled={paying}
+                className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${paying ? "opacity-50 cursor-not-allowed" :
+                    method === m
+                      ? "bg-accent-400 text-white"
+                      : "bg-background-tertiary text-content-secondary ring-1 ring-border-opaque"
+                  }`}
               >
                 <span className="flex items-center gap-2">
                   {PAYMENT_ICONS[m]}
@@ -241,6 +248,11 @@ export default function BillPage() {
 
       {/* Pay CTA */}
       <div className="px-4 pb-8">
+        {confirmCash && (
+          <p className="mb-2 text-center text-label-small text-content-secondary">
+            Confirm cash payment of <span className="font-semibold text-content-primary">{formatCurrency(displayTotal)}</span>
+          </p>
+        )}
         <ShimmerButton
           type="button"
           disabled={paying}
@@ -250,7 +262,8 @@ export default function BillPage() {
           borderRadius="16px"
           className="w-full py-4 text-base font-bold shadow-elevation-2 disabled:opacity-60"
         >
-          {method === "CASH" ? "Mark as Paid" : `Pay ${formatCurrency(displayTotal)}`}
+          {method === "CASH" && confirmCash ? "Confirm & Mark as Paid" :
+            method === "CASH" ? "Mark as Paid" : `Pay ${formatCurrency(displayTotal)}`}
         </ShimmerButton>
       </div>
 

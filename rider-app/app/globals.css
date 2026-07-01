@@ -135,6 +135,9 @@
   /* ── Custom Bento Colors ── */
   --color-secondary: #0040e0;
   --color-secondary-hover: #0035be;
+  --color-secondary-2: #2563eb;  /* hero brand gradient — mid */
+  --color-secondary-3: #4f46e5;  /* hero brand gradient — end (indigo) */
+  --shadow-brand-glow: 0 4px 24px rgba(0, 64, 224, 0.3);  /* primary CTA glow */
   --color-surface-dim: #cbdbf5;
   --color-surface-container-highest: #d3e4fe;
   --color-surface-container-high: #dce9ff;

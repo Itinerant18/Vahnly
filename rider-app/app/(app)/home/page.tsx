@@ -26,6 +26,7 @@ export default function HomePage() {
   const [userLocation, setUserLocation]  = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
+  const [geoError, setGeoError] = useState(false);
   const setPickup = useBookingStore((s) => s.setPickup);
 
   // Hydrate the bell unread badge and the SOS shortcut's active-order gate.
@@ -64,6 +65,7 @@ export default function HomePage() {
         loadNearby(loc.lat, loc.lng);
       },
       () => {
+        setGeoError(true);
         setMapCenter(DEFAULT_CENTER);
         setPickup({ ...DEFAULT_CENTER, address: "Kolkata, West Bengal" });
         loadNearby(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
@@ -77,7 +79,7 @@ export default function HomePage() {
   }, [userLocation]);
 
   return (
-    <BlurFade duration={0.5} className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary">
+    <BlurFade duration={0.5} className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary" style={{ paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}>
       {/* Map — full screen behind everything */}
       <div className="absolute inset-0 z-0">
         <RiderMap
@@ -87,17 +89,26 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Top bar — floats above map */}
-      <div className="absolute inset-x-0 top-0 z-20">
+      {/* Top bar — floats above map; sets --topbar-offset for sibling elements */}
+      <div className="absolute inset-x-0 top-0 z-20" style={{ '--topbar-offset': '64px' } as React.CSSProperties}>
         <TopBar />
       </div>
 
-      {/* Marquee tagline */}
-      <div className="absolute inset-x-0 z-10" style={{ top: "64px" }}>
+      {/* Marquee tagline — positioned below TopBar via CSS variable */}
+      <div className="absolute inset-x-0 z-10" style={{ top: 'var(--topbar-offset)' }}>
         <ScrollVelocityRow baseVelocity={0.8} className="text-[10px] text-content-tertiary/30 tracking-[0.2em] uppercase">
           Driver on demand · Safe rides · 24/7 support · Cashless payments ·
         </ScrollVelocityRow>
       </div>
+
+      {/* Geolocation-denied banner */}
+      {geoError && (
+        <div className="absolute left-1/2 z-10 mt-2 -translate-x-1/2" style={{ top: 'calc(var(--topbar-offset) + 8px)' }}>
+          <div className="rounded-full bg-surface-negative/90 px-4 py-1.5 text-xs font-medium text-content-negative backdrop-blur-sm">
+            Location unavailable — showing default area
+          </div>
+        </div>
+      )}
 
       {/* Booking bottom sheet — floats above map */}
       <SentryErrorBoundary name="rider-booking">

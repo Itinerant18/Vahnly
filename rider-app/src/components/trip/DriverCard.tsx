@@ -34,10 +34,12 @@ export function DriverCard({
   onCall,
   onShare,
   onCancel,
+  onChat,
 }: {
   onCall?: () => void;
   onShare?: () => void;
   onCancel?: () => void;
+  onChat?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [chatToast, setChatToast] = useState(false);
@@ -122,10 +124,10 @@ export function DriverCard({
               {
                 icon: <ChatIcon size={20} />,
                 label: "Chat",
-                onClick: () => {
+                onClick: onChat ?? (() => {
                   setChatToast(true);
                   setTimeout(() => setChatToast(false), 2000);
-                },
+                }),
               },
               { icon: <ShareIcon size={20} />, label: "Share", onClick: onShare },
             ].map(({ icon, label, onClick }) => (

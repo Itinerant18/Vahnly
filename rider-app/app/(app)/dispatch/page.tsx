@@ -84,6 +84,7 @@ function DriverAssignedModal({
   driver: AssignedDriver;
   onGoToTrip: () => void;
 }) {
+  const [callStatus, setCallStatus] = useState<"idle" | "unavailable">("idle");
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/60">
       <div className="w-full rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-6 shadow-elevation-3 animate-spring-up">
@@ -131,12 +132,13 @@ function DriverAssignedModal({
         </div>
 
         <div className="mt-5 flex gap-3">
-          <a
-            href="tel:"
-            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-background-tertiary text-base font-semibold text-content-primary"
+          <button
+            type="button"
+            onClick={() => setCallStatus("unavailable")}
+            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-background-tertiary text-base font-semibold text-content-primary active:scale-[0.98] transition-transform"
           >
-            Call
-          </a>
+            {callStatus === "unavailable" ? "Number unavailable" : "Call"}
+          </button>
           <ShimmerButton
             type="button"
             onClick={onGoToTrip}
@@ -173,6 +175,7 @@ function DispatchContent() {
   // True when the search timed out *because the dispatch service is down* (503 from
   // /api/v1/health/dispatch), as opposed to drivers simply being busy. Drives the copy.
   const [dispatchDown, setDispatchDown] = useState(false);
+  const [searchRadiusExpanded, setSearchRadiusExpanded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const goLiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,10 +194,11 @@ function DispatchContent() {
     router.replace("/trip/live");
   };
 
-  const startSearching = (oid: string) => {
+  const startSearching = (oid: string, expandedRadius = false) => {
     setActiveOrderId(oid);
     setState("SEARCHING");
     setDispatchDown(false);
+    if (expandedRadius) setSearchRadiusExpanded(true);
 
     // Countdown timer
     let secs = 60;
@@ -239,7 +243,11 @@ function DispatchContent() {
       try {
         await apiClient.get("/api/v1/health/dispatch");
       } catch (e) {
-        if (e instanceof ApiError && e.status === 503) setDispatchDown(true);
+        if (e instanceof ApiError && e.status === 503) {
+          setDispatchDown(true);
+        } else {
+          setDispatchDown(true); // network error = dispatch unreachable
+        }
       }
       setState("TIMEOUT");
     }, SEARCH_TIMEOUT_MS);
@@ -322,6 +330,20 @@ function DispatchContent() {
       .catch(() => setState("TIMEOUT"));
   };
 
+  const handleExpandRadius = () => {
+    stopTimers();
+    setState("BOOKING");
+    startedRef.current = false;
+    setActiveOrderId(null);
+    bookDriver()
+      .then(({ order, otp }) => {
+        setOTP(otp);
+        startedRef.current = true;
+        startSearching(order.id, true);
+      })
+      .catch(() => setState("TIMEOUT"));
+  };
+
   const handleGoBack = () => {
     stopTimers();
     resetBooking();
@@ -359,7 +381,9 @@ function DispatchContent() {
               ]}
               className="h-8 text-xl font-bold leading-none text-content-primary"
             />
-            <p className="mt-1 text-sm text-content-secondary">Usually takes 30–60 seconds</p>
+            <p className="mt-1 text-sm text-content-secondary" role="status" aria-live="polite">
+              {searchRadiusExpanded ? "Searching wider area…" : "Usually takes 30–60 seconds"}
+            </p>
           </div>
 
           {/* Trip summary chip */}
@@ -375,7 +399,9 @@ function DispatchContent() {
             </div>
           )}
 
-          <CountdownRing seconds={remainingSecs} total={60} />
+          <div role="timer" aria-live="polite" aria-label={`${remainingSecs} seconds remaining`}>
+            <CountdownRing seconds={remainingSecs} total={60} />
+          </div>
 
           {/* Cancel button (free within first 30s) */}
           {remainingSecs > 30 && activeOrderId && (
@@ -439,8 +465,8 @@ function DispatchContent() {
             {!dispatchDown && (
               <>
                 <button
-                  onClick={handleTryAgain}
-                  className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-primary"
+                  onClick={handleExpandRadius}
+                  className="h-12 w-full rounded-2xl bg-background-tertiary text-sm font-medium text-content-primary active:scale-[0.98] transition-transform"
                 >
                   Increase search radius
                 </button>
