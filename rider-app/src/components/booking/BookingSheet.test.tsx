@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/lib/api/garage', () => ({ garageApi: { list: vi.fn(async () => []) } }));
 vi.mock('./QuickTiles', () => ({ QuickTiles: () => <div data-testid="quick-tiles" /> }));
+// CoolMode paints particles on a <canvas>; jsdom has no 2D context. Passthrough it.
+vi.mock('@/components/ui/cool-mode', () => ({ CoolMode: ({ children }: { children?: ReactNode }) => children }));
 
 // Shared mock booking-store actions (asserted on).
 const setTripType = vi.fn();

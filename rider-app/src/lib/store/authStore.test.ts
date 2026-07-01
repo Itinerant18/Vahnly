@@ -15,6 +15,7 @@ vi.mock('../api/auth', () => ({
 vi.mock('../api/client', () => ({
   TOKEN_STORAGE_KEY: 'dfu_token',
   setUnauthorizedHandler: vi.fn(),
+  persistRefresh: vi.fn(),
 }));
 
 import { useAuthStore } from './authStore';

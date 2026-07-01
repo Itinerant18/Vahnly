@@ -21,6 +21,34 @@ for (const name of ['localStorage', 'sessionStorage'] as const) {
   Object.defineProperty(globalThis, name, { value: new MemStorage(), configurable: true, writable: true });
 }
 
+// ── Canvas 2D stub ──────────────────────────────────────────────────────────
+// jsdom has no canvas backend. lottie-web (loaded eagerly by the ds/Icon barrel)
+// probes a 2D context at import, and MagicUI effects (CoolMode, particles) paint
+// on <canvas>. Return a no-op context so these modules load and render under jsdom.
+const gradientStub = { addColorStop: vi.fn() };
+const ctx2dStub = new Proxy(
+  {
+    getImageData: () => ({ data: [] }),
+    createLinearGradient: () => gradientStub,
+    createRadialGradient: () => gradientStub,
+    measureText: () => ({ width: 0 }),
+  } as Record<string, unknown>,
+  { get: (t, p) => (p in t ? t[p as string] : vi.fn()), set: () => true },
+);
+HTMLCanvasElement.prototype.getContext = vi.fn(() => ctx2dStub) as unknown as HTMLCanvasElement['getContext'];
+
+// ── Observer stubs ──────────────────────────────────────────────────────────
+// jsdom ships neither ResizeObserver (used by AnimatedBeam) nor
+// IntersectionObserver (used by BlurFade via framer-motion useInView).
+class ObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return []; }
+}
+globalThis.ResizeObserver = ObserverStub as unknown as typeof ResizeObserver;
+globalThis.IntersectionObserver = ObserverStub as unknown as typeof IntersectionObserver;
+
 // ── Capacitor plugin mocks ──────────────────────────────────────────────────
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => false, getPlatform: () => 'web' },
