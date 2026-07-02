@@ -12,6 +12,7 @@ vi.mock('@/components/ui/cool-mode', () => ({ CoolMode: ({ children }: { childre
 
 // Shared mock booking-store actions (asserted on).
 const setTripType = vi.fn();
+const setOneTimeCar = vi.fn();
 const validatePromo = vi.fn(async () => {});
 const bookDriver = vi.fn(async () => ({ order: { id: 'order-9' } }));
 
@@ -30,10 +31,10 @@ function baseStore(overrides: Store = {}): Store {
   return {
     pickup: null, dropoff: null, tripType: 'IN_CITY_ROUND', durationHours: 4, personsCount: 1,
     d4mCare: false, promoCode: '', paymentMethod: 'CASH', fareEstimate: null, isSearching: false,
-    scheduledAt: null, selectedCarId: null,
+    scheduledAt: null, selectedCarId: null, oneTimeCar: null,
     setPickup: vi.fn(), setDropoff: vi.fn(), setTripType, setDurationHours: vi.fn(),
     setPersonsCount: vi.fn(), setScheduledAt: vi.fn(), setD4mCare: vi.fn(), setPromoCode: vi.fn(),
-    setPaymentMethod: vi.fn(), validatePromo, bookDriver, setSelectedCar: vi.fn(),
+    setPaymentMethod: vi.fn(), validatePromo, bookDriver, setSelectedCar: vi.fn(), setOneTimeCar,
     ...overrides,
   };
 }
@@ -83,6 +84,28 @@ describe('BookingSheet', () => {
     expect(bookDriver).not.toHaveBeenCalled(); // review shown, not booked yet
     await userEvent.click(screen.getByRole('button', { name: 'Confirm booking' }));
     expect(bookDriver).toHaveBeenCalled();
+  });
+
+  it('car spec commits only once BOTH transmission and class are picked', async () => {
+    render(<BookingSheet />);
+    await userEvent.click(screen.getByRole('button', { name: 'Manual' }));
+    expect(setOneTimeCar).not.toHaveBeenCalled(); // half a spec is not a car
+    await userEvent.click(screen.getByRole('button', { name: 'SUV' }));
+    expect(setOneTimeCar).toHaveBeenCalledWith({ car_type: 'SUV', transmission: 'MANUAL' });
+  });
+
+  it('review sheet shows the picked spec, not "One-time car"', async () => {
+    storeState = baseStore({
+      pickup: { lat: 22.5, lng: 88.3, address: 'Home' },
+      oneTimeCar: { car_type: 'SUV', transmission: 'AUTOMATIC' },
+      fareEstimate: {
+        fare_breakdown: { estimated_total_paise: 48000, surge_multiplier: 1, promo_discount_paise: 0 },
+        surge_active: false, driver_availability: 'HIGH', estimated_pickup_eta_minutes: 5,
+      },
+    });
+    render(<BookingSheet />);
+    await userEvent.click(screen.getByRole('button', { name: 'Book Driver' }));
+    expect(screen.getByText('SUV · Automatic')).toBeInTheDocument();
   });
 
   it('shows the context hint for the selected trip type', () => {

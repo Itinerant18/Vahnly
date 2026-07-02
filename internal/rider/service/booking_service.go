@@ -416,12 +416,11 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		carType, transmission = car.CarType, car.Transmission
 	case req.OneTimeCar != nil:
 		ot := req.OneTimeCar
-		if strings.TrimSpace(ot.Make) == "" || strings.TrimSpace(ot.Model) == "" ||
-			strings.TrimSpace(ot.CarType) == "" || strings.TrimSpace(ot.Transmission) == "" {
+		ct, tr, ok := normalizeOneTimeCarSpec(ot.CarType, ot.Transmission)
+		if !ok {
 			return nil, ErrInvalidBooking
 		}
-		otMake, otModel = &ot.Make, &ot.Model
-		ct, tr := strings.ToUpper(ot.CarType), strings.ToUpper(ot.Transmission)
+		otMake, otModel = optionalStringPtr(ot.Make), optionalStringPtr(ot.Model)
 		otType, otTrans = &ct, &tr
 		carType, transmission = ct, tr
 	default:
@@ -1180,6 +1179,30 @@ func findCar(cars []*domain.RiderGarageCar, id string) *domain.RiderGarageCar {
 		}
 	}
 	return nil
+}
+
+func optionalStringPtr(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeOneTimeCarSpec(carType, transmission string) (string, string, bool) {
+	ct := strings.ToUpper(strings.TrimSpace(carType))
+	tr := strings.ToUpper(strings.TrimSpace(transmission))
+	switch ct {
+	case tierHatchback, tierSedan, tierSUV, tierPremium:
+	default:
+		return "", "", false
+	}
+	switch tr {
+	case "MANUAL", "AUTOMATIC":
+	default:
+		return "", "", false
+	}
+	return ct, tr, true
 }
 
 func defaultCar(cars []*domain.RiderGarageCar) *domain.RiderGarageCar {

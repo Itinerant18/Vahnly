@@ -83,9 +83,15 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
   const [chargeSubmitting, setChargeSubmitting] = useState(false);
 
   const riderFirstName = String(activeTrip?.customer_name || 'Rider').split(' ')[0];
-  const carMake = activeTrip?.car_make || activeTrip?.rider_car_make;
-  const carModel = activeTrip?.car_model || activeTrip?.rider_car_model;
+  const carMake = activeTrip?.car_make || activeTrip?.rider_car_make || activeTrip?.backend_offer?.carMake;
+  const carModel = activeTrip?.car_model || activeTrip?.rider_car_model || activeTrip?.backend_offer?.carModel;
   const carPlate = activeTrip?.car_plate || activeTrip?.rider_car_plate;
+  // Spec-only bookings carry no make/model — fall back to class · transmission
+  // from the accepted offer so the panel never says "Not specified" needlessly.
+  const carSpec = [
+    activeTrip?.backend_offer?.carType || activeTrip?.vehicle_tier,
+    activeTrip?.backend_offer?.carTransmission || activeTrip?.transmission,
+  ].filter(Boolean).join(' · ');
   const emergencyCount = activeTrip?.emergency_contact_count ?? 0;
   const d4mCareOpted = Boolean(activeTrip?.d4m_care_opted ?? activeTrip?.d4mCareOptIn);
 
@@ -270,7 +276,7 @@ export const TripInProgressPane: React.FC<TripInProgressPaneProps> = ({
                     <p className="text-paragraph-small text-content-secondary">
                       In car:{' '}
                       <span className="text-content-primary font-medium">
-                        {[carMake, carModel].filter(Boolean).join(' ') || 'Not specified'}
+                        {[carMake, carModel].filter(Boolean).join(' ') || carSpec || 'Not specified'}
                       </span>
                       {carPlate && <span className="text-content-tertiary"> [{carPlate}]</span>}
                     </p>

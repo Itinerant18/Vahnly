@@ -151,6 +151,12 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
   const showToast = useToastStore((s) => s.show);
 
   const orderId = activeTrip?.order_id;
+  // Garage cars always carry make/model (and a plate on file to verify against);
+  // spec-only bookings carry neither, so there is nothing to handshake.
+  const hasNamedCar = Boolean(
+    activeTrip?.backend_offer?.carMake || activeTrip?.backend_offer?.carModel ||
+    activeTrip?.car_make || activeTrip?.rider_car_make,
+  );
 
   // Fetch order details (waiting_started_at + last_odometer)
   useEffect(() => {
@@ -382,25 +388,29 @@ export const ArrivedVerificationPane: React.FC<ArrivedVerificationPaneProps> = (
           <OtpInput value={otpVerificationCode} onChange={setOtpVerificationCode} />
         </div>
 
-        {/* Car handshake — confirm the right vehicle before driving off */}
-        <div className="card space-y-3">
-          <div>
-            <h4 className="text-heading-small text-content-primary mb-1">Confirm the car</h4>
-            <p className="text-paragraph-small text-content-secondary">
-              Enter the number plate on the car you&apos;re about to drive.
-            </p>
+        {/* Car handshake — confirm the right vehicle before driving off. Spec-only
+            bookings (class + transmission, no make/model) have no plate on file, so
+            the server skips the compare and the input would be theatre — hide it. */}
+        {hasNamedCar && (
+          <div className="card space-y-3">
+            <div>
+              <h4 className="text-heading-small text-content-primary mb-1">Confirm the car</h4>
+              <p className="text-paragraph-small text-content-secondary">
+                Enter the number plate on the car you&apos;re about to drive.
+              </p>
+            </div>
+            <input
+              type="text"
+              value={carPlate}
+              onChange={(e) => setCarPlate(e.target.value.toUpperCase())}
+              placeholder="e.g. WB 02 AK 9988"
+              maxLength={16}
+              className="w-full h-12 px-4 rounded-sm bg-background-secondary border border-border-opaque
+                text-label-large font-mono uppercase text-content-primary tracking-wider
+                focus:outline-none focus:border-2 focus:border-border-accent placeholder:text-content-tertiary"
+            />
           </div>
-          <input
-            type="text"
-            value={carPlate}
-            onChange={(e) => setCarPlate(e.target.value.toUpperCase())}
-            placeholder="e.g. WB 02 AK 9988"
-            maxLength={16}
-            className="w-full h-12 px-4 rounded-sm bg-background-secondary border border-border-opaque
-              text-label-large font-mono uppercase text-content-primary tracking-wider
-              focus:outline-none focus:border-2 focus:border-border-accent placeholder:text-content-tertiary"
-          />
-        </div>
+        )}
 
         {/* Verify CTA */}
         <button

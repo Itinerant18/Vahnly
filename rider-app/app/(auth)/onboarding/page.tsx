@@ -6,17 +6,13 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { Geolocation } from "@capacitor/geolocation";
 import { authApi } from "@/lib/api/auth";
-import { garageApi, type GarageCarInput } from "@/lib/api/garage";
 import { accountApi } from "@/lib/api/account";
 import { useAuthStore } from "@/lib/store/authStore";
 import { compressImage, blobToDataUrl } from "@/lib/utils/imageCompress";
-import type { CarType, Transmission } from "@/lib/api/types";
 import { AnimatedIcon, HomeAddressIcon, WorkBriefcaseIcon, PinIcon } from "@/components/ds/Icon";
 import { AnimUser, AnimMapPin, AnimBell } from "@/assets/icons/animated";
 
-const TOTAL_STEPS = 6;
-const CAR_TYPES: CarType[] = ["HATCHBACK", "SEDAN", "SUV", "PREMIUM"];
-const TRANSMISSIONS: Transmission[] = ["MANUAL", "AUTOMATIC"];
+const TOTAL_STEPS = 5;
 
 const INPUT =
   "w-full rounded-xl bg-background-tertiary px-4 py-3 text-sm text-content-primary outline-none ring-1 ring-border-opaque placeholder:text-content-tertiary focus:ring-2 focus:ring-border-accent";
@@ -24,17 +20,6 @@ const INPUT =
 type PermState = "idle" | "granted" | "denied";
 
 // ── Per-step local state shapes ──────────────────────────────────────────────
-interface CarForm {
-  make: string;
-  model: string;
-  year: string;
-  car_type: CarType;
-  transmission: Transmission;
-  fuel_type: string;
-  registration_plate: string;
-  color: string;
-}
-
 interface PlaceForm {
   address: string;
   lat: number | null;
@@ -158,26 +143,14 @@ export default function OnboardingPage() {
   const [dob, setDob] = useState(rider?.date_of_birth ?? "");
   const [photoUrl, setPhotoUrl] = useState<string>(rider?.profile_photo_url ?? "");
 
-  // Step 2 — first car
-  const [car, setCar] = useState<CarForm>({
-    make: "",
-    model: "",
-    year: "",
-    car_type: "HATCHBACK",
-    transmission: "MANUAL",
-    fuel_type: "",
-    registration_plate: "",
-    color: "",
-  });
-
-  // Step 3 — home & work
+  // Step 2 — home & work
   const [home, setHome] = useState<PlaceForm>({ address: "", lat: null, lng: null });
   const [work, setWork] = useState<PlaceForm>({ address: "", lat: null, lng: null });
 
-  // Step 4 — emergency contacts
+  // Step 3 — emergency contacts
   const [contacts, setContacts] = useState<ContactRow[]>([{ name: "", phone: "" }]);
 
-  // Step 5 / 6 — permissions
+  // Step 4 / 5 — permissions
   const [notifState, setNotifState] = useState<PermState>("idle");
   const [locState, setLocState] = useState<PermState>("idle");
 
@@ -228,38 +201,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Step 2: save first car ──────────────────────────────────────────────────
-  const carValid =
-    car.make.trim().length > 0 &&
-    car.model.trim().length > 0 &&
-    /^\d{4}$/.test(car.year) &&
-    car.registration_plate.trim().length >= 4;
-
-  const saveCar = async () => {
-    setBusy(true);
-    setError("");
-    const payload: GarageCarInput = {
-      make: car.make.trim(),
-      model: car.model.trim(),
-      year: Number(car.year),
-      car_type: car.car_type,
-      transmission: car.transmission,
-      registration_plate: car.registration_plate.trim().toUpperCase(),
-      is_default: true,
-      ...(car.fuel_type.trim() ? { fuel_type: car.fuel_type.trim() } : {}),
-      ...(car.color.trim() ? { color: car.color.trim() } : {}),
-    };
-    try {
-      await garageApi.add(payload);
-      next();
-    } catch {
-      setError("Could not save your car. You can add it later from your account.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // ── Step 3: save home & work ────────────────────────────────────────────────
+  // ── Step 2: save home & work ────────────────────────────────────────────────
   const fillCurrentLocation = (set: (p: PlaceForm) => void, current: PlaceForm) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -305,7 +247,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Step 4: save emergency contacts ─────────────────────────────────────────
+  // ── Step 3: save emergency contacts ─────────────────────────────────────────
   const updateContact = (i: number, patch: Partial<ContactRow>) =>
     setContacts((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const addContactRow = () =>
@@ -333,7 +275,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Step 5: notifications permission ────────────────────────────────────────
+  // ── Step 4: notifications permission ────────────────────────────────────────
   const requestNotif = async () => {
     setError("");
     try {
@@ -351,7 +293,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Step 6: location permission ─────────────────────────────────────────────
+  // ── Step 5: location permission ─────────────────────────────────────────────
   const requestLocation = async () => {
     setError("");
     try {
@@ -475,112 +417,8 @@ export default function OnboardingPage() {
         </>
       )}
 
-      {/* ── Step 2: Add first car ── */}
+      {/* ── Step 2: Home & Work ── */}
       {step === 2 && (
-        <>
-          <StepHeader title="Add your car" subtitle="You hire a driver for your own car. Add it now, or skip." />
-
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <input
-                className={INPUT}
-                placeholder="Make"
-                value={car.make}
-                onChange={(e) => setCar({ ...car, make: e.target.value })}
-              />
-              <input
-                className={INPUT}
-                placeholder="Model"
-                value={car.model}
-                onChange={(e) => setCar({ ...car, model: e.target.value })}
-              />
-            </div>
-            <div className="flex gap-3">
-              <input
-                className={INPUT}
-                placeholder="Year"
-                inputMode="numeric"
-                value={car.year}
-                onChange={(e) => setCar({ ...car, year: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-              />
-              <input
-                className={INPUT}
-                placeholder="Color (optional)"
-                value={car.color}
-                onChange={(e) => setCar({ ...car, color: e.target.value })}
-              />
-            </div>
-            <input
-              className={INPUT}
-              placeholder="Registration plate"
-              value={car.registration_plate}
-              onChange={(e) => setCar({ ...car, registration_plate: e.target.value.toUpperCase() })}
-            />
-            <input
-              className={INPUT}
-              placeholder="Fuel type (optional, e.g. Petrol)"
-              value={car.fuel_type}
-              onChange={(e) => setCar({ ...car, fuel_type: e.target.value })}
-            />
-
-            <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-content-secondary">Type</p>
-              <div className="flex flex-wrap gap-2">
-                {CAR_TYPES.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setCar({ ...car, car_type: t })}
-                    className={`rounded-xl px-3 py-2 text-xs ${
-                      car.car_type === t
-                        ? "bg-accent-400 text-content-primary"
-                        : "bg-background-tertiary text-content-secondary"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-content-secondary">
-                Transmission
-              </p>
-              <div className="flex gap-2">
-                {TRANSMISSIONS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setCar({ ...car, transmission: t })}
-                    className={`flex-1 rounded-xl py-2.5 text-xs ${
-                      car.transmission === t
-                        ? "bg-accent-400 text-content-primary"
-                        : "bg-background-tertiary text-content-secondary"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {error && <InlineError message={error} />}
-
-          <NavBar
-            step={step}
-            onBack={back}
-            onSkip={next}
-            onNext={saveCar}
-            nextLabel="Save & Continue"
-            nextDisabled={!carValid}
-            busy={busy}
-            skippable
-          />
-        </>
-      )}
-
-      {/* ── Step 3: Home & Work ── */}
-      {step === 3 && (
         <>
           <StepHeader title="Home & Work" subtitle="Save them for one-tap booking. You can add coords later." />
 
@@ -636,8 +474,8 @@ export default function OnboardingPage() {
         </>
       )}
 
-      {/* ── Step 4: Emergency contacts ── */}
-      {step === 4 && (
+      {/* ── Step 3: Emergency contacts ── */}
+      {step === 3 && (
         <>
           <StepHeader title="Emergency contacts" subtitle="Add up to 3 people to alert during a trip." />
 
@@ -695,8 +533,8 @@ export default function OnboardingPage() {
         </>
       )}
 
-      {/* ── Step 5: Notifications ── */}
-      {step === 5 && (
+      {/* ── Step 4: Notifications ── */}
+      {step === 4 && (
         <>
           <StepHeader
             title="Stay updated"
@@ -739,8 +577,8 @@ export default function OnboardingPage() {
         </>
       )}
 
-      {/* ── Step 6: Location ── */}
-      {step === 6 && (
+      {/* ── Step 5: Location ── */}
+      {step === 5 && (
         <>
           <StepHeader
             title="Find drivers near you"

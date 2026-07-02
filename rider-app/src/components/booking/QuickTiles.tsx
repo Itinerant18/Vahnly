@@ -4,16 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ordersApi } from "@/lib/api/orders";
 import { useBookingStore } from "@/lib/store/bookingStore";
-import { HomeIcon } from "@/components/ds/Icon";
 import type { Order } from "@/lib/api/types";
 
 const TILES = [
-  {
-    id: "garage",
-    label: "My Garage",
-    href: "/account/garage",
-    icon: <HomeIcon size={24} className="text-content-accent" />,
-  },
   {
     id: "offers",
     label: "Offers",

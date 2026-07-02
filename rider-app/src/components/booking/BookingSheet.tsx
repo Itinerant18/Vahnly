@@ -17,7 +17,7 @@ import { BorderBeam } from "@/components/ui/border-beam";
 import { AnimatedBeam } from "@/components/ui/animated-beam";
 import { CoolMode } from "@/components/ui/cool-mode";
 import { RainbowButton } from "@/components/ui/rainbow-button";
-import type { GarageCar, LocationPoint, PaymentMethod, TripType } from "@/lib/api/types";
+import type { CarType, GarageCar, LocationPoint, PaymentMethod, Transmission, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
   { value: "IN_CITY_ONE_WAY",  label: "One-Way" },
@@ -26,6 +26,19 @@ const TRIP_TYPES: { value: TripType; label: string }[] = [
   { value: "MINI_OUTSTATION",  label: "Mini Out." },
   { value: "OUTSTATION",       label: "Outstation" },
   { value: "MONTHLY",          label: "Monthly" },
+];
+
+// Simple car spec — the only two facts a booking needs about the rider's car:
+// transmission routes to capable drivers, class sets the fare tier.
+const TRANSMISSIONS: { value: Transmission; label: string }[] = [
+  { value: "MANUAL",    label: "Manual" },
+  { value: "AUTOMATIC", label: "Automatic" },
+];
+const CAR_CLASSES: { value: CarType; label: string }[] = [
+  { value: "HATCHBACK", label: "Hatchback" },
+  { value: "SEDAN",     label: "Sedan" },
+  { value: "SUV",       label: "SUV" },
+  { value: "PREMIUM",   label: "Premium" },
 ];
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
@@ -265,7 +278,9 @@ export function BookingSheet() {
   const isDragging = useRef(false);
   const [dragPx, setDragPx] = useState<number | null>(null);
   const [cars, setCars] = useState<GarageCar[]>([]);
-  const [showCarPicker, setShowCarPicker] = useState(false);
+  // Half-picked car spec (chip taps) until both halves exist and hit the store.
+  const [pickedTransmission, setPickedTransmission] = useState<Transmission | null>(null);
+  const [pickedClass, setPickedClass] = useState<CarType | null>(null);
   const [showFareModal, setShowFareModal] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showD4mInfo, setShowD4mInfo] = useState(false);
@@ -293,7 +308,7 @@ export function BookingSheet() {
     promoCode, paymentMethod, fareEstimate, isSearching, scheduledAt,
     setPickup, setDropoff, setTripType, setDurationHours, setPersonsCount,
     setScheduledAt, setD4mCare, setOwnerNotInCar, setPromoCode, setPaymentMethod,
-    validatePromo, bookDriver, selectedCarId, oneTimeCar, setSelectedCar,
+    validatePromo, bookDriver, selectedCarId, oneTimeCar, setSelectedCar, setOneTimeCar,
   } = useBookingStore();
 
   // Fetch garage cars (single call, pick default car from result)
@@ -327,6 +342,26 @@ export function BookingSheet() {
   const tripHint = tripCatalog.find((t) => t.value === tripType)?.hint ?? TRIP_HINT[tripType];
 
   const selectedCar = cars.find((c) => c.id === selectedCarId);
+
+  // ── Car spec picker ──────────────────────────────────────────────────────────
+  // Booking needs only transmission + class. A garage default (auto-picked above)
+  // prefills both and books as a garage car; tapping any chip switches to a
+  // one-time spec. The store is only written once BOTH halves are known, so the
+  // "car" blocker stays up until the spec is complete.
+  const specTransmission: Transmission | null =
+    oneTimeCar?.transmission ?? selectedCar?.transmission ?? pickedTransmission;
+  const specClass: CarType | null =
+    oneTimeCar?.car_type ?? selectedCar?.car_type ?? pickedClass;
+
+  const chooseTransmission = (t: Transmission) => {
+    setPickedTransmission(t);
+    if (specClass) setOneTimeCar({ car_type: specClass, transmission: t });
+  };
+  const chooseClass = (c: CarType) => {
+    setPickedClass(c);
+    if (specTransmission) setOneTimeCar({ car_type: c, transmission: specTransmission });
+  };
+
   const needsDuration =
     tripType === "IN_CITY_ROUND" || tripType === "OUTSTATION" ||
     tripType === "MINI_OUTSTATION" || tripType === "IN_CITY_HOURLY";
@@ -649,32 +684,41 @@ export function BookingSheet() {
             </Section>
           )}
 
-          {/* [7] Car Selector */}
+          {/* [7] Car spec — transmission + class, nothing else to fill */}
           <Section>
-            <button
-              onClick={() => setShowCarPicker(true)}
-              className="flex w-full items-center justify-between min-h-[44px]
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
-            >
-              <div className="flex items-center gap-3">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
                 <CarIcon size={18} className="text-content-tertiary" />
-                <div className="text-left">
-                  {selectedCar ? (
-                    <>
-                      <p className="text-label-medium text-content-primary">
-                        {selectedCar.color ?? ""} {selectedCar.make} {selectedCar.model}
-                      </p>
-                      <p className="text-label-small text-content-secondary">
-                        {selectedCar.registration_plate} · {selectedCar.transmission}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-paragraph-medium text-content-tertiary">Select your car</p>
-                  )}
-                </div>
+                <span className="text-paragraph-medium text-content-primary">Your car</span>
               </div>
-              <span className="text-label-small text-content-accent">Change ›</span>
-            </button>
+              <div className="flex gap-2">
+                {TRANSMISSIONS.map((t) => (
+                  <Chip
+                    key={t.value}
+                    active={specTransmission === t.value}
+                    onClick={() => chooseTransmission(t.value)}
+                  >
+                    {t.label}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+                {CAR_CLASSES.map((c) => (
+                  <Chip
+                    key={c.value}
+                    active={specClass === c.value}
+                    onClick={() => chooseClass(c.value)}
+                  >
+                    {c.label}
+                  </Chip>
+                ))}
+              </div>
+              {selectedCar && (
+                <p className="text-label-small text-content-secondary">
+                  Booking with your {selectedCar.make} {selectedCar.model} ({selectedCar.registration_plate})
+                </p>
+              )}
+            </div>
           </Section>
 
           {/* [8] Persons stepper */}
@@ -909,55 +953,6 @@ export function BookingSheet() {
         </div>
       </div>
 
-      {/* ── Car picker bottom sheet ────────────────────────────────────────── */}
-      {showCarPicker && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
-          onClick={() => setShowCarPicker(false)}
-          onKeyDown={(e) => { if (e.key === "Escape") setShowCarPicker(false); }}
-        >
-          <div
-            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
-            <h3 className="mb-3 text-heading-small text-content-primary">Select your car</h3>
-            <div className="space-y-2">
-              {cars.map((car) => (
-                <button
-                  key={car.id}
-                  type="button"
-                  onClick={() => { setSelectedCar(car.id, car.car_type); setShowCarPicker(false); }}
-                  className={[
-                    "flex w-full items-center justify-between rounded-sm px-4 py-3 min-h-[56px] transition-base cursor-pointer",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
-                    selectedCarId === car.id
-                      ? "bg-background-secondary border-2 border-interactive-primary"
-                      : "bg-background-secondary border border-border-opaque hover:border-border-selected",
-                  ].join(" ")}
-                >
-                  <div className="text-left">
-                    <p className="text-label-medium text-content-primary">{car.make} {car.model}</p>
-                    <p className="text-label-small text-content-secondary">{car.registration_plate} · {car.transmission}</p>
-                  </div>
-                  {selectedCarId === car.id && (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-interactive-primary" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-              {cars.length === 0 && (
-                <p className="py-6 text-center text-paragraph-small text-content-secondary">
-                  No cars in garage. Add one from Account.
-                </p>
-              )}
-            </div>
-            <div className="h-6" />
-          </div>
-        </div>
-      )}
-
       {/* ── Review & confirm sheet (Phase 3) ───────────────────────────────── */}
       {showReview && (
         <div
@@ -980,7 +975,13 @@ export function BookingSheet() {
               <ReviewRow label="Trip" value={TRIP_TYPES.find((t) => t.value === tripType)?.label ?? tripType} />
               <ReviewRow
                 label="Car"
-                value={selectedCar ? `${selectedCar.make} ${selectedCar.model} · ${selectedCar.registration_plate}` : "One-time car"}
+                value={
+                  selectedCar
+                    ? `${selectedCar.make} ${selectedCar.model} · ${selectedCar.registration_plate}`
+                    : oneTimeCar
+                      ? `${CAR_CLASSES.find((c) => c.value === oneTimeCar.car_type)?.label ?? oneTimeCar.car_type} · ${TRANSMISSIONS.find((t) => t.value === oneTimeCar.transmission)?.label ?? oneTimeCar.transmission}`
+                      : "—"
+                }
               />
               <ReviewRow label="Payment" value={PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod} />
               <ReviewRow label="When" value={scheduledAt ? new Date(scheduledAt).toLocaleString() : "Now"} />

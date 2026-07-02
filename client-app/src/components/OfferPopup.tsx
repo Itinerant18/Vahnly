@@ -238,14 +238,19 @@ export function OfferPopup() {
           )}
 
           {/* ── Car context card ── */}
-          {(currentOffer.carMake || currentOffer.carModel) && (
+          {/* Spec-only bookings (no make/model) still must show class + transmission —
+              that's all the driver needs to know what they'll be driving. */}
+          {(currentOffer.carMake || currentOffer.carModel || currentOffer.carType) && (
             <div className="bg-background-secondary rounded-md p-500 space-y-200">
               <p className="text-heading-small text-content-primary">
-                {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel].filter(Boolean).join(' ')}
+                {[currentOffer.carColor, currentOffer.carMake, currentOffer.carModel].filter(Boolean).join(' ') ||
+                  `${currentOffer.carType || 'Car'} · ${currentOffer.carTransmission || 'Any'}`}
               </p>
-              <p className="text-paragraph-small text-content-secondary">
-                {currentOffer.carType || 'Car'} · {currentOffer.carTransmission || 'Any'}
-              </p>
+              {(currentOffer.carMake || currentOffer.carModel) && (
+                <p className="text-paragraph-small text-content-secondary">
+                  {currentOffer.carType || 'Car'} · {currentOffer.carTransmission || 'Any'}
+                </p>
+              )}
 
               {/* Transmission mismatch warning */}
               {currentOffer.transmissionMatch === false && (

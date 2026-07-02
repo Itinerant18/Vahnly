@@ -5,6 +5,10 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/platform/driver-delivery/internal/domain"
+	"github.com/platform/driver-delivery/internal/rider/repository"
 )
 
 type fakeQuoter struct {
@@ -163,5 +167,200 @@ func TestEstimateFare_RoundTripDoublesDistance(t *testing.T) {
 	if roundEst.FareBreakdown.DistanceChargePaise <= oneWayEst.FareBreakdown.DistanceChargePaise {
 		t.Errorf("round-trip distance charge (%d) should exceed one-way (%d)",
 			roundEst.FareBreakdown.DistanceChargePaise, oneWayEst.FareBreakdown.DistanceChargePaise)
+	}
+}
+
+type fakeCreateOrderRepo struct {
+	inserted     repository.InsertOrderParams
+	insertCalled bool
+	orderID      string
+}
+
+func (f *fakeCreateOrderRepo) GetActiveOrderID(context.Context, string) (string, error) {
+	return "", pgx.ErrNoRows
+}
+
+func (f *fakeCreateOrderRepo) InsertRiderOrder(_ context.Context, p repository.InsertOrderParams) (string, error) {
+	f.inserted = p
+	f.insertCalled = true
+	if f.orderID != "" {
+		return f.orderID, nil
+	}
+	return "order-1", nil
+}
+
+func (f *fakeCreateOrderRepo) EnqueueScheduledDispatch(context.Context, string, time.Time, []byte) error {
+	return nil
+}
+
+func (f *fakeCreateOrderRepo) InsertFareBreakdown(context.Context, string, int64, int64, int64, int64) error {
+	return nil
+}
+
+func (f *fakeCreateOrderRepo) GetAssignedDriver(context.Context, string, string) (string, error) {
+	return "", errors.New("unexpected GetAssignedDriver")
+}
+
+func (f *fakeCreateOrderRepo) GetOrderForRider(_ context.Context, orderID, riderID string) (*domain.RiderOrder, error) {
+	return &domain.RiderOrder{ID: orderID, RiderID: &riderID, CreatedAt: time.Now()}, nil
+}
+
+func (f *fakeCreateOrderRepo) GetOrderByID(context.Context, string) (*domain.RiderOrder, error) {
+	return nil, errors.New("unexpected GetOrderByID")
+}
+
+func (f *fakeCreateOrderRepo) GetOrderByShareToken(context.Context, string) (*domain.RiderOrder, error) {
+	return nil, errors.New("unexpected GetOrderByShareToken")
+}
+
+func (f *fakeCreateOrderRepo) GetPickupOTP(context.Context, string) (string, error) {
+	return "", errors.New("unexpected GetPickupOTP")
+}
+
+func (f *fakeCreateOrderRepo) ListOrders(context.Context, string, repository.OrderFilter) ([]*domain.RiderOrder, int64, error) {
+	return nil, 0, errors.New("unexpected ListOrders")
+}
+
+func (f *fakeCreateOrderRepo) CancelOrder(context.Context, string, string, string, int64) error {
+	return nil
+}
+
+func (f *fakeCreateOrderRepo) RateOrder(context.Context, repository.RateParams) (string, error) {
+	return "", errors.New("unexpected RateOrder")
+}
+
+func (f *fakeCreateOrderRepo) GetDriverPublicInfo(context.Context, string) (string, float64, error) {
+	return "", 0, errors.New("unexpected GetDriverPublicInfo")
+}
+
+func (f *fakeCreateOrderRepo) MarkSOSTriggered(context.Context, string, string) (string, error) {
+	return "", errors.New("unexpected MarkSOSTriggered")
+}
+
+func (f *fakeCreateOrderRepo) GetLastGPSPoint(context.Context, string) (float64, float64, bool, error) {
+	return 0, 0, false, errors.New("unexpected GetLastGPSPoint")
+}
+
+func (f *fakeCreateOrderRepo) UpdateOrderStops(context.Context, string, string, []byte, int64, float64) error {
+	return errors.New("unexpected UpdateOrderStops")
+}
+
+func (f *fakeCreateOrderRepo) UpdateBookedDuration(context.Context, string, string, int, int64) error {
+	return errors.New("unexpected UpdateBookedDuration")
+}
+
+func (f *fakeCreateOrderRepo) UpdateOrderDropoff(context.Context, string, string, float64, float64, string, int64, float64) error {
+	return errors.New("unexpected UpdateOrderDropoff")
+}
+
+func (f *fakeCreateOrderRepo) InServiceArea(context.Context, string, float64, float64) (bool, error) {
+	return true, nil
+}
+
+type fakeGarageReader struct {
+	cars []*domain.RiderGarageCar
+}
+
+func (f fakeGarageReader) GetGarageCars(context.Context, string) ([]*domain.RiderGarageCar, error) {
+	return f.cars, nil
+}
+
+func baseCreateOrderReq() CreateOrderRequest {
+	dlat, dlng := dropoff(kolLat+0.02, kolLng+0.02)
+	return CreateOrderRequest{
+		PickupLat: kolLat, PickupLng: kolLng,
+		DropoffLat: dlat, DropoffLng: dlng,
+		TripType: "IN_CITY_ONE_WAY", PaymentMethod: "CASH", City: "KOL",
+	}
+}
+
+func newCreateOrderSvc(repo *fakeCreateOrderRepo, garage fakeGarageReader) *BookingService {
+	return NewBookingService(repo, garage, fakeQuoter{fare: 20000, mult: 1.0}, NewStaticPromoValidator(), nil, nil, nil, nil)
+}
+
+func TestCreateOrder_OneTimeSpecOnlyCarBooks(t *testing.T) {
+	repo := &fakeCreateOrderRepo{}
+	svc := newCreateOrderSvc(repo, fakeGarageReader{})
+	req := baseCreateOrderReq()
+	req.OneTimeCar = &OneTimeCarDTO{
+		CarType:      " sedan ",
+		Transmission: " automatic ",
+	}
+
+	if _, err := svc.CreateOrder(context.Background(), "rider-1", req); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if !repo.insertCalled {
+		t.Fatal("expected order insert")
+	}
+	if repo.inserted.OneTimeCarMake != nil || repo.inserted.OneTimeCarModel != nil {
+		t.Fatalf("make/model should persist NULL, got make=%v model=%v", repo.inserted.OneTimeCarMake, repo.inserted.OneTimeCarModel)
+	}
+	if repo.inserted.OneTimeCarType == nil || *repo.inserted.OneTimeCarType != "SEDAN" {
+		t.Fatalf("car type: want SEDAN, got %v", repo.inserted.OneTimeCarType)
+	}
+	if repo.inserted.OneTimeCarTransmission == nil || *repo.inserted.OneTimeCarTransmission != "AUTOMATIC" {
+		t.Fatalf("transmission: want AUTOMATIC, got %v", repo.inserted.OneTimeCarTransmission)
+	}
+	if repo.inserted.GarageCarID != nil {
+		t.Fatalf("garage car should be nil for one-time car, got %v", repo.inserted.GarageCarID)
+	}
+}
+
+func TestCreateOrder_OneTimeBadCarTypeRejected(t *testing.T) {
+	repo := &fakeCreateOrderRepo{}
+	svc := newCreateOrderSvc(repo, fakeGarageReader{})
+	req := baseCreateOrderReq()
+	req.OneTimeCar = &OneTimeCarDTO{
+		CarType:      "VAN",
+		Transmission: "MANUAL",
+	}
+
+	if _, err := svc.CreateOrder(context.Background(), "rider-1", req); !errors.Is(err, ErrInvalidBooking) {
+		t.Fatalf("want ErrInvalidBooking, got %v", err)
+	}
+	if repo.insertCalled {
+		t.Fatal("invalid car type should not insert an order")
+	}
+}
+
+func TestCreateOrder_OneTimeBadTransmissionRejected(t *testing.T) {
+	repo := &fakeCreateOrderRepo{}
+	svc := newCreateOrderSvc(repo, fakeGarageReader{})
+	req := baseCreateOrderReq()
+	req.OneTimeCar = &OneTimeCarDTO{
+		CarType:      "SUV",
+		Transmission: "CVT",
+	}
+
+	if _, err := svc.CreateOrder(context.Background(), "rider-1", req); !errors.Is(err, ErrInvalidBooking) {
+		t.Fatalf("want ErrInvalidBooking, got %v", err)
+	}
+	if repo.insertCalled {
+		t.Fatal("invalid transmission should not insert an order")
+	}
+}
+
+func TestCreateOrder_GarageCarPathUntouched(t *testing.T) {
+	repo := &fakeCreateOrderRepo{}
+	garageID := "garage-1"
+	svc := newCreateOrderSvc(repo, fakeGarageReader{cars: []*domain.RiderGarageCar{{
+		ID:           garageID,
+		CarType:      "LEGACY",
+		Transmission: "CVT",
+		IsActive:     true,
+	}}})
+	req := baseCreateOrderReq()
+	req.GarageCarID = garageID
+
+	if _, err := svc.CreateOrder(context.Background(), "rider-1", req); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if repo.inserted.GarageCarID == nil || *repo.inserted.GarageCarID != garageID {
+		t.Fatalf("garage car id: want %s, got %v", garageID, repo.inserted.GarageCarID)
+	}
+	if repo.inserted.OneTimeCarType != nil || repo.inserted.OneTimeCarTransmission != nil ||
+		repo.inserted.OneTimeCarMake != nil || repo.inserted.OneTimeCarModel != nil {
+		t.Fatalf("one-time fields should stay nil for garage car path: %+v", repo.inserted)
 	}
 }

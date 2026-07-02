@@ -5,6 +5,10 @@ import type { FareEstimate, LocationPoint, TripType } from '../api/types';
 vi.mock('../api/fare', () => ({
   fareApi: { estimate: vi.fn(async () => ({ fare_breakdown: {} })) },
 }));
+const createOrder = vi.fn(async (..._args: unknown[]) => ({ order: { id: 'o1' }, otp: '1234' }));
+vi.mock('../api/orders', () => ({
+  ordersApi: { create: (...args: unknown[]) => createOrder(...args) },
+}));
 
 const pickup: LocationPoint = { lat: 22.5, lng: 88.3, address: 'Home' };
 const dropoff: LocationPoint = { lat: 22.6, lng: 88.4, address: 'Work' };
@@ -66,6 +70,19 @@ describe('TRIP_HINT', () => {
       'MINI_OUTSTATION', 'OUTSTATION', 'MONTHLY',
     ];
     for (const t of types) expect(TRIP_HINT[t]).toBeTruthy();
+  });
+});
+
+describe('spec-only car booking', () => {
+  it('bookDriver sends the bare car spec as one_time_car (no garage id)', async () => {
+    useBookingStore.setState({
+      pickup, dropoff, tripType: 'IN_CITY_ONE_WAY', selectedCarId: null,
+      oneTimeCar: { car_type: 'SUV', transmission: 'MANUAL' }, fareEstimate: fare,
+    });
+    await useBookingStore.getState().bookDriver();
+    const payload = createOrder.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.one_time_car).toEqual({ car_type: 'SUV', transmission: 'MANUAL' });
+    expect(payload.garage_car_id).toBeUndefined();
   });
 });
 

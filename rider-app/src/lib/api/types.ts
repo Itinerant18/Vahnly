@@ -39,9 +39,12 @@ export interface LocationPoint {
   address: string;
 }
 
+// Car spec for a booking without a saved garage car. Only the class +
+// transmission matter (they drive pricing tier and driver matching); make and
+// model are optional detail the backend no longer requires.
 export interface OneTimeCar {
-  make: string;
-  model: string;
+  make?: string;
+  model?: string;
   car_type: CarType;
   transmission: Transmission;
 }
