@@ -85,6 +85,18 @@ describe('BookingSheet', () => {
     expect(bookDriver).toHaveBeenCalled();
   });
 
+  it('shows the context hint for the selected trip type', () => {
+    // baseStore defaults to IN_CITY_ROUND — round trips need no drop-off.
+    render(<BookingSheet />);
+    expect(screen.getByText(/no drop-off needed/i)).toBeInTheDocument();
+  });
+
+  it('hint follows the trip type', () => {
+    storeState = baseStore({ tripType: 'IN_CITY_ONE_WAY' });
+    render(<BookingSheet />);
+    expect(screen.getByText(/different locations in the city/i)).toBeInTheDocument();
+  });
+
   it('changing the trip type updates the store', async () => {
     render(<BookingSheet />);
     await userEvent.click(screen.getByRole('button', { name: 'One-Way' }));

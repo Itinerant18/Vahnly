@@ -32,6 +32,18 @@ const packageTypeFor = (t: TripType): string | undefined => TRIP_TO_PACKAGE[t];
 export const tripNeedsDropoff = (t: TripType): boolean =>
   t === "IN_CITY_ONE_WAY" || t === "MINI_OUTSTATION" || t === "OUTSTATION";
 
+// One-line context hint per trip type, shown under the selector so the rider
+// knows what each tier means before filling the form (e.g. round trips need no
+// drop-off). Exhaustive Record — adding a TripType forces a hint here.
+export const TRIP_HINT: Record<TripType, string> = {
+  IN_CITY_ONE_WAY: "Pickup & drop are different locations in the city.",
+  IN_CITY_ROUND: "Driver waits and brings you back — no drop-off needed.",
+  IN_CITY_HOURLY: "Book a driver by the hour for multiple stops.",
+  MINI_OUTSTATION: "Short intercity trip — set your out-of-city drop.",
+  OUTSTATION: "Full intercity trip — set your destination.",
+  MONTHLY: "Dedicated monthly driver — coming soon.",
+};
+
 export type BookingBlocker = "pickup" | "dropoff" | "car" | "fare" | null;
 
 type ReadinessInput = Pick<

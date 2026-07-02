@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { bookingBlocker, tripNeedsDropoff, useBookingStore } from './bookingStore';
+import { bookingBlocker, tripNeedsDropoff, useBookingStore, TRIP_HINT } from './bookingStore';
 import type { FareEstimate, LocationPoint, TripType } from '../api/types';
 
 vi.mock('../api/fare', () => ({
@@ -56,6 +56,16 @@ describe('fare freshness (Phase 4)', () => {
     useBookingStore.setState({ pickup, fareEstimate: fare });
     useBookingStore.getState().setDropoff(dropoff);
     expect(useBookingStore.getState().fareEstimate).toBeNull();
+  });
+});
+
+describe('TRIP_HINT', () => {
+  it('has a non-empty hint for every trip type', () => {
+    const types: TripType[] = [
+      'IN_CITY_ONE_WAY', 'IN_CITY_ROUND', 'IN_CITY_HOURLY',
+      'MINI_OUTSTATION', 'OUTSTATION', 'MONTHLY',
+    ];
+    for (const t of types) expect(TRIP_HINT[t]).toBeTruthy();
   });
 });
 

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/platform/driver-delivery/internal/rider/service"
 )
 
 // CityConfigHandler exposes the booking-relevant slice of regional_cities to the
@@ -62,5 +64,8 @@ func (h *CityConfigHandler) HandleGetCityConfig(w http.ResponseWriter, r *http.R
 		"operating_hours_start": start,
 		"operating_hours_end":   end,
 		"supported_trip_types":  tripTypes,
+		// Full catalog (label + hint + requirements) for the city's tiers, so the
+		// app renders trip-type copy from the server instead of hardcoding it.
+		"trip_types": service.TripCatalog(tripTypes),
 	})
 }

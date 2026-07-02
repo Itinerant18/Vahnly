@@ -145,6 +145,9 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	if !inIndiaBBox(req.PickupLat, req.PickupLng) {
 		return nil, ErrInvalidBooking
 	}
+	if err := validateTrip(req.TripType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
+		return nil, err
+	}
 	city := strings.ToUpper(strings.TrimSpace(req.City))
 	if city == "" {
 		city = "KOL"
@@ -183,10 +186,7 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 			promoDiscount = res.DiscountPaise
 			promoCodeID = res.PromoCodeID
 		}
-		total := q.ServiceFarePaise() + q.RiderAddonsPaise() + d4m - promoDiscount
-		if total < 0 {
-			total = 0
-		}
+		total := max(q.ServiceFarePaise()+q.RiderAddonsPaise()+d4m-promoDiscount, 0)
 		availability, _ := s.driverAvailability(ctx, city, req.PickupLat, req.PickupLng)
 		return &FareEstimate{
 			FareBreakdown: FareBreakdown{
@@ -243,10 +243,7 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 		promoCodeID = res.PromoCodeID
 	}
 
-	total := surgedSubtotal + night + d4m - promoDiscount
-	if total < 0 {
-		total = 0
-	}
+	total := max(surgedSubtotal+night+d4m-promoDiscount, 0)
 
 	availability, _ := s.driverAvailability(ctx, city, req.PickupLat, req.PickupLng)
 
@@ -372,12 +369,17 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 
 	// Monthly/permanent packages are a recurring engagement — the estimate is supported but
 	// booking needs the recurring-billing subsystem (not in this slice).
-	if strings.EqualFold(strings.TrimSpace(req.PackageType), PackageMonthly) {
+	if strings.EqualFold(strings.TrimSpace(req.PackageType), PackageMonthly) || !tripBookable(req.TripType) {
 		return nil, ErrMonthlyNotBookable
 	}
 
 	if !inIndiaBBox(req.PickupLat, req.PickupLng) {
 		return nil, ErrInvalidBooking
+	}
+	// Server-authoritative trip requirements: without this, a One-Way with no
+	// dropoff would silently fall back to dropoff=pickup below and price ~0 km.
+	if err := validateTrip(req.TripType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
+		return nil, err
 	}
 	if req.PersonsCount < 0 || req.PersonsCount > 8 {
 		return nil, ErrInvalidBooking

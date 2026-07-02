@@ -2,11 +2,11 @@
 
 import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useBookingStore, bookingBlocker, tripNeedsDropoff } from "@/lib/store/bookingStore";
+import { useBookingStore, bookingBlocker, tripNeedsDropoff, TRIP_HINT } from "@/lib/store/bookingStore";
 import { useToastStore } from "@/lib/store/useToastStore";
 import { friendlyError } from "@/lib/ui/errorMessage";
 import { garageApi } from "@/lib/api/garage";
-import { cityConfigApi } from "@/lib/api/cityConfig";
+import { cityConfigApi, type TripTypeInfo } from "@/lib/api/cityConfig";
 import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
@@ -284,6 +284,9 @@ export function BookingSheet() {
   const [openH, setOpenH] = useState(DEFAULT_OPEN_HOUR);
   const [closeH, setCloseH] = useState(DEFAULT_CLOSE_HOUR);
   const [allowedTiers, setAllowedTiers] = useState<string[]>([]);
+  // Server trip-type catalog (label + hint per city). Empty until fetched or on
+  // older backends — local TRIP_TYPES/TRIP_HINT are the fallback.
+  const [tripCatalog, setTripCatalog] = useState<TripTypeInfo[]>([]);
 
   const {
     pickup, dropoff, tripType, durationHours, personsCount, d4mCare, ownerNotInCar,
@@ -310,13 +313,18 @@ export function BookingSheet() {
       if (Number.isFinite(oh)) setOpenH(oh);
       if (Number.isFinite(ch)) setCloseH(ch);
       setAllowedTiers(c.supported_trip_types ?? []);
+      setTripCatalog(c.trip_types ?? []);
     }).catch(() => { /* keep defaults */ });
   }, []);
 
-  // Only offer tiers the city supports; empty list = all tiers.
-  const tripTypes = allowedTiers.length
-    ? TRIP_TYPES.filter((t) => allowedTiers.includes(t.value))
-    : TRIP_TYPES;
+  // Only offer tiers the city supports. Prefer the server catalog (already
+  // city-filtered, carries per-city labels); fall back to the local list.
+  const tripTypes = tripCatalog.length
+    ? tripCatalog.map((t) => ({ value: t.value, label: t.label }))
+    : allowedTiers.length
+      ? TRIP_TYPES.filter((t) => allowedTiers.includes(t.value))
+      : TRIP_TYPES;
+  const tripHint = tripCatalog.find((t) => t.value === tripType)?.hint ?? TRIP_HINT[tripType];
 
   const selectedCar = cars.find((c) => c.id === selectedCarId);
   const needsDuration =
@@ -518,6 +526,11 @@ export function BookingSheet() {
                 );
               })}
             </div>
+            {/* Context hint: what the selected trip type means (mirrors the
+                reference design's per-type explainer line). */}
+            <p className="mt-2 text-label-small text-content-positive" aria-live="polite">
+              {tripHint}
+            </p>
           </Section>
 
           {/* [2] Pickup — current location prefilled by home page; type to search */}
