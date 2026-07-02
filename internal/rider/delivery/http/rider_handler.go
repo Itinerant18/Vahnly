@@ -232,7 +232,7 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 
 	var googleClaims struct {
 		Email         string      `json:"email"`
-		EmailVerified interface{} `json:"email_verified"`
+		EmailVerified any         `json:"email_verified"`
 		Name          string      `json:"name"`
 		Sub           string      `json:"sub"`
 	}
@@ -315,7 +315,7 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 	if err == nil {
 		// Rider exists by phone. Check if they already have an email.
 		if existingRider.Email != nil && *existingRider.Email != "" {
-			if strings.ToLower(*existingRider.Email) != strings.ToLower(googleClaims.Email) {
+			if !strings.EqualFold(*existingRider.Email, googleClaims.Email) {
 				writeError(w, http.StatusConflict, "Phone number already registered with another email", "ERR_CONFLICT")
 				return
 			}
