@@ -7,8 +7,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useNotificationStore } from "@/lib/store/notificationStore";
 import { useAuthStore } from "@/lib/store/authStore";
 
+import { TubelightNavbar } from "@/components/ui/tubelight-navbar";
+
 function HomeIcon({ active }: { active: boolean }) {
-  const c = active ? "var(--accent-400)" : "var(--content-secondary)";
+  const c = active ? "var(--interactive-primary)" : "var(--content-secondary)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1v-9.5z" stroke={c} strokeWidth="1.5" fill={active ? "var(--surface-accent)" : "none"} />
@@ -18,7 +20,7 @@ function HomeIcon({ active }: { active: boolean }) {
 }
 
 function TripsIcon({ active }: { active: boolean }) {
-  const c = active ? "var(--accent-400)" : "var(--content-secondary)";
+  const c = active ? "var(--interactive-primary)" : "var(--content-secondary)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <circle cx="5" cy="17" r="2" stroke={c} strokeWidth="1.5" fill={active ? "var(--surface-accent)" : "none"} />
@@ -30,7 +32,7 @@ function TripsIcon({ active }: { active: boolean }) {
 }
 
 function WalletIcon({ active }: { active: boolean }) {
-  const c = active ? "var(--accent-400)" : "var(--content-secondary)";
+  const c = active ? "var(--interactive-primary)" : "var(--content-secondary)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <rect x="2" y="6" width="20" height="14" rx="2" stroke={c} strokeWidth="1.5" fill={active ? "var(--surface-accent)" : "none"} />
@@ -41,7 +43,7 @@ function WalletIcon({ active }: { active: boolean }) {
 }
 
 function AccountIcon({ active }: { active: boolean }) {
-  const c = active ? "var(--accent-400)" : "var(--content-secondary)";
+  const c = active ? "var(--interactive-primary)" : "var(--content-secondary)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="8" r="4" stroke={c} strokeWidth="1.5" fill={active ? "var(--surface-accent)" : "none"} />
@@ -49,13 +51,6 @@ function AccountIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
-
-const NAV = [
-  { href: "/home", label: "Home", Icon: HomeIcon },
-  { href: "/account/bookings", label: "Trips", Icon: TripsIcon },
-  { href: "/account/wallet", label: "Wallet", Icon: WalletIcon },
-  { href: "/account", label: "Account", Icon: AccountIcon },
-];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -76,37 +71,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   if (!authChecked) return null;
 
+  const navItems = [
+    { name: "Home", url: "/home", icon: HomeIcon },
+    { name: "Trips", url: "/account/bookings", icon: TripsIcon },
+    { name: "Wallet", url: "/account/wallet", icon: WalletIcon },
+    { name: "Account", url: "/account", icon: AccountIcon, badge: unreadCount },
+  ];
+
   return (
-    <div className="min-h-screen bg-background-primary pb-[68px]">
+    <div className="min-h-screen bg-background-primary pb-28">
       {children}
-      <nav className="fixed inset-x-0 bottom-0 z-50 flex h-[68px] items-center border-t border-border-opaque/50 bg-background-primary/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.04)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {NAV.map((n) => {
-          const active = pathname === n.href || (n.href !== "/account" && pathname.startsWith(n.href + "/"));
-          const isAccount = n.href === "/account";
-          const acctActive = isAccount && (pathname === "/account" || pathname.startsWith("/account/"));
-          const isActive = isAccount ? acctActive : active;
-          return (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2"
-            >
-              {isAccount && unreadCount > 0 && (
-                <span className="absolute right-[calc(50%-14px)] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-400 text-[9px] font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-              <n.Icon active={isActive} />
-              <span className={`text-[10px] font-medium ${isActive ? "text-content-accent" : "text-content-secondary"}`}>
-                {n.label}
-              </span>
-              {isActive && (
-                <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-accent-400" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+      <TubelightNavbar items={navItems} />
     </div>
   );
 }
