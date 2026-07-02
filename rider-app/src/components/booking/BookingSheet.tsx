@@ -1,7 +1,8 @@
 "use client";
 
-import { forwardRef, useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import { useBookingStore, bookingBlocker, tripNeedsDropoff, TRIP_HINT } from "@/lib/store/bookingStore";
 import { useToastStore } from "@/lib/store/useToastStore";
 import { friendlyError } from "@/lib/ui/errorMessage";
@@ -11,12 +12,7 @@ import { searchPlaces, type GeocodeResult } from "@/lib/utils/geocode";
 import { QuickTiles } from "./QuickTiles";
 import { FareDisplay } from "@/components/ds/FareDisplay";
 import { CrossIcon, PinIcon, CarIcon, FlameIcon, CheckIcon } from "@/components/ds/Icon";
-import { BlurFade } from "@/components/ui/blur-fade";
-import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { BorderBeam } from "@/components/ui/border-beam";
-import { AnimatedBeam } from "@/components/ui/animated-beam";
-import { CoolMode } from "@/components/ui/cool-mode";
-import { RainbowButton } from "@/components/ui/rainbow-button";
 import type { CarType, GarageCar, LocationPoint, PaymentMethod, Transmission, TripType } from "@/lib/api/types";
 
 const TRIP_TYPES: { value: TripType; label: string }[] = [
@@ -34,12 +30,14 @@ const TRANSMISSIONS: { value: Transmission; label: string }[] = [
   { value: "MANUAL",    label: "Manual" },
   { value: "AUTOMATIC", label: "Automatic" },
 ];
-const CAR_CLASSES: { value: CarType; label: string }[] = [
-  { value: "HATCHBACK", label: "Hatchback" },
-  { value: "SEDAN",     label: "Sedan" },
-  { value: "SUV",       label: "SUV" },
-  { value: "PREMIUM",   label: "Premium" },
+const CAR_CLASSES: { value: CarType; label: string; seats: number; bags: number }[] = [
+  { value: "HATCHBACK", label: "Hatchback", seats: 4, bags: 2 },
+  { value: "SEDAN",     label: "Sedan",     seats: 4, bags: 3 },
+  { value: "SUV",       label: "SUV",       seats: 6, bags: 4 },
+  { value: "PREMIUM",   label: "Premium",   seats: 4, bags: 3 },
 ];
+
+const HOURLY_BLOCKS = [2, 4, 8, 12];
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CASH",   label: "Cash" },
@@ -89,15 +87,42 @@ function defaultSlot(openH: number, closeH: number) {
   return clampToHours(d, openH, closeH);
 }
 
-// ── Section wrapper ───────────────────────────────────────────────────────────
-const Section = forwardRef<HTMLDivElement, { children: React.ReactNode }>(({ children }, ref) => {
+// ── Section reveal — heavy fade-up on first entrance ─────────────────────────
+const sectionMotion = (index: number) => ({
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.55, delay: 0.05 * index, ease: [0.22, 1, 0.36, 1] as const },
+});
+
+// ── GlassSection — a frosted bento tile. `span` sets its footprint in the
+// 6-column bento grid; headers live INSIDE tiles so the grid stays gallery-clean.
+function GlassSection({
+  index,
+  span,
+  className = "",
+  children,
+}: {
+  index: number;
+  span: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div ref={ref} className="border-b border-border-opaque px-4 py-3">
-      {children}
+    <motion.div {...sectionMotion(index)} className={span}>
+      <div className={`glass-panel h-full rounded-3xl p-4 ${className}`}>{children}</div>
+    </motion.div>
+  );
+}
+
+// Small in-tile header: icon + label, one consistent family.
+function TileHeader({ icon, label }: { icon?: React.ReactNode; label: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      {icon && <span className="text-content-tertiary">{icon}</span>}
+      <span className="text-label-medium font-semibold text-content-primary">{label}</span>
     </div>
   );
-});
-Section.displayName = "Section";
+}
 
 // ── Shimmer: exact same width as the loaded fare strip ────────────────────────
 function FareShimmer() {
@@ -112,7 +137,7 @@ function FareShimmer() {
   );
 }
 
-// ── Chip — reusable pill-shape selector chip ──────────────────────────────────
+// ── Chip — reusable glass pill selector ───────────────────────────────────────
 function Chip({
   active,
   onClick,
@@ -128,12 +153,12 @@ function Chip({
       onClick={onClick}
       className={[
         "flex-shrink-0 rounded-pill px-4 py-1.5 text-label-medium cursor-pointer",
-        "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+        "transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         "active:scale-95",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
         active
-          ? "bg-background-inverse text-content-inverse shadow-elevation-2"
-          : "bg-background-secondary text-content-secondary border border-border-opaque hover:text-content-primary hover:bg-background-tertiary",
+          ? "bg-secondary text-content-inverse shadow-brand-glow"
+          : "glass-tile text-content-secondary hover:text-content-primary",
       ].join(" ")}
     >
       {children}
@@ -141,8 +166,8 @@ function Chip({
   );
 }
 
-// ── D4M Toggle ────────────────────────────────────────────────────────────────
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+// ── Add-on toggle — hand-tuned glass switch, not a system default ─────────────
+function Toggle({ on, onToggle, tone = "positive" }: { on: boolean; onToggle: () => void; tone?: "positive" | "warm" }) {
   return (
     <button
       type="button"
@@ -150,14 +175,19 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       aria-checked={on}
       onClick={onToggle}
       className={[
-        "relative h-6 w-11 rounded-pill transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 cursor-pointer",
-        on ? "bg-positive-400" : "bg-background-tertiary",
+        "relative h-7 w-12 rounded-pill transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 cursor-pointer",
+        "shadow-[inset_0_1px_3px_rgba(15,30,80,0.12)]",
+        on
+          ? tone === "positive" ? "bg-positive-400" : "bg-warning-400"
+          : "bg-background-tertiary",
       ].join(" ")}
     >
       <span
         className={[
-          "absolute top-0.5 h-5 w-5 rounded-pill bg-background-primary shadow-elevation-1 border-2 border-white transition-transform duration-200",
-          on ? "translate-x-5" : "translate-x-0.5",
+          "absolute top-0.5 h-6 w-6 rounded-pill bg-white shadow-elevation-1",
+          "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          on ? "translate-x-[22px]" : "translate-x-0.5",
         ].join(" ")}
       />
     </button>
@@ -172,6 +202,51 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
       <span className="text-right text-label-medium text-content-primary">{value}</span>
     </div>
   );
+}
+
+// ── Car silhouettes — iconic line-art per class, one visual family ────────────
+function ClassSilhouette({ type }: { type: CarType }) {
+  const common = { stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+  switch (type) {
+    case "HATCHBACK":
+      return (
+        <svg width="52" height="26" viewBox="0 0 52 26" aria-hidden="true">
+          <path d="M6 18h-2c-1 0-2-1-2-2v-3c0-1 1-2 2.5-2.2L12 9l6-5h13c2 0 4 1 5 2.5L40 11l7 1.5c1.5.3 3 1.5 3 3v1.5c0 1-1 2-2 2h-2" {...common} />
+          <circle cx="13" cy="19" r="4" {...common} />
+          <circle cx="39" cy="19" r="4" {...common} />
+          <path d="M17 19h18" {...common} />
+        </svg>
+      );
+    case "SEDAN":
+      return (
+        <svg width="52" height="26" viewBox="0 0 52 26" aria-hidden="true">
+          <path d="M5 18H3c-1 0-2-1-2-2v-2.5C1 12 2 11 3.5 11L11 10l6-5h14l8 5.5 8 1c1.5.2 3 1.3 3 2.8V16c0 1-1 2-2 2h-2" {...common} />
+          <circle cx="13" cy="19" r="4" {...common} />
+          <circle cx="40" cy="19" r="4" {...common} />
+          <path d="M17 19h19" {...common} />
+        </svg>
+      );
+    case "SUV":
+      return (
+        <svg width="52" height="28" viewBox="0 0 52 28" aria-hidden="true">
+          <path d="M5 20H3c-1 0-2-1-2-2v-5c0-1.5 1-2.5 2.5-2.5H8l4-6h22l6 6h7c1.5 0 3 1 3 2.5V18c0 1-1 2-2 2h-2" {...common} />
+          <circle cx="13" cy="21" r="4" {...common} />
+          <circle cx="40" cy="21" r="4" {...common} />
+          <path d="M17 21h19" {...common} />
+          <path d="M22 4v6" {...common} />
+        </svg>
+      );
+    case "PREMIUM":
+      return (
+        <svg width="52" height="26" viewBox="0 0 52 26" aria-hidden="true">
+          <path d="M4 18H3c-1 0-2-1-2-2v-2c0-1.5 1.2-2.4 2.7-2.6L13 10l7-5h13c3 0 6 1.5 7.5 3.5L42 11l6 1c1.6.3 3 1.4 3 3v1c0 1-1 2-2 2h-2" {...common} />
+          <circle cx="12" cy="19" r="4" {...common} />
+          <circle cx="41" cy="19" r="4" {...common} />
+          <path d="M16 19h21" {...common} />
+          <path d="M31 8l2 3" {...common} />
+        </svg>
+      );
+  }
 }
 
 // ── PlaceInput — debounced Nominatim search with a results dropdown ───────────
@@ -223,8 +298,10 @@ function PlaceInput({
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">{icon}</div>
+      <div className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2.5 border border-white/70
+        transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]
+        focus-within:border-border-accent focus-within:bg-white/80 focus-within:shadow-elevation-1 focus-within:scale-[1.01]">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">{icon}</div>
         <input
           className="flex-1 bg-transparent text-paragraph-medium text-content-primary
             outline-none placeholder:text-content-tertiary"
@@ -245,7 +322,7 @@ function PlaceInput({
         )}
       </div>
       {open && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-sm
+        <div className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-2xl
           border border-border-opaque bg-background-primary shadow-elevation-3">
           {results.map((r, i) => (
             <button
@@ -266,17 +343,46 @@ function PlaceInput({
   );
 }
 
-// ── Main BookingSheet ─────────────────────────────────────────────────────────
-type Snap = "peek" | "half" | "full";
+// ── Payment method icons — one line-icon family ───────────────────────────────
+function PaymentIcon({ method }: { method: PaymentMethod }) {
+  const common = { stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+  switch (method) {
+    case "CASH":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="6" width="20" height="12" rx="2" {...common} />
+          <circle cx="12" cy="12" r="3" {...common} />
+          <path d="M5 9h.01M19 15h.01" {...common} />
+        </svg>
+      );
+    case "UPI":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z" {...common} />
+        </svg>
+      );
+    case "CARD":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="5" width="20" height="14" rx="2" {...common} />
+          <path d="M2 10h20" {...common} />
+          <path d="M6 15h4" {...common} />
+        </svg>
+      );
+    case "WALLET":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 7H5a2 2 0 01-2-2 2 2 0 012-2h13v4" {...common} />
+          <path d="M3 5v13a2 2 0 002 2h15a1 1 0 001-1V8a1 1 0 00-1-1" {...common} />
+          <path d="M17 13h.01" {...common} />
+        </svg>
+      );
+  }
+}
 
+// ── Main BookingSheet ─────────────────────────────────────────────────────────
 export function BookingSheet() {
   const router = useRouter();
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const [snapPoint, setSnapPoint] = useState<Snap>("peek");
-  const dragStartY = useRef(0);
-  const dragStartPx = useRef(0);
-  const isDragging = useRef(false);
-  const [dragPx, setDragPx] = useState<number | null>(null);
   const [cars, setCars] = useState<GarageCar[]>([]);
   // Half-picked car spec (chip taps) until both halves exist and hit the store.
   const [pickedTransmission, setPickedTransmission] = useState<Transmission | null>(null);
@@ -288,11 +394,6 @@ export function BookingSheet() {
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "err">("idle");
   const [bookingState, setBookingState] = useState<"idle" | "loading">("idle");
   const [bookingError, setBookingError] = useState<string | null>(null);
-
-  const bookingFormRef = useRef<HTMLDivElement>(null);
-  const tripTypeRef = useRef<HTMLDivElement>(null);
-  const pickupRef = useRef<HTMLDivElement>(null);
-  const dropoffRef = useRef<HTMLDivElement>(null);
 
   // City config drives the picker's hours + which tiers are offered. Defaults hold
   // until the fetch resolves, and on any failure.
@@ -345,7 +446,7 @@ export function BookingSheet() {
 
   // ── Car spec picker ──────────────────────────────────────────────────────────
   // Booking needs only transmission + class. A garage default (auto-picked above)
-  // prefills both and books as a garage car; tapping any chip switches to a
+  // prefills both and books as a garage car; tapping any control switches to a
   // one-time spec. The store is only written once BOTH halves are known, so the
   // "car" blocker stays up until the spec is complete.
   const specTransmission: Transmission | null =
@@ -380,59 +481,14 @@ export function BookingSheet() {
     : blocker === "dropoff" ? "Add drop-off"
     : blocker === "car" ? "Choose your car"
     : blocker === "fare" ? "Getting fare…"
-    : "Book Driver";
+    : "Confirm Booking";
 
-  // ── Drag/snap logic (3 snaps: peek ~120px, half ~55%, full ~92%) ─────────────
-  // Values are "px from the top of the viewport" where the sheet's top edge sits.
-  // Smaller = sheet pulled further up / more content visible.
-  const getSnapPx = useCallback(() => {
-    const h = sheetRef.current?.offsetHeight ?? (typeof window !== "undefined" ? window.innerHeight : 800);
-    return {
-      peek: h - 120,            // ~120px visible
-      half: Math.round(h * 0.45), // ~55% height visible
-      full: Math.round(h * 0.08), // ~92% height visible
-    };
-  }, []);
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    const snap = getSnapPx();
-    dragStartY.current = e.touches[0].clientY;
-    dragStartPx.current = snap[snapPoint];
-    isDragging.current = true;
+  // Swap pickup and drop — both must render for point-to-point trips.
+  const swapEnds = () => {
+    const p = pickup;
+    setPickup(dropoff);
+    setDropoff(p);
   };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging.current) return;
-    const delta = e.touches[0].clientY - dragStartY.current;
-    const snap = getSnapPx();
-    const clamped = Math.max(snap.full, Math.min(snap.peek, dragStartPx.current + delta));
-    setDragPx(clamped);
-  };
-
-  const onTouchEnd = () => {
-    isDragging.current = false;
-    if (dragPx !== null) {
-      const snap = getSnapPx();
-      // Snap to whichever of the three points is nearest on release.
-      const nearest = (["peek", "half", "full"] as const).reduce((best, key) =>
-        Math.abs(snap[key] - dragPx) < Math.abs(snap[best] - dragPx) ? key : best,
-      "peek");
-      setSnapPoint(nearest);
-      setDragPx(null);
-    }
-  };
-
-  // Tap on the handle cycles peek → half → full → peek.
-  const onHandleTap = () => {
-    setSnapPoint((s) => (s === "peek" ? "half" : s === "half" ? "full" : "peek"));
-  };
-
-  const snap = typeof window !== "undefined" ? getSnapPx() : { peek: 680, half: 360, full: 64 };
-  const translateY = dragPx !== null
-    ? `${dragPx}px`
-    : snapPoint === "peek"
-      ? `calc(100% - 120px)`
-      : `${snap[snapPoint]}px`;
 
   // ── Promo ──────────────────────────────────────────────────────────────────
   const applyPromo = async () => {
@@ -447,7 +503,7 @@ export function BookingSheet() {
 
   // ── Book ───────────────────────────────────────────────────────────────────
   // Tapping the CTA opens a review sheet — it does NOT dispatch. Booking only
-  // happens from the explicit Confirm inside the review (Phase 3).
+  // happens from the explicit confirm inside the review (Phase 3).
   const openReview = () => {
     if (blocker) return;
     setBookingError(null);
@@ -471,89 +527,64 @@ export function BookingSheet() {
 
   const fareBreakdown = fareEstimate?.fare_breakdown;
 
+  // Small breakdown chips under the headline fare — light, secondary.
+  const breakdownChips = fareBreakdown
+    ? [
+        { label: "Base",     paise: fareBreakdown.base_fare_paise },
+        { label: "Distance", paise: fareBreakdown.distance_charge_paise },
+        { label: "Night",    paise: fareBreakdown.night_charge_paise },
+        { label: "Care",     paise: fareBreakdown.d4m_care_paise },
+      ].filter((c) => Number(c.paise) > 0)
+    : [];
+
   return (
     <>
-      {/* ── Bottom sheet ─────────────────────────────────────────────────── */}
-      <div
-        ref={sheetRef}
-        style={{
-          transform: `translateY(${translateY})`,
-          transition: isDragging.current ? "none" : "transform 0.3s cubic-bezier(0.32,0.72,0,1)",
-        }}
-        className="fixed inset-x-0 bottom-0 z-30 flex h-screen flex-col rounded-t-lg
-          bg-background-primary shadow-elevation-3"
-      >
-        {/* Drag handle */}
-        <div
-          className="flex-shrink-0 cursor-grab touch-none px-4 pb-2 pt-3 active:cursor-grabbing"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onClick={onHandleTap}
-        >
-          <div className="mx-auto h-1 w-9 rounded-pill bg-border-opaque" />
+      {/* Bottom padding clears the floating tubelight navbar (+ device safe area). */}
+      <div className="relative pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">
+        {/* Handle — hints the sheet layering over the map */}
+        <div className="flex justify-center pb-1 pt-3">
+          <div className="h-1 w-10 rounded-pill bg-secondary/25 shadow-brand-glow" />
         </div>
 
-        {/* Quick tiles — always visible at top */}
-        <div className="flex-shrink-0">
-          <QuickTiles />
-        </div>
+        {/* Quick tiles */}
+        <QuickTiles />
 
-        {/* Scrollable booking form */}
-        <div ref={bookingFormRef} className="relative flex-1 overflow-y-auto overscroll-contain pb-44">
-
-          <AnimatedBeam
-            containerRef={bookingFormRef}
-            fromRef={tripTypeRef}
-            toRef={pickupRef}
-            curvature={-30}
-            duration={6}
-            pathColor="#4A6FA5"
-            pathWidth={2}
-            pathOpacity={0.12}
-            gradientStartColor="#4A6FA5"
-            gradientStopColor="#1a5cff"
-          />
-          <AnimatedBeam
-            containerRef={bookingFormRef}
-            fromRef={pickupRef}
-            toRef={dropoffRef}
-            curvature={-30}
-            duration={6}
-            pathColor="#4A6FA5"
-            pathWidth={2}
-            pathOpacity={0.12}
-            gradientStartColor="#4A6FA5"
-            gradientStopColor="#1a5cff"
-            reverse
-          />
-
-          {/* [1] Trip Type Selector */}
-          <Section ref={tripTypeRef}>
-            <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+        {/* Bento grid — 6 columns, tiles claim varied footprints for rhythm */}
+        <div className="mx-4 grid grid-cols-6 gap-3 pt-1">
+          {/* [1] Trip type selector — one of the brand moments, panel-free */}
+          <motion.div {...sectionMotion(0)} className="col-span-6">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
               {tripTypes.map((t) => {
                 const disabled = t.value === "MONTHLY";
+                const active = tripType === t.value;
                 return (
-                  <div key={t.value} className="relative">
+                  <div key={t.value} className="relative flex-shrink-0">
                     <button
                       type="button"
                       disabled={disabled}
                       onClick={() => setTripType(t.value)}
                       className={[
-                        "flex-shrink-0 rounded-pill px-4 py-1.5 text-label-medium cursor-pointer",
-                        "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-                        "active:scale-95",
+                        "relative rounded-pill px-4 py-2 text-label-medium cursor-pointer",
+                        "transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
-                        tripType === t.value
-                          ? "bg-background-inverse text-content-inverse shadow-elevation-2"
-                          : "bg-background-secondary text-content-secondary border border-border-opaque hover:text-content-primary hover:bg-background-tertiary",
+                        active
+                          ? "text-content-inverse font-semibold scale-[1.04]"
+                          : "glass-tile text-content-secondary hover:text-content-primary",
                         disabled && "opacity-40 cursor-not-allowed",
                       ].join(" ")}
                     >
-                      {t.label}
+                      {active && (
+                        <motion.span
+                          layoutId="trip-aura"
+                          transition={{ type: "spring", stiffness: 320, damping: 30 }}
+                          className="absolute inset-0 rounded-pill bg-gradient-to-r from-secondary to-secondary-3 shadow-brand-glow"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span className="relative">{t.label}</span>
                     </button>
                     {disabled && (
-                      <span className="absolute -right-1 -top-1 rounded-full bg-surface-warning px-1.5 py-0.5 text-[9px] font-semibold text-content-warning leading-none">
+                      <span className="badge-shimmer absolute -right-1 -top-1 rounded-full bg-surface-warning px-1.5 py-0.5 text-[9px] font-semibold text-content-warning leading-none">
                         Soon
                       </span>
                     )}
@@ -561,63 +592,88 @@ export function BookingSheet() {
                 );
               })}
             </div>
-            {/* Context hint: what the selected trip type means (mirrors the
-                reference design's per-type explainer line). */}
-            <p className="mt-2 text-label-small text-content-positive" aria-live="polite">
+            {/* Context hint: what the selected trip type means. */}
+            <p className="mt-2 px-1 text-label-small text-content-positive" aria-live="polite">
               {tripHint}
             </p>
-          </Section>
+          </motion.div>
 
-          {/* [2] Pickup — current location prefilled by home page; type to search */}
-          <Section ref={pickupRef}>
-            <PlaceInput
-              value={pickup?.address ?? ""}
-              placeholder="Pickup location"
-              icon={<div className="h-3 w-3 rounded-pill bg-accent-400" />}
-              onSelect={setPickup}
-              onClear={() => setPickup(null)}
+          {/* [2] Trip details — fields morph per trip type, container stays */}
+          <GlassSection index={1} span="col-span-6">
+            <TileHeader
+              label="Route"
+              icon={<PinIcon size={14} />}
             />
-          </Section>
-
-          {/* [3] Drop — hidden for Round Trip */}
-          {needsDrop && (
-            <Section ref={dropoffRef}>
-              <PlaceInput
-                value={dropoff?.address ?? ""}
-                placeholder="Where to?"
-                icon={<PinIcon size={14} className="text-content-tertiary" />}
-                onSelect={setDropoff}
-                onClear={() => setDropoff(null)}
-              />
-            </Section>
-          )}
-
-          {/* [4] Add Stop */}
-          {dropoff && needsDrop && (
-            <Section>
-              <button className="flex items-center gap-2 text-label-small text-content-accent hover:opacity-80 min-h-[36px]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                Add stop
-              </button>
-            </Section>
-          )}
-
-          {/* [5] Schedule */}
-          <Section>
-            <div className="flex items-center gap-2">
-              <span className="text-label-small text-content-secondary">When</span>
-              <Chip active={!scheduledAt} onClick={() => setScheduledAt(null)}>Now</Chip>
-              <Chip
-                active={!!scheduledAt}
-                onClick={() => setScheduledAt(defaultSlot(openH, closeH).toISOString())}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={isMonthly ? "monthly" : needsDrop ? "route" : "pickup-only"}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               >
-                Schedule
-              </Chip>
-            </div>
-            {scheduledAt && (
+                {isMonthly ? (
+                  <div className="py-4 text-center">
+                    <p className="text-label-medium text-content-primary">Monthly driver plans are launching soon</p>
+                    <p className="mt-1 text-paragraph-small text-content-secondary">
+                      A dedicated driver for your daily routine — long-term plans arrive shortly.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="relative space-y-2.5">
+                    <PlaceInput
+                      value={pickup?.address ?? ""}
+                      placeholder="Pickup location"
+                      icon={<div className="h-3 w-3 rounded-pill bg-secondary" />}
+                      onSelect={setPickup}
+                      onClear={() => setPickup(null)}
+                    />
+                    {needsDrop && (
+                      <>
+                        {/* Route connector — dotted line from pickup dot to drop pin */}
+                        <div className="pointer-events-none absolute left-[25px] top-[44px] h-[26px] border-l-2 border-dotted border-secondary/35" aria-hidden="true" />
+                        <PlaceInput
+                          value={dropoff?.address ?? ""}
+                          placeholder="Where to?"
+                          icon={<PinIcon size={15} className="text-secondary-3" />}
+                          onSelect={setDropoff}
+                          onClear={() => setDropoff(null)}
+                        />
+                        {/* Swap ends */}
+                        <button
+                          type="button"
+                          onClick={swapEnds}
+                          aria-label="Swap pickup and drop"
+                          className="glass-tile absolute right-2 top-[38px] z-10 flex h-9 w-9 items-center justify-center rounded-full
+                            text-content-secondary transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]
+                            active:scale-90 active:rotate-180 cursor-pointer
+                            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                            <path d="M7 4v13M7 4L4 7M7 4l3 3M17 20V7m0 13l3-3m-3 3l-3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* When — Now / Schedule chips */}
+            {!isMonthly && (
+              <div className="mt-4 flex items-center gap-2 border-t border-white/60 pt-3">
+                <span className="text-label-small text-content-secondary">When</span>
+                <Chip active={!scheduledAt} onClick={() => setScheduledAt(null)}>Now</Chip>
+                <Chip
+                  active={!!scheduledAt}
+                  onClick={() => setScheduledAt(defaultSlot(openH, closeH).toISOString())}
+                >
+                  Schedule
+                </Chip>
+              </div>
+            )}
+            {scheduledAt && !isMonthly && (
               <div className="mt-3">
                 <label htmlFor="schedule-at" className="mb-1 block text-label-small text-content-secondary">
                   Pickup date &amp; time
@@ -630,7 +686,7 @@ export function BookingSheet() {
                   max={toLocalInput(new Date(Date.now() + SCHEDULE_MAX_DAYS * 86_400_000))}
                   value={toLocalInput(new Date(scheduledAt))}
                   onChange={(e) => { if (e.target.value) setScheduledAt(clampToHours(new Date(e.target.value), openH, closeH).toISOString()); }}
-                  className="w-full h-11 rounded-sm border border-border-opaque bg-background-secondary
+                  className="w-full h-11 rounded-2xl border border-white/70 bg-white/55
                     px-3 text-paragraph-medium text-content-primary outline-none transition-base
                     focus:border-border-accent focus:ring-2 focus:ring-accent-400"
                 />
@@ -646,127 +702,148 @@ export function BookingSheet() {
                 </p>
               </div>
             )}
-          </Section>
 
-          {/* [6] Duration slider */}
-          {needsDuration && (
-            <Section>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-paragraph-medium text-content-primary">Duration</span>
-                  <span className="font-mono text-mono-medium text-content-primary tabular-nums">
-                    {durationHours != null ? durationHours : 4}h
-                  </span>
+            {/* Duration — hourly gets block chips; longer trips keep the slider */}
+            {needsDuration && !isMonthly && (
+              tripType === "IN_CITY_HOURLY" ? (
+                <div className="mt-4 border-t border-white/60 pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-label-small text-content-secondary">Duration</span>
+                    {HOURLY_BLOCKS.map((h) => (
+                      <Chip key={h} active={durationHours === h} onClick={() => setDurationHours(h)}>
+                        {h}h
+                      </Chip>
+                    ))}
+                  </div>
                 </div>
-                {/* Custom slider track */}
-                <div className="relative h-2 rounded-pill bg-background-tertiary">
-                  <div
-                    className="absolute left-0 top-0 h-full rounded-pill bg-background-inverse transition-all"
-                    style={{ width: `${(((durationHours ?? 4) - 1) / 11) * 100}%` }}
+              ) : (
+                <div className="mt-4 space-y-2 border-t border-white/60 pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-label-small text-content-secondary">Duration</span>
+                    <span className="font-mono text-mono-medium text-content-primary tabular-nums">
+                      {durationHours != null ? durationHours : 4}h
+                    </span>
+                  </div>
+                  <div className="relative h-2 rounded-pill bg-background-tertiary">
+                    <div
+                      className="absolute left-0 top-0 h-full rounded-pill bg-gradient-to-r from-secondary to-secondary-3 transition-all"
+                      style={{ width: `${(((durationHours ?? 4) - 1) / 11) * 100}%` }}
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={12}
+                    step={1}
+                    value={durationHours ?? 4}
+                    onChange={(e) => setDurationHours(Number(e.target.value))}
+                    className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
+                    aria-label="Trip duration in hours"
+                    style={{ marginTop: '-8px', position: 'relative' }}
                   />
+                  <div className="flex justify-between text-label-small text-content-secondary">
+                    <span>1h</span>
+                    <span>12h</span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={12}
-                  step={1}
-                  value={durationHours ?? 4}
-                  onChange={(e) => setDurationHours(Number(e.target.value))}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
-                  aria-label="Trip duration in hours"
-                  style={{ marginTop: '-8px', position: 'relative' }}
-                />
-                <div className="flex justify-between text-label-small text-content-secondary">
-                  <span>1h</span>
-                  <span>12h</span>
-                </div>
-              </div>
-            </Section>
-          )}
+              )
+            )}
+          </GlassSection>
 
-          {/* [7] Car spec — transmission + class, nothing else to fill */}
-          <Section>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CarIcon size={18} className="text-content-tertiary" />
-                <span className="text-paragraph-medium text-content-primary">Your car</span>
-              </div>
-              <div className="flex gap-2">
-                {TRANSMISSIONS.map((t) => (
-                  <Chip
+          {/* [3] Car preference — segmented transmission + class carousel */}
+          <GlassSection index={2} span="col-span-6">
+            <TileHeader label="Your car" icon={<CarIcon size={15} />} />
+            {/* Transmission — luxury segmented control with a gliding thumb */}
+            <div className="relative flex rounded-pill bg-white/50 p-1 border border-white/70 shadow-[inset_0_1px_3px_rgba(15,30,80,0.06)]">
+              {TRANSMISSIONS.map((t) => {
+                const active = specTransmission === t.value;
+                return (
+                  <button
                     key={t.value}
-                    active={specTransmission === t.value}
+                    type="button"
                     onClick={() => chooseTransmission(t.value)}
+                    className={[
+                      "relative flex-1 rounded-pill py-2.5 text-label-medium cursor-pointer",
+                      "transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
+                      active ? "text-content-inverse font-semibold" : "text-content-secondary hover:text-content-primary",
+                    ].join(" ")}
                   >
-                    {t.label}
-                  </Chip>
-                ))}
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-                {CAR_CLASSES.map((c) => (
-                  <Chip
+                    {active && (
+                      <motion.span
+                        layoutId="trans-thumb"
+                        transition={{ type: "spring", stiffness: 360, damping: 32 }}
+                        className="absolute inset-0 rounded-pill bg-gradient-to-r from-secondary to-secondary-2 shadow-brand-glow"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="relative">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Car class — horizontal snap carousel of silhouette cards */}
+            <div
+              key={specTransmission ?? "none"}
+              className="mt-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 scrollbar-none"
+            >
+              {CAR_CLASSES.map((c, i) => {
+                const active = specClass === c.value;
+                return (
+                  <motion.button
                     key={c.value}
-                    active={specClass === c.value}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.04 * i, ease: [0.22, 1, 0.36, 1] }}
+                    type="button"
                     onClick={() => chooseClass(c.value)}
+                    className={[
+                      "min-w-[118px] flex-shrink-0 snap-start rounded-2xl px-3 py-3 text-left cursor-pointer",
+                      "transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
+                      active
+                        ? "bg-white/85 border-2 border-secondary shadow-brand-glow -translate-y-0.5"
+                        : "glass-tile border border-white/65 opacity-85 hover:opacity-100",
+                    ].join(" ")}
+                    aria-pressed={active}
+                    aria-label={c.label}
                   >
-                    {c.label}
-                  </Chip>
-                ))}
-              </div>
-              {selectedCar && (
-                <p className="text-label-small text-content-secondary">
-                  Booking with your {selectedCar.make} {selectedCar.model} ({selectedCar.registration_plate})
-                </p>
-              )}
+                    <span className={active ? "text-secondary" : "text-content-tertiary"}>
+                      <ClassSilhouette type={c.value} />
+                    </span>
+                    <span className="mt-1.5 block text-label-medium text-content-primary">{c.label}</span>
+                    <span className="mt-0.5 block text-label-small text-content-secondary">
+                      {c.seats} seats · {c.bags} bags
+                    </span>
+                  </motion.button>
+                );
+              })}
             </div>
-          </Section>
 
-          {/* [8] Persons stepper */}
-          <Section>
-            <div className="flex items-center justify-between">
-              <span className="text-paragraph-medium text-content-primary">Persons</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPersonsCount(personsCount - 1)}
-                  disabled={personsCount <= 1}
-                  aria-label="Decrease persons"
-                  className="flex h-11 w-11 items-center justify-center rounded-sm
-                    bg-background-secondary border border-border-opaque
-                    text-label-large text-content-primary
-                    disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
-                    hover:bg-background-tertiary transition-base
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
-                >
-                  −
-                </button>
-                <span className="font-mono text-mono-medium text-content-primary tabular-nums w-4 text-center">
-                  {personsCount}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPersonsCount(personsCount + 1)}
-                  disabled={personsCount >= 8}
-                  aria-label="Increase persons"
-                  className="flex h-11 w-11 items-center justify-center rounded-sm
-                    bg-background-secondary border border-border-opaque
-                    text-label-large text-content-primary
-                    disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
-                    hover:bg-background-tertiary transition-base
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </Section>
+            {selectedCar && (
+              <p className="mt-3 text-label-small text-content-secondary">
+                Booking with your {selectedCar.make} {selectedCar.model} ({selectedCar.registration_plate})
+              </p>
+            )}
+          </GlassSection>
 
-          {/* [9] Fare Estimate Strip */}
-          <Section>
+          {/* [4] Fare estimate + promo — the commercial hero tile */}
+          <GlassSection
+            index={3}
+            span="col-span-6"
+            className="border-2 border-secondary/15 bg-white/70"
+          >
+            <TileHeader label="Estimated fare" />
             {isSearching && !fareEstimate ? (
               <FareShimmer />
             ) : fareEstimate ? (
-              <div className="relative space-y-2 overflow-hidden rounded-sm">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="relative space-y-2 overflow-hidden rounded-xl"
+              >
                 <BorderBeam size={60} duration={8} colorFrom="#1a5cff" colorTo="rgba(26,92,255,0.05)" borderWidth={1} delay={0.5} />
                 <div className="flex items-start justify-between">
                   <div>
@@ -778,94 +855,38 @@ export function BookingSheet() {
                           {fareBreakdown?.surge_multiplier?.toFixed(1)}× surge
                         </span>
                       )}
-                      {(fareBreakdown?.night_charge_paise ?? 0) > 0 && (
-                        <span title="Night charge" className="inline-flex text-content-tertiary">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-                          </svg>
-                        </span>
-                      )}
                     </div>
                     <p className="text-paragraph-small text-content-secondary mt-0.5">
-                      Estimated fare · {fareEstimate.driver_availability} availability
+                      {fareEstimate.driver_availability} availability · ~{fareEstimate.estimated_pickup_eta_minutes} min pickup
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowFareModal(true)}
-                      className="text-label-small text-content-accent hover:opacity-80 mt-0.5
-                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
-                    >
-                      Fare breakdown →
-                    </button>
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono text-mono-small text-content-secondary tabular-nums">
-                      ~{fareEstimate.estimated_pickup_eta_minutes} min
-                    </span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFareModal(true)}
+                    className="text-label-small text-content-accent hover:opacity-80
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                  >
+                    Breakdown →
+                  </button>
                 </div>
-              </div>
+                {breakdownChips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {breakdownChips.map((c) => (
+                      <span key={c.label} className="rounded-pill bg-white/60 border border-white/70 px-2 py-0.5 text-label-small text-content-secondary">
+                        {c.label} <FareDisplay amount={Number(c.paise)} size="sm" />
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
             ) : (
               <p className="text-paragraph-small text-content-tertiary">
-                Enter pickup to see fare estimate
+                Set your route and car to see the fare
               </p>
             )}
-          </Section>
 
-          {/* [10] D4M Care toggle */}
-          <Section>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center text-content-accent">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 3l7 3v5c0 4.4-3 7.4-7 8.5-4-1.1-7-4.1-7-8.5V6l7-3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <div>
-                  <span className="text-label-medium text-content-primary">D4M Care</span>
-                  <p className="text-paragraph-small text-content-secondary">
-                    ₹49 — Insurance + support
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowD4mInfo(true)}
-                  className="ml-1 text-content-tertiary hover:text-content-secondary min-w-[24px] min-h-[24px] flex items-center justify-center
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 rounded-pill"
-                  aria-label="D4M Care info"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-              <Toggle on={d4mCare} onToggle={() => setD4mCare(!d4mCare)} />
-            </div>
-          </Section>
-
-          {/* [10b] Owner-not-in-car toggle */}
-          <Section>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center text-content-secondary">
-                  <CarIcon size={20} />
-                </span>
-                <div>
-                  <span className="text-label-medium text-content-primary">I won&apos;t be in the car</span>
-                  <p className="text-paragraph-small text-content-secondary">
-                    Driver takes the car without me
-                  </p>
-                </div>
-              </div>
-              <Toggle on={ownerNotInCar} onToggle={() => setOwnerNotInCar(!ownerNotInCar)} />
-            </div>
-          </Section>
-
-          {/* [11] Promo Code */}
-          <Section>
-            <div className="flex items-center gap-2">
+            {/* Promo code */}
+            <div className="mt-4 flex items-center gap-2 border-t border-white/60 pt-3">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
                 <path d="M7 7h.01M17 17h.01M3 12l9-9 9 9-9 9-9-9z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-content-tertiary" />
               </svg>
@@ -877,9 +898,15 @@ export function BookingSheet() {
                 onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoStatus("idle"); }}
               />
               {promoStatus === "ok" && (
-                <span className="flex items-center text-content-positive" aria-label="Promo applied">
+                <motion.span
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="flex items-center text-content-positive"
+                  aria-label="Promo applied"
+                >
                   <CheckIcon size={16} />
-                </span>
+                </motion.span>
               )}
               {promoStatus === "err" && (
                 <span className="text-content-negative text-label-small" role="status">Invalid</span>
@@ -888,10 +915,9 @@ export function BookingSheet() {
                 type="button"
                 onClick={applyPromo}
                 disabled={!promoInput}
-                className="rounded-sm bg-background-secondary border border-border-opaque
-                  px-3 py-1.5 text-label-small text-content-accent font-medium
+                className="glass-tile rounded-pill px-3 py-1.5 text-label-small text-content-accent font-medium
                   disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
-                  hover:bg-background-tertiary transition-base
+                  transition-transform duration-200 active:scale-95
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
                 Apply
@@ -905,51 +931,183 @@ export function BookingSheet() {
             {promoStatus === "err" && (
               <p className="mt-1.5 text-label-small text-content-negative">Invalid or expired code</p>
             )}
-          </Section>
+          </GlassSection>
 
-          {/* [12] Payment Method */}
-          <Section>
-            <div className="flex gap-2">
-              {PAYMENT_METHODS.map((pm) => (
-                <Chip key={pm.value} active={paymentMethod === pm.value} onClick={() => setPaymentMethod(pm.value)}>
-                  {pm.label}
-                </Chip>
-              ))}
+          {/* [5a] D4M Care — square bento tile */}
+          <GlassSection
+            index={4}
+            span="col-span-3"
+            className={d4mCare ? "bg-positive-50/70 shadow-[0_0_20px_rgba(58,157,104,0.14)] transition-all duration-300" : "transition-all duration-300"}
+          >
+            <div className="flex h-full flex-col">
+              <div className="flex items-start justify-between">
+                <motion.span
+                  animate={d4mCare ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  className={["flex h-7 w-7 items-center justify-center", d4mCare ? "text-content-positive" : "text-content-accent"].join(" ")}
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3l7 3v5c0 4.4-3 7.4-7 8.5-4-1.1-7-4.1-7-8.5V6l7-3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </motion.span>
+                <button
+                  type="button"
+                  onClick={() => setShowD4mInfo(true)}
+                  className="text-content-tertiary hover:text-content-secondary min-w-[24px] min-h-[24px] flex items-center justify-center
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 rounded-pill"
+                  aria-label="D4M Care info"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+              <span className="mt-2 text-label-medium font-semibold text-content-primary">D4M Care</span>
+              <p className="text-label-small text-content-secondary">₹49 — Insurance + support</p>
+              <div className="mt-auto pt-3">
+                <Toggle on={d4mCare} onToggle={() => setD4mCare(!d4mCare)} />
+              </div>
             </div>
-          </Section>
+          </GlassSection>
 
-          {/* [13] Book Driver CTA */}
-          <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
+          {/* [5b] Owner not in car — square bento tile, warmer cue */}
+          <GlassSection
+            index={4}
+            span="col-span-3"
+            className={ownerNotInCar ? "bg-warning-50/70 transition-all duration-300" : "transition-all duration-300"}
+          >
+            <div className="flex h-full flex-col">
+              <span className="flex h-7 w-7 items-center justify-center text-content-secondary">
+                <CarIcon size={22} />
+              </span>
+              <span className="mt-2 text-label-medium font-semibold text-content-primary">I won&apos;t be in the car</span>
+              <p className="text-label-small text-content-secondary">Driver takes the car without me</p>
+              <AnimatePresence>
+                {ownerNotInCar && (
+                  <motion.p
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    className="mt-1 overflow-hidden text-label-small text-content-warning"
+                  >
+                    Verified driver · GPS-tracked end to end.
+                  </motion.p>
+                )}
+              </AnimatePresence>
+              <div className="mt-auto pt-3">
+                <Toggle on={ownerNotInCar} onToggle={() => setOwnerNotInCar(!ownerNotInCar)} tone="warm" />
+              </div>
+            </div>
+          </GlassSection>
+
+          {/* [6a] Payment — 2×2 method grid */}
+          <GlassSection index={5} span="col-span-4">
+            <TileHeader label="Payment" />
+            <div className="grid grid-cols-2 gap-2">
+              {PAYMENT_METHODS.map((pm) => {
+                const active = paymentMethod === pm.value;
+                return (
+                  <button
+                    key={pm.value}
+                    type="button"
+                    onClick={() => setPaymentMethod(pm.value)}
+                    aria-pressed={active}
+                    className={[
+                      "relative flex flex-col items-center gap-1 rounded-2xl py-2.5 cursor-pointer",
+                      "transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
+                      active
+                        ? "bg-white/85 border-2 border-secondary shadow-brand-glow"
+                        : "glass-tile border border-white/65",
+                    ].join(" ")}
+                  >
+                    <span className={active ? "text-secondary" : "text-content-tertiary"}>
+                      <PaymentIcon method={pm.value} />
+                    </span>
+                    <span className="text-label-small text-content-primary">{pm.label}</span>
+                    {active && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-white">
+                        <CheckIcon size={11} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </GlassSection>
+
+          {/* [6b] Persons — compact bento tile */}
+          <GlassSection index={5} span="col-span-2">
+            <div className="flex h-full flex-col items-center">
+              <span className="text-label-medium font-semibold text-content-primary">Persons</span>
+              <span className="my-auto font-mono text-heading-medium text-content-primary tabular-nums">
+                {personsCount}
+              </span>
+              <div className="flex gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPersonsCount(personsCount - 1)}
+                  disabled={personsCount <= 1}
+                  aria-label="Decrease persons"
+                  className="glass-tile flex h-10 w-10 items-center justify-center rounded-xl
+                    text-label-large text-content-primary
+                    disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
+                    transition-transform duration-200 active:scale-90
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPersonsCount(personsCount + 1)}
+                  disabled={personsCount >= 8}
+                  aria-label="Increase persons"
+                  className="glass-tile flex h-10 w-10 items-center justify-center rounded-xl
+                    text-label-large text-content-primary
+                    disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed
+                    transition-transform duration-200 active:scale-90
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </GlassSection>
+
+          {/* [7] Hero confirm CTA */}
+          <motion.div {...sectionMotion(6)} className="col-span-6 pt-2">
             {bookingError && (
               <p role="alert" className="mb-2 text-label-small text-content-negative">
                 {bookingError}
               </p>
             )}
-            <CoolMode>
-              <RainbowButton
-                type="button"
-                disabled={!!blocker || isMonthly || bookingState === "loading"}
-                onClick={openReview}
-                aria-live="polite"
-                className="h-14 w-full text-label-large font-medium text-content-inverse cursor-pointer
-                  shadow-[0_4px_16px_rgba(0,0,0,0.24)]
-                  active:scale-[0.99]
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
-              >
-                {bookingState === "loading" ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
-                    </svg>
-                    Finding drivers…
-                  </span>
-                ) : (
-                  <span>{ctaLabel}</span>
-                )}
-              </RainbowButton>
-            </CoolMode>
-          </div>
+            <button
+              type="button"
+              disabled={!!blocker || isMonthly || bookingState === "loading"}
+              onClick={openReview}
+              aria-live="polite"
+              className="cta-sheen h-16 w-full rounded-pill text-label-large font-semibold text-content-inverse cursor-pointer
+                bg-gradient-to-r from-secondary via-secondary-2 to-secondary-3
+                shadow-brand-glow
+                transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.98]
+                disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
+            >
+              {bookingState === "loading" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
+                  </svg>
+                  Finding drivers…
+                </span>
+              ) : (
+                <span>{ctaLabel}</span>
+              )}
+            </button>
+          </motion.div>
         </div>
       </div>
 
@@ -964,7 +1122,7 @@ export function BookingSheet() {
           aria-label="Review booking"
         >
           <div
-            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
+            className="rounded-t-[2rem] bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
@@ -997,17 +1155,17 @@ export function BookingSheet() {
               type="button"
               onClick={confirmBooking}
               disabled={bookingState === "loading"}
-              className="mt-4 h-14 w-full rounded-sm bg-secondary text-content-inverse text-label-large font-medium
-                cursor-pointer transition-transform active:scale-[0.99]
+              className="mt-4 h-14 w-full rounded-pill bg-gradient-to-r from-secondary to-secondary-3 text-content-inverse text-label-large font-semibold
+                cursor-pointer transition-transform active:scale-[0.99] shadow-brand-glow
                 disabled:opacity-50 disabled:cursor-not-allowed
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
             >
-              {bookingState === "loading" ? "Finding drivers…" : "Confirm booking"}
+              {bookingState === "loading" ? "Finding drivers…" : "Book Driver"}
             </button>
             <button
               type="button"
               onClick={() => setShowReview(false)}
-              className="mt-2 h-11 w-full rounded-sm text-label-medium text-content-secondary hover:text-content-primary cursor-pointer"
+              className="mt-2 h-11 w-full rounded-pill text-label-medium text-content-secondary hover:text-content-primary cursor-pointer"
             >
               Back
             </button>
@@ -1027,7 +1185,7 @@ export function BookingSheet() {
           aria-label="Fare breakdown"
         >
           <div
-            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
+            className="rounded-t-[2rem] bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
@@ -1083,7 +1241,7 @@ export function BookingSheet() {
           aria-label="D4M Care information"
         >
           <div
-            className="rounded-t-2xl bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
+            className="rounded-t-[2rem] bg-background-primary/95 backdrop-blur-xl p-4 shadow-elevation-3 animate-spring-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border-opaque/60" />
@@ -1096,9 +1254,9 @@ export function BookingSheet() {
             <button
               type="button"
               onClick={() => setShowD4mInfo(false)}
-              className="mt-5 w-full h-11 rounded-sm bg-background-secondary border border-border-opaque
+              className="mt-5 w-full h-11 rounded-pill glass-tile
                 text-label-medium text-content-primary cursor-pointer
-                hover:bg-background-tertiary transition-base
+                transition-transform duration-200 active:scale-[0.98]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               Got it

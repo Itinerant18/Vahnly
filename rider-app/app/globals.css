@@ -473,6 +473,123 @@ body {
 .delay-400 { animation-delay: 400ms; }
 
 /* ─────────────────────────────────────────────
+   GLASS HOME — premium booking surface
+   ───────────────────────────────────────────── */
+
+/* Frosted glass tiers. -tile for small chips/tiles, -panel for section cards,
+   -sheet for the main booking surface over the map. */
+.glass-tile {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 12px rgba(15, 30, 80, 0.05);
+}
+.glass-panel {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 8px 32px rgba(15, 30, 80, 0.07);
+}
+.glass-sheet {
+  background: rgba(250, 251, 254, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 -12px 48px rgba(15, 30, 80, 0.1);
+}
+
+/* Ambient light shapes — sit far behind the sheet content. Fixed +
+   pointer-events-none so they never repaint on scroll. */
+.ambient-glows {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ambient-glows::before,
+.ambient-glows::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  animation: auraDrift 24s ease-in-out infinite alternate;
+}
+.ambient-glows::before {
+  width: 60vw; height: 60vw;
+  left: -20vw; top: 18%;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.16), transparent 70%);
+}
+.ambient-glows::after {
+  width: 55vw; height: 55vw;
+  right: -18vw; bottom: 6%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.12), transparent 70%);
+  animation-delay: -12s;
+}
+@keyframes auraDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(4vw, -3vh, 0) scale(1.12); }
+}
+
+/* Hero CTA sheen — a slow gloss sweep at long intervals. */
+.cta-sheen { position: relative; overflow: hidden; }
+.cta-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; width: 40%;
+  left: -60%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: ctaSheen 6s var(--ease-out-quint) infinite;
+  pointer-events: none;
+}
+@keyframes ctaSheen {
+  0%, 72% { left: -60%; }
+  88%     { left: 120%; }
+  100%    { left: 120%; }
+}
+
+/* Occasional shimmer for the Monthly "Soon" badge. */
+.badge-shimmer {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: badgeShimmer 5s ease-in-out infinite;
+}
+@keyframes badgeShimmer {
+  0%, 70% { background-position: 120% 0; }
+  100%    { background-position: -60% 0; }
+}
+
+/* Soft pulsing map marker (service-readiness pin). */
+.pin-pulse { position: relative; }
+.pin-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: rgba(0, 64, 224, 0.18);
+  animation: pinPulse 2.4s var(--ease-out-quint) infinite;
+}
+@keyframes pinPulse {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  70%  { transform: scale(1.25); opacity: 0; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-glows::before, .ambient-glows::after,
+  .cta-sheen::after, .badge-shimmer, .pin-pulse::before {
+    animation: none;
+  }
+}
+
+/* ─────────────────────────────────────────────
    DS5 REDUCED MOTION (must be last)
    ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

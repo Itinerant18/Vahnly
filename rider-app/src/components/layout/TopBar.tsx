@@ -16,8 +16,8 @@ export function TopBar() {
   const activeOrder = useTripStore((s) => s.activeOrder);
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 glass-solid">
-      {/* City selector */}
+    <div className="flex items-center justify-between px-4 py-3">
+      {/* City selector — floating glass chip over the map */}
       <div className="relative">
         <button
           onClick={() => setCityOpen((o) => !o)}
@@ -25,7 +25,7 @@ export function TopBar() {
           aria-expanded={cityOpen}
           aria-haspopup="listbox"
           aria-controls="city-listbox"
-          className="flex items-center gap-1.5 rounded-full bg-background-tertiary px-4 py-2 text-sm font-semibold text-content-primary active:scale-95 transition-transform"
+          className="glass-tile flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-content-primary active:scale-95 transition-transform"
         >
           <span className="h-2 w-2 rounded-full bg-status-online" />
           {city}
@@ -55,7 +55,7 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         {/* Notification bell */}
         <div className="relative">
-          <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="flex h-11 w-11 items-center justify-center rounded-full bg-background-tertiary active:scale-90 transition-transform">
+          <button onClick={() => router.push("/account/notifications")} aria-label="Notifications" className="glass-tile flex h-11 w-11 items-center justify-center rounded-full active:scale-90 transition-transform">
             <BellIcon size={20} className="text-content-primary" />
           </button>
           {unreadCount > 0 && (

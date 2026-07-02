@@ -57,7 +57,7 @@ describe('BookingSheet', () => {
     expect(screen.getByRole('button', { name: 'Choose your car' })).toBeDisabled();
   });
 
-  it('enables "Book Driver" only once pickup, car and fare are all present', () => {
+  it('enables "Confirm Booking" only once pickup, car and fare are all present', () => {
     storeState = baseStore({
       pickup: { lat: 22.5, lng: 88.3, address: 'Home' },
       selectedCarId: 'car-1',
@@ -67,10 +67,10 @@ describe('BookingSheet', () => {
       },
     });
     render(<BookingSheet />);
-    expect(screen.getByRole('button', { name: 'Book Driver' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Confirm Booking' })).toBeEnabled();
   });
 
-  it('tapping Book opens a review sheet — only Confirm dispatches', async () => {
+  it('tapping Confirm opens a review sheet — only the review CTA dispatches', async () => {
     storeState = baseStore({
       pickup: { lat: 22.5, lng: 88.3, address: 'Home' },
       selectedCarId: 'car-1',
@@ -80,9 +80,9 @@ describe('BookingSheet', () => {
       },
     });
     render(<BookingSheet />);
-    await userEvent.click(screen.getByRole('button', { name: 'Book Driver' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     expect(bookDriver).not.toHaveBeenCalled(); // review shown, not booked yet
-    await userEvent.click(screen.getByRole('button', { name: 'Confirm booking' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Book Driver' }));
     expect(bookDriver).toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe('BookingSheet', () => {
       },
     });
     render(<BookingSheet />);
-    await userEvent.click(screen.getByRole('button', { name: 'Book Driver' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     expect(screen.getByText('SUV · Automatic')).toBeInTheDocument();
   });
 

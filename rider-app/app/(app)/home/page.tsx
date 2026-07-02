@@ -11,7 +11,6 @@ import { useTripStore } from "@/lib/store/tripStore";
 import { nearbyApi, type NearbyDriver } from "@/lib/api/nearby";
 import { cityConfigApi } from "@/lib/api/cityConfig";
 import { BlurFade } from "@/components/ui/blur-fade";
-import { ScrollVelocityRow } from "@/components/ui/scroll-based-velocity";
 
 // Leaflet must be lazily loaded — no SSR
 const RiderMap = dynamic(() => import("@/components/map/RiderMap"), {
@@ -79,41 +78,43 @@ export default function HomePage() {
   }, [userLocation]);
 
   return (
-    <BlurFade duration={0.5} className="relative h-[100dvh] w-full overflow-hidden bg-background-secondary" style={{ paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}>
-      {/* Map — full screen behind everything */}
-      <div className="absolute inset-0 z-0">
-        <RiderMap
-          center={mapCenter}
-          nearbyDrivers={nearbyDrivers}
-          onRecenter={handleRecenter}
-        />
-      </div>
+    <BlurFade duration={0.5} className="relative h-[100dvh] w-full overflow-y-auto overscroll-contain bg-background-secondary" style={{ paddingBottom: 'env(safe-area-inset-bottom)' } as React.CSSProperties}>
+      {/* Ambient light shapes — far behind everything, fixed so scroll never repaints */}
+      <div className="ambient-glows" aria-hidden="true" />
 
-      {/* Top bar — floats above map; sets --topbar-offset for sibling elements */}
-      <div className="absolute inset-x-0 top-0 z-20" style={{ '--topbar-offset': '64px' } as React.CSSProperties}>
-        <TopBar />
-      </div>
-
-      {/* Marquee tagline — positioned below TopBar via CSS variable */}
-      <div className="absolute inset-x-0 z-10" style={{ top: 'var(--topbar-offset)' }}>
-        <ScrollVelocityRow baseVelocity={0.8} className="text-[10px] text-content-tertiary/30 tracking-[0.2em] uppercase">
-          Driver on demand · Safe rides · 24/7 support · Cashless payments ·
-        </ScrollVelocityRow>
-      </div>
-
-      {/* Geolocation-denied banner */}
-      {geoError && (
-        <div className="absolute left-1/2 z-10 mt-2 -translate-x-1/2" style={{ top: 'calc(var(--topbar-offset) + 8px)' }}>
-          <div className="rounded-full bg-surface-negative/90 px-4 py-1.5 text-xs font-medium text-content-negative backdrop-blur-sm">
-            Location unavailable — showing default area
-          </div>
+      {/* Map hero — upper third, rounded into the booking sheet below */}
+      <section className="relative h-[42dvh] min-h-[280px] overflow-hidden rounded-b-[2rem] shadow-elevation-2">
+        <div className="absolute inset-0 z-0">
+          <RiderMap
+            center={mapCenter}
+            nearbyDrivers={nearbyDrivers}
+            onRecenter={handleRecenter}
+          />
         </div>
-      )}
+        {/* Soft fade at the hero's lower edge into the sheet */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-b from-transparent to-white/45" />
 
-      {/* Booking bottom sheet — floats above map */}
-      <SentryErrorBoundary name="rider-booking">
-        <BookingSheet />
-      </SentryErrorBoundary>
+        {/* Floating utility bar */}
+        <div className="absolute inset-x-0 top-0 z-20">
+          <TopBar />
+        </div>
+
+        {/* Geolocation-denied banner */}
+        {geoError && (
+          <div className="absolute left-1/2 top-[68px] z-10 -translate-x-1/2">
+            <div className="rounded-full bg-surface-negative/90 px-4 py-1.5 text-xs font-medium text-content-negative backdrop-blur-sm">
+              Location unavailable — showing default area
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Booking sheet — glass surface emerging from the map's lower edge */}
+      <section className="glass-sheet relative z-10 -mt-6 rounded-t-[2rem]">
+        <SentryErrorBoundary name="rider-booking">
+          <BookingSheet />
+        </SentryErrorBoundary>
+      </section>
     </BlurFade>
   );
 }
