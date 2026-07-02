@@ -142,10 +142,14 @@ func (h *SupportHandler) HandleCreateTicket(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Seed the thread with the opening message (sender_type USER satisfies the CHECK).
-	_, _ = h.db.Exec(ctx, `
+	// The ticket row exists either way; losing the rider's complaint text silently
+	// would leave an empty thread, so at least log the failure.
+	if _, mErr := h.db.Exec(ctx, `
 		INSERT INTO ticket_messages (ticket_id, sender_id, sender_name, sender_type, message_type, content, created_at)
 		VALUES ($1, $2::uuid, $3, 'USER', 'CHAT', $4, NOW())`,
-		ticketID, riderID, name, req.Message)
+		ticketID, riderID, name, req.Message); mErr != nil && h.logger != nil {
+		h.logger.Printf("[RIDER_SUPPORT] ticket %s created but opening message insert failed: %v", ticketID, mErr)
+	}
 
 	writeData(w, http.StatusCreated, supportTicket{
 		ID: ticketID, Subject: req.Subject, Category: category, Status: "OPEN",
@@ -215,9 +219,15 @@ func (h *SupportHandler) HandleGetTicket(w http.ResponseWriter, r *http.Request)
 	t.UserType = "RIDER"
 
 	messages := make([]supportTicketMessage, 0)
-	if rows, qerr := h.db.Query(ctx, `
+	rows, qerr := h.db.Query(ctx, `
 		SELECT id::text, sender_type, COALESCE(content, ''), created_at
-		FROM ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC`, ticketID); qerr == nil {
+		FROM ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC`, ticketID)
+	if qerr != nil {
+		// A failed messages query must not masquerade as an empty thread.
+		h.internal(w, qerr)
+		return
+	}
+	{
 		defer rows.Close()
 		for rows.Next() {
 			var m supportTicketMessage
@@ -258,10 +268,14 @@ func (h *SupportHandler) HandleReplyTicket(w http.ResponseWriter, r *http.Reques
 
 	var owned bool
 	var name *string
-	_ = h.db.QueryRow(ctx, `
+	if err := h.db.QueryRow(ctx, `
 		SELECT EXISTS(SELECT 1 FROM support_tickets WHERE id = $1 AND creator_id = $2::uuid AND creator_type = 'RIDER'),
 		       (SELECT name FROM riders WHERE id = $2::uuid)`,
-		ticketID, riderID).Scan(&owned, &name)
+		ticketID, riderID).Scan(&owned, &name); err != nil {
+		// A DB outage must surface as 500, not "ticket not found".
+		h.internal(w, err)
+		return
+	}
 	if !owned {
 		writeError(w, http.StatusNotFound, "ticket not found", "ERR_NOT_FOUND")
 		return

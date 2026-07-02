@@ -72,7 +72,9 @@ func parseFloatDefault(s string, def float64) float64 {
 	if s == "" {
 		return def
 	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
+	// ParseFloat accepts "NaN"/"Inf" without error; NaN/Inf coordinates make the
+	// JSON encoder fail after the 200 header is written. Clamp to real geo bounds.
+	if f, err := strconv.ParseFloat(s, 64); err == nil && f >= -180 && f <= 180 {
 		return f
 	}
 	return def

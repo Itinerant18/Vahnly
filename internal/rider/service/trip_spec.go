@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"slices"
 	"strings"
 )
 
@@ -14,22 +15,31 @@ var ErrDropoffRequired = errors.New("this trip type requires a drop-off location
 // guides, backend enforces).
 type tripSpec struct {
 	NeedsDropoff bool
-	Bookable     bool // false = estimate-only (e.g. MONTHLY until recurring billing lands)
+	Bookable     bool     // false = estimate-only (e.g. MONTHLY until recurring billing lands)
+	Packages     []string // allowed package_type values; "" entry = metered allowed
 }
 
 var tripSpecs = map[string]tripSpec{
-	"IN_CITY_ONE_WAY": {NeedsDropoff: true, Bookable: true},
-	"IN_CITY_ROUND":   {Bookable: true},
-	"IN_CITY_HOURLY":  {Bookable: true},
-	"MINI_OUTSTATION": {NeedsDropoff: true, Bookable: true}, // retired tier, still valid for old clients
-	"OUTSTATION":      {NeedsDropoff: true, Bookable: true},
-	"MONTHLY":         {},
+	"IN_CITY_ONE_WAY": {NeedsDropoff: true, Bookable: true, Packages: []string{""}},
+	// ROUND is currently metered (package empty). Known product gap: with no
+	// dropoff the metered fare is base-only — pricing model decision pending.
+	"IN_CITY_ROUND":  {Bookable: true, Packages: []string{""}},
+	"IN_CITY_HOURLY": {Bookable: true, Packages: []string{PackageHourly}},
+	// retired tier, still valid for old clients; prices as single-day OUTSTATION
+	"MINI_OUTSTATION": {NeedsDropoff: true, Bookable: true, Packages: []string{PackageMiniOutstation, PackageOutstation}},
+	"OUTSTATION":      {NeedsDropoff: true, Bookable: true, Packages: []string{PackageOutstation}},
+	"MONTHLY":         {Packages: []string{PackageMonthly}},
 }
 
 // validateTrip gates fare estimates and order creation on the trip-type spec.
 // Empty trip_type stays lenient (legacy clients estimate metered point-to-point
 // with no dropoff requirement); an unknown non-empty value is rejected.
-func validateTrip(tripType string, hasDropoff bool) error {
+//
+// The package coupling closes a pricing hole: without it, an HOURLY or
+// OUTSTATION trip sent with an empty package_type would silently fall through
+// to the in-city metered engine (roadMeters ≈ 0 → near-base-only fare for
+// hours of driving), and a ONE_WAY sent WITH a package would dodge surge.
+func validateTrip(tripType, packageType string, hasDropoff bool) error {
 	tt := strings.ToUpper(strings.TrimSpace(tripType))
 	if tt == "" {
 		return nil
@@ -40,6 +50,10 @@ func validateTrip(tripType string, hasDropoff bool) error {
 	}
 	if spec.NeedsDropoff && !hasDropoff {
 		return ErrDropoffRequired
+	}
+	pkg := strings.ToUpper(strings.TrimSpace(packageType))
+	if !slices.Contains(spec.Packages, pkg) {
+		return ErrInvalidBooking
 	}
 	return nil
 }

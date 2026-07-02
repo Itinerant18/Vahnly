@@ -286,6 +286,20 @@ func (h *InsuranceHandler) HandleFileClaim(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "claim_type must be ACCIDENT, PROPERTY_DAMAGE, or OTHER", "ERR_VALIDATION")
 		return
 	}
+	if req.AmountPaise != nil && *req.AmountPaise < 0 {
+		writeError(w, http.StatusBadRequest, "amount_paise cannot be negative", "ERR_VALIDATION")
+		return
+	}
+
+	// Ownership gate: a rider may only file claims against their OWN orders —
+	// otherwise anyone could attach claims to arbitrary order IDs.
+	var owns bool
+	if err := h.db.QueryRow(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM orders WHERE id = $1::uuid AND rider_id = $2::uuid)`,
+		req.OrderID, riderID).Scan(&owns); err != nil || !owns {
+		writeError(w, http.StatusNotFound, "order not found", "ERR_NOT_FOUND")
+		return
+	}
 
 	// Marshal the submitted photo URLs to a JSONB array for persistence.
 	var photosJSON []byte

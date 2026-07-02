@@ -10,24 +10,32 @@ func TestValidateTrip(t *testing.T) {
 	cases := []struct {
 		name     string
 		tripType string
+		pkg      string
 		hasDrop  bool
 		want     error
 	}{
-		{"one-way without drop rejected", "IN_CITY_ONE_WAY", false, ErrDropoffRequired},
-		{"one-way with drop ok", "IN_CITY_ONE_WAY", true, nil},
-		{"outstation without drop rejected", "OUTSTATION", false, ErrDropoffRequired},
-		{"mini-outstation without drop rejected", "MINI_OUTSTATION", false, ErrDropoffRequired},
-		{"round trip needs no drop", "IN_CITY_ROUND", false, nil},
-		{"hourly needs no drop", "IN_CITY_HOURLY", false, nil},
-		{"monthly needs no drop", "MONTHLY", false, nil},
-		{"unknown type rejected", "TELEPORT", true, ErrInvalidBooking},
-		{"empty type lenient (legacy clients)", "", false, nil},
-		{"case/space insensitive", "  in_city_one_way ", true, nil},
+		{"one-way without drop rejected", "IN_CITY_ONE_WAY", "", false, ErrDropoffRequired},
+		{"one-way with drop ok", "IN_CITY_ONE_WAY", "", true, nil},
+		{"outstation without drop rejected", "OUTSTATION", "OUTSTATION", false, ErrDropoffRequired},
+		{"mini-outstation without drop rejected", "MINI_OUTSTATION", "MINI_OUTSTATION", false, ErrDropoffRequired},
+		{"round trip needs no drop", "IN_CITY_ROUND", "", false, nil},
+		{"hourly needs no drop", "IN_CITY_HOURLY", "HOURLY", false, nil},
+		{"monthly needs no drop", "MONTHLY", "MONTHLY", false, nil},
+		{"unknown type rejected", "TELEPORT", "", true, ErrInvalidBooking},
+		{"empty type lenient (legacy clients)", "", "", false, nil},
+		{"case/space insensitive", "  in_city_one_way ", "", true, nil},
+		// package coupling — the pricing-engine hole
+		{"hourly without its package rejected", "IN_CITY_HOURLY", "", false, ErrInvalidBooking},
+		{"outstation without its package rejected", "OUTSTATION", "", true, ErrInvalidBooking},
+		{"outstation with wrong package rejected", "OUTSTATION", "HOURLY", true, ErrInvalidBooking},
+		{"one-way with a package rejected (metered only)", "IN_CITY_ONE_WAY", "HOURLY", true, ErrInvalidBooking},
+		{"mini-outstation accepts OUTSTATION package too", "MINI_OUTSTATION", "OUTSTATION", true, nil},
+		{"monthly without its package rejected", "MONTHLY", "", false, ErrInvalidBooking},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := validateTrip(c.tripType, c.hasDrop); !errors.Is(got, c.want) {
-				t.Errorf("validateTrip(%q, %v) = %v, want %v", c.tripType, c.hasDrop, got, c.want)
+			if got := validateTrip(c.tripType, c.pkg, c.hasDrop); !errors.Is(got, c.want) {
+				t.Errorf("validateTrip(%q, %q, %v) = %v, want %v", c.tripType, c.pkg, c.hasDrop, got, c.want)
 			}
 		})
 	}

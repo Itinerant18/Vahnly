@@ -39,6 +39,8 @@ type RiderOrder struct {
 	RiderStops   json.RawMessage `json:"stops,omitempty"`
 	ScheduledAt  *time.Time      `json:"scheduled_at,omitempty"`
 	TripType     *string         `json:"trip_type,omitempty"`
+	// PackageType is the flat-rate tier (HOURLY/OUTSTATION/…); nil/"" = metered.
+	PackageType *string `json:"package_type,omitempty"`
 
 	TripShareToken     *string    `json:"trip_share_token,omitempty"`
 	TripShareExpiresAt *time.Time `json:"trip_share_expires_at,omitempty"`

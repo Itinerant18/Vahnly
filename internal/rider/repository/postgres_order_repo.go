@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/platform/driver-delivery/internal/domain"
@@ -20,6 +21,9 @@ var (
 	// ErrNotRatable is returned when an order cannot be rated (not completed,
 	// not owned, or already rated).
 	ErrNotRatable = errors.New("order is not ratable")
+	// ErrDuplicateActiveOrder is returned when the one-active-order-per-rider
+	// unique index rejects an insert (concurrent double-booking).
+	ErrDuplicateActiveOrder = errors.New("rider already has an active order")
 )
 
 // RiderOrderRepository is the persistence contract for rider bookings.
@@ -202,6 +206,13 @@ func (r *postgresOrderRepo) InsertRiderOrder(ctx context.Context, p InsertOrderP
 		p.BookedDurationHours, p.PackageType, p.OwnerNotInCar, p.TripType,
 	).Scan(&orderID)
 	if err != nil {
+		// The partial unique index (migration 000123) is the race-proof backstop
+		// for the service's active-order pre-check: a concurrent double-tap loses
+		// here instead of creating a second live order.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_orders_one_active_per_rider" {
+			return "", ErrDuplicateActiveOrder
+		}
 		return "", err
 	}
 
@@ -253,7 +264,7 @@ const orderSelect = `
 	pickup_h3_cell,
 	garage_car_id::text, one_time_car_make, one_time_car_model, one_time_car_type, one_time_car_transmission,
 	base_fare_paise, surge_multiplier, promo_code, promo_discount_paise, d4m_care_opted, payment_method,
-	persons_count, rider_stops, scheduled_at, trip_type,
+	persons_count, rider_stops, scheduled_at, trip_type, package_type,
 	trip_share_token, trip_share_expires_at,
 	rider_rating_for_driver, rider_tip_paise, rider_review_tags, rider_review_comment,
 	cancelled_by, cancellation_reason,
@@ -270,7 +281,7 @@ func scanRiderOrder(row rowScanner) (*domain.RiderOrder, error) {
 		&o.PickupH3Cell,
 		&o.GarageCarID, &o.OneTimeCarMake, &o.OneTimeCarModel, &o.OneTimeCarType, &o.OneTimeCarTransmission,
 		&o.BaseFarePaise, &surge, &o.PromoCode, &o.PromoDiscountPaise, &o.D4MCareOpted, &o.PaymentMethod,
-		&o.PersonsCount, &o.RiderStops, &o.ScheduledAt, &o.TripType,
+		&o.PersonsCount, &o.RiderStops, &o.ScheduledAt, &o.TripType, &o.PackageType,
 		&o.TripShareToken, &o.TripShareExpiresAt,
 		&o.RiderRatingForDriver, &o.RiderTipPaise, &o.RiderReviewTags, &o.RiderReviewComment,
 		&o.CancelledBy, &o.CancellationReason,

@@ -57,6 +57,25 @@ const (
 // on the host tz database.
 var istZone = time.FixedZone("IST", 5*3600+30*60)
 
+// Scheduled-booking bounds (server-authoritative; the FE mirrors them). A past
+// scheduled_at would let the night-charge basis be gamed, and a far-future one
+// parks in the replay queue while blocking the rider's one-active-order slot.
+const (
+	scheduleGracePast  = 5 * time.Minute
+	scheduleMaxHorizon = 7 * 24 * time.Hour
+)
+
+func validateScheduledAt(t *time.Time) error {
+	if t == nil {
+		return nil
+	}
+	now := time.Now()
+	if t.Before(now.Add(-scheduleGracePast)) || t.After(now.Add(scheduleMaxHorizon)) {
+		return ErrInvalidBooking
+	}
+	return nil
+}
+
 // FareQuoter is satisfied by *pricing/service.OrderPricingService. Abstracted so
 // the fare math is unit-testable without Redis/Kafka.
 type FareQuoter interface {
@@ -145,8 +164,15 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	if !inIndiaBBox(req.PickupLat, req.PickupLng) {
 		return nil, ErrInvalidBooking
 	}
-	if err := validateTrip(req.TripType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
+	if err := validateTrip(req.TripType, req.PackageType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
 		return nil, err
+	}
+	// (scheduled_at bounds are enforced at CreateOrder — estimates stay
+	// permissive so a preview never blocks on clock skew.)
+	// HOURLY quotes silently default to the 6h block; make that explicit so the
+	// booked duration persists and trip-end overtime has a basis.
+	if strings.EqualFold(strings.TrimSpace(req.PackageType), PackageHourly) && req.DurationHours < 1 {
+		req.DurationHours = 6
 	}
 	city := strings.ToUpper(strings.TrimSpace(req.City))
 	if city == "" {
@@ -223,6 +249,12 @@ func (s *BookingService) EstimateFare(ctx context.Context, req FareEstimateReque
 	_, multiplier, err := s.quoter.GetFareQuote(ctx, city, cell, roadMeters)
 	if err != nil {
 		return nil, err
+	}
+	// A booking scheduled beyond the dispatch lead is priced for a FUTURE slot —
+	// baking in the current surge would be permanently wrong (store-and-replay
+	// never re-prices). Packages already skip surge; do the same here.
+	if req.ScheduledAt != nil && req.ScheduledAt.After(time.Now().Add(dispatchDomain.ScheduledDispatchLead())) {
+		multiplier = 1.0
 	}
 	surgedSubtotal := int64(float64(preSurge) * multiplier)
 
@@ -377,9 +409,17 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		return nil, ErrInvalidBooking
 	}
 	// Server-authoritative trip requirements: without this, a One-Way with no
-	// dropoff would silently fall back to dropoff=pickup below and price ~0 km.
-	if err := validateTrip(req.TripType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
+	// dropoff would silently fall back to dropoff=pickup below and price ~0 km,
+	// and a package trip sent without its package_type would price metered.
+	if err := validateTrip(req.TripType, req.PackageType, req.DropoffLat != nil && req.DropoffLng != nil); err != nil {
 		return nil, err
+	}
+	if err := validateScheduledAt(req.ScheduledAt); err != nil {
+		return nil, err
+	}
+	// Mirror EstimateFare's HOURLY default so booked_duration_hours persists.
+	if strings.EqualFold(strings.TrimSpace(req.PackageType), PackageHourly) && req.DurationHours < 1 {
+		req.DurationHours = 6
 	}
 	if req.PersonsCount < 0 || req.PersonsCount > 8 {
 		return nil, ErrInvalidBooking
@@ -494,7 +534,7 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		paymentMethod = "CASH"
 	}
 
-	orderID, err := s.orders.InsertRiderOrder(ctx, repository.InsertOrderParams{
+	orderID, insertErr := s.orders.InsertRiderOrder(ctx, repository.InsertOrderParams{
 		RiderID:                riderID,
 		CityPrefix:             city,
 		PickupLat:              req.PickupLat,
@@ -526,8 +566,12 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		OwnerNotInCar:          req.OwnerNotInCar,
 		TripType:               req.TripType,
 	})
-	if err != nil {
-		return nil, err
+	if insertErr != nil {
+		// DB backstop for the racy active-order pre-check above (double-tap).
+		if errors.Is(insertErr, repository.ErrDuplicateActiveOrder) {
+			return nil, ErrActiveOrderExists
+		}
+		return nil, insertErr
 	}
 
 	// Persist the fare component breakdown (best-effort, never blocks a booking) so the
@@ -554,7 +598,14 @@ func (s *BookingService) CreateOrder(ctx context.Context, riderID string, req Cr
 		CarType:       carType,
 		Transmission:  transmission,
 	}
-	if payloadBytes, mErr := json.Marshal(payload); mErr == nil {
+	payloadBytes, mErr := json.Marshal(payload)
+	if mErr != nil {
+		// Nothing can ever dispatch this order without a payload — don't return
+		// success on a ghost booking. Cancel to clear the active-order block.
+		_ = s.orders.CancelOrder(ctx, orderID, riderID, "dispatch_payload_failed", 0)
+		return nil, fmt.Errorf("failed to build dispatch payload: %w", mErr)
+	}
+	{
 		deferUntilLead := req.ScheduledAt != nil &&
 			req.ScheduledAt.After(time.Now().Add(dispatchDomain.ScheduledDispatchLead()))
 		if deferUntilLead {
@@ -626,9 +677,11 @@ type ActiveOrderResult struct {
 
 func (s *BookingService) GetActiveOrder(ctx context.Context, riderID string) (*ActiveOrderResult, error) {
 	orderID := ""
+	fromCache := false
 	if s.cache != nil {
 		if v, err := s.cache.Get(ctx, "rider:active:order:"+riderID).Result(); err == nil {
 			orderID = v
+			fromCache = true
 		}
 	}
 	if orderID == "" {
@@ -648,6 +701,28 @@ func (s *BookingService) GetActiveOrder(ctx context.Context, riderID string) (*A
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// The Redis pointer is only cleared on rider-initiated cancel — after a trip
+	// completes (or a driver/admin cancel) it can dangle for up to its 4h TTL and
+	// would tell the rider a finished trip is still active. Detect, purge, and
+	// fall back to the DB for a genuinely active order.
+	if fromCache && (order.Status == "COMPLETED" || order.Status == "CANCELLED") {
+		_ = s.cache.Del(ctx, "rider:active:order:"+riderID).Err()
+		id, err := s.orders.GetActiveOrderID(ctx, riderID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNoActiveOrder
+		}
+		if err != nil {
+			return nil, err
+		}
+		order, err = s.orders.GetOrderByID(ctx, id)
+		if errors.Is(err, repository.ErrOrderNotFound) {
+			return nil, ErrNoActiveOrder
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	res := &ActiveOrderResult{Order: order}
@@ -932,6 +1007,38 @@ type waypointData struct {
 	Stops          []StopDTO `json:"stops"`
 }
 
+// orderIsPackage reports whether an order was booked on a flat-rate package
+// tier. Package fares include stops/waypoints in the block price and are never
+// surged, so mid-trip changes must NOT push them through the metered engine.
+func orderIsPackage(order *domain.RiderOrder) bool {
+	return order.PackageType != nil && isPackageBooking(*order.PackageType)
+}
+
+// repriceMetered recomputes an in-progress METERED order's dispatch fare the
+// same way EstimateFare priced it: tier rate card (base + per-km) with only
+// the live multiplier taken from the quoter. Using the quoter's own fare here
+// would silently switch the order to a different rate basis.
+func (s *BookingService) repriceMetered(ctx context.Context, order *domain.RiderOrder, riderID string, roadMeters float64) (int64, float64, error) {
+	carType := ""
+	switch {
+	case order.OneTimeCarType != nil:
+		carType = *order.OneTimeCarType
+	case order.GarageCarID != nil:
+		if cars, err := s.garage.GetGarageCars(ctx, riderID); err == nil {
+			if car := findCar(cars, *order.GarageCarID); car != nil {
+				carType = car.CarType
+			}
+		}
+	}
+	base, perKmPaise := meteredRateFor(carType) // unknown/empty tier falls back to HATCHBACK
+	_, mult, err := s.quoter.GetFareQuote(ctx, order.CityPrefix, order.PickupH3Cell, roadMeters)
+	if err != nil {
+		return 0, 0, err
+	}
+	distanceCharge := int64(math.Round(float64(perKmPaise) * roadMeters / 1000))
+	return int64(float64(base+distanceCharge) * mult), mult, nil
+}
+
 // AddStop appends an intermediate stop to an in-progress trip (max 3), recomputes
 // the fare over the new waypoint chain, and notifies the driver.
 func (s *BookingService) AddStop(ctx context.Context, riderID, orderID string, stop StopDTO) (*domain.RiderOrder, error) {
@@ -956,10 +1063,15 @@ func (s *BookingService) AddStop(ctx context.Context, riderID, orderID string, s
 	wp.Stops = append(wp.Stops, stop)
 	stopsJSON, _ := json.Marshal(wp)
 
-	road := waypointRoadMeters(order, wp.Stops)
-	newFare, mult, err := s.quoter.GetFareQuote(ctx, order.CityPrefix, order.PickupH3Cell, road)
-	if err != nil {
-		return nil, err
+	// Package bookings: stops are included in the block fare — persist the
+	// waypoint but keep the fare and (never-surged) multiplier unchanged.
+	newFare, mult := order.BaseFarePaise, order.SurgeMultiplier
+	if !orderIsPackage(order) {
+		road := waypointRoadMeters(order, wp.Stops)
+		newFare, mult, err = s.repriceMetered(ctx, order, riderID, road)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := s.orders.UpdateOrderStops(ctx, orderID, riderID, stopsJSON, newFare, mult); err != nil {
 		return nil, err
@@ -997,10 +1109,15 @@ func (s *BookingService) ChangeDrop(ctx context.Context, riderID, orderID string
 	if len(order.RiderStops) > 0 {
 		_ = json.Unmarshal(order.RiderStops, &wp)
 	}
-	road := waypointRoadMeters(order, wp.Stops)
-	newFare, mult, err := s.quoter.GetFareQuote(ctx, order.CityPrefix, order.PickupH3Cell, road)
-	if err != nil {
-		return nil, err
+	// Package bookings keep the block fare (extra km reconcile at trip end);
+	// metered orders re-derive from the tier rate card, not the raw quoter.
+	newFare, mult := order.BaseFarePaise, order.SurgeMultiplier
+	if !orderIsPackage(order) {
+		road := waypointRoadMeters(order, wp.Stops)
+		newFare, mult, err = s.repriceMetered(ctx, order, riderID, road)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := s.orders.UpdateOrderDropoff(ctx, orderID, riderID, lat, lng, address, newFare, mult); err != nil {
 		return nil, err

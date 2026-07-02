@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -216,9 +217,17 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Verify ID token via Google TokenInfo API
+	// Verify ID token via Google TokenInfo API. Bounded: a stalled Google endpoint
+	// must not pin login goroutines indefinitely.
 	tokenInfoUrl := "https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(req.IDToken)
-	resp, err := http.Get(tokenInfoUrl)
+	verifyCtx, cancelVerify := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancelVerify()
+	tokenReq, err := http.NewRequestWithContext(verifyCtx, http.MethodGet, tokenInfoUrl, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to verify ID token", "ERR_INTERNAL")
+		return
+	}
+	resp, err := http.DefaultClient.Do(tokenReq)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "Failed to verify ID token with Google", "ERR_UNAUTHENTICATED")
 		return
@@ -231,6 +240,8 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 	}
 
 	var googleClaims struct {
+		Aud           string      `json:"aud"`
+		Iss           string      `json:"iss"`
 		Email         string      `json:"email"`
 		EmailVerified any         `json:"email_verified"`
 		Name          string      `json:"name"`
@@ -238,6 +249,22 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&googleClaims); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to decode Google token response", "ERR_INTERNAL")
+		return
+	}
+
+	// Audience check: without it, a Google ID token minted for ANY OAuth client
+	// (e.g. a malicious third-party app the victim signed into) logs in as the
+	// victim here — account takeover. Enforced when GOOGLE_OAUTH_CLIENT_ID is set.
+	if clientID := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CLIENT_ID")); clientID != "" {
+		if googleClaims.Aud != clientID {
+			writeError(w, http.StatusUnauthorized, "Google ID token was not issued for this app", "ERR_UNAUTHENTICATED")
+			return
+		}
+	} else if h.logger != nil {
+		h.logger.Printf("[RIDER_AUTH] WARNING: GOOGLE_OAUTH_CLIENT_ID unset — Google ID token audience is NOT verified")
+	}
+	if googleClaims.Iss != "https://accounts.google.com" && googleClaims.Iss != "accounts.google.com" {
+		writeError(w, http.StatusUnauthorized, "Invalid Google ID token issuer", "ERR_UNAUTHENTICATED")
 		return
 	}
 

@@ -124,6 +124,10 @@ func (h *PaymentHandler) HandleAddPaymentMethod(w http.ResponseWriter, r *http.R
 			writeError(w, http.StatusBadRequest, "card_number is required", "ERR_VALIDATION")
 			return
 		}
+		if req.ExpMonth < 1 || req.ExpMonth > 12 || req.ExpYear < 2000 || req.ExpYear > 2100 {
+			writeError(w, http.StatusBadRequest, "invalid card expiry", "ERR_VALIDATION")
+			return
+		}
 		brand := cardBrand(digits)
 		last4 := digits[len(digits)-4:]
 		label := encodeCardLabel(last4, req.ExpMonth, req.ExpYear)
