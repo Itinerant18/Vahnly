@@ -61,6 +61,18 @@ describe('fare freshness (Phase 4)', () => {
     useBookingStore.getState().setDropoff(dropoff);
     expect(useBookingStore.getState().fareEstimate).toBeNull();
   });
+
+  it('never requests a fare while a required drop-off is missing', async () => {
+    vi.useFakeTimers();
+    const { fareApi } = await import('../api/fare');
+    vi.mocked(fareApi.estimate).mockClear();
+    useBookingStore.setState({ pickup: null, dropoff: null, tripType: 'IN_CITY_ONE_WAY', fareEstimate: null });
+    useBookingStore.getState().setPickup(pickup); // one-way with no drop-off yet
+    expect(useBookingStore.getState().isSearching).toBe(false); // no doomed shimmer
+    vi.runAllTimers();
+    expect(fareApi.estimate).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });
 
 describe('TRIP_HINT', () => {

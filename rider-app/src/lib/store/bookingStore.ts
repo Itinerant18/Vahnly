@@ -12,6 +12,10 @@ import type {
 } from "../api/types";
 
 let fareDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+// Monotonic token for fare requests: a response only lands if it is still the
+// NEWEST request. The debounce serializes scheduling, not responses — without
+// this, a slow stale quote can overwrite a fresh one after inputs changed.
+let fareSeq = 0;
 
 // Trip types that price as a flat package (no surge) rather than by distance. The
 // IN_CITY_ONE_WAY / IN_CITY_ROUND point-to-point types map to nothing (distance-priced).
@@ -131,39 +135,44 @@ const initial = {
 export const useBookingStore = create<BookingState>((set, get) => ({
   ...initial,
 
+  // Every booking-input setter rotates bookingIdemKey: the gateway replays a
+  // cached 2xx for 24h on the SAME key, so reusing it after the rider EDITS the
+  // booking could silently return the previous order instead of the new trip.
   setPickup: (p) => {
-    set({ pickup: p });
+    set({ pickup: p, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
   setDropoff: (p) => {
-    set({ dropoff: p });
+    set({ dropoff: p, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
-  addStop: (p) => set((s) => ({ stops: [...s.stops, p].slice(0, 3) })),
-  removeStop: (index) => set((s) => ({ stops: s.stops.filter((_, i) => i !== index) })),
+  addStop: (p) => set((s) => ({ stops: [...s.stops, p].slice(0, 3), bookingIdemKey: null })),
+  removeStop: (index) => set((s) => ({ stops: s.stops.filter((_, i) => i !== index), bookingIdemKey: null })),
   setTripType: (t) => {
-    set({ tripType: t });
+    set({ tripType: t, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
   setDurationHours: (h) => {
-    set({ durationHours: h });
+    set({ durationHours: h, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
   setSelectedCar: (carId, carType = null) => {
-    set({ selectedCarId: carId, carType, oneTimeCar: null });
+    set({ selectedCarId: carId, carType, oneTimeCar: null, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
   setOneTimeCar: (car) => {
-    set({ oneTimeCar: car, selectedCarId: null, carType: car?.car_type ?? null });
+    set({ oneTimeCar: car, selectedCarId: null, carType: car?.car_type ?? null, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
-  setPersonsCount: (n) => set({ personsCount: Math.max(1, Math.min(8, n)) }),
-  setScheduledAt: (t) => set({ scheduledAt: t }),
-  setPromoCode: (code) => set({ promoCode: code }),
+  setPersonsCount: (n) => set({ personsCount: Math.max(1, Math.min(8, n)), bookingIdemKey: null }),
+  setScheduledAt: (t) => set({ scheduledAt: t, bookingIdemKey: null }),
+  setPromoCode: (code) => set({ promoCode: code, bookingIdemKey: null }),
 
   validatePromo: async () => {
     const s = get();
-    if (!s.promoCode || !s.pickup) {
+    // Same pricing preconditions as fetchFareEstimate — without a required
+    // dropoff the estimate call 400s and would surface as a bogus promo error.
+    if (!s.promoCode || !s.pickup || (tripNeedsDropoff(s.tripType) && !s.dropoff)) {
       set({ promoResult: null });
       return;
     }
@@ -198,24 +207,34 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   },
 
   setD4mCare: (on) => {
-    set({ d4mCare: on });
+    set({ d4mCare: on, bookingIdemKey: null });
     get().fetchFareEstimate();
   },
-  setOwnerNotInCar: (on) => set({ ownerNotInCar: on }),
-  setPaymentMethod: (m) => set({ paymentMethod: m }),
+  setOwnerNotInCar: (on) => set({ ownerNotInCar: on, bookingIdemKey: null }),
+  setPaymentMethod: (m) => set({ paymentMethod: m, bookingIdemKey: null }),
 
   fetchFareEstimate: () => {
-    const { pickup } = get();
-    if (!pickup) return;
+    const { pickup, dropoff, tripType } = get();
+    if (fareDebounceTimer) clearTimeout(fareDebounceTimer);
+    // Can't be priced yet (no pickup, or a drop-off-required trip without one):
+    // don't fire a request the backend deterministically rejects, and make sure
+    // no stale in-flight response or shimmer survives.
+    if (!pickup || (tripNeedsDropoff(tripType) && !dropoff)) {
+      fareSeq++; // invalidate anything still in flight
+      set({ fareEstimate: null, isSearching: false });
+      return;
+    }
     // Phase 4 — fare freshness: drop the previous quote the moment a fare input
     // changes so readiness re-blocks (CTA → "Getting fare…") and the rider can
     // never confirm a stale price. isSearching keeps the shimmer up meanwhile.
     set({ fareEstimate: null, isSearching: true });
-    if (fareDebounceTimer) clearTimeout(fareDebounceTimer);
+    const seq = ++fareSeq;
     fareDebounceTimer = setTimeout(async () => {
       const s = get();
-      if (!s.pickup) return;
-      set({ isSearching: true });
+      if (!s.pickup || (tripNeedsDropoff(s.tripType) && !s.dropoff)) {
+        if (seq === fareSeq) set({ isSearching: false });
+        return;
+      }
       try {
         const est = await fareApi.estimate({
           pickup_lat: s.pickup.lat,
@@ -230,9 +249,20 @@ export const useBookingStore = create<BookingState>((set, get) => ({
           d4m_care: s.d4mCare,
           payment_method: s.paymentMethod,
         });
-        set({ fareEstimate: est });
+        if (seq === fareSeq) {
+          // Re-derive the promo display from THIS quote so an "applied" badge
+          // can never show a discount the current fare no longer carries.
+          const discount = est.fare_breakdown.promo_discount_paise;
+          set({
+            fareEstimate: est,
+            promoResult:
+              s.promoCode && discount > 0 ? { code: s.promoCode, discount_paise: discount } : null,
+          });
+        }
+      } catch {
+        // Failed or superseded quote — readiness stays blocked on "fare".
       } finally {
-        set({ isSearching: false });
+        if (seq === fareSeq) set({ isSearching: false });
       }
     }, 500);
   },
@@ -280,5 +310,11 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     return { order: res.order, otp: res.otp };
   },
 
-  reset: () => set({ ...initial }),
+  reset: () => {
+    // Kill the async pipeline too — a quote resolving after reset must not
+    // repopulate the fresh session with a stale estimate.
+    if (fareDebounceTimer) clearTimeout(fareDebounceTimer);
+    fareSeq++;
+    set({ ...initial });
+  },
 }));
