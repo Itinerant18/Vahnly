@@ -1,8 +1,9 @@
 'use client';
 
-import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
 import { useEffect, useRef } from 'react';
-import type L from 'leaflet';
+import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import { cellToBoundary } from 'h3-js';
 
 export interface MapDriver {
@@ -29,206 +30,247 @@ interface DriverMapProps {
   theme?: 'light' | 'dark';
 }
 
-const DRIVER_ICON_HTML = `
-  <div style="position:relative;width:24px;height:24px">
-    <div style="position:absolute;inset:0;border-radius:50%;background:var(--accent-400);opacity:0.25;animation:pulse 2s infinite"></div>
-    <div style="position:absolute;inset:4px;border-radius:50%;background:var(--accent-400);border:2px solid var(--content-primary);box-shadow:0 0 8px var(--accent-400)"></div>
-  </div>
-`;
+const DEFAULT_CENTER = { lat: 22.5726, lng: 88.3639 };
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const ROUTE_SOURCE_ID = 'driver-route';
+const ROUTE_LAYER_ID = 'driver-route-line';
+const H3_SOURCE_ID = 'driver-h3-heatmap';
+const H3_FILL_LAYER_ID = 'driver-h3-fill';
+const H3_LINE_LAYER_ID = 'driver-h3-line';
+const BUILDINGS_LAYER_ID = 'driver-buildings-3d';
+
+function toLngLat(point: { lat: number; lng: number }): [number, number] {
+  return [point.lng, point.lat];
+}
+
+function markerElement(kind: 'driver' | 'pickup' | 'drop'): HTMLElement {
+  const element = document.createElement('div');
+  element.innerHTML =
+    kind === 'driver'
+      ? `<div style="position:relative;width:28px;height:28px">
+          <div style="position:absolute;inset:0;border-radius:999px;background:#1a5cff;opacity:.24;animation:dfu-map-pulse 1.8s ease-out infinite"></div>
+          <div style="position:absolute;inset:8px;border-radius:999px;background:#1a5cff;border:2px solid white;box-shadow:0 0 18px rgba(26,92,255,.65)"></div>
+        </div>`
+      : `<div style="width:26px;height:34px;display:grid;place-items:center;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:${kind === 'pickup' ? '#12a150' : '#e23b3b'};box-shadow:0 8px 24px rgba(0,0,0,.28)">
+          <span style="transform:rotate(45deg);color:white;font-size:11px;font-weight:800">${kind === 'pickup' ? 'P' : 'D'}</span>
+        </div>`;
+  return element;
+}
+
+function enableBuildings(map: MapLibreMap): void {
+  if (map.getLayer(BUILDINGS_LAYER_ID)) return;
+  try {
+    const firstSymbol = map.getStyle().layers?.find((layer) => layer.type === 'symbol')?.id;
+    map.addLayer(
+      {
+        id: BUILDINGS_LAYER_ID,
+        type: 'fill-extrusion',
+        source: 'openmaptiles',
+        'source-layer': 'building',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#3d4b5d',
+          'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 12],
+          'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+          'fill-extrusion-opacity': 0.45,
+        },
+      },
+      firstSymbol,
+    );
+  } catch {
+    // Style variants can differ; the base map remains usable without extrusion.
+  }
+}
+
+function h3FeatureCollection(h3Hexagons: MapH3Hex[]): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: h3Hexagons.flatMap((hex) => {
+      try {
+        const ring = cellToBoundary(hex.index).map(([lat, lng]) => [lng, lat]);
+        ring.push(ring[0]);
+        return [{
+          type: 'Feature' as const,
+          properties: {
+            intensity: Math.max(0, Math.min(1, hex.intensity)),
+            color: hex.color || '#ef4444',
+          },
+          geometry: {
+            type: 'Polygon' as const,
+            coordinates: [ring],
+          },
+        }];
+      } catch {
+        return [];
+      }
+    }),
+  };
+}
 
 export default function DriverMap({
   drivers = [],
   h3Hexagons = [],
   pickup = null,
   destination = null,
-  center = { lat: 22.5726, lng: 88.3639 },
+  center = DEFAULT_CENTER,
   zoom = 15,
 }: DriverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMap = useRef<L.Map | null>(null);
-  const driverMarkers = useRef<L.Marker[]>([]);
-  const polygonLayers = useRef<L.Polygon[]>([]);
-  const pickupMarker = useRef<L.Marker | null>(null);
-  const destinationMarker = useRef<L.Marker | null>(null);
-  const routePolyline = useRef<L.Polyline | null>(null);
-
-  const defaultCenter = center ?? { lat: 22.5726, lng: 88.3639 };
+  const mapInstance = useRef<MapLibreMap | null>(null);
+  const markers = useRef<Map<string, Marker>>(new Map());
+  const loaded = useRef(false);
 
   useEffect(() => {
-    let isCancelled = false;
-    let createdMap: L.Map | null = null;
-
     const container = mapRef.current;
-    if (!container) return;
+    if (!container || mapInstance.current) return;
 
-    import('leaflet')
-      .then((L) => {
-        if (isCancelled || !mapRef.current) return;
-
-        if (leafletMap.current || (container as any)._leaflet_id != null) return;
-
-        let map: L.Map;
-        try {
-          map = L.map(container, {
-            center: [defaultCenter.lat, defaultCenter.lng],
-            zoom: zoom,
-            zoomControl: false,
-            attributionControl: false,
-          });
-        } catch {
-          return;
-        }
-
-        L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          { subdomains: 'abcd', maxZoom: 19 }
-        ).addTo(map);
-
-        createdMap = map;
-        leafletMap.current = map;
-      })
-      .catch(() => {});
+    const map = new maplibregl.Map({
+      container,
+      style: STYLE_URL,
+      center: toLngLat(center),
+      zoom,
+      pitch: 50,
+      attributionControl: false,
+    });
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+    map.once('load', () => {
+      loaded.current = true;
+      enableBuildings(map);
+    });
+    mapInstance.current = map;
 
     return () => {
-      isCancelled = true;
-      const map = createdMap ?? leafletMap.current;
-      if (map) {
-        map.remove();
-      }
-      delete (container as any)._leaflet_id;
-      leafletMap.current = null;
-      pickupMarker.current = null;
-      destinationMarker.current = null;
-      routePolyline.current = null;
-      driverMarkers.current = [];
-      polygonLayers.current = [];
+      markers.current.forEach((marker) => marker.remove());
+      markers.current.clear();
+      loaded.current = false;
+      map.remove();
+      mapInstance.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Initialize once; prop updates are handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Recenter map when prop changes
-  const centerLat = center?.lat;
-  const centerLng = center?.lng;
   useEffect(() => {
-    if (!leafletMap.current || centerLat === undefined || centerLng === undefined) return;
-    leafletMap.current.setView([centerLat, centerLng], leafletMap.current.getZoom(), { animate: true });
-  }, [centerLat, centerLng]);
+    const map = mapInstance.current;
+    if (!map) return;
+    map.flyTo({ center: toLngLat(center), zoom: Math.max(zoom, map.getZoom()), speed: 0.8, essential: true });
+  }, [center.lat, center.lng, zoom]);
 
-  // Update drivers
   useEffect(() => {
-    if (!leafletMap.current) return;
-    import('leaflet').then((L) => {
-      // Clear old driver markers
-      driverMarkers.current.forEach((m) => m.remove());
-      driverMarkers.current = [];
+    const map = mapInstance.current;
+    if (!map) return;
 
-      const driverIcon = L.divIcon({
-        html: DRIVER_ICON_HTML,
-        className: '',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-
-      drivers.forEach((d) => {
-        const m = L.marker([d.latitude, d.longitude], { icon: driverIcon }).addTo(leafletMap.current!);
-        driverMarkers.current.push(m);
-      });
+    const active = new Set<string>();
+    drivers.forEach((driver) => {
+      const id = `driver:${driver.id}`;
+      active.add(id);
+      const point = [driver.longitude, driver.latitude] as [number, number];
+      const existing = markers.current.get(id);
+      if (existing) {
+        existing.setLngLat(point);
+      } else {
+        markers.current.set(id, new maplibregl.Marker({ element: markerElement('driver') }).setLngLat(point).addTo(map));
+      }
     });
+
+    for (const [id, marker] of markers.current.entries()) {
+      if (id.startsWith('driver:') && !active.has(id)) {
+        marker.remove();
+        markers.current.delete(id);
+      }
+    }
   }, [drivers]);
 
-  // Update Pickup & Destination markers + route polyline
   useEffect(() => {
-    if (!leafletMap.current) return;
-    import('leaflet').then((L) => {
-      // Clear pickup marker
-      if (pickupMarker.current) {
-        pickupMarker.current.remove();
-        pickupMarker.current = null;
-      }
-      if (pickup) {
-        const pickupIcon = L.divIcon({
-          html: `<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:var(--positive-400);opacity:0.3;animation:pulse 2s infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;background:var(--positive-400);border:2.5px solid var(--content-primary)"></div></div>`,
-          className: '',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        });
-        pickupMarker.current = L.marker([pickup.lat, pickup.lng], { icon: pickupIcon }).addTo(leafletMap.current!);
-      }
+    const map = mapInstance.current;
+    if (!map) return;
 
-      // Clear destination marker
-      if (destinationMarker.current) {
-        destinationMarker.current.remove();
-        destinationMarker.current = null;
+    const syncMarker = (id: string, point: { lat: number; lng: number } | null, kind: 'pickup' | 'drop') => {
+      const existing = markers.current.get(id);
+      if (!point) {
+        existing?.remove();
+        markers.current.delete(id);
+        return;
       }
-      if (destination) {
-        const dropIcon = L.divIcon({
-          html: `<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:var(--negative-400);opacity:0.3;animation:pulse 2s infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;background:var(--negative-400);border:2.5px solid var(--content-primary)"></div></div>`,
-          className: '',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        });
-        destinationMarker.current = L.marker([destination.lat, destination.lng], { icon: dropIcon }).addTo(leafletMap.current!);
-      }
+      if (existing) existing.setLngLat(toLngLat(point));
+      else markers.current.set(id, new maplibregl.Marker({ element: markerElement(kind), anchor: 'bottom' }).setLngLat(toLngLat(point)).addTo(map));
+    };
 
-      // Clear polyline
-      if (routePolyline.current) {
-        routePolyline.current.remove();
-        routePolyline.current = null;
+    syncMarker('pickup', pickup, 'pickup');
+    syncMarker('drop', destination, 'drop');
+
+    const route: GeoJSON.Feature<GeoJSON.LineString> = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: pickup && destination ? [toLngLat(pickup), toLngLat(destination)] : [],
+      },
+    };
+
+    const drawRoute = () => {
+      const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
+      if (source) {
+        source.setData(route);
+      } else {
+        map.addSource(ROUTE_SOURCE_ID, { type: 'geojson', data: route });
+        map.addLayer({
+          id: ROUTE_LAYER_ID,
+          type: 'line',
+          source: ROUTE_SOURCE_ID,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#1a5cff', 'line-width': 4, 'line-opacity': 0.9 },
+        });
       }
-      if (pickup && destination) {
-        routePolyline.current = L.polyline(
-          [
-            [pickup.lat, pickup.lng],
-            [destination.lat, destination.lng],
-          ],
-          {
-            color: 'var(--accent-400)',
-            weight: 3,
-            opacity: 0.8,
-          }
-        ).addTo(leafletMap.current!);
-      }
-    });
+    };
+
+    if (loaded.current) drawRoute();
+    else map.once('load', drawRoute);
   }, [pickup, destination]);
 
-  // Update H3 Hexagon Surges
   useEffect(() => {
-    if (!leafletMap.current) return;
-    import('leaflet').then((L) => {
-      // Clear old hexagon polygons
-      polygonLayers.current.forEach((p) => p.remove());
-      polygonLayers.current = [];
+    const map = mapInstance.current;
+    if (!map) return;
+    const data = h3FeatureCollection(h3Hexagons);
 
-      h3Hexagons.forEach((hex) => {
-        try {
-          const boundary = cellToBoundary(hex.index); // Array of [lat, lng]
-          const poly = L.polygon(
-            boundary.map(([lat, lng]) => [lat, lng]),
-            {
-              fillColor: hex.color || 'var(--negative-400)',
-              fillOpacity: hex.intensity * 0.3 || 0.1,
-              color: hex.color || 'var(--negative-400)',
-              weight: 1,
-              opacity: 0.5,
-            }
-          ).addTo(leafletMap.current!);
-          polygonLayers.current.push(poly);
-        } catch (e) {
-          console.warn('[DriverMap] Failed to render H3 Hexagon:', hex.index, e);
-        }
+    const drawH3 = () => {
+      const source = map.getSource(H3_SOURCE_ID) as GeoJSONSource | undefined;
+      if (source) {
+        source.setData(data);
+        return;
+      }
+      map.addSource(H3_SOURCE_ID, { type: 'geojson', data });
+      map.addLayer({
+        id: H3_FILL_LAYER_ID,
+        type: 'fill',
+        source: H3_SOURCE_ID,
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': ['+', 0.08, ['*', ['get', 'intensity'], 0.35]],
+        },
       });
-    });
+      map.addLayer({
+        id: H3_LINE_LAYER_ID,
+        type: 'line',
+        source: H3_SOURCE_ID,
+        paint: { 'line-color': ['get', 'color'], 'line-opacity': 0.55, 'line-width': 1 },
+      });
+    };
+
+    if (loaded.current) drawH3();
+    else map.once('load', drawH3);
   }, [h3Hexagons]);
 
   return (
     <div className="relative w-full h-full overflow-hidden rounded-2xl border border-border-opaque shadow-2xl bg-background-tertiary select-none">
+      <style>{`@keyframes dfu-map-pulse{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.8);opacity:0}}`}</style>
       <div ref={mapRef} className="w-full h-full" />
 
-      <div className="absolute top-4 left-4 p-2.5 rounded-xl border border-border-opaque/80 bg-background-secondary/70 backdrop-blur-md shadow-lg flex items-center gap-2 z-[1000]">
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 rounded-xl border border-border-opaque/80 bg-background-secondary/80 p-2.5 text-[11px] font-semibold uppercase tracking-wider text-content-secondary shadow-lg backdrop-blur-md">
         <div className="w-2 h-2 rounded-full bg-positive-400 animate-pulse" />
-        <span className="text-[11px] font-semibold text-content-secondary uppercase tracking-wider">
-          Live Map Grid (CartoDB)
-        </span>
+        Live Map Grid
       </div>
     </div>
   );
 }
+

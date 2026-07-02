@@ -21,6 +21,7 @@ import { FareDisplay } from "@/components/ds/FareDisplay";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { BorderBeam } from "@/components/ui/border-beam";
+import { openGoogleMapsNavigation } from "@/lib/map/navigation";
 
 const TripMap = dynamic(() => import("@/components/trip/TripMap"), {
   ssr: false,
@@ -45,7 +46,7 @@ function FAB({
         onClick={onClick}
         className={[
           "flex flex-col items-center gap-1 rounded-md px-3 py-3 min-h-[56px] min-w-[48px] cursor-pointer",
-          "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+          "transition-all duration-200 ease-out",
           "active:scale-90",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
           danger
@@ -646,6 +647,19 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
           </div>
         )}
 
+        {dropoff && (
+          <button
+            type="button"
+            onClick={() => openGoogleMapsNavigation(dropoff)}
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-md bg-background-inverse px-4 py-3 text-label-medium font-semibold text-content-inverse shadow-elevation-2 transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3l7 18-7-4-7 4 7-18z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+            </svg>
+            Start navigation
+          </button>
+        )}
+
         {/* OTP (ARRIVED_AT_PICKUP) */}
         <OTPDisplay />
 
@@ -706,7 +720,7 @@ export default function LiveTripView({ tripId }: { tripId: string }) {
                     <button
                       key={q}
                       onClick={() => sendChat(q)}
-                      className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary hover:bg-background-primary transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95"
+                      className="rounded-pill border border-border-opaque px-3 py-1 text-label-small text-content-secondary hover:text-content-primary hover:bg-background-primary transition-all duration-200 ease-out active:scale-95"
                     >
                       {q}
                     </button>

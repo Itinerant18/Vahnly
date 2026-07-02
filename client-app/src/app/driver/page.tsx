@@ -45,6 +45,7 @@ import { startTelemetryStream, TelemetryStreamHandle } from '@/services/telemetr
 import { OfferPopup } from '@/components/OfferPopup';
 import { RefreshIcon, MenuIcon, SirenIcon, NavigateIcon, SignalIcon, FlameIcon, PauseIcon, ChatIcon, OctagonAlertIcon, ClockIcon } from '@/components/ds';
 import { useOfferStore } from '@/store/useOfferStore';
+import { openGoogleMapsNavigation } from '@/lib/map/navigation';
 
 interface ActiveOrderAssignment {
   order_id: string;
@@ -691,10 +692,7 @@ export default function DriverTerminalPage() {
       // opens a new tab. Fires once — clearOffer below flips offerStatus so the guard
       // above won't re-run.
       if (currentOffer.pickup.lat && currentOffer.pickup.lng) {
-        window.open(
-          `https://www.google.com/maps/dir/?api=1&destination=${currentOffer.pickup.lat},${currentOffer.pickup.lng}&travelmode=driving`,
-          '_blank',
-        );
+        openGoogleMapsNavigation({ lat: currentOffer.pickup.lat, lng: currentOffer.pickup.lng });
       }
       // Clear offer from store now that it is active
       useOfferStore.getState().clearOffer();
@@ -1251,7 +1249,17 @@ export default function DriverTerminalPage() {
 
           {/* Turn-by-Turn Navigation panel */}
           {activeTrip && (dutyState === 'EN_ROUTE' || dutyState === 'DELIVERING') && (
-            <div className="absolute top-4 left-4 z-20 bg-background-primary/90 border border-border-opaque p-3 rounded-md font-mono text-label-small space-y-1 max-w-xs shadow-elevation-2 text-left animate-enter">
+            <button
+              type="button"
+              onClick={() =>
+                openGoogleMapsNavigation(
+                  dutyState === 'EN_ROUTE'
+                    ? { lat: activeTrip.pickup_lat, lng: activeTrip.pickup_lng }
+                    : { lat: activeTrip.dropoff_lat, lng: activeTrip.dropoff_lng },
+                )
+              }
+              className="absolute top-4 left-4 z-20 bg-background-primary/90 border border-border-opaque p-3 rounded-md font-mono text-label-small space-y-1 max-w-xs shadow-elevation-2 text-left animate-enter transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
               <span className="text-label-small text-content-tertiary uppercase tracking-wider block">Navigation</span>
               <div className="text-content-primary font-medium flex items-center gap-1.5">
                 <NavigateIcon size={16} />
@@ -1262,7 +1270,7 @@ export default function DriverTerminalPage() {
                   ? `Turn Left — Howrah Bridge Rd in ${(150 - mapGlideProgress * 1.5).toFixed(0)}m`
                   : `Turn Right — E.M. Bypass in ${(200 - mapGlideProgress * 2).toFixed(0)}m`}
               </div>
-            </div>
+            </button>
           )}
 
           {/* Offline overlay */}

@@ -1,0 +1,78 @@
+.maplibregl-map {
+  font-family: inherit;
+}
+
+.dfu-map-marker-wrap {
+  pointer-events: none;
+}
+
+.dfu-map-marker {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.dfu-map-marker-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(26, 92, 255, 0.28);
+  animation: dfu-map-pulse 1.8s ease-out infinite;
+}
+
+.dfu-map-marker-core {
+  position: absolute;
+  inset: 8px;
+  border-radius: 999px;
+  background: #1a5cff;
+  border: 2px solid white;
+  box-shadow: 0 0 18px rgba(26, 92, 255, 0.65);
+}
+
+.dfu-map-pin {
+  width: 30px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px 999px 999px 4px;
+  transform: rotate(-45deg);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+}
+
+.dfu-map-pin span {
+  transform: rotate(45deg);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dfu-map-pin-pickup {
+  background: #12a150;
+}
+
+.dfu-map-pin-dropoff {
+  background: #e23b3b;
+}
+
+.dfu-map-pin-user {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  transform: none;
+  background: #4a6fa5;
+  border: 3px solid white;
+  box-shadow: 0 0 0 7px rgba(74, 111, 165, 0.2);
+}
+
+@keyframes dfu-map-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
