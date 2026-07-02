@@ -254,9 +254,18 @@ func (h *RiderHandler) HandleRiderGoogleLogin(w http.ResponseWriter, r *http.Req
 
 	// Audience check: without it, a Google ID token minted for ANY OAuth client
 	// (e.g. a malicious third-party app the victim signed into) logs in as the
-	// victim here — account takeover. Enforced when GOOGLE_OAUTH_CLIENT_ID is set.
-	if clientID := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CLIENT_ID")); clientID != "" {
-		if googleClaims.Aud != clientID {
+	// victim here — account takeover. Enforced when GOOGLE_OAUTH_CLIENT_ID is
+	// set; comma-separated because web/iOS/Android sign-ins carry different
+	// client IDs from the same project.
+	if raw := strings.TrimSpace(os.Getenv("GOOGLE_OAUTH_CLIENT_ID")); raw != "" {
+		allowed := false
+		for id := range strings.SplitSeq(raw, ",") {
+			if googleClaims.Aud == strings.TrimSpace(id) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
 			writeError(w, http.StatusUnauthorized, "Google ID token was not issued for this app", "ERR_UNAUTHENTICATED")
 			return
 		}
