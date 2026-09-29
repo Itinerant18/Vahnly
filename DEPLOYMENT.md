@@ -180,3 +180,42 @@ Upgrading to **Workers Paid ($5/month)** expands:
 - Durable Objects: 1M requests/month included
 - Queues: 1M operations/month included
 
+---
+
+## Cut over 2026-09-29
+
+### What is live where
+
+| Component | Provider / Platform | Live Endpoint | Role / Notes |
+|---|---|---|---|
+| **Rider Web App** | Cloudflare Workers Static Assets | https://rider.aniket.site | Next.js SPA, full HSTS & security headers |
+| **Driver Web App** | Cloudflare Workers Static Assets | https://driver.aniket.site | Next.js SPA, full HSTS & security headers |
+| **Admin Web App** | Cloudflare Workers Static Assets | https://vahnly-admin.itinerant018.workers.dev | Vite SPA (routes to `admin.aniket.site` once DNS CNAME freed) |
+| **Backend API Gateway** | Cloudflare Worker (`vahnly-api`) | https://vahnly-api.itinerant018.workers.dev (and `api.aniket.site`) | Hono REST API, WebSocket streams, auth, dispatch |
+| **Scheduled Sweeper** | Cloudflare Worker (`vahnly-cron`) | `vahnly-cron.itinerant018.workers.dev` | Minute sweep, hourly KPI snapshots, daily expiry |
+| **Relational Database** | Neon PostgreSQL (us-east-2) | `autumn-violet-86694453` (branch `production`) | PostGIS 3.6, 138 tables migrated (version 125), current size: 23 MB |
+| **Connection Pooling** | Cloudflare Hyperdrive | `vahnly-pg` (`1fda2c58...`), `vahnly-pg-rw` (`4023e87f...`) | Global connection pooling & 60s read caching |
+| **Object Storage** | Neon Object Storage | `https://br-spring-sky-b4nsjnka.storage.c-6.us-east-2.aws.neon.tech` | Bucket `uploads`, S3-compatible SDK upload/download |
+| **Realtime State** | Cloudflare Durable Objects | `vahnly-api` | 7 SQLite DO namespaces for city dispatch, streams & locks |
+| **Event Bus** | Cloudflare Queues | `vahnly-domain-events` / `vahnly-domain-events-dlq` | Asynchronous domain event ingestion |
+
+### Rollback Path
+
+The legacy GCP VM `dfu-stack` (`35.244.47.44` on project `vahnly-platform`) is retained as the emergency rollback target.
+To roll back:
+1. Re-point `api.aniket.site` A record in DNS to `35.244.47.44` with Cloudflare proxy disabled.
+2. Re-point CNAME records for `rider`, `driver`, `admin` to `*.web.app` (Firebase Hosting).
+
+### Soak Period
+
+- **Soak End Date**: 2026-10-06 (+7 days)
+- During this window, monitor Cloudflare Worker analytics, Hyperdrive latency, Neon database compute hours, and error logging.
+
+### Decommission Checklist (Post-Soak: after 2026-10-06)
+
+- [ ] Disable Firebase Hosting sites (`vahnly-rider`, `vahnly-driver`, `vahnly-platform`).
+- [ ] Shut down and delete GCP VM `dfu-stack` + release static IP `35.244.47.44`.
+- [ ] Remove `GCP_SA_KEY` from GitHub repository secrets.
+- [ ] Remove legacy VM deploy scripts: `deploy/vm-setup.sh`, `deploy/gcp-vm-setup.md`, `.github/workflows/vm-deploy.yml`, `.github/workflows/deploy.yml`.
+
+

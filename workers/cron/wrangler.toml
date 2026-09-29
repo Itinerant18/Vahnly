@@ -23,7 +23,7 @@ service = "vahnly-api"
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "vahnly-pg"
+id = "1fda2c5842454a2e81e916a43929ed16"
 
 [[kv_namespaces]]
 binding = "CONFIG"

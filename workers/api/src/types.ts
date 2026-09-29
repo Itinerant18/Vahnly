@@ -32,9 +32,18 @@ export interface Env {
   HYPERDRIVE: Hyperdrive;
   HYPERDRIVE_RW?: Hyperdrive;
   DATABASE_URL?: string;
-  DOCS: R2Bucket;
+  DOCS?: R2Bucket;
   CONFIG: KVNamespace;
   EVENTS: Queue<DomainEvent>;
+
+  // Neon Object Storage (S3-compatible)
+  S3_ENDPOINT?: string;
+  S3_BUCKET?: string;
+  S3_REGION?: string;
+  AWS_ENDPOINT_URL_S3?: string;
+  AWS_REGION?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
 
   // Durable Objects
   CITY_DISPATCH_DO: DurableObjectNamespace<CityDispatchDO>;
