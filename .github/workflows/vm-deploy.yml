@@ -19,10 +19,9 @@ name: VM Deploy
 #   Optional: Variable VM_HEALTH_URL  — health URL to smoke-test (default below).
 # Until GCP_SA_KEY exists, the job skips cleanly (green, never red).
 
+# DEPRECATED: Retained as fallback during Cloudflare migration bridge period.
+# Will be removed after Phase 8 cut-over.
 on:
-  workflow_run:
-    workflows: ["Backend CI"]
-    types: [completed]
   workflow_dispatch: {}
 
 concurrency:

@@ -153,3 +153,30 @@ git push origin main            # Backend CI → VM Deploy (auto, if GCP_SA_KEY 
 # Cut a release (images + mobile)
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
+
+---
+
+## Cloudflare Free-Tier Capacity Limits & Upgrade Triggers
+
+Targeting **$0/month** deployment on Cloudflare Free + Neon Free. The following capacity budget governs pilot operations:
+
+| Resource | Free Limit | Platform Consumption Rate | Pilot Ceiling / Bottleneck |
+|---|---|---|---|
+| **Durable Objects (SQLite)** | 100k requests/day, 13,000 GB-s/day | Driver GPS @ 1 msg / 3 s over WebSocket = 28,800 msgs/driver/day = 1,440 billed DO requests/driver/day (20:1 hibernation ratio) | **~60 drivers online 24h** saturate 100k requests/day. Client telemetry throttles to 5 s while idle, 2 s on trip, batching 3 fixes per frame. |
+| **Workers** | 100k requests/day, 10 ms CPU cap | Each REST call = 1 request; Worker → DO hop = 1 DO request | 100k Worker + 100k DO requests/day is sized for a pilot city. |
+| **Hyperdrive** | 100k queries/day, 60s query cache | Every uncached query touching Neon Postgres | Hot reads (regions, flags, driver profile) cached in KV/DO. |
+| **Queues** | 10,000 operations/day | Domain events only (`order.*`, `driver.rated`, etc.) | **≤ 3,000 orders/day** across the platform. High-frequency telemetry strictly uses DO RPC. |
+| **KV Storage** | 100k reads/day, 1,000 writes/day | Surge snapshots & feature flags | Surge snapshots synced to KV **only on delta change**. |
+| **Neon Postgres** | 0.5 GB storage, 100 CU-h | Relational data + PostGIS | Telemetry history and notifications pruned via cron or exported to R2 daily. |
+
+### Upgrade Trigger ($5/mo Workers Paid)
+When pilot scaling exceeds:
+- > 60 concurrent active drivers or > 3,000 orders/day
+- > 100k daily Worker/DO invocations
+- > 10 ms CPU execution requirement for complex spatial math
+
+Upgrading to **Workers Paid ($5/month)** expands:
+- Workers: 10M requests/month + 30 s CPU time limit (removes 10 ms cap)
+- Durable Objects: 1M requests/month included
+- Queues: 1M operations/month included
+

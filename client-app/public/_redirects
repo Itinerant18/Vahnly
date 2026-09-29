@@ -1,0 +1,3 @@
+/driver/account/referrals  /driver-account/refer/     301
+/driver/account/insurance  /driver-account/vehicles/  301
+/driver/account/*          /driver-account/:splat     301

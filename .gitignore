@@ -238,3 +238,11 @@ opencode.jsonc
 # Personal home-laptop setup transcript (contains local dev config, not for repo)
 HOME_SETUP.md
 fcm-service-account*.json
+
+# Cloudflare Wrangler local state & Serena cache
+.wrangler/
+**/.wrangler/
+**/.dev.vars
+workers/*/dist
+.serena/
+.neon

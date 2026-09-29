@@ -1,0 +1,11 @@
+name = "vahnly-driver"
+compatibility_date = "2026-09-01"
+
+routes = [
+  { pattern = "driver.aniket.site", custom_domain = true }
+]
+
+[assets]
+directory = "./out"
+not_found_handling = "single-page-application"
+html_handling = "auto-trailing-slash"

@@ -1,0 +1,40 @@
+name = "vahnly-cron"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[placement]
+mode = "smart"
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["* * * * *", "0 3 * * *", "0 * * * *"]
+
+[vars]
+CITY_PREFIX = "KOL"
+SCHEDULED_DISPATCH_LEAD_MINUTES = "15"
+PAYOUT_SANDBOX_AUTOSETTLE = "true"
+
+[[services]]
+binding = "API"
+service = "vahnly-api"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "vahnly-pg"
+
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "c7bf0a6e41e04c119bcebc3540bb528b"
+
+[[queues.producers]]
+binding = "EVENTS"
+queue = "vahnly-domain-events"
+
+[durable_objects]
+bindings = [
+  { name = "LOCK_DO", class_name = "LockDO", script_name = "vahnly-api" },
+  { name = "CITY_DISPATCH_DO", class_name = "CityDispatchDO", script_name = "vahnly-api" }
+]

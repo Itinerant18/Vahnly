@@ -1,0 +1,74 @@
+{
+  "zone_id": "69f32d026e8908d4f11ef163",
+  "name": "aniket.site",
+  "exported_at": "2026-09-29T15:31:00Z",
+  "source": "Netlify DNS API",
+  "records": [
+    {
+      "hostname": "aniket.site",
+      "type": "CNAME",
+      "value": "aniket-site.netlify.app",
+      "note": "Root site on Netlify"
+    },
+    {
+      "hostname": "www.aniket.site",
+      "type": "CNAME",
+      "value": "aniket-site.netlify.app",
+      "note": "WWW subdomain for Netlify"
+    },
+    {
+      "hostname": "serendipity.aniket.site",
+      "type": "CNAME",
+      "value": "serendipity-frontend-v1.netlify.app",
+      "note": "Serendipity project on Netlify"
+    },
+    {
+      "hostname": "api.aniket.site",
+      "type": "A",
+      "value": "35.244.47.44",
+      "note": "Existing GCP VM (dfu-stack)"
+    },
+    {
+      "hostname": "rider.aniket.site",
+      "type": "CNAME",
+      "value": "vahnly-rider.web.app",
+      "note": "Firebase Hosting (legacy rider app)"
+    },
+    {
+      "hostname": "driver.aniket.site",
+      "type": "CNAME",
+      "value": "vahnly-driver.web.app",
+      "note": "Firebase Hosting (legacy driver app)"
+    },
+    {
+      "hostname": "admin.aniket.site",
+      "type": "CNAME",
+      "value": "vahnly-platform.web.app",
+      "note": "Firebase Hosting (legacy admin portal)"
+    },
+    {
+      "hostname": "resend._domainkey.aniket.site",
+      "type": "TXT",
+      "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCl5iBPX9FU4C+Rn0REi5PQ0mroXmjMuiUJotrhvFT8pVW9YEo2+TF0kDWOJLgZkuQuNrbQysO7lfgeSYUQR0foDH2fARCi2Gv/2OaT5KG8T5Ftg8D1wBVk8z4q+x+hVLDznJbH3MlCmQZeE8ChcrQVjdL6KQ26fe9gQN8eKhub6wIDAQAB",
+      "note": "Resend DKIM"
+    },
+    {
+      "hostname": "rsend.aniket.site",
+      "type": "CNAME",
+      "value": "rsend.forge.rmta.net",
+      "note": "Resend routing"
+    },
+    {
+      "hostname": "send.aniket.site",
+      "type": "CNAME",
+      "value": "send.forge.rmta.net",
+      "note": "Resend sending"
+    },
+    {
+      "hostname": "_dmarc.aniket.site",
+      "type": "TXT",
+      "value": "v=DMARC1; p=none;",
+      "note": "DMARC policy"
+    }
+  ]
+}

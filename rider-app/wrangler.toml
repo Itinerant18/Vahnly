@@ -1,0 +1,11 @@
+name = "vahnly-rider"
+compatibility_date = "2026-09-01"
+
+routes = [
+  { pattern = "rider.aniket.site", custom_domain = true }
+]
+
+[assets]
+directory = "./out"
+not_found_handling = "single-page-application"
+html_handling = "auto-trailing-slash"

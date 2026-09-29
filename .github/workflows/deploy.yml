@@ -2,10 +2,8 @@ name: Deploy
 
 # Runs only AFTER Backend CI succeeds on main (execution rule 3), or on manual dispatch.
 # It does NOT rebuild images — it deploys the ones Backend CI already pushed for the commit.
+# DEPRECATED: Kubernetes Helm deployment is inactive. Use Cloudflare deployment workflows.
 on:
-  workflow_run:
-    workflows: ["Backend CI"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       image_tag:

@@ -1,0 +1,86 @@
+name: Cloudflare Web Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rider-app/**'
+      - 'client-app/**'
+      - 'frontend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-rider:
+    name: Deploy Rider App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: rider-app/package-lock.json
+
+      - name: Build Rider App
+        run: |
+          cd rider-app
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'rider-app'
+          command: deploy
+
+  deploy-driver:
+    name: Deploy Driver App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: client-app/package-lock.json
+
+      - name: Build Driver App
+        run: |
+          cd client-app
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'client-app'
+          command: deploy
+
+  deploy-admin:
+    name: Deploy Admin Portal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Admin App
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'frontend'
+          command: deploy

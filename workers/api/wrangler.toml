@@ -1,0 +1,75 @@
+name = "vahnly-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[placement]
+mode = "smart"
+
+routes = [
+  { pattern = "api.aniket.site", custom_domain = true }
+]
+
+[observability]
+enabled = true
+
+[vars]
+CITY_PREFIX = "KOL"
+DEFAULT_CITY_PREFIX = "KOL"
+SUPPORTED_REGIONS = "KOL,BLR"
+SURGE_TRACKED_CELLS = "88754cb247fffff,88283473fffffff"
+ACCESS_TOKEN_TTL = "4h"
+FIREBASE_PROJECT_ID = "vahnly-platform"
+ALLOWED_ORIGINS = "https://app.driversforu.com,https://admin.driversforu.com,capacitor://localhost,http://localhost:3000,http://localhost:3050,http://localhost:5173,https://rider.aniket.site,https://driver.aniket.site,https://admin.aniket.site"
+ADMIN_COOKIE_SAMESITE = "None"
+ADMIN_FRONTEND_URL = "https://admin.aniket.site"
+APP_VERSION = "1.0.0"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "vahnly-pg"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE_RW"
+id = "vahnly-pg-rw"
+
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "vahnly-documents"
+
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "c7bf0a6e41e04c119bcebc3540bb528b"
+
+[[queues.producers]]
+binding = "EVENTS"
+queue = "vahnly-domain-events"
+
+[[queues.consumers]]
+queue = "vahnly-domain-events"
+max_batch_size = 10
+max_batch_timeout = 5
+dead_letter_queue = "vahnly-domain-events-dlq"
+
+[durable_objects]
+bindings = [
+  { name = "CITY_DISPATCH_DO", class_name = "CityDispatchDO" },
+  { name = "ORDER_STREAM_DO", class_name = "OrderStreamDO" },
+  { name = "RIDER_STREAM_DO", class_name = "RiderStreamDO" },
+  { name = "HEATMAP_DO", class_name = "HeatmapDO" },
+  { name = "RATE_LIMIT_DO", class_name = "RateLimitDO" },
+  { name = "SESSION_DO", class_name = "SessionDO" },
+  { name = "LOCK_DO", class_name = "LockDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = [
+  "CityDispatchDO",
+  "OrderStreamDO",
+  "RiderStreamDO",
+  "HeatmapDO",
+  "RateLimitDO",
+  "SessionDO",
+  "LockDO"
+]
