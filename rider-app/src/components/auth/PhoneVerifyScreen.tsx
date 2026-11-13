@@ -46,7 +46,7 @@ export default function PhoneVerifyScreen({
     setError("");
     try {
       const res = await authApi.sendOTP(targetPhone);
-      const code = res.test_code || (res.method_id?.startsWith("dev-") || res.method_id?.startsWith("mock-") ? "123456" : null);
+      const code = res?.test_code || (res?.method_id?.startsWith("dev-") || res?.method_id?.startsWith("mock-") ? "123456" : null);
       setTestCode(code);
       setStep("otp");
       setOtp(["", "", "", "", "", ""]);

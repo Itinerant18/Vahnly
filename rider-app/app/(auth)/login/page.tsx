@@ -245,7 +245,7 @@ export default function LoginPage() {
     }
     try {
       const res = await authApi.sendOTP(cleanPhone);
-      const code = res.test_code || (res.method_id?.startsWith("dev-") || res.method_id?.startsWith("mock-") ? "123456" : null);
+      const code = res?.test_code || (res?.method_id?.startsWith("dev-") || res?.method_id?.startsWith("mock-") ? "123456" : null);
       setGoogleTestCode(code);
       setGoogleOtpSent(true);
     } catch (err: unknown) {

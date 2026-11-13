@@ -146,7 +146,10 @@ async function request<T>(
       envelope?.code,
     );
   }
-  return (envelope?.data ?? (undefined as unknown)) as T;
+  if (envelope && typeof envelope === "object" && envelope.data !== undefined) {
+    return envelope.data;
+  }
+  return (envelope ?? (undefined as unknown)) as T;
 }
 
 async function requestRawJson<T>(
