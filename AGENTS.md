@@ -7,6 +7,7 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 All 8 MagicUI components deployed across the rider app. Build passes clean (`npm run build`).
 
 ### Done
+
 - **ShimmerButton** (15): BookingSheet "Book Driver", Dispatch "Try Again"/"Go to trip", Bill "Pay"/"Mark as Paid", Wallet "+ Add Money" & sheet submit, Support "Submit Ticket", Insurance "File a Claim", Refer "Copy Code", Rewards "Save", Login "Log In"/"Sign up with phone number"/"Reset & Log In"/"Create password & continue"/"Complete Registration"
 - **BorderBeam** (9): Wallet balance card, Refer code card, Rewards active offers (staggered), Account profile card, DriverCard (green), LiveTrip fare strip, LiveTrip StatusBanner (active), BookingSheet fare strip, Dispatch DriverAssignedModal strip
 - **WordRotate** (16 pages): Account, Bill, Bookings, BookingDetail, Emergency, Garage, Insurance, Legal, Notifications, Payments, Places, Profile, Refer, Rewards, Settings, Support, Wallet — cycles 3 words/3s
@@ -27,6 +28,7 @@ All 8 MagicUI components deployed across the rider app. Build passes clean (`npm
 - **ScrollBasedVelocity** (1): Home page marquee strip — scroll-reactive text
 
 ### Key Decisions
+
 - `AccountScaffold` `title` prop type changed from `string` to `ReactNode` for WordRotate
 - ShimmerButton replaces `RippleButton`/`<button>` — visual swap only
 - BorderBeam needs `position: relative` + `overflow-hidden` on parent
@@ -46,6 +48,7 @@ All 8 MagicUI components deployed across the rider app. Build passes clean (`npm
 When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
 
 Rules:
+
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
@@ -55,4 +58,3 @@ Rules:
 ## Cloudflare
 
 When interacting with Cloudflare, use the cf CLI unless the project has a Wrangler configuration file.
-
