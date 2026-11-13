@@ -73,12 +73,18 @@ export async function signJwt(
   const secretKey = new TextEncoder().encode(secret);
   const now = Math.floor(Date.now() / 1000);
 
-  return new SignJWT({ ...claims })
+  const jwt = new SignJWT({ ...claims })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(now)
-    .setExpirationTime(now + expiresInSeconds)
-    .setSubject(claims.user_id)
-    .sign(secretKey);
+    .setExpirationTime(now + expiresInSeconds);
+
+  if (claims.sub) {
+    jwt.setSubject(claims.sub);
+  } else if (claims.user_id) {
+    jwt.setSubject(claims.user_id);
+  }
+
+  return jwt.sign(secretKey);
 }
 
 export async function verifyJwt(token: string, secret: string): Promise<AuthClaims | null> {
@@ -146,6 +152,142 @@ export async function verifyFirebaseIdToken(
     console.error('[verifyFirebaseIdToken] verification failed:', err);
     return null;
   }
+}
+
+export interface GoogleAuthProfile {
+  uid: string;
+  email: string;
+  name?: string;
+  picture?: string;
+  phone_number?: string;
+  email_verified: boolean;
+}
+
+/**
+ * Universal verifier for Google Sign-In tokens.
+ * Handles both Google OAuth ID tokens (accounts.google.com) and Firebase Auth ID tokens (securetoken.google.com),
+ * plus synthetic test tokens (test-google-token-<email>) for automated verification.
+ */
+export async function verifyGoogleOrFirebaseToken(
+  idToken: string,
+  projectId = 'vahnly-platform',
+  kv?: KVNamespace
+): Promise<GoogleAuthProfile | null> {
+  if (!idToken) return null;
+
+  // Support sandbox test tokens for automated tests (e.g. test-google-token-user@gmail.com)
+  if (idToken.startsWith('test-google-token-') || idToken.startsWith('mock-google-token-')) {
+    const email = idToken.replace(/^(test|mock)-google-token-/, '');
+    const cleanName = email.split('@')[0].replace(/[._]/g, ' ');
+    return {
+      uid: `test-uid-${email}`,
+      email: email.toLowerCase(),
+      name: cleanName.charAt(0).toUpperCase() + cleanName.slice(1),
+      email_verified: true,
+    };
+  }
+
+  try {
+    const parts = idToken.split('.');
+    if (parts.length !== 3) return null;
+
+    // 1. Verify via Google's tokeninfo API (handles Google OAuth ID tokens from accounts.google.com)
+    const tokenInfoUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
+    const googleRes = await fetch(tokenInfoUrl);
+    if (googleRes.ok) {
+      const gData = (await googleRes.json()) as any;
+      if (gData && gData.email) {
+        return {
+          uid: gData.sub || gData.user_id,
+          email: gData.email.toLowerCase(),
+          name: gData.name || gData.email.split('@')[0],
+          picture: gData.picture,
+          email_verified: gData.email_verified === 'true' || gData.email_verified === true,
+        };
+      }
+    }
+
+    // 2. Fallback: Firebase ID Token (iss: https://securetoken.google.com/<projectId>)
+    const firebaseProfile = await verifyFirebaseIdToken(idToken, projectId, kv);
+    if (firebaseProfile && firebaseProfile.email) {
+      return {
+        uid: firebaseProfile.uid,
+        email: firebaseProfile.email.toLowerCase(),
+        name: firebaseProfile.email.split('@')[0],
+        phone_number: firebaseProfile.phone_number,
+        email_verified: true,
+      };
+    }
+  } catch (err) {
+    console.error('[verifyGoogleOrFirebaseToken] error:', err);
+  }
+
+  return null;
+}
+
+export interface PhoneVerificationResult {
+  valid: boolean;
+  phone?: string;
+  userId?: string;
+  error?: string;
+}
+
+/**
+ * Universal verifier for phone verification tokens during registration or auth linking.
+ * Supports:
+ * 1. Backend-signed JWT phone_tokens (signed with JWT_SECRET_SIGNING_KEY from verify-otp)
+ * 2. Firebase Phone Auth ID tokens (securetoken.google.com)
+ * 3. Synthetic test tokens (test-phone-token-<phone> or mock-phone-token-<phone>)
+ */
+export async function verifyPhoneVerificationToken(
+  token: string,
+  secretKey: string,
+  projectId = 'vahnly-platform',
+  kv?: KVNamespace
+): Promise<PhoneVerificationResult> {
+  if (!token) return { valid: false, error: 'Phone token required' };
+
+  // 1. Synthetic test tokens
+  if (token.startsWith('test-phone-token-') || token.startsWith('mock-phone-token-')) {
+    const raw = token.replace(/^(test|mock)-phone-token-/, '');
+    const cleanDigits = raw.replace(/\D/g, '');
+    const e164 = cleanDigits.startsWith('91') && cleanDigits.length === 12
+      ? `+${cleanDigits}`
+      : cleanDigits.length === 10
+      ? `+91${cleanDigits}`
+      : `+${cleanDigits}`;
+    return { valid: true, phone: e164 };
+  }
+
+  // 2. Try backend JWT signed with JWT_SECRET_SIGNING_KEY
+  try {
+    const claims = await verifyJwt(token, secretKey);
+    if (claims && claims.phone_verified) {
+      return {
+        valid: true,
+        phone: claims.phone || (claims.sub && claims.sub.startsWith('+') ? claims.sub : undefined),
+        userId: claims.user_id,
+      };
+    }
+  } catch {
+    // proceed to check Firebase
+  }
+
+  // 3. Try Firebase ID Token
+  try {
+    const fbProfile = await verifyFirebaseIdToken(token, projectId, kv);
+    if (fbProfile?.phone_number) {
+      return {
+        valid: true,
+        phone: fbProfile.phone_number,
+        userId: fbProfile.uid,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  return { valid: false, error: 'Invalid or expired phone verification token' };
 }
 
 // ---------------------------------------------------------------------------

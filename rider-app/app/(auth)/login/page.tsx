@@ -365,6 +365,32 @@ export default function LoginPage() {
                     onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   />
                 </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-content-tertiary">
+                  <span className="font-medium">Test Riders:</span>
+                  <button
+                    type="button"
+                    onClick={() => setLoginPhone('7602676448')}
+                    className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+                  >
+                    76026 76448
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setLoginPhone('9933632763')}
+                    className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+                  >
+                    99336 32763
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setLoginPhone('9775104726')}
+                    className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+                  >
+                    97751 04726
+                  </button>
+                </div>
                 <input
                   className="h-12 w-full rounded-md border border-border-opaque bg-background-primary px-4 text-content-primary placeholder:text-content-tertiary outline-none focus:border-border-accent focus:ring-2 focus:ring-accent-400 transition-base"
                   placeholder="Password"

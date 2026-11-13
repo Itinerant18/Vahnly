@@ -12,16 +12,15 @@ export default function PhoneVerificationGate() {
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(30);
   const [otpSent, setOtpSent] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [otpChannel, setOtpChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [methodId, setMethodId] = useState<string | null>(null);
 
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const rawPhone = user?.phone || '';
   const cleanPhone = rawPhone.replace(/\s/g, '');
 
-  const isFirebaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && !(window as any).__E2E__;
-
-  const triggerSendOTP = async () => {
+  const triggerSendOTP = async (targetChannel: 'sms' | 'whatsapp' = 'sms') => {
     if (!cleanPhone) {
       setError('No phone number associated with this account. Please log out and contact support.');
       return;
@@ -29,18 +28,14 @@ export default function PhoneVerificationGate() {
     setError(null);
     setLoading(true);
     try {
-      if (isFirebaseConfigured) {
-        // Firebase sends real SMS via reCAPTCHA verification
-        const { startPhoneVerification } = await import('@/lib/phoneAuth');
-        const conf = await startPhoneVerification(`+91${cleanPhone}`);
-        setConfirmationResult(conf);
-      } else {
-        // Fallback log-OTP dev flow
-        await sendDriverOTP(cleanPhone);
+      const res = await sendDriverOTP(cleanPhone, targetChannel);
+      if (res.method_id) {
+        setMethodId(res.method_id);
       }
+      setOtpChannel(targetChannel);
       setOtpSent(true);
       setResendTimer(30);
-      console.log(`[PhoneVerificationGate] OTP sent to ${cleanPhone} (Firebase: ${isFirebaseConfigured})`);
+      console.log(`[PhoneVerificationGate] OTP sent to ${cleanPhone} via ${targetChannel}`);
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code. Please try again.');
     } finally {
@@ -120,13 +115,7 @@ export default function PhoneVerificationGate() {
     setLoading(true);
 
     try {
-      let otpOrToken = otpCode;
-      if (isFirebaseConfigured && confirmationResult) {
-        // Exchange 6-digit code for Firebase ID token (JWT phone proof)
-        otpOrToken = await confirmationResult.confirm(otpCode);
-      }
-
-      const res = await verifyDriverOTP(cleanPhone, otpOrToken);
+      const res = await verifyDriverOTP(cleanPhone, otpCode, methodId || undefined);
       if (res.token && res.user) {
         // Successful login, update auth store
         login(res.token, {
@@ -176,7 +165,7 @@ export default function PhoneVerificationGate() {
           </p>
           {cleanPhone && (
             <p className="text-paragraph-medium font-mono font-semibold text-accent-400 mt-2">
-              +91 {cleanPhone.slice(0, 5)} {cleanPhone.slice(5)}
+              +91 {cleanPhone.slice(0, 5)} {cleanPhone.slice(5)} ({otpChannel.toUpperCase()})
             </p>
           )}
         </div>
@@ -220,30 +209,40 @@ export default function PhoneVerificationGate() {
               Verify & Complete Access
             </Button>
 
-            <div className="flex items-center justify-between text-label-small pt-1">
-              <button
-                type="button"
-                onClick={triggerSendOTP}
-                disabled={loading || resendTimer > 0}
-                className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
-              >
-                {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Resend Code'}
-              </button>
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center justify-between text-label-small">
+                <button
+                  type="button"
+                  onClick={() => triggerSendOTP('sms')}
+                  disabled={loading || resendTimer > 0}
+                  className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
+                >
+                  {resendTimer > 0 ? `Resend SMS in ${resendTimer}s` : 'Resend SMS'}
+                </button>
 
-              <button
-                type="button"
-                onClick={logout}
-                className="text-content-negative hover:underline transition cursor-pointer font-medium"
-              >
-                Sign Out
-              </button>
+                <button
+                  type="button"
+                  onClick={() => triggerSendOTP('whatsapp')}
+                  disabled={loading}
+                  className="text-emerald-500 hover:text-emerald-400 transition cursor-pointer font-medium"
+                >
+                  Send via WhatsApp
+                </button>
+              </div>
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="text-content-negative hover:underline transition cursor-pointer font-medium text-label-small"
+                >
+                  Sign Out
+                </button>
+              </div>
             </div>
           </div>
         </form>
       </div>
-
-      {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
-      <div id="recaptcha-container" className="hidden" />
 
       <footer className="mt-8 text-center text-label-small text-content-tertiary font-mono select-none">
         VAHNLY Guard • OTP Verification Gate

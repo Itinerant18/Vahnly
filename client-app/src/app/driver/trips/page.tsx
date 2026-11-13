@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthGuard from '../../../components/AuthGuard';
-import { TabBar } from '@/components/TabBar';
+import { TabBarRedesign } from '@/components/TabBarRedesign';
 import TripHistoryList from '../../driver-account/trip-history/page';
 import { ClockIcon, FareDisplay } from '@/components/ds';
 import {
@@ -247,7 +247,7 @@ function TripsContent() {
           <TripHistoryList />
         )}
       </div>
-      <TabBar />
+      <TabBarRedesign />
     </div>
   );
 }

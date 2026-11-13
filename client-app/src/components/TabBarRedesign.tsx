@@ -53,12 +53,12 @@ function MeIcon({ active }: { active: boolean }) {
 }
 
 // ─── Tab Configuration ─────────────────────────────────────────────────────────
-// Renamed: "Trips" → "Jobs" (driver-hiring, not ride-hailing)
+// Tab 2: Trips (unified upcoming scheduled planner + trip history)
 // Accent color for active state (--accent-400 / forest-400)
 
 const TABS = [
   { label: 'Home', href: '/driver', icon: HomeIcon, match: /^\/driver\/?$/ },
-  { label: 'Jobs', href: '/driver/jobs', icon: JobsIcon, match: /^\/driver\/jobs/ },
+  { label: 'Trips', href: '/driver/trips', icon: JobsIcon, match: /^\/driver\/(trips|jobs)/ },
   { label: 'Earn', href: '/driver/earnings', icon: EarnIcon, match: /^\/driver\/earnings/ },
   { label: 'Me', href: '/driver-account/profile', icon: MeIcon, match: /^\/driver-account/ },
 ] as const;

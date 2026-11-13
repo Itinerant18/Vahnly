@@ -829,8 +829,14 @@ export interface DriverRegisterResponse {
 }
 
 export interface DriverSendOTPResponse {
+  success?: boolean;
   message: string;
-  expires_in_seconds: number;
+  expires_in_seconds?: number;
+  channel?: 'sms' | 'whatsapp';
+  method_id?: string;
+  phone?: string;
+  is_test_mode?: boolean;
+  test_code?: string;
 }
 
 export interface DriverVerifyOTPResponse {
@@ -843,24 +849,42 @@ export interface DriverVerifyOTPResponse {
   phone_verified?: boolean;
 }
 
-export async function sendDriverOTP(phone: string): Promise<DriverSendOTPResponse> {
+export async function sendDriverOTP(
+  phone: string,
+  channel: 'sms' | 'whatsapp' = 'sms'
+): Promise<DriverSendOTPResponse> {
   return request<DriverSendOTPResponse>('/api/v1/driver/auth/send-otp', {
     method: 'POST',
-    body: { phone },
+    body: { phone, channel },
   });
 }
 
-export async function verifyDriverOTP(phone: string, otp: string): Promise<DriverVerifyOTPResponse> {
+export async function verifyDriverOTP(
+  phone: string,
+  otp: string,
+  method_id?: string
+): Promise<DriverVerifyOTPResponse> {
   const res = await request<any>('/api/v1/driver/auth/verify-otp', {
     method: 'POST',
-    body: { phone, otp },
+    body: { phone, otp, method_id },
   });
   
   if (res.is_new_driver) {
     return {
       is_new_driver: true,
       phone_token: res.phone_token,
-      phone: res.phone,
+      phone: res.phone || phone,
+      token: res.token,
+      refresh_token: res.refresh_token,
+      user: res.user || (res.driver_id ? {
+        id: res.driver_id,
+        role: res.role ?? 'DRIVER',
+        name: res.name,
+        current_state: res.current_state || 'OFFLINE',
+        phone_verified: res.phone_verified ?? true,
+        phone: res.phone || phone,
+      } : undefined),
+      phone_verified: res.phone_verified ?? true,
     };
   }
   
@@ -868,15 +892,15 @@ export async function verifyDriverOTP(phone: string, otp: string): Promise<Drive
     is_new_driver: false,
     token: res.token,
     refresh_token: res.refresh_token,
-    user: {
+    user: res.user || {
       id: res.driver_id,
       role: res.role ?? 'DRIVER',
       name: res.name,
-      current_state: '',
-      phone_verified: res.phone_verified,
+      current_state: res.current_state || 'OFFLINE',
+      phone_verified: res.phone_verified ?? true,
       phone: res.phone || phone,
     },
-    phone_verified: res.phone_verified,
+    phone_verified: res.phone_verified ?? true,
   };
 }
 

@@ -15,6 +15,7 @@ export interface DomainEvent {
 export interface AuthClaims {
   user_id: string;
   role: string;
+  phone?: string;
   email?: string;
   city_scope?: string;
   two_factor_pending?: boolean;
@@ -57,6 +58,11 @@ export interface Env {
   // Secrets & Config Variables
   JWT_SECRET_SIGNING_KEY: string;
   FIELD_ENCRYPTION_KEY: string;
+  STYTCH_PROJECT_ID?: string;
+  STYTCH_SECRET?: string;
+  STYTCH_PUBLIC_TOKEN?: string;
+  STYTCH_ENV?: string;
+  STYTCH_BASE_URL?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   APPLE_OAUTH_CLIENT_ID?: string;

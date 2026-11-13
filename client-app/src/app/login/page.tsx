@@ -37,11 +37,13 @@ function UnifiedLoginContent() {
 
   // OTP Verification States
   const [showOtpVerification, setShowOtpVerification] = useState<boolean>(false);
-  const [otpPurpose, setOtpPurpose] = useState<'registration' | 'google_registration' | 'login_verification' | null>(null);
+  const [otpPurpose, setOtpPurpose] = useState<'registration' | 'google_registration' | 'login_verification' | 'otp_login' | null>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpResendTimer, setOtpResendTimer] = useState<number>(30);
+  const [otpChannel, setOtpChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [methodId, setMethodId] = useState<string | null>(null);
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [registrationPayload, setRegistrationPayload] = useState<any>(null);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Forgot / reset password states
@@ -134,20 +136,22 @@ function UnifiedLoginContent() {
     }
   };
 
-  const startOTPVerification = async (purpose: 'registration' | 'google_registration' | 'login_verification', cleanPhone: string, payload?: any) => {
+  const startOTPVerification = async (
+    purpose: 'registration' | 'google_registration' | 'login_verification' | 'otp_login',
+    cleanPhone: string,
+    payload?: any,
+    channel: 'sms' | 'whatsapp' = 'sms'
+  ) => {
     setLoading(true);
     setAuthError(null);
     try {
-      if (isFirebaseConfigured) {
-        // Firebase sends real SMS via invisible reCAPTCHA
-        const { startPhoneVerification } = await import('@/lib/phoneAuth');
-        const conf = await startPhoneVerification(`+91${cleanPhone}`);
-        setConfirmationResult(conf);
-      } else {
-        // Fallback custom OTP log flow
-        await sendDriverOTP(cleanPhone);
+      const res = await sendDriverOTP(cleanPhone, channel);
+      if (res.method_id) {
+        setMethodId(res.method_id);
       }
-
+      const code = res.test_code || (res.method_id?.startsWith('dev-') || res.method_id?.startsWith('mock-') ? '123456' : null);
+      setTestCode(code);
+      setOtpChannel(channel);
       setOtpPurpose(purpose);
       setOtpDigits(['', '', '', '', '', '']);
       setOtpResendTimer(30);
@@ -155,10 +159,11 @@ function UnifiedLoginContent() {
         setRegistrationPayload(payload);
       }
       setShowOtpVerification(true);
-      addAuditLog('OTP_SENT', { phone: cleanPhone, purpose, firebase: isFirebaseConfigured });
+      addAuditLog('OTP_SENT', { phone: cleanPhone, purpose, channel, method_id: res.method_id, test_code: code });
+      useToastStore.getState().show(res.message || `Code sent via ${channel.toUpperCase()}`, 'info');
     } catch (err: any) {
       setAuthError(err.message || 'Failed to send OTP verification code. Please try again.');
-      addAuditLog('OTP_SEND_FAILED', { phone: cleanPhone, error: String(err) });
+      addAuditLog('OTP_SEND_FAILED', { phone: cleanPhone, channel, error: String(err) });
     } finally {
       setLoading(false);
     }
@@ -177,18 +182,10 @@ function UnifiedLoginContent() {
     const cleanPhone = phone.replace(/\s/g, '');
 
     try {
-      let otpOrToken = otpCode;
-      if (isFirebaseConfigured && confirmationResult) {
-        // Exchange 6-digit code for Firebase ID token (JWT phone proof)
-        otpOrToken = await confirmationResult.confirm(otpCode);
-      }
+      const verifyRes = await verifyDriverOTP(cleanPhone, otpCode, methodId || undefined);
+      addAuditLog('OTP_VERIFIED', { phone: cleanPhone, purpose: otpPurpose });
 
-      const verifyRes = await verifyDriverOTP(cleanPhone, otpOrToken);
-      addAuditLog('OTP_VERIFIED', { phone: cleanPhone });
-
-      if (otpPurpose === 'login_verification') {
-        // Existing driver clearing the post-login phone gate -> verify-otp returns a
-        // fresh session (the backend marked the row phone_verified=true).
+      if (otpPurpose === 'login_verification' || otpPurpose === 'otp_login') {
         if (!verifyRes.token || !verifyRes.user) {
           throw new Error('Verification succeeded but no session was returned.');
         }
@@ -203,7 +200,11 @@ function UnifiedLoginContent() {
           console.warn('[UnifiedAuth] Push notification registration skipped:', pushErr);
         });
         addAuditLog('LOGIN_VERIFIED', { userId: verifyRes.user.id });
-        router.push('/driver');
+        if (verifyRes.is_new_driver) {
+          router.push('/driver-onboarding');
+        } else {
+          router.push('/driver');
+        }
         return;
       }
 
@@ -580,9 +581,22 @@ function UnifiedLoginContent() {
           <form onSubmit={(e) => handleVerifyOtpSubmit(e)} className="space-y-6 text-left">
             <div className="mb-2">
               <p className="text-paragraph-small text-content-secondary">
-                Enter the 6-digit verification code sent to <strong>+91 {phone}</strong>
+                Enter the 6-digit verification code sent to <strong>+91 {phone}</strong> via <span className="font-semibold text-content-primary uppercase">{otpChannel}</span>
               </p>
             </div>
+
+            {testCode && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-paragraph-small py-2.5 px-3 rounded-sm flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm">🧪 Test Mode: Code is <strong className="font-mono text-emerald-300 font-bold">{testCode}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setOtpDigits(testCode.split(''))}
+                  className="bg-emerald-500 text-background-primary text-label-small font-bold px-2.5 py-1 rounded-sm hover:bg-emerald-400 transition cursor-pointer shrink-0"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
 
             <div className="flex justify-between gap-2">
               {otpDigits.map((digit, idx) => (
@@ -613,31 +627,47 @@ function UnifiedLoginContent() {
                 loading={loading}
                 disabled={otpDigits.join('').length < 6}
               >
-                {otpPurpose === 'login_verification' ? 'Verify & Continue' : 'Verify & Register'}
+                {otpPurpose === 'registration' || otpPurpose === 'google_registration'
+                  ? 'Verify & Register'
+                  : 'Verify & Sign In'}
               </Button>
 
-              <div className="flex items-center justify-between text-label-small pt-1">
-                <button
-                  type="button"
-                  onClick={() => startOTPVerification(otpPurpose!, phone.replace(/\s/g, ''))}
-                  disabled={loading || otpResendTimer > 0}
-                  className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
-                >
-                  {otpResendTimer > 0 ? `Resend Code in ${otpResendTimer}s` : 'Resend Code'}
-                </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex items-center justify-between text-label-small">
+                  <button
+                    type="button"
+                    onClick={() => startOTPVerification(otpPurpose!, phone.replace(/\s/g, ''), registrationPayload, 'sms')}
+                    disabled={loading || otpResendTimer > 0}
+                    className="text-content-secondary hover:text-content-primary transition disabled:text-content-tertiary cursor-pointer font-medium"
+                  >
+                    {otpResendTimer > 0 ? `Resend SMS in ${otpResendTimer}s` : 'Resend SMS'}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowOtpVerification(false);
-                    setOtpPurpose(null);
-                    setAuthError(null);
-                  }}
-                  disabled={loading}
-                  className="text-content-negative hover:underline transition cursor-pointer font-medium"
-                >
-                  Back
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => startOTPVerification(otpPurpose!, phone.replace(/\s/g, ''), registrationPayload, 'whatsapp')}
+                    disabled={loading}
+                    className="text-emerald-500 hover:text-emerald-400 transition cursor-pointer font-medium"
+                  >
+                    Send via WhatsApp
+                  </button>
+                </div>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowOtpVerification(false);
+                      setOtpPurpose(null);
+                      setAuthError(null);
+                      setTestCode(null);
+                    }}
+                    disabled={loading}
+                    className="text-content-secondary hover:text-content-primary text-label-small underline transition cursor-pointer"
+                  >
+                    Use another method or number
+                  </button>
+                </div>
               </div>
             </div>
           </form>
@@ -668,6 +698,41 @@ function UnifiedLoginContent() {
               leftIcon={<span className="text-content-secondary font-mono text-paragraph-medium">+91</span>}
               disabled={loading}
             />
+
+            <div className="flex flex-wrap items-center gap-1.5 text-label-small text-content-tertiary">
+              <span className="font-medium">Test Drivers:</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('7029295088')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                70292 95088
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('8001316145')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                80013 16145
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9800355276')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                98003 55276
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9876543210')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                Subir
+              </button>
+            </div>
 
             <div className="w-full">
               <label className="block text-label-small text-content-secondary mb-1">
@@ -728,6 +793,41 @@ function UnifiedLoginContent() {
               leftIcon={<span className="text-content-secondary font-mono text-paragraph-medium">+91</span>}
               disabled={loading}
             />
+
+            <div className="flex flex-wrap items-center gap-1.5 text-label-small text-content-tertiary">
+              <span className="font-medium">Test Drivers:</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('7029295088')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                70292 95088
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('8001316145')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                80013 16145
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9800355276')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                98003 55276
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9876543210')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                Subir
+              </button>
+            </div>
 
             <Input
               label="Email Address (Optional)"
@@ -807,6 +907,41 @@ function UnifiedLoginContent() {
               disabled={loading}
             />
 
+            <div className="flex flex-wrap items-center gap-1.5 text-label-small text-content-tertiary">
+              <span className="font-medium">Test Drivers:</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('7029295088')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                70292 95088
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('8001316145')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                80013 16145
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9800355276')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                98003 55276
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => handlePhoneChange('9876543210')}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                Subir
+              </button>
+            </div>
+
             <Input
               label="Secure PIN / Password"
               type="password"
@@ -832,7 +967,24 @@ function UnifiedLoginContent() {
                 fullWidth
                 loading={loading}
               >
-                Log In
+                Log In with Password
+              </Button>
+
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={() => {
+                  const cleanPhone = phone.replace(/\s/g, '');
+                  if (!phone || cleanPhone.length < 10) {
+                    setAuthError('Please enter a valid 10-digit mobile number to receive OTP.');
+                    return;
+                  }
+                  startOTPVerification('otp_login', cleanPhone);
+                }}
+                disabled={loading}
+              >
+                Log In with Mobile OTP
               </Button>
 
               <Button

@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Env, AuthClaims } from '../types';
 import { getDb } from '../services/db';
-import { signJwt, verifyFirebaseIdToken, hashPassword, verifyPassword } from '../services/auth';
+import { signJwt, verifyFirebaseIdToken, hashPassword, verifyPassword, verifyGoogleOrFirebaseToken, verifyJwt, verifyPhoneVerificationToken } from '../services/auth';
+import { sendStytchOTP, verifyStytchOTP, toE164, isTestNumber } from '../services/stytch';
 
 const auth = new Hono<{ Bindings: Env }>();
 
@@ -94,6 +95,386 @@ auth.post('/api/v1/auth/firebase/verify', async (c) => {
       role,
     },
   });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Driver Google Login & Two-Step Registration
+// ---------------------------------------------------------------------------
+auth.post('/api/v1/driver/login/google', async (c) => {
+  try {
+    const body = await c.req.json<{
+      id_token: string;
+      phone?: string;
+      city_prefix?: string;
+      name?: string;
+      phone_token?: string;
+    }>().catch(() => null);
+
+    if (!body?.id_token) {
+      return c.json({ success: false, code: 'BAD_REQUEST', error: 'id_token required' }, 400);
+    }
+
+    const projectId = c.env.FIREBASE_PROJECT_ID || 'vahnly-platform';
+    const googleProfile = await verifyGoogleOrFirebaseToken(body.id_token, projectId, c.env.CONFIG);
+
+    if (!googleProfile?.email) {
+      return c.json({ success: false, code: 'INVALID_TOKEN', error: 'Invalid Google authentication token' }, 401);
+    }
+
+    const sql = getDb(c.env, { write: true });
+    const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
+
+    // 1. Check if driver already exists by verified Google email
+    const existing = await sql<{
+      id: string;
+      name: string;
+      phone: string;
+      email: string | null;
+      city_prefix: string;
+      is_verified: boolean;
+      current_state: string;
+      phone_verified: boolean;
+    }[]>`
+      SELECT id, name, phone, email, city_prefix, is_verified, current_state, phone_verified
+      FROM drivers
+      WHERE LOWER(email) = ${googleProfile.email.toLowerCase()}
+        AND ${Date.now()}::bigint > 0
+      LIMIT 1
+    `;
+
+    if (existing.length > 0) {
+      const driver = existing[0];
+      const claims: AuthClaims = {
+        user_id: driver.id,
+        role: 'DRIVER',
+        city_scope: driver.city_prefix,
+        phone_verified: driver.phone_verified ?? true,
+      };
+
+      const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+      const refreshToken = crypto.randomUUID();
+      await sessionStub.storeRefreshToken(refreshToken, driver.id, 'DRIVER', Date.now() + 30 * 86400 * 1000);
+
+      return c.json({
+        success: true,
+        registered: true,
+        token,
+        refresh_token: refreshToken,
+        role: 'DRIVER',
+        driver_id: driver.id,
+        name: driver.name,
+        phone: driver.phone,
+        phone_verified: driver.phone_verified ?? true,
+        user: {
+          id: driver.id,
+          name: driver.name,
+          phone: driver.phone,
+          role: 'DRIVER',
+          phone_verified: driver.phone_verified ?? true,
+          current_state: driver.current_state,
+        },
+      });
+    }
+
+    // 2. Driver does not exist yet. Check if registration payload + phone_token provided.
+    if (!body.phone_token) {
+      return c.json({
+        success: true,
+        registered: false,
+        email: googleProfile.email,
+        name: body.name || googleProfile.name || '',
+      });
+    }
+
+    // 3. Verify cryptographic phone_token
+    const phoneResult = await verifyPhoneVerificationToken(
+      body.phone_token,
+      c.env.JWT_SECRET_SIGNING_KEY,
+      projectId,
+      c.env.CONFIG
+    );
+
+    if (!phoneResult.valid) {
+      return c.json({ success: false, code: 'INVALID_PHONE_TOKEN', error: phoneResult.error || 'Invalid or expired phone verification token' }, 400);
+    }
+
+    const verifiedPhone = phoneResult.phone || (body.phone ? toE164(body.phone) : '');
+    if (!verifiedPhone) {
+      return c.json({ success: false, code: 'PHONE_REQUIRED', error: 'Valid phone number is required' }, 400);
+    }
+
+    const e164 = toE164(verifiedPhone);
+    const cleanDigits = verifiedPhone.replace(/\D/g, '');
+    const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const driverName = (body.name || googleProfile.name || 'New Driver').trim();
+    const cityPrefix = body.city_prefix || c.env.CITY_PREFIX || 'KOL';
+
+    // 4. Check if driver already exists with this phone
+    const existingByPhone = await sql<{
+      id: string;
+      name: string;
+      phone: string;
+      city_prefix: string;
+      is_verified: boolean;
+      current_state: string;
+    }[]>`
+      SELECT id, name, phone, city_prefix, is_verified, current_state
+      FROM drivers
+      WHERE phone = ${e164} OR phone = ${raw10Digits}
+      LIMIT 1
+    `;
+
+    let driverId = '';
+    let currentState = 'OFFLINE';
+
+    if (existingByPhone.length > 0) {
+      driverId = existingByPhone[0].id;
+      currentState = existingByPhone[0].current_state;
+      await sql`
+        UPDATE drivers
+        SET email = ${googleProfile.email.toLowerCase()},
+            name = COALESCE(NULLIF(name, 'New Driver'), ${driverName}),
+            phone_verified = true,
+            updated_at = NOW()
+        WHERE id = ${driverId}::uuid
+      `;
+    } else {
+      const created = await sql<{ id: string }[]>`
+        INSERT INTO drivers (
+          name,
+          phone,
+          email,
+          city_prefix,
+          current_state,
+          is_verified,
+          phone_verified,
+          dl_number
+        ) VALUES (
+          ${driverName},
+          ${e164},
+          ${googleProfile.email.toLowerCase()},
+          ${cityPrefix},
+          'OFFLINE',
+          false,
+          true,
+          'PENDING'
+        )
+        RETURNING id
+      `;
+      driverId = created[0].id;
+    }
+
+    const claims: AuthClaims = {
+      user_id: driverId,
+      role: 'DRIVER',
+      city_scope: cityPrefix,
+      phone_verified: true,
+    };
+
+    const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+    const refreshToken = crypto.randomUUID();
+    await sessionStub.storeRefreshToken(refreshToken, driverId, 'DRIVER', Date.now() + 30 * 86400 * 1000);
+
+    return c.json({
+      success: true,
+      registered: true,
+      token,
+      refresh_token: refreshToken,
+      role: 'DRIVER',
+      driver_id: driverId,
+      name: driverName,
+      phone: e164,
+      phone_verified: true,
+      user: {
+        id: driverId,
+        name: driverName,
+        phone: e164,
+        role: 'DRIVER',
+        phone_verified: true,
+        current_state: currentState,
+      },
+    });
+  } catch (err: any) {
+    console.error('[DriverGoogleLogin] Failed:', err);
+    return c.json({ success: false, code: 'INTERNAL_ERROR', error: err.message || 'Google login failed' }, 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 1c. Rider Google Login & Registration
+// ---------------------------------------------------------------------------
+auth.post('/api/v1/rider/auth/login/google', async (c) => {
+  try {
+    const body = await c.req.json<{
+      id_token: string;
+      phone?: string;
+      phone_token?: string;
+      name?: string;
+      referred_by_code?: string;
+    }>().catch(() => null);
+
+    if (!body?.id_token) {
+      return c.json({ success: false, code: 'BAD_REQUEST', error: 'id_token required' }, 400);
+    }
+
+    const projectId = c.env.FIREBASE_PROJECT_ID || 'vahnly-platform';
+    const googleProfile = await verifyGoogleOrFirebaseToken(body.id_token, projectId, c.env.CONFIG);
+
+    if (!googleProfile?.email) {
+      return c.json({ success: false, code: 'INVALID_TOKEN', error: 'Invalid Google authentication token' }, 401);
+    }
+
+    const sql = getDb(c.env, { write: true });
+    const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
+
+    const existing = await sql<{
+      id: string;
+      name: string;
+      phone: string;
+      email: string | null;
+      phone_verified: boolean;
+    }[]>`
+      SELECT id, name, phone, email, phone_verified
+      FROM riders
+      WHERE LOWER(email) = ${googleProfile.email.toLowerCase()}
+        AND ${Date.now()}::bigint > 0
+      LIMIT 1
+    `;
+
+    if (existing.length > 0) {
+      const rider = existing[0];
+      const claims: AuthClaims = {
+        user_id: rider.id,
+        role: 'RIDER',
+        phone_verified: rider.phone_verified ?? true,
+      };
+
+      const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+      const refreshToken = crypto.randomUUID();
+      await sessionStub.storeRefreshToken(refreshToken, rider.id, 'RIDER', Date.now() + 30 * 86400 * 1000);
+
+      return c.json({
+        success: true,
+        registered: true,
+        token,
+        refresh_token: refreshToken,
+        is_new_rider: false,
+        rider: {
+          id: rider.id,
+          name: rider.name,
+          email: rider.email,
+          phone: rider.phone,
+        },
+      });
+    }
+
+    // 2. Rider not found by email. Check if phone_token provided.
+    if (!body.phone_token) {
+      return c.json({
+        success: true,
+        registered: false,
+        email: googleProfile.email,
+        name: body.name || googleProfile.name || '',
+      });
+    }
+
+    // 3. Verify cryptographic phone_token
+    const phoneResult = await verifyPhoneVerificationToken(
+      body.phone_token,
+      c.env.JWT_SECRET_SIGNING_KEY,
+      projectId,
+      c.env.CONFIG
+    );
+
+    if (!phoneResult.valid) {
+      return c.json({ success: false, code: 'INVALID_PHONE_TOKEN', error: phoneResult.error || 'Invalid or expired phone verification token' }, 400);
+    }
+
+    const verifiedPhone = phoneResult.phone || (body.phone ? toE164(body.phone) : '');
+    if (!verifiedPhone) {
+      return c.json({ success: false, code: 'PHONE_REQUIRED', error: 'Valid phone number is required' }, 400);
+    }
+
+    const e164 = toE164(verifiedPhone);
+    const cleanDigits = verifiedPhone.replace(/\D/g, '');
+    const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const riderName = (body.name || googleProfile.name || 'New Rider').trim();
+
+    // 4. Check if rider already exists with this phone
+    const existingByPhone = await sql<{
+      id: string;
+      name: string;
+      phone: string;
+    }[]>`
+      SELECT id, name, phone
+      FROM riders
+      WHERE phone = ${e164} OR phone = ${raw10Digits}
+      LIMIT 1
+    `;
+
+    let riderId = '';
+    let isNewRider = false;
+
+    if (existingByPhone.length > 0) {
+      riderId = existingByPhone[0].id;
+      await sql`
+        UPDATE riders
+        SET email = ${googleProfile.email.toLowerCase()},
+            name = COALESCE(NULLIF(name, 'Rider'), ${riderName}),
+            phone_verified = true,
+            updated_at = NOW()
+        WHERE id = ${riderId}::uuid
+      `;
+    } else {
+      isNewRider = true;
+      const created = await sql<{ id: string }[]>`
+        INSERT INTO riders (
+          name,
+          email,
+          phone,
+          phone_verified,
+          is_active,
+          referral_code
+        ) VALUES (
+          ${riderName},
+          ${googleProfile.email.toLowerCase()},
+          ${e164},
+          true,
+          true,
+          ${body.referred_by_code || null}
+        )
+        RETURNING id
+      `;
+      riderId = created[0].id;
+    }
+
+    const claims: AuthClaims = {
+      user_id: riderId,
+      role: 'RIDER',
+      phone_verified: true,
+    };
+
+    const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+    const refreshToken = crypto.randomUUID();
+    await sessionStub.storeRefreshToken(refreshToken, riderId, 'RIDER', Date.now() + 30 * 86400 * 1000);
+
+    return c.json({
+      success: true,
+      registered: true,
+      token,
+      refresh_token: refreshToken,
+      is_new_rider: isNewRider,
+      rider: {
+        id: riderId,
+        name: riderName,
+        email: googleProfile.email,
+        phone: e164,
+      },
+    });
+  } catch (err: any) {
+    console.error('[RiderGoogleLogin] Failed:', err);
+    return c.json({ success: false, code: 'INTERNAL_ERROR', error: err.message || 'Google login failed' }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -206,47 +587,116 @@ auth.post('/api/v1/driver/login', async (c) => {
 });
 
 auth.post('/api/v1/driver/auth/send-otp', async (c) => {
-  const body = await c.req.json<{ phone: string }>().catch(() => null);
+  const body = await c.req.json<{ phone: string; channel?: 'sms' | 'whatsapp' }>().catch(() => null);
   if (!body?.phone) {
     return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone required' }, 400);
   }
 
+  const e164 = toE164(body.phone);
+  const channel = body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
   const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
-  const count = await sessionStub.incrementOTP(`otp_rate:${body.phone}`, 600);
-  if (count > 5) {
-    return c.json({ success: false, code: 'RATE_LIMITED', error: 'Too many OTP attempts. Please wait.' }, 429);
+
+  if (!isTestNumber(e164)) {
+    const count = await sessionStub.incrementOTP(`otp_rate:${e164}`, 600);
+    if (count > 5) {
+      return c.json({ success: false, code: 'RATE_LIMITED', error: 'Too many OTP attempts. Please wait 10 minutes.' }, 429);
+    }
   }
 
-  // Generate 6-digit OTP
-  const otp = '123456'; // Standard testing OTP or SMS integration
-  await sessionStub.setCachedValue(`otp:${body.phone}`, otp, 300);
+  try {
+    const stytchRes = await sendStytchOTP(c.env, e164, channel);
+    if (stytchRes.method_id) {
+      await sessionStub.setCachedValue(`stytch_method_id:${e164}`, stytchRes.method_id, 600);
+    }
 
-  return c.json({ success: true, message: 'OTP sent successfully' });
+    const isTestMode = isTestNumber(e164) || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
+    return c.json({
+      success: true,
+      message: isTestMode
+        ? `[TEST MODE] Use code 123456 to verify (Carrier billing pending in Stytch)`
+        : `OTP sent successfully via ${channel.toUpperCase()}`,
+      channel,
+      method_id: stytchRes.method_id,
+      phone: e164,
+      is_test_mode: isTestMode,
+      test_code: isTestMode ? '123456' : undefined,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
+  }
 });
 
 auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
-  const body = await c.req.json<{ phone: string; otp: string }>().catch(() => null);
-  if (!body?.phone || !body?.otp) {
-    return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone and otp required' }, 400);
-  }
+  try {
+    const body = await c.req.json<{ phone: string; otp: string; method_id?: string }>().catch(() => null);
+    if (!body?.phone || !body?.otp) {
+      return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone and otp required' }, 400);
+    }
 
-  const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
-  const cachedOtp = await sessionStub.getCachedValue(`otp:${body.phone}`);
+    const e164 = toE164(body.phone);
+    const cleanDigits = body.phone.replace(/\D/g, '');
+    const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
 
-  if (body.otp !== '123456' && cachedOtp !== body.otp) {
-    return c.json({ success: false, code: 'INVALID_OTP', error: 'invalid or expired OTP' }, 400);
-  }
+    let methodId = body.method_id;
+    if (!methodId) {
+      methodId = (await sessionStub.getCachedValue(`stytch_method_id:${e164}`)) || undefined;
+    }
 
-  const sql = getDb(c.env);
-  const rows = await sql<{ id: string; name: string; city_prefix: string }[]>`
-    SELECT id, name, city_prefix FROM drivers WHERE phone = ${body.phone}
-  `;
+    try {
+      await verifyStytchOTP(c.env, {
+        code: body.otp,
+        method_id: methodId,
+        phone: e164,
+      });
+    } catch (err: any) {
+      return c.json({ success: false, code: 'INVALID_OTP', error: err.message || 'invalid or expired OTP' }, 400);
+    }
 
-  let driverId = rows.length > 0 ? rows[0].id : '';
-  if (!driverId) {
+    // Clear rate limit counter upon successful OTP verification
+    await sessionStub.resetOTP(`otp_rate:${e164}`);
+
+    const sql = getDb(c.env, { write: true });
+    const likePattern = `%${cleanDigits}`;
+    const rows = await sql<{
+      id: string;
+      name: string;
+      phone: string;
+      email: string | null;
+      city_prefix: string;
+      is_verified: boolean;
+      current_state: string;
+    }[]>`
+      SELECT id, name, phone, email, city_prefix, is_verified, current_state
+      FROM drivers
+      WHERE phone = ${e164}
+         OR phone = ${raw10Digits}
+         OR phone = ${cleanDigits}
+         OR phone = ${body.phone}
+         OR phone LIKE ${likePattern}
+      ORDER BY created_at ASC
+      LIMIT 1
+    `;
+
+  let driverId = '';
+  let isNewDriver = false;
+  let driverName = 'New Driver';
+  let cityPrefix = 'KOL';
+  let isVerified = false;
+  let currentState = 'OFFLINE';
+
+  if (rows.length > 0) {
+    const d = rows[0];
+    driverId = d.id;
+    driverName = d.name;
+    cityPrefix = d.city_prefix;
+    isVerified = d.is_verified;
+    currentState = d.current_state;
+  } else {
+    isNewDriver = true;
     const created = await sql<{ id: string }[]>`
       INSERT INTO drivers (name, phone, city_prefix, current_state, is_verified, dl_number)
-      VALUES ('Driver', ${body.phone}, 'KOL', 'OFFLINE', false, 'PENDING')
+      VALUES (${driverName}, ${e164}, ${cityPrefix}, 'OFFLINE', false, 'PENDING')
       RETURNING id
     `;
     driverId = created[0].id;
@@ -255,6 +705,7 @@ auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
   const claims: AuthClaims = {
     user_id: driverId,
     role: 'DRIVER',
+    city_scope: cityPrefix,
     phone_verified: true,
   };
 
@@ -262,11 +713,265 @@ auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
   const refreshToken = crypto.randomUUID();
   await sessionStub.storeRefreshToken(refreshToken, driverId, 'DRIVER', Date.now() + 30 * 86400 * 1000);
 
+  // Issue cryptographic phone_token so client-app two-step registration can verify phone ownership
+  const phoneTokenClaims: AuthClaims = {
+    user_id: driverId,
+    role: 'DRIVER',
+    sub: e164,
+    phone_verified: true,
+  };
+  const phoneToken = await signJwt(phoneTokenClaims, c.env.JWT_SECRET_SIGNING_KEY);
+
+  return c.json({
+    success: true,
+    token,
+    refresh_token: refreshToken,
+    is_new_driver: isNewDriver,
+    driver_id: driverId,
+    role: 'DRIVER',
+    name: driverName,
+    phone: e164,
+    phone_verified: true,
+    phone_token: phoneToken,
+    user: {
+      id: driverId,
+      name: driverName,
+      phone: e164,
+      role: 'DRIVER',
+      phone_verified: true,
+      current_state: currentState,
+    },
+    driver: {
+      id: driverId,
+      name: driverName,
+      phone: e164,
+      city_prefix: cityPrefix,
+      is_verified: isVerified,
+      current_state: currentState,
+      phone_verified: true,
+    },
+  });
+  } catch (err: any) {
+    console.error('[DriverVerifyOTP] Internal Error:', err);
+    return c.json({ success: false, code: 'INTERNAL_ERROR', error: err.message || 'Driver verification failed' }, 500);
+  }
+});
+
+auth.post('/api/v1/driver/register', async (c) => {
+  const body = await c.req.json<{
+    name: string;
+    phone: string;
+    email?: string;
+    password?: string;
+    city_prefix?: string;
+    dl_number?: string;
+    referral_code?: string;
+    referred_by_code?: string;
+    phone_token?: string;
+  }>().catch(() => null);
+
+  if (!body?.phone || !body?.name) {
+    return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone and name required' }, 400);
+  }
+
+  const e164 = toE164(body.phone);
+  const cleanDigits = body.phone.replace(/\D/g, '');
+  const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+  const cityPrefix = body.city_prefix || c.env.CITY_PREFIX || 'KOL';
+  const referral = body.referral_code || body.referred_by_code || null;
+  const passwordHash = body.password ? await hashPassword(body.password) : null;
+  const sql = getDb(c.env, { write: true });
+
+  const existing = await sql<{ id: string }[]>`
+    SELECT id FROM drivers WHERE phone = ${e164} OR phone = ${raw10Digits} LIMIT 1
+  `;
+
+  let driverId = '';
+  if (existing.length > 0) {
+    driverId = existing[0].id;
+    await sql`
+      UPDATE drivers
+      SET name = ${body.name},
+          email = COALESCE(${body.email || null}, email),
+          password_hash = COALESCE(${passwordHash}, password_hash),
+          city_prefix = ${cityPrefix},
+          referral_code = COALESCE(${referral}, referral_code),
+          updated_at = NOW()
+      WHERE id = ${driverId}::uuid
+    `;
+  } else {
+    const created = await sql<{ id: string }[]>`
+      INSERT INTO drivers (name, phone, email, password_hash, city_prefix, current_state, is_verified, dl_number, referral_code)
+      VALUES (${body.name}, ${e164}, ${body.email || null}, ${passwordHash}, ${cityPrefix}, 'OFFLINE', false, ${body.dl_number || 'PENDING'}, ${referral})
+      RETURNING id
+    `;
+    driverId = created[0].id;
+  }
+
+  const claims: AuthClaims = {
+    user_id: driverId,
+    role: 'DRIVER',
+    city_scope: cityPrefix,
+    phone_verified: true,
+  };
+
+  const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+  const refreshToken = crypto.randomUUID();
+  const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
+  await sessionStub.storeRefreshToken(refreshToken, driverId, 'DRIVER', Date.now() + 30 * 86400 * 1000);
+
   return c.json({
     success: true,
     token,
     refresh_token: refreshToken,
     driver_id: driverId,
+    role: 'DRIVER',
+    name: body.name,
+    phone: e164,
+    phone_verified: true,
+    user: {
+      id: driverId,
+      name: body.name,
+      phone: e164,
+      role: 'DRIVER',
+      phone_verified: true,
+    },
+    driver: {
+      id: driverId,
+      name: body.name,
+      phone: e164,
+      city_prefix: cityPrefix,
+      is_verified: false,
+      current_state: 'OFFLINE',
+    },
+  });
+});
+
+auth.post('/api/v1/driver/auth/forgot-password', async (c) => {
+  const body = await c.req.json<{ phone: string }>().catch(() => null);
+  if (!body?.phone) {
+    return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone required' }, 400);
+  }
+
+  const e164 = toE164(body.phone);
+  const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
+
+  const count = await sessionStub.incrementOTP(`otp_rate:${e164}`, 600);
+  if (count > 5) {
+    return c.json({ success: false, code: 'RATE_LIMITED', error: 'Too many OTP attempts. Please wait 10 minutes.' }, 429);
+  }
+
+  try {
+    const stytchRes = await sendStytchOTP(c.env, e164, 'sms');
+    if (stytchRes.method_id) {
+      await sessionStub.setCachedValue(`stytch_method_id:${e164}`, stytchRes.method_id, 600);
+    }
+  } catch (err: any) {
+    console.warn(`[ForgotPassword] Stytch send failed for ${e164}:`, err.message);
+  }
+
+  // Anti-enumeration: always return success message
+  return c.json({
+    success: true,
+    message: 'If that number is registered, a reset code was sent.',
+  });
+});
+
+auth.post('/api/v1/driver/auth/reset-password', async (c) => {
+  const body = await c.req.json<{ phone: string; otp: string; new_password: string }>().catch(() => null);
+  if (!body?.phone || !body?.otp || !body?.new_password) {
+    return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone, otp, and new_password required' }, 400);
+  }
+
+  if (body.new_password.length < 8) {
+    return c.json({ success: false, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' }, 400);
+  }
+
+  const e164 = toE164(body.phone);
+  const cleanDigits = body.phone.replace(/\D/g, '');
+  const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+  const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
+
+  const methodId = (await sessionStub.getCachedValue(`stytch_method_id:${e164}`)) || undefined;
+
+  try {
+    await verifyStytchOTP(c.env, {
+      code: body.otp,
+      method_id: methodId,
+      phone: e164,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, code: 'INVALID_OTP', error: err.message || 'invalid or expired OTP' }, 400);
+  }
+
+  const sql = getDb(c.env, { write: true });
+  const rows = await sql<{
+    id: string;
+    name: string;
+    phone: string;
+    city_prefix: string;
+    is_verified: boolean;
+    current_state: string;
+  }[]>`
+    SELECT id, name, phone, city_prefix, is_verified, current_state
+    FROM drivers
+    WHERE phone = ${e164} OR phone = ${raw10Digits}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) {
+    return c.json({ success: false, code: 'NOT_FOUND', error: 'driver not registered' }, 404);
+  }
+
+  const driver = rows[0];
+  const newHash = await hashPassword(body.new_password);
+
+  await sql`
+    UPDATE drivers
+    SET password_hash = ${newHash},
+        updated_at = NOW()
+    WHERE id = ${driver.id}::uuid
+  `;
+
+  await sessionStub.resetOTP(`otp_rate:${e164}`);
+
+  const claims: AuthClaims = {
+    user_id: driver.id,
+    role: 'DRIVER',
+    city_scope: driver.city_prefix,
+    phone_verified: true,
+  };
+
+  const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+  const refreshToken = crypto.randomUUID();
+  await sessionStub.storeRefreshToken(refreshToken, driver.id, 'DRIVER', Date.now() + 30 * 86400 * 1000);
+
+  return c.json({
+    success: true,
+    token,
+    refresh_token: refreshToken,
+    driver_id: driver.id,
+    role: 'DRIVER',
+    name: driver.name,
+    phone: driver.phone,
+    phone_verified: true,
+    user: {
+      id: driver.id,
+      name: driver.name,
+      phone: driver.phone,
+      role: 'DRIVER',
+      phone_verified: true,
+      current_state: driver.current_state,
+    },
+    driver: {
+      id: driver.id,
+      name: driver.name,
+      phone: driver.phone,
+      city_prefix: driver.city_prefix,
+      is_verified: driver.is_verified,
+      current_state: driver.current_state,
+      phone_verified: true,
+    },
   });
 });
 
@@ -274,66 +979,131 @@ auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
 // 4. Rider Auth
 // ---------------------------------------------------------------------------
 auth.post('/api/v1/rider/auth/send-otp', async (c) => {
-  const body = await c.req.json<{ phone: string }>().catch(() => null);
+  const body = await c.req.json<{ phone: string; channel?: 'sms' | 'whatsapp' }>().catch(() => null);
   if (!body?.phone) {
     return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone required' }, 400);
   }
 
+  const e164 = toE164(body.phone);
+  const channel = body.channel === 'whatsapp' ? 'whatsapp' : 'sms';
   const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
-  await sessionStub.setCachedValue(`rider_otp:${body.phone}`, '123456', 300);
 
-  return c.json({ success: true, message: 'OTP sent' });
+  if (!isTestNumber(e164)) {
+    const count = await sessionStub.incrementOTP(`rider_otp_rate:${e164}`, 600);
+    if (count > 5) {
+      return c.json({ success: false, code: 'RATE_LIMITED', error: 'Too many OTP attempts. Please wait.' }, 429);
+    }
+  }
+
+  try {
+    const stytchRes = await sendStytchOTP(c.env, e164, channel);
+    if (stytchRes.method_id) {
+      await sessionStub.setCachedValue(`stytch_rider_method_id:${e164}`, stytchRes.method_id, 600);
+    }
+    const isTestMode = isTestNumber(e164) || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
+    return c.json({
+      success: true,
+      message: isTestMode
+        ? `[TEST MODE] Use code 123456 to verify`
+        : `OTP sent via ${channel.toUpperCase()}`,
+      method_id: stytchRes.method_id,
+      channel,
+      phone: e164,
+      is_test_mode: isTestMode,
+      test_code: isTestMode ? '123456' : undefined,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
+  }
 });
 
 auth.post('/api/v1/rider/auth/verify-otp', async (c) => {
-  const body = await c.req.json<{ phone: string; otp: string }>().catch(() => null);
-  if (!body?.phone || !body?.otp) {
-    return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone and otp required' }, 400);
-  }
+  try {
+    const body = await c.req.json<{ phone: string; otp: string; method_id?: string }>().catch(() => null);
+    if (!body?.phone || !body?.otp) {
+      return c.json({ success: false, code: 'BAD_REQUEST', error: 'phone and otp required' }, 400);
+    }
 
-  const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
-  const cached = await sessionStub.getCachedValue(`rider_otp:${body.phone}`);
-  if (body.otp !== '123456' && cached !== body.otp) {
-    return c.json({ success: false, code: 'INVALID_OTP', error: 'invalid OTP' }, 400);
-  }
+    const e164 = toE164(body.phone);
+    const cleanDigits = body.phone.replace(/\D/g, '');
+    const raw10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    const sessionStub = c.env.SESSION_DO.getByName('global-sessions');
 
-  const sql = getDb(c.env, { write: true });
-  const rows = await sql<{ id: string; name: string }[]>`
-    SELECT id, name FROM riders WHERE phone = ${body.phone}
-  `;
+    let methodId = body.method_id;
+    if (!methodId) {
+      methodId = (await sessionStub.getCachedValue(`stytch_rider_method_id:${e164}`)) || undefined;
+    }
 
-  let riderId = rows.length > 0 ? rows[0].id : '';
-  let isNew = false;
-  if (!riderId) {
-    isNew = true;
-    const created = await sql<{ id: string }[]>`
-      INSERT INTO riders (name, phone, is_active)
-      VALUES ('Rider', ${body.phone}, true)
-      RETURNING id
+    try {
+      await verifyStytchOTP(c.env, {
+        code: body.otp,
+        method_id: methodId,
+        phone: e164,
+      });
+    } catch (err: any) {
+      return c.json({ success: false, code: 'INVALID_OTP', error: err.message || 'invalid OTP' }, 400);
+    }
+
+    await sessionStub.resetOTP(`rider_otp_rate:${e164}`);
+
+    const sql = getDb(c.env, { write: true });
+    const likePattern = `%${cleanDigits}`;
+    const rows = await sql<{ id: string; name: string }[]>`
+      SELECT id, name FROM riders
+      WHERE phone = ${e164}
+         OR phone = ${raw10Digits}
+         OR phone = ${cleanDigits}
+         OR phone = ${body.phone}
+         OR phone LIKE ${likePattern}
+      LIMIT 1
     `;
-    riderId = created[0].id;
+
+    let riderId = rows.length > 0 ? rows[0].id : '';
+    let isNew = false;
+    if (!riderId) {
+      isNew = true;
+      const created = await sql<{ id: string }[]>`
+        INSERT INTO riders (name, phone, is_active)
+        VALUES ('Rider', ${e164}, true)
+        RETURNING id
+      `;
+      riderId = created[0].id;
+    }
+
+    const claims: AuthClaims = {
+      user_id: riderId,
+      role: 'RIDER',
+      phone_verified: true,
+    };
+
+    const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+    const refreshToken = crypto.randomUUID();
+    await sessionStub.storeRefreshToken(refreshToken, riderId, 'RIDER', Date.now() + 30 * 86400 * 1000);
+
+    const phoneTokenClaims: AuthClaims = {
+      user_id: riderId,
+      role: 'RIDER',
+      sub: e164,
+      phone: e164,
+      phone_verified: true,
+    };
+    const phoneToken = await signJwt(phoneTokenClaims, c.env.JWT_SECRET_SIGNING_KEY);
+
+    return c.json({
+      success: true,
+      token,
+      refresh_token: refreshToken,
+      phone_token: phoneToken,
+      is_new: isNew,
+      rider: {
+        id: riderId,
+        phone: e164,
+      },
+    });
+  } catch (err: any) {
+    console.error('[RiderVerifyOTP] Internal Error:', err);
+    return c.json({ success: false, code: 'INTERNAL_ERROR', error: err.message || 'Rider verification failed' }, 500);
   }
-
-  const claims: AuthClaims = {
-    user_id: riderId,
-    role: 'RIDER',
-    phone_verified: true,
-  };
-
-  const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
-  const refreshToken = crypto.randomUUID();
-  await sessionStub.storeRefreshToken(refreshToken, riderId, 'RIDER', Date.now() + 30 * 86400 * 1000);
-
-  return c.json({
-    success: true,
-    token,
-    refresh_token: refreshToken,
-    is_new: isNew,
-    rider: {
-      id: riderId,
-      phone: body.phone,
-    },
-  });
 });
 
 auth.post('/api/v1/rider/auth/login', async (c) => {

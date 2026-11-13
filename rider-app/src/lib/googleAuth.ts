@@ -27,7 +27,9 @@ export async function getGoogleIdToken(): Promise<string> {
     throw new Error("Authentication module is not initialized.");
   }
   const result = await signInWithPopup(auth, googleProvider);
-  const idToken = GoogleAuthProvider.credentialFromResult(result)?.idToken;
+  const oauthToken = GoogleAuthProvider.credentialFromResult(result)?.idToken;
+  const userToken = await result.user.getIdToken();
+  const idToken = oauthToken || userToken;
   if (!idToken) {
     throw new Error("No Google ID token found in credential.");
   }

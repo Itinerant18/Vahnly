@@ -49,6 +49,20 @@ export async function handleQueueBatch(
               status: 'ASSIGNED',
             });
 
+            // ALSO fan out to global-driver stream so the idle driver app receives the assignment!
+            try {
+              const globalDriverStream = env.ORDER_STREAM_DO.getByName('global-driver');
+              await globalDriverStream.broadcastJSON({
+                type: 'order.assigned',
+                order_id: orderId,
+                driver_id: matchResult.driverId,
+                city_prefix: cityPrefix,
+                status: 'ASSIGNED',
+              });
+            } catch (streamErr) {
+              console.error('[queue] Failed to broadcast to global-driver stream:', streamErr);
+            }
+
             // Fan out via RiderStreamDO
             const riderId = payload.customer_id as string;
             if (riderId) {

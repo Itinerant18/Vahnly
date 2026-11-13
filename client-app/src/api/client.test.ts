@@ -9,6 +9,11 @@ import {
   declineOffer,
   declineScheduledOffer,
   driverLogin,
+  driverRegister,
+  driverForgotPassword,
+  driverResetPassword,
+  sendDriverOTP,
+  verifyDriverOTP,
   getDriverProfile,
   getEarnings,
   getPendingOffer,
@@ -319,5 +324,126 @@ describe('driver API client smoke tests', () => {
         speed_kms: 30,
       },
     });
+  });
+
+  it('sends driver OTP via SMS and WhatsApp', async () => {
+    server.use(
+      http.post(`${baseUrl}/api/v1/driver/auth/send-otp`, async ({ request }) => {
+        await capture(request);
+        return HttpResponse.json({
+          success: true,
+          message: 'OTP sent successfully',
+          method_id: 'phone-test-id-123',
+          channel: 'sms',
+        });
+      }),
+    );
+
+    const res = await sendDriverOTP('9876543210', 'sms');
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/auth/send-otp',
+      body: { phone: '9876543210', channel: 'sms' },
+    });
+    expect(res.method_id).toBe('phone-test-id-123');
+
+    await sendDriverOTP('9876543210', 'whatsapp');
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/auth/send-otp',
+      body: { phone: '9876543210', channel: 'whatsapp' },
+    });
+  });
+
+  it('verifies driver OTP with method_id', async () => {
+    server.use(
+      http.post(`${baseUrl}/api/v1/driver/auth/verify-otp`, async ({ request }) => {
+        await capture(request);
+        return HttpResponse.json({
+          success: true,
+          token: 'auth-jwt-token',
+          refresh_token: 'refresh-token-uuid',
+          is_new_driver: false,
+          driver_id: 'driver-uuid-1',
+          name: 'Verified Driver',
+          phone: '+919876543210',
+          phone_verified: true,
+        });
+      }),
+    );
+
+    const res = await verifyDriverOTP('9876543210', '123456', 'phone-test-id-123');
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/auth/verify-otp',
+      body: { phone: '9876543210', otp: '123456', method_id: 'phone-test-id-123' },
+    });
+    expect(res.token).toBe('auth-jwt-token');
+    expect(res.user?.phone_verified).toBe(true);
+  });
+
+  it('handles forgot and reset password flows', async () => {
+    server.use(
+      http.post(`${baseUrl}/api/v1/driver/auth/forgot-password`, async ({ request }) => {
+        await capture(request);
+        return HttpResponse.json({
+          message: 'If that number is registered, a reset code was sent.',
+        });
+      }),
+      http.post(`${baseUrl}/api/v1/driver/auth/reset-password`, async ({ request }) => {
+        await capture(request);
+        return HttpResponse.json({
+          token: 'new-jwt-token',
+          refresh_token: 'new-refresh-token',
+          driver_id: 'driver-uuid-1',
+          name: 'Reset Driver',
+          phone: '+919876543210',
+        });
+      }),
+    );
+
+    const forgotRes = await driverForgotPassword('9876543210');
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/auth/forgot-password',
+      body: { phone: '9876543210' },
+    });
+    expect(forgotRes.message).toContain('reset code was sent');
+
+    const resetRes = await driverResetPassword('9876543210', '654321', 'newSecretPassword123');
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/auth/reset-password',
+      body: { phone: '9876543210', otp: '654321', new_password: 'newSecretPassword123' },
+    });
+    expect(resetRes.token).toBe('new-jwt-token');
+  });
+
+  it('registers new driver with phone token and password', async () => {
+    server.use(
+      http.post(`${baseUrl}/api/v1/driver/register`, async ({ request }) => {
+        await capture(request);
+        return HttpResponse.json({
+          token: 'reg-jwt-token',
+          refresh_token: 'reg-refresh-token',
+          driver_id: 'new-driver-id',
+          name: 'New Driver',
+          phone: '+919876543210',
+        });
+      }),
+    );
+
+    const regRes = await driverRegister({
+      name: 'New Driver',
+      phone: '9876543210',
+      password: 'mypassword123',
+      city_prefix: 'KOL',
+      phone_token: 'valid-phone-token',
+    });
+
+    expect(captured).toMatchObject({
+      pathname: '/api/v1/driver/register',
+      body: {
+        name: 'New Driver',
+        phone: '9876543210',
+        phone_token: 'valid-phone-token',
+      },
+    });
+    expect(regRes.token).toBe('reg-jwt-token');
   });
 });
