@@ -1,0 +1,17 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Vahnly",
+        "supportEmail": "karmakaraniket018@gmail.com",
+        "authorizedRedirectUris": [
+          "https://driver.aniket.site",
+          "https://rider.aniket.site",
+          "http://localhost:3000",
+          "http://localhost:3050"
+        ]
+      }
+    }
+  }
+}
+

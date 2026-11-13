@@ -63,6 +63,11 @@ export interface Env {
   STYTCH_PUBLIC_TOKEN?: string;
   STYTCH_ENV?: string;
   STYTCH_BASE_URL?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_VERIFY_SERVICE_SID?: string;
+  TWILIO_FROM_PHONE_NUMBER?: string;
+  SMS_PROVIDER?: 'stytch' | 'twilio' | 'hybrid';
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   APPLE_OAUTH_CLIENT_ID?: string;

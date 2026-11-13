@@ -3,6 +3,7 @@ import type { Env, AuthClaims } from '../types';
 import { getDb } from '../services/db';
 import { signJwt, verifyFirebaseIdToken, hashPassword, verifyPassword, verifyGoogleOrFirebaseToken, verifyJwt, verifyPhoneVerificationToken } from '../services/auth';
 import { sendStytchOTP, verifyStytchOTP, toE164, isTestNumber } from '../services/stytch';
+import { sendTwilioOTP, verifyTwilioOTP } from '../services/twilio';
 
 const auth = new Hono<{ Bindings: Env }>();
 
@@ -604,26 +605,51 @@ auth.post('/api/v1/driver/auth/send-otp', async (c) => {
   }
 
   try {
-    const stytchRes = await sendStytchOTP(c.env, e164, channel);
-    if (stytchRes.method_id) {
-      await sessionStub.setCachedValue(`stytch_method_id:${e164}`, stytchRes.method_id, 600);
-    }
+      let methodId = '';
+      let isTestMode = isTestNumber(e164);
+      let provider = 'stytch';
 
-    const isTestMode = isTestNumber(e164) || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
-    return c.json({
-      success: true,
-      message: isTestMode
-        ? `[TEST MODE] Use code 123456 to verify (Carrier billing pending in Stytch)`
-        : `OTP sent successfully via ${channel.toUpperCase()}`,
-      channel,
-      method_id: stytchRes.method_id,
-      phone: e164,
-      is_test_mode: isTestMode,
-      test_code: isTestMode ? '123456' : undefined,
+      if (c.env.SMS_PROVIDER === 'twilio' && c.env.TWILIO_ACCOUNT_SID) {
+        provider = 'twilio';
+        const twilioRes = await sendTwilioOTP(c.env, e164, channel);
+        methodId = twilioRes.service_sid || 'twilio';
+        isTestMode = isTestMode || twilioRes.is_test_mode === true;
+      } else {
+        try {
+          const stytchRes = await sendStytchOTP(c.env, e164, channel);
+          methodId = stytchRes.method_id;
+          isTestMode = isTestMode || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
+        } catch (stytchErr: any) {
+          if (c.env.TWILIO_ACCOUNT_SID && c.env.TWILIO_AUTH_TOKEN && c.env.TWILIO_VERIFY_SERVICE_SID) {
+            console.warn('[DriverOTP] Stytch failed, falling back to Twilio:', stytchErr.message);
+            provider = 'twilio';
+            const twilioRes = await sendTwilioOTP(c.env, e164, channel);
+            methodId = twilioRes.service_sid || 'twilio';
+            isTestMode = isTestMode || twilioRes.is_test_mode === true;
+          } else {
+            throw stytchErr;
+          }
+        }
+      }
+
+      if (methodId) {
+        await sessionStub.setCachedValue(`stytch_method_id:${e164}`, methodId, 600);
+      }
+
+      return c.json({
+        success: true,
+        message: isTestMode
+          ? `[TEST MODE] Use code 123456 to verify (Carrier billing pending in Stytch)`
+        : `OTP sent successfully via ${channel.toUpperCase()} (${provider})`,
+        channel,
+        method_id: methodId,
+        phone: e164,
+        is_test_mode: isTestMode,
+        test_code: isTestMode ? '123456' : undefined,
     });
   } catch (err: any) {
-    return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
-  }
+  return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
+}
 });
 
 auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
@@ -643,14 +669,33 @@ auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
       methodId = (await sessionStub.getCachedValue(`stytch_method_id:${e164}`)) || undefined;
     }
 
+    let verified = false;
+    let verifyError = '';
+
     try {
       await verifyStytchOTP(c.env, {
         code: body.otp,
         method_id: methodId,
         phone: e164,
       });
+      verified = true;
     } catch (err: any) {
-      return c.json({ success: false, code: 'INVALID_OTP', error: err.message || 'invalid or expired OTP' }, 400);
+      verifyError = err.message || 'invalid or expired OTP';
+      if (c.env.TWILIO_ACCOUNT_SID && c.env.TWILIO_AUTH_TOKEN && c.env.TWILIO_VERIFY_SERVICE_SID) {
+        try {
+          await verifyTwilioOTP(c.env, {
+            code: body.otp,
+            phone: e164,
+          });
+          verified = true;
+        } catch (twilioErr: any) {
+          verifyError = twilioErr.message || verifyError;
+        }
+      }
+    }
+
+    if (!verified) {
+      return c.json({ success: false, code: 'INVALID_OTP', error: verifyError }, 400);
     }
 
     // Clear rate limit counter upon successful OTP verification
@@ -678,79 +723,79 @@ auth.post('/api/v1/driver/auth/verify-otp', async (c) => {
       LIMIT 1
     `;
 
-  let driverId = '';
-  let isNewDriver = false;
-  let driverName = 'New Driver';
-  let cityPrefix = 'KOL';
-  let isVerified = false;
-  let currentState = 'OFFLINE';
+    let driverId = '';
+    let isNewDriver = false;
+    let driverName = 'New Driver';
+    let cityPrefix = 'KOL';
+    let isVerified = false;
+    let currentState = 'OFFLINE';
 
-  if (rows.length > 0) {
-    const d = rows[0];
-    driverId = d.id;
-    driverName = d.name;
-    cityPrefix = d.city_prefix;
-    isVerified = d.is_verified;
-    currentState = d.current_state;
-  } else {
-    isNewDriver = true;
-    const created = await sql<{ id: string }[]>`
+    if (rows.length > 0) {
+      const d = rows[0];
+      driverId = d.id;
+      driverName = d.name;
+      cityPrefix = d.city_prefix;
+      isVerified = d.is_verified;
+      currentState = d.current_state;
+    } else {
+      isNewDriver = true;
+      const created = await sql<{ id: string }[]>`
       INSERT INTO drivers (name, phone, city_prefix, current_state, is_verified, dl_number)
       VALUES (${driverName}, ${e164}, ${cityPrefix}, 'OFFLINE', false, 'PENDING')
       RETURNING id
     `;
-    driverId = created[0].id;
-  }
+      driverId = created[0].id;
+    }
 
-  const claims: AuthClaims = {
-    user_id: driverId,
-    role: 'DRIVER',
-    city_scope: cityPrefix,
-    phone_verified: true,
-  };
-
-  const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
-  const refreshToken = crypto.randomUUID();
-  await sessionStub.storeRefreshToken(refreshToken, driverId, 'DRIVER', Date.now() + 30 * 86400 * 1000);
-
-  // Issue cryptographic phone_token so client-app two-step registration can verify phone ownership
-  const phoneTokenClaims: AuthClaims = {
-    user_id: driverId,
-    role: 'DRIVER',
-    sub: e164,
-    phone_verified: true,
-  };
-  const phoneToken = await signJwt(phoneTokenClaims, c.env.JWT_SECRET_SIGNING_KEY);
-
-  return c.json({
-    success: true,
-    token,
-    refresh_token: refreshToken,
-    is_new_driver: isNewDriver,
-    driver_id: driverId,
-    role: 'DRIVER',
-    name: driverName,
-    phone: e164,
-    phone_verified: true,
-    phone_token: phoneToken,
-    user: {
-      id: driverId,
-      name: driverName,
-      phone: e164,
+    const claims: AuthClaims = {
+      user_id: driverId,
       role: 'DRIVER',
+      city_scope: cityPrefix,
       phone_verified: true,
-      current_state: currentState,
-    },
-    driver: {
-      id: driverId,
+    };
+
+    const token = await signJwt(claims, c.env.JWT_SECRET_SIGNING_KEY);
+    const refreshToken = crypto.randomUUID();
+    await sessionStub.storeRefreshToken(refreshToken, driverId, 'DRIVER', Date.now() + 30 * 86400 * 1000);
+
+    // Issue cryptographic phone_token so client-app two-step registration can verify phone ownership
+    const phoneTokenClaims: AuthClaims = {
+      user_id: driverId,
+      role: 'DRIVER',
+      sub: e164,
+      phone_verified: true,
+    };
+    const phoneToken = await signJwt(phoneTokenClaims, c.env.JWT_SECRET_SIGNING_KEY);
+
+    return c.json({
+      success: true,
+      token,
+      refresh_token: refreshToken,
+      is_new_driver: isNewDriver,
+      driver_id: driverId,
+      role: 'DRIVER',
       name: driverName,
       phone: e164,
-      city_prefix: cityPrefix,
-      is_verified: isVerified,
-      current_state: currentState,
       phone_verified: true,
-    },
-  });
+      phone_token: phoneToken,
+      user: {
+        id: driverId,
+        name: driverName,
+        phone: e164,
+        role: 'DRIVER',
+        phone_verified: true,
+        current_state: currentState,
+      },
+      driver: {
+        id: driverId,
+        name: driverName,
+        phone: e164,
+        city_prefix: cityPrefix,
+        is_verified: isVerified,
+        current_state: currentState,
+        phone_verified: true,
+      },
+    });
   } catch (err: any) {
     console.error('[DriverVerifyOTP] Internal Error:', err);
     return c.json({ success: false, code: 'INTERNAL_ERROR', error: err.message || 'Driver verification failed' }, 500);
@@ -996,25 +1041,51 @@ auth.post('/api/v1/rider/auth/send-otp', async (c) => {
   }
 
   try {
-    const stytchRes = await sendStytchOTP(c.env, e164, channel);
-    if (stytchRes.method_id) {
-      await sessionStub.setCachedValue(`stytch_rider_method_id:${e164}`, stytchRes.method_id, 600);
-    }
-    const isTestMode = isTestNumber(e164) || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
-    return c.json({
-      success: true,
-      message: isTestMode
-        ? `[TEST MODE] Use code 123456 to verify`
-        : `OTP sent via ${channel.toUpperCase()}`,
-      method_id: stytchRes.method_id,
-      channel,
-      phone: e164,
-      is_test_mode: isTestMode,
-      test_code: isTestMode ? '123456' : undefined,
+      let methodId = '';
+      let isTestMode = isTestNumber(e164);
+      let provider = 'stytch';
+
+      if (c.env.SMS_PROVIDER === 'twilio' && c.env.TWILIO_ACCOUNT_SID) {
+        provider = 'twilio';
+        const twilioRes = await sendTwilioOTP(c.env, e164, channel);
+        methodId = twilioRes.service_sid || 'twilio';
+        isTestMode = isTestMode || twilioRes.is_test_mode === true;
+      } else {
+        try {
+          const stytchRes = await sendStytchOTP(c.env, e164, channel);
+          methodId = stytchRes.method_id;
+          isTestMode = isTestMode || stytchRes.method_id?.startsWith('dev-') || stytchRes.method_id?.startsWith('mock-');
+        } catch (stytchErr: any) {
+          if (c.env.TWILIO_ACCOUNT_SID && c.env.TWILIO_AUTH_TOKEN && c.env.TWILIO_VERIFY_SERVICE_SID) {
+            console.warn('[RiderOTP] Stytch failed, falling back to Twilio:', stytchErr.message);
+            provider = 'twilio';
+            const twilioRes = await sendTwilioOTP(c.env, e164, channel);
+            methodId = twilioRes.service_sid || 'twilio';
+            isTestMode = isTestMode || twilioRes.is_test_mode === true;
+          } else {
+            throw stytchErr;
+          }
+        }
+      }
+
+      if (methodId) {
+        await sessionStub.setCachedValue(`stytch_rider_method_id:${e164}`, methodId, 600);
+      }
+
+      return c.json({
+        success: true,
+        message: isTestMode
+          ? `[TEST MODE] Use code 123456 to verify`
+        : `OTP sent via ${channel.toUpperCase()} (${provider})`,
+        method_id: methodId,
+        channel,
+        phone: e164,
+        is_test_mode: isTestMode,
+        test_code: isTestMode ? '123456' : undefined,
     });
   } catch (err: any) {
-    return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
-  }
+  return c.json({ success: false, code: 'OTP_SEND_FAILED', error: err.message || 'Failed to send OTP' }, 502);
+}
 });
 
 auth.post('/api/v1/rider/auth/verify-otp', async (c) => {
@@ -1034,14 +1105,33 @@ auth.post('/api/v1/rider/auth/verify-otp', async (c) => {
       methodId = (await sessionStub.getCachedValue(`stytch_rider_method_id:${e164}`)) || undefined;
     }
 
+    let verified = false;
+    let verifyError = '';
+
     try {
       await verifyStytchOTP(c.env, {
         code: body.otp,
         method_id: methodId,
         phone: e164,
       });
+      verified = true;
     } catch (err: any) {
-      return c.json({ success: false, code: 'INVALID_OTP', error: err.message || 'invalid OTP' }, 400);
+      verifyError = err.message || 'invalid OTP';
+      if (c.env.TWILIO_ACCOUNT_SID && c.env.TWILIO_AUTH_TOKEN && c.env.TWILIO_VERIFY_SERVICE_SID) {
+        try {
+          await verifyTwilioOTP(c.env, {
+            code: body.otp,
+            phone: e164,
+          });
+          verified = true;
+        } catch (twilioErr: any) {
+          verifyError = twilioErr.message || verifyError;
+        }
+      }
+    }
+
+    if (!verified) {
+      return c.json({ success: false, code: 'INVALID_OTP', error: verifyError }, 400);
     }
 
     await sessionStub.resetOTP(`rider_otp_rate:${e164}`);

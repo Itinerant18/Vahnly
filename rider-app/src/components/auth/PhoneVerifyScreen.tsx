@@ -1,26 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Capacitor } from "@capacitor/core";
-import { auth } from "@/lib/firebase";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  PhoneAuthProvider,
-  signInWithCredential,
-  linkWithCredential,
-  type ConfirmationResult,
-  type User,
-} from "firebase/auth";
 import { persistRefresh } from "@/lib/api/client";
 import { authApi } from "@/lib/api/auth";
 
 interface PhoneVerifyScreenProps {
   /** Called after phone verified + backend JWT received */
   onVerified: (jwt: string, isNewUser: boolean) => void;
-  /** Firebase user from prior Google/Email step. Null = direct phone sign-in. */
-  existingFirebaseUser?: User | null;
-  userType: "driver" | "rider";
+  userType?: "driver" | "rider";
   title?: string;
   /** Optional: show a back link on the phone step (returns to the caller's screen). */
   onBack?: () => void;
@@ -28,40 +15,19 @@ interface PhoneVerifyScreenProps {
 
 export default function PhoneVerifyScreen({
   onVerified,
-  existingFirebaseUser,
-  userType,
+  userType = "rider",
   title = "Verify Your Mobile Number",
   onBack,
 }: PhoneVerifyScreenProps) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [verificationId, setVerificationId] = useState("");
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(0);
 
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Initialize invisible reCAPTCHA once the container is in the DOM.
-  useEffect(() => {
-    if (!recaptchaContainerRef.current || !auth) return;
-    recaptchaVerifierRef.current = new RecaptchaVerifier(
-      auth,
-      recaptchaContainerRef.current,
-      {
-        size: "invisible",
-        callback: () => {},
-        "expired-callback": () => setError("reCAPTCHA expired. Try again."),
-      },
-    );
-    return () => {
-      try { recaptchaVerifierRef.current?.clear(); } catch { /* ignore */ }
-      recaptchaVerifierRef.current = null;
-    };
-  }, []);
 
   // Resend countdown timer.
   useEffect(() => {
@@ -70,69 +36,23 @@ export default function PhoneVerifyScreen({
     return () => clearInterval(t);
   }, [countdown]);
 
-  const formatE164 = (raw: string) => {
-    const digits = raw.replace(/\D/g, "");
-    if (digits.startsWith("91") && digits.length === 12) return "+" + digits;
-    if (digits.length === 10) return "+91" + digits;
-    return "+" + digits;
-  };
-
-  const handleSendOTP = async () => {
-    if (phone.length < 10) {
+  const handleSendOTP = async (customPhone?: string) => {
+    const targetPhone = (customPhone || phone).replace(/\D/g, "").slice(-10);
+    if (targetPhone.length < 10) {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      if (Capacitor.isNativePlatform()) {
-        // Native path: use @capacitor-firebase/authentication (no reCAPTCHA needed).
-        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        const vId = await new Promise<string>((resolve, reject) => {
-          FirebaseAuthentication.addListener("phoneCodeSent", (event: { verificationId: string }) => {
-            resolve(event.verificationId);
-          })
-            .then((handle) => {
-              FirebaseAuthentication.signInWithPhoneNumber({ phoneNumber: formatE164(phone) }).catch((err) => {
-                void handle.remove();
-                reject(err);
-              });
-            })
-            .catch(reject);
-        });
-        setVerificationId(vId);
-      } else {
-        // Web path: invisible reCAPTCHA + Firebase JS SDK.
-        if (!auth) {
-          setError("Firebase not initialized.");
-          setLoading(false);
-          return;
-        }
-        if (!recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current = new RecaptchaVerifier(
-            auth,
-            recaptchaContainerRef.current!,
-            { size: "invisible", callback: () => {} },
-          );
-        }
-        const result: ConfirmationResult = await signInWithPhoneNumber(
-          auth,
-          formatE164(phone),
-          recaptchaVerifierRef.current,
-        );
-        setVerificationId(result.verificationId);
-      }
+      const res = await authApi.sendOTP(targetPhone);
+      const code = res.test_code || (res.method_id?.startsWith("dev-") || res.method_id?.startsWith("mock-") ? "123456" : null);
+      setTestCode(code);
       setStep("otp");
       setOtp(["", "", "", "", "", ""]);
       setCountdown(30);
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? "";
-      if (code === "auth/invalid-phone-number") setError("Invalid phone number.");
-      else if (code === "auth/too-many-requests") setError("Too many attempts. Try later.");
-      else setError("Failed to send OTP. Try again.");
-      // Reset verifier for next attempt (web only).
-      try { recaptchaVerifierRef.current?.clear(); } catch { /* ignore */ }
-      recaptchaVerifierRef.current = null;
+      setError((err as Error).message || "Failed to send OTP. Try again.");
     } finally {
       setLoading(false);
     }
@@ -143,53 +63,24 @@ export default function PhoneVerifyScreen({
     if (code.length < 6) return;
     setLoading(true);
     setError("");
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
     try {
-      let firebaseIdToken: string;
-
-      if (Capacitor.isNativePlatform()) {
-        // Native path: confirm via @capacitor-firebase/authentication.
-        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
-        await FirebaseAuthentication.confirmVerificationCode({
-          verificationId,
-          verificationCode: code,
-        });
-        const { token } = await FirebaseAuthentication.getIdToken();
-        firebaseIdToken = token;
-      } else {
-        // Web path: use credential from verificationId.
-        const credential = PhoneAuthProvider.credential(verificationId, code);
-        if (existingFirebaseUser) {
-          const uc = await linkWithCredential(existingFirebaseUser, credential);
-          firebaseIdToken = await uc.user.getIdToken(true);
-        } else {
-          if (!auth) throw new Error("Firebase not initialized.");
-          const uc = await signInWithCredential(auth, credential);
-          firebaseIdToken = await uc.user.getIdToken();
-        }
+      const res = await authApi.verifyOTP(cleanPhone, code);
+      if (!res.token) {
+        throw new Error("Verification failed: no token received.");
       }
-
-      const data = await authApi.firebaseVerify(firebaseIdToken, userType);
-      if (!data.success || !data.data?.token) {
-        throw new Error(data.message ?? "Verification failed.");
+      if (res.refresh_token) {
+        persistRefresh(res.refresh_token);
       }
-      persistRefresh(data.data.refresh_token ?? null);
-      onVerified(data.data.token, data.is_new_user);
+      onVerified(res.token, res.is_new ?? res.is_new_rider ?? false);
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? "";
-      if (code === "auth/invalid-verification-code") {
-        setError("Incorrect OTP. Try again.");
-        setOtp(["", "", "", "", "", ""]);
-        otpRefs.current[0]?.focus();
-      } else if (code === "auth/code-expired") {
-        setError("OTP expired. Request a new one.");
-        setStep("phone");
-      } else {
-        setError((err as Error).message || "Verification failed. Try again.");
-      }
+      setError((err as Error).message || "Incorrect or expired OTP. Please try again.");
+      setOtp(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
-  }, [otp, verificationId, existingFirebaseUser, userType, onVerified]);
+  }, [otp, phone, onVerified]);
 
   // Auto-submit when all 6 digits filled.
   useEffect(() => {
@@ -221,9 +112,6 @@ export default function PhoneVerifyScreen({
 
   return (
     <main className="flex min-h-screen flex-col bg-background-primary">
-      {/* Invisible reCAPTCHA mount point */}
-      <div ref={recaptchaContainerRef} id="recaptcha-container-phone-verify" />
-
       {/* Top hero */}
       <div className="flex flex-[2] flex-col items-center justify-center gap-4 px-6 pt-safe-top">
         <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-interactive-primary shadow-elevation-2">
@@ -275,6 +163,35 @@ export default function PhoneVerifyScreen({
                 onKeyDown={(e) => { if (e.key === "Enter" && phone.length === 10) handleSendOTP(); }}
               />
             </div>
+
+            {/* Quick Test Rider Numbers */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-content-tertiary pt-1">
+              <span className="font-medium">Quick Test:</span>
+              <button
+                type="button"
+                onClick={() => { setPhone("7602676448"); handleSendOTP("7602676448"); }}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                76026 76448
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => { setPhone("9933632763"); handleSendOTP("9933632763"); }}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                99336 32763
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => { setPhone("9775104726"); handleSendOTP("9775104726"); }}
+                className="underline hover:text-accent-400 cursor-pointer text-content-secondary transition"
+              >
+                97751 04726
+              </button>
+            </div>
+
             <button
               className="flex h-14 w-full items-center justify-center rounded-sm
                 bg-interactive-primary text-interactive-primary-text
@@ -283,7 +200,7 @@ export default function PhoneVerifyScreen({
                 disabled:opacity-50 disabled:cursor-not-allowed
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               disabled={loading || phone.length < 10}
-              onClick={handleSendOTP}
+              onClick={() => handleSendOTP()}
             >
               {loading ? "Sending…" : "Send OTP"}
             </button>
@@ -305,6 +222,20 @@ export default function PhoneVerifyScreen({
                 Sent to +91 {phone.slice(-10)}
               </p>
             </div>
+
+            {testCode && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-paragraph-small py-2.5 px-3 rounded-sm flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm">🧪 Test Mode: Code is <strong className="font-mono text-emerald-300 font-bold">{testCode}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setOtp(testCode.split(""))}
+                  className="bg-emerald-500 text-background-primary text-label-small font-bold px-2.5 py-1 rounded-sm hover:bg-emerald-400 transition cursor-pointer shrink-0"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
+
             <div
               className="flex gap-2"
               onPaste={handleOTPPaste}
@@ -346,7 +277,7 @@ export default function PhoneVerifyScreen({
               </p>
             ) : (
               <button
-                onClick={() => { setStep("phone"); setOtp(["", "", "", "", "", ""]); setError(""); }}
+                onClick={() => { handleSendOTP(); }}
                 className="w-full text-center text-label-medium text-content-accent
                   hover:opacity-80 transition-base min-h-[44px]"
               >
@@ -364,7 +295,7 @@ export default function PhoneVerifyScreen({
         )}
 
         <p className="mt-8 pb-4 text-center text-label-small text-content-tertiary">
-          🔒 Secured by Firebase · For trip communication only
+          🔒 Secure Verification • Vahnly Rider
         </p>
       </div>
     </main>

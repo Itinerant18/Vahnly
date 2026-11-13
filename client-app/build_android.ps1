@@ -1,0 +1,139 @@
+# build_android.ps1
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21.0.10"
+Write-Host "Starting Driver App Android Build Process..." -ForegroundColor Cyan
+
+# 1. Install packages
+Write-Host "Step 1: Installing dependencies..." -ForegroundColor Yellow
+npm install
+
+# 2. Build Web Assets
+Write-Host "Step 2: Building Next.js web assets..." -ForegroundColor Yellow
+npm run build
+
+# 3. Add Android Platform if missing
+if (-not (Test-Path "android")) {
+    Write-Host "Step 3: Adding Android Platform..." -ForegroundColor Yellow
+    npx cap add android
+} else {
+    Write-Host "Step 3: Android Platform already added." -ForegroundColor Green
+}
+
+# 4. Write local.properties
+Write-Host "Step 4: Writing local.properties configuration..." -ForegroundColor Yellow
+$sdkDir = "sdk.dir=C\:\\Users\\itine\\AppData\\Local\\Android\\Sdk"
+$sdkDir | Out-File -FilePath "android\local.properties" -Encoding utf8 -NoNewline
+
+# 5. Write google-services.json
+Write-Host "Step 5: Writing google-services.json config..." -ForegroundColor Yellow
+$jsonConfig = @"
+{
+  "project_info": {
+    "project_number": "1016868477506",
+    "project_id": "vahnly-platform",
+    "storage_bucket": "vahnly-platform.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016868477506:android:ac85012fd450dd0f43abdb",
+        "android_client_info": {
+          "package_name": "com.vahnly.driver"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1016868477506-e8v36s2vuma8id60c17ijobjeg0ufuo9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vahnly.driver",
+            "certificate_hash": "84140cd2bc41eefc805e9ae14f44e36c9934ff1b"
+          }
+        },
+        {
+          "client_id": "1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBc5byg3MbbpSQHlHMAU3hdxfcevdNOYvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1016868477506-bh622jnm5n63k71otbmfcrt0greoqkku.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.vahnly.rider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016868477506:android:2cb3e626b1fefb8343abdb",
+        "android_client_info": {
+          "package_name": "com.vahnly.rider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1016868477506-kbu0bj2j2ejp73qn9e1a2v80v0vn25b2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vahnly.rider",
+            "certificate_hash": "84140cd2bc41eefc805e9ae14f44e36c9934ff1b"
+          }
+        },
+        {
+          "client_id": "1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBc5byg3MbbpSQHlHMAU3hdxfcevdNOYvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1016868477506-ql98dsuphlm7t1ftumqjj89rptsg9947.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1016868477506-bh622jnm5n63k71otbmfcrt0greoqkku.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.vahnly.rider"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+"@
+$jsonConfig | Out-File -FilePath "android\app\google-services.json" -Encoding utf8
+
+# 6. Sync Capacitor
+Write-Host "Step 6: Syncing assets with Android platform..." -ForegroundColor Yellow
+npx cap sync android
+
+# 7. Compile APK
+Write-Host "Step 7: Compiling APK using Gradle..." -ForegroundColor Yellow
+cd android
+./gradlew clean assembleDebug
+
+Write-Host "Build Finished! Check android\app\build\outputs\apk\debug\ for app-debug.apk" -ForegroundColor Green

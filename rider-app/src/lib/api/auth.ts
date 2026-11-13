@@ -1,10 +1,24 @@
 import { apiClient } from "./client";
 import type { Rider } from "./types";
 
+export interface SendOTPResponse {
+  success: boolean;
+  message: string;
+  channel?: string;
+  method_id?: string;
+  phone?: string;
+  is_test_mode?: boolean;
+  test_code?: string;
+  expires_in_seconds?: number;
+}
+
 export interface VerifyOTPResponse {
   token: string;
+  refresh_token?: string;
+  phone_token?: string;
   rider: Rider;
-  is_new_rider: boolean;
+  is_new_rider?: boolean;
+  is_new?: boolean;
 }
 
 export interface GoogleLoginResponse {
@@ -31,10 +45,10 @@ export interface FirebaseVerifyResponse {
 }
 
 export const authApi = {
-  sendOTP: (phone: string) =>
-    apiClient.post<{ message: string; expires_in_seconds: number }>(
+  sendOTP: (phone: string, channel?: "sms" | "whatsapp") =>
+    apiClient.post<SendOTPResponse>(
       "/api/v1/rider/auth/send-otp",
-      { phone },
+      { phone, channel: channel ?? "sms" },
     ),
 
   verifyOTP: (phone: string, otp: string, referredByCode?: string) =>

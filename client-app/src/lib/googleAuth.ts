@@ -29,12 +29,22 @@ export async function getGoogleIdToken(): Promise<string> {
   if (!auth) {
     throw new Error('Authentication module is not initialized.');
   }
-  const result = await signInWithPopup(auth, googleProvider);
-  const oauthToken = GoogleAuthProvider.credentialFromResult(result)?.idToken;
-  const userToken = await result.user.getIdToken();
-  const idToken = oauthToken || userToken;
-  if (!idToken) {
-    throw new Error('No Google ID token found in credential.');
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const oauthToken = GoogleAuthProvider.credentialFromResult(result)?.idToken;
+    const userToken = await result.user.getIdToken();
+    const idToken = oauthToken || userToken;
+    if (!idToken) {
+      throw new Error('No Google ID token found in credential.');
+    }
+    return idToken;
+  } catch (err: any) {
+    if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
+      throw new Error(
+        'This domain (driver.aniket.site) is not authorized in Firebase Authentication. ' +
+        'Please verify authorized domains in Firebase Console -> Authentication -> Settings.'
+      );
+    }
+    throw err;
   }
-  return idToken;
 }

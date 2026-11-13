@@ -19,3 +19,5 @@ if (typeof window !== "undefined") {
 
 export { app, auth };
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+

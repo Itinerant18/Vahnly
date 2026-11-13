@@ -1,5 +1,5 @@
 # build_android.ps1
-
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21.0.10"
 Write-Host "Starting Rider App Android Build Process..." -ForegroundColor Cyan
 
 # 1. Install packages

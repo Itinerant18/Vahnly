@@ -84,8 +84,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await authApi.verifyOTP(phone, otp, referredByCode);
       persistToken(res.token);
       persistRider(res.rider);
-      set({ token: res.token, rider: res.rider, isNewRider: res.is_new_rider });
-      return { isNew: res.is_new_rider };
+      set({ token: res.token, rider: res.rider, isNewRider: !!res.is_new_rider });
+      return { isNew: !!res.is_new_rider };
     } finally {
       set({ isLoading: false });
     }

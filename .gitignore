@@ -246,3 +246,6 @@ fcm-service-account*.json
 workers/*/dist
 .serena/
 .neon
+
+*_apk_for_rea/
+0.26.0

@@ -27,6 +27,11 @@ APP_VERSION = "1.0.0"
 S3_ENDPOINT = "https://br-spring-sky-b4nsjnka.storage.c-6.us-east-2.aws.neon.tech"
 S3_BUCKET = "uploads"
 S3_REGION = "us-east-2"
+STYTCH_PROJECT_ID = "project-live-c241d437-a7c4-41c1-b7e1-b0d5bb039b3c"
+STYTCH_SECRET = "secret-live-6WdA4T7dVHIwdNhCMBHtZQzYeR6g86FNtMc="
+STYTCH_PUBLIC_TOKEN = "public-token-live-800d393f-ff39-4167-85b6-31d75ca60ef7"
+STYTCH_ENV = "live"
+SMS_PROVIDER = "hybrid"
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
